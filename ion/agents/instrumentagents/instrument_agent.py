@@ -35,6 +35,7 @@ instrument_parameters   = 'instrument_parameters'
 Observatory state names.
 """
 ci_state_list = [
+    'CI_STATE_UNKNOWN',
     'CI_STATE_POWERED_DOWN',
     'CI_STATE_UNINITIALIZED',
     'CI_STATE_INACTIVE',
@@ -182,11 +183,11 @@ Names of observatory and device capability lists.
 """
 capabilities_list = [
     'CAP_OBSERVATORY_COMMANDS',         # Common and specific observatory command names.
-    'CAP_OBSERVATORY_PARAMETERS',       # Common and specific observatory parameter names.
+    'CAP_OBSERVATORY_PARAMS',           # Common and specific observatory parameter names.
     'CAP_OBSERVATORY_STATUSES',         # Common and specific observatory status names.
     'CAP_METADATA',                     # Common and specific metadata names.
     'CAP_DEVICE_COMMANDS',              # Common and specific device command names.
-    'CAP_DEVICE_PARAMETERS',            # Common and specific device parameter names.
+    'CAP_DEVICE_PARAMS',                # Common and specific device parameter names.
     'CAP_DEVICE_STATUSES'               # Common and specific device status names.
 ]
 
@@ -224,7 +225,7 @@ ci_param_metadata = {
         {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_FRIENDLY_NAME':'State Topics'},
-    'CI_PARAMS_DRIVER_ADDRESS' :
+    'CI_PARAM_DRIVER_ADDRESS' :
         {'META_DATATYPE':'CI_TYPE_ADDRESS',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_FRIENDLY_NAME':'Driver Address'},
@@ -299,6 +300,7 @@ errors = {
     'INVALID_PARAMETER'         : ['ERROR','INVALID_PARAMETER','The parameter is not available.'],
     'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.'],
     'INVALID_METADATA'          : ['ERROR','INVALID_METADATA','The metadata parameter is not available.'],
+    'NO_PARAM_METADATA'         : ['ERROR','NO_PARAM_METADATA','The parameter has no associated metadata.'],
     'INVALID_STATUS'            : ['ERROR','INVALID_STATUS','The status parameter is not available.'],
     'INVALID_CAPABILITY'        : ['ERROR','INVALID_CAPABILITY','The capability parameter is not available.']
 }
@@ -465,99 +467,111 @@ class InstrumentAgent(ResourceAgent):
     getCapabilities.
     """
     
-    """
-    The driver client to communicate with the child driver
-    """
-    driver_client = None
-    
-    """
-    A dictionary of the topics where data is published, indexed by transducer
-    name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    output_topics = None
-
-    """
-    A dictionary of the topics where events are published, indexed by
-    transducer name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    event_topics = None
-
-    """
-    A dictionary of the topics where state changes are published, indexed by
-    transducer name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    state_topics = None
-
-    """
-    A UUID specifying the current transaction. None
-    indicates no current transaction.
-    """
-    transaction_id = None
-    
-    """
-    An integer in seconds for how long to wait to acquire a new transaction if
-    a value is not explicitly given.
-    """
-    default_transaction_timeout = 10   
-    
-    """
-    An integer in seconds for the maximum allowable timeout to wait for a new transaction.
-    """
-    max_transaction_timeout = 120
-
-    """
-    An integer in seconds for the maximum time a transaction may be open.
-    """
-    transaction_expire_timeout = 300
-
-    """
-    A finite state machine to track and manage agent state according to the general
-    instrument state model.
-    """
-    agent_fsm = None
-
-    """
-    String indicating the source of time being used for the instrument.
-    See time_sources list for available values.
-    """
-    time_source = 'TIME_NOT_SPECIFIED'
-
-    """
-    String describing how the device is connected to the observatory.
-    See connection_methods list for available values.
-    """
-    connection_method = 'CONNECTION_NOT_SPECIFIED'
-    
-    """
-    Buffer to hold instrument data for periodic transmission.
-    """
-    data_buffer = []    # Should this be a dict or something else?
-
-    """
-    List of current alarm conditions. Tuple of (ID,description).
-    """
-    alarms = []
-    
-    """
-    Dictionary of time status values.
-    """
-    time_status = {
-        'Uncertainty': None,
-        'Peers' : None
-    }
     
     """
     The software version of the instrument agent.
     """
-    version = 0.1
+    version = '0.1'
+    
+    @classmethod
+    def get_version(cls):
+        """
+        Return the software version of the instrument agent.
+        """
+        return cls.version
     
     
     def plc_init(self):
+        
         ResourceAgent.plc_init(self)
         self.pubsub_client = PubSubClient(proc=self)
+
+        """
+        The driver client to communicate with the child driver
+        """
+        self.driver_client = None
+        
+        """
+        A dictionary of the topics where data is published, indexed by transducer
+        name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.output_topics = None
+    
+        """
+        A dictionary of the topics where events are published, indexed by
+        transducer name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.event_topics = None
+    
+        """
+        A dictionary of the topics where state changes are published, indexed by
+        transducer name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.state_topics = None
+    
+        """
+        A UUID specifying the current transaction. None
+        indicates no current transaction.
+        """
+        self.transaction_id = None
+        
+        """
+        An integer in seconds for how long to wait to acquire a new transaction if
+        a value is not explicitly given.
+        """
+        self.default_transaction_timeout = 10   
+        
+        """
+        An integer in seconds for the maximum allowable timeout to wait for a new transaction.
+        """
+        self.max_transaction_timeout = 120
+    
+        """
+        An integer in seconds for the maximum time a transaction may be open.
+        """
+        self.transaction_expire_timeout = 300
+    
+        """
+        A finite state machine to track and manage agent state according to the general
+        instrument state model.
+        """
+        self.agent_fsm = None
+    
+        """
+        String indicating the source of time being used for the instrument.
+        See time_sources list for available values.
+        """
+        self.time_source = 'TIME_NOT_SPECIFIED'
+    
+        """
+        String describing how the device is connected to the observatory.
+        See connection_methods list for available values.
+        """
+        self.connection_method = 'CONNECTION_NOT_SPECIFIED'
+        
+        """
+        Buffer to hold instrument data for periodic transmission.
+        """
+        #TODO driver integration. I think this is a list of strings.
+        self.data_buffer = []
+    
+        """
+        List of current alarm conditions. Tuple of (ID,description).
+        """
+        self.alarms = []
+        
+        """
+        Dictionary of time status values.
+        """
+        self.time_status = {
+            'Uncertainty': None,
+            'Peers' : None
+        }
+
+
         
     @defer.inlineCallbacks
     def _register_publisher(self):
@@ -1085,9 +1099,9 @@ class InstrumentAgent(ResourceAgent):
         """
         Retrieve metadata about the observatory configuration parameters.
         @param content A dict
-            {'params':[(param_arg,meta_arg),...,param_arg,meta_arg)],'transaction_id':transaction_id}
-        @retval A reply message with a dict {'success':success,'result':{(param_arg,meta_arg):(success,val),...,
-            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.
+            {'params':[(param_arg,meta_arg),...,(param_arg,meta_arg)],'transaction_id':transaction_id}
+        @retval A reply message with a dict {'success':success,'result':{param_arg:{meta_arg):(success,val),...,
+            meta_arg:(success,val)},...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},'transaction_id':transaction_id}.
         """
         
         assert(isinstance(content,dict)), 'Expected a dict content.'
@@ -1126,43 +1140,78 @@ class InstrumentAgent(ResourceAgent):
         get_errors = False
         result = {}
         
+
+                
+                                
         # Do the work here.
         # Set up the result message.
         for (param_arg,meta_arg) in params:
-            if not param_arg in ci_params_list or param_arg != 'all':
-                get_errors = True
-                result[(param_arg,meta_arg)] = (errors['INVALID_PARAMETER'],None)
-                get_errors = True
-                continue
-            if not meta_arg in metadata_list or meta_arg != 'all':
-                result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
-                get_errors = True
-                continue
+            
             
             if param_arg == 'all' and meta_arg == 'all':
-                for param_key in ci_metadata.keys():
-                    for meta_key in ci_metadata[param_key]:
-                        result[(param_key,meta_key)] = ci_metadata[param_key][meta_key]
-            elif param_arg == 'all' and meta_arg != 'all':
-                for param_key in ci_parameter_list.keys():
-                    try:
-                        val = ci_metadata[param_key][meta_arg]
-                    except:
-                        result[(param_key,meta_arg)] = (errors['INVALID_METADATA'],None)
+                for param_key in ci_param_list:
+                    if not result.has_key(param_key):
+                        result[param_key] = {}
+                    if param_key not in ci_param_metadata.keys():
+                        result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                        get_errors = True
                     else:
-                        result[(param_key,meta_arg)] = (['OK'],val)
-                        
+                        for meta_key in ci_param_metadata[param_key]:
+                            val = ci_param_metadata[param_key][meta_key]
+                            result[param_key].update({meta_key:(['OK'],val)})
+                                                            
+            
+            elif param_arg == 'all' and meta_arg != 'all':
+                for param_key in ci_param_list:
+                    if not result.has_key(param_key):
+                        result[param_key] = {}
+                    if param_key not in ci_param_metadata.keys():
+                        result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                        get_errors = True
+                    elif meta_arg not in metadata_list:
+                        result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
+                        get_errors = True
+                    else:
+                        try:
+                            val = ci_param_metadata[param_key][meta_arg]
+                        except:
+                            result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
+                            get_errors = True
+                        else:
+                            result[param_key].update({meta_arg:(['OK'],val)})
+                            
+                                        
             elif param_arg != 'all' and meta_arg == 'all':
-                for meta_key in ci_metadata[param_arg].keys():
-                    result[(param_arg,meta_arg)] = ci_metadata[param_arg][meta_arg]
-            else:
-                try:
-                    val = ci_metadata[param_arg][meta_arg]
-                except:
-                    result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
+                if not result.has_key(param_arg):
+                    result[param_arg] = {}
+                if param_arg not in ci_param_list:
+                    result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
+                    get_errors = True
+                elif param_arg not in ci_param_metadata.keys():
+                    result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                    get_errors = True
                 else:
-                    result[(param_arg,meta_arg)] = (['OK'],val)
-                        
+                    for meta_key in ci_param_metadata[param_arg].keys():
+                        val = ci_param_metadata[param_arg][meta_key]
+                        result[param_arg].update({meta_key:(['OK'],val)})
+                
+            else:
+                if not result.has_key(param_arg):
+                    result[param_arg] = {}
+                if param_arg not in ci_param_list:
+                    result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
+                    get_errors = True
+                elif param_arg not in ci_param_metadata.keys():
+                    result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                    get_errors = True
+                else:
+                    try:
+                        val = ci_param_metadata[param_arg][meta_arg]
+                    except:
+                        result[param_arg].update({meta_arg:(errors['INVALID_METADATA'],None)})    
+                    else:
+                        result[param_arg].update({meta_arg:(['OK'],val)})
+        
         
         if get_errors:
             success = errors['GET_OBSERVATORY_ERR']
@@ -1192,6 +1241,8 @@ class InstrumentAgent(ResourceAgent):
             'transaction_id':transaction_id}
         """
         
+        
+        
         assert(isinstance(content,dict)), 'Expected a dict content.'
         assert(content.has_key('params')), 'Expected params.'
         assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
@@ -1203,6 +1254,7 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
+
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
             reply['success'] = errors['INVALID_TRANSACTION_ID']
@@ -1232,37 +1284,46 @@ class InstrumentAgent(ResourceAgent):
         # Set up the result message.
         for arg in params:
             if arg not in ci_status_list and arg != 'all':
-                result[arg] = errors['INVALID_STATUS']
+                result[arg] = (errors['INVALID_STATUS'],None)
                 get_errors = True
                 continue
-            elif arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
-                result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
-            elif arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
-                dvr_msg_content = {'params':[('instrument','channel_names')]}
-                dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
-                dvr_success = dvr_result['success']
-                dvr_val = dvr_result['params'][('instrument','channel_names')]
-                result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                    
-                if dvr_success[0] != 'OK':
+            
+            if arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
+                # TODO FSM integration.
+                #result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
+                result['CI_STATUS_AGENT_STATE'] = (['OK'],'CI_STATE_UNKNOWN')
+            if arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
+                # TODO driver integration.
+                #dvr_msg_content = {'params':[('instrument','channel_names')]}
+                #dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
+                #dvr_success = dvr_result['success']
+                #dvr_val = dvr_result['params'][('instrument','channel_names')]
+                dvr_val = [['OK'],['CHAN_1','CHAN_2','CHAN_3']]
+                result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
-            elif arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
-                dvr_msg_content = {'params':[('instrument','connection_status')]}
-                dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
-                dvr_success = dvr_result['success']
-                dvr_val = dvr_result['params'][('instrument','connection_status')]
+            if arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
+                #TODO driver integration.
+                #dvr_msg_content = {'params':[('instrument','connection_status')]}
+                #dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
+                #dvr_success = dvr_result['success']
+                #dvr_val = dvr_result['params'][('instrument','connection_status')]
+                dvr_val=[['OK'],'DRIVER_CONNECTION_STATE']
                 result['CI_STATUS_INSTRUMENT_CONNECTION_STATE'] = (dvr_val[0],dvr_val[1])                    
-                if dvr_success[0] != 'OK':
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
-            elif arg == 'CI_STATUS_ALARMS' or arg == 'all':
+            if arg == 'CI_STATUS_ALARMS' or arg == 'all':
                 result['CI_STATUS_ALARMS'] = (['OK'],self.alarms)
-            elif arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
-                result['CI_STATUS_TIME_STATUS'] = (['OK'],time_status)
-            elif arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
-                pass    #TBD
-            elif arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
+            if arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
+                result['CI_STATUS_TIME_STATUS'] = (['OK'],self.time_status)
+            if arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
+                result['CI_STATUS_BUFFER_SIZE'] = (['OK'],self._get_buffer_size())
+            if arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
                 result['CI_STATUS_AGENT_VERSION'] = (['OK'],self.get_version())
-            elif arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
-                version = yield self.driver_client.get_version()
+            if arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
+                #TODO driver integration.
+                #version = yield self.driver_client.get_version()
+                version = '0.1'
                 result['CI_STATUS_DRIVER_VERSION'] = (['OK'],version)
                 
                 
@@ -1333,46 +1394,54 @@ class InstrumentAgent(ResourceAgent):
         # Do the work here.
         # Set up the result message.
         for arg in params:
-            if arg not in capabilities_list or arg != 'all':
-                result[arg] = (errors['INVALID_CAP_PARAM'],None)
-                
-            elif arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
+            if arg not in capabilities_list and arg != 'all':
+                result[arg] = (errors['INVALID_CAPABILITY'],None)
+                get_errors = True
+                continue
+            
+            if arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
                 result['CAP_OBSERVATORY_COMMANDS'] = (['OK'],ci_command_list)
                 
-            elif arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
+            if arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
                 result['CAP_OBSERVATORY_PARAMS'] = (['OK'],ci_param_list)
                 
-            elif arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
+            if arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
                 result['CAP_OBSERVATORY_STATUSES'] = (['OK'],ci_status_list)
                 
-            elif arg == 'CAP_METADATA' or arg == 'all':
-                result['CAP_METADATA'] = (['OK'],ci_metadata_list)
+            if arg == 'CAP_METADATA' or arg == 'all':
+                result['CAP_METADATA'] = (['OK'],metadata_list)
                 
-            elif arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
-                result['CAP_DEVICE_COMMANDS'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
+                #TDOD driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
+                dvr_val = (['OK'],['device_command_1','device_command_2'])
+                result['CAP_DEVICE_COMMANDS'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
                 
-            elif arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_PARAMS'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
-                result['CAP_DEVICE_PARAMS'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
+                #TDOD driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_PARAMS'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
+                dvr_val = (['OK'],['device_param_1','device_param_2','device_param_3'])
+                result['CAP_DEVICE_PARAMS'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
                 
-            elif arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_STATUSES'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
-                result['CAP_DEVICE_STATUSES'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
+                #TODO driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_STATUSES'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
+                dvr_val = (['OK'],['device_status_1','device_status_2','device_status_3'])
+                result['CAP_DEVICE_STATUSES'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
  
         
@@ -1826,8 +1895,23 @@ class InstrumentAgent(ResourceAgent):
         if (type == publish_msg_type["StateChange"]):
                 yield self.pubsub_client.publish(self.sup,
                             self.state_topics["Agent"].reference(),value)
+
         
+    ############################################################################
+    #   Other.
+    ############################################################################
         
+    def _get_buffer_size(self):
+        """
+        Return the total size in characters of the data buffer.
+        """
+        return sum(map(lambda x: len(x),self.data_buffer))
+        
+
+
+
+
+
         
 class InstrumentAgentClient(ResourceAgentClient):
     """
@@ -1941,8 +2025,9 @@ class InstrumentAgentClient(ResourceAgentClient):
         Retrieve metadata about the observatory configuration parameters.
         @param params A metadata parameter list [(param_arg,meta_arg),...,(param_arg,meta_arg)].
         @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                
-        @retval A reply dict {'success':success,'result':{(param_arg,meta_arg):(success,val),...,
-            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.        
+        @retval A reply dict {'success':success,'result':{param_arg:{meta_arg):(success,val),...,
+            meta_arg:(success,val)},...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},
+            'transaction_id':transaction_id}.
         """
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'

@@ -21,6 +21,7 @@ from ion.core.intercept.interceptor import Invocation
 from ion.core.messaging import messaging
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
+from ion.core.object.codec import ION_R1_GPB
 
 class IReceiver(Interface):
     """
@@ -48,7 +49,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, consumer_config={}, publisher_config={}):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, error_handler=None, raw=False, consumer_config=None, publisher_config=None):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -72,14 +73,18 @@ class Receiver(BasicLifecycleObject):
         self.process = process
         self.group = group
         self.raw = raw
-        self.consumer_config  = consumer_config
-        self.publisher_config = publisher_config
+        self.consumer_config  = consumer_config if consumer_config is not None else {}
+        self.publisher_config = publisher_config if publisher_config is not None else {}
 
         self.handlers = []
+        self.error_handlers = []
         self.consumer = None
 
         if handler:
             self.add_handler(handler)
+
+        if error_handler:
+            self.add_error_handler(error_handler)
 
         self.xname = pu.get_scoped_name(self.name, self.scope)
 
@@ -133,7 +138,7 @@ class Receiver(BasicLifecycleObject):
         @brief Activate the consumer.
         @retval Deferred
         """
-        self.consumer.register_callback(self._receive)
+        self.consumer.register_callback(self.receive)
         yield self.consumer.iterconsume()
         #log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
@@ -176,6 +181,10 @@ class Receiver(BasicLifecycleObject):
 
     handle = add_handler
 
+
+    def add_error_handler(self, callback):
+        self.error_handlers.append(callback)
+
     def _receive(self, msg):
         """
         @brief entry point for received messages; callback from Carrot. All
@@ -210,30 +219,41 @@ class Receiver(BasicLifecycleObject):
         org_msg = msg
         data = msg.payload
         if not self.raw:
-            wb = None
-            if hasattr(self.process, 'workbench'):
-                wb = self.process.workbench
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
                              content=data,
-                             workbench=wb)
+                             )
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
 
-        # Make the calls into the application code (e.g. process receive)
-        try:
-            for handler in self.handlers:
-                yield defer.maybeDeferred(handler, data, msg)
-        finally:
-            if org_msg._state == "RECEIVED":
-                log.error("Message has not been ACK'ed at the end of processing")
-            del self.rec_messages[id(org_msg)]
-            if id(org_msg) in self.processing_messages:
-                del self.processing_messages[id(org_msg)]
-            if self.completion_deferred and len(self.processing_messages) == 0:
-                self.completion_deferred.callback(None)
-                self.completion_deferred = None
+            # Interceptor failed message.  Call error handler(s)
+            if inv1.status != Invocation.STATUS_PROCESS:
+                log.info("Message error! to=%s op=%s" % (data.get('receiver',None), data.get('op',None)))
+                try:
+                    for error_handler in self.error_handlers:
+                        yield defer.maybeDeferred(error_handler, data, msg, inv1.code)
+                finally:
+                    del self.rec_messages[id(msg)]
+            else:
+                if 'encoding' in data and data['encoding'] == ION_R1_GPB:
+                    # The Codec does not attach the repository to the process. That is done here.
+                    content = data.get('content')
+                    self.process.workbench.put_repository(content.Repository)
+
+                # Make the calls into the application code (e.g. process receive)
+                try:
+                    for handler in self.handlers:
+                        yield defer.maybeDeferred(handler, data, msg)
+                finally:
+                    if msg._state == "RECEIVED":
+                        log.error("Message has not been ACK'ed at the end of processing")
+                    del self.rec_messages[id(msg)]
+                    if id(org_msg) in self.processing_messages:
+                        del self.processing_messages[id(org_msg)]
+                    if self.completion_deferred and len(self.processing_messages) == 0:
+                        self.completion_deferred.callback(None)
+                        self.completion_deferred = None
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
@@ -251,23 +271,26 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
             if not self.raw:
-                wb = None
-                if hasattr(self.process, 'workbench'):
-                    wb = self.process.workbench
                 inv = Invocation(path=Invocation.PATH_OUT,
                                  message=msg,
                                  content=msg['content'],
-                                 workbench=wb)
+                                 )
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
 
-            # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
-            yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
+            # TODO fix this
+            # For now, silently dropping message
+            if inv1.status == Invocation.STATUS_DROP:
+                log.info("Message dropped! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+            else:
+                # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
+                yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
         except Exception, ex:
             log.exception("Send error")
         else:
-            log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
-            #log.debug("msg"+str(msg))
+            if inv1.status != Invocation.STATUS_DROP:
+                log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+                #log.debug("msg"+str(msg))
 
     def __str__(self):
         return "Receiver(label=%s,xname=%s,group=%s)" % (

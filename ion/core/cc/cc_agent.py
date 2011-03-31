@@ -53,7 +53,8 @@ class CCAgent(ResourceAgent):
                                            label=annName+'.'+self.receiver.label,
                                            scope=FanoutReceiver.SCOPE_SYSTEM,
                                            group=self.receiver.group,
-                                           handler=self.receive)
+                                           handler=self.receive,
+                                           error_handler=self.receive_error)
         self.ann_name = yield self.ann_receiver.attach()
 
         log.info("Listening to CC anouncements: "+str(self.ann_name))

@@ -114,8 +114,8 @@ class PubSubService(ServiceProcess):
 
     def _key_to_idref(self, key_string, object):
         """
-        From a CASref key, create a full-on casref.
-        @param key_string String, from casref key
+        From a CASref key, create a full-on casref and append into id_list array
+        @param key_string String, from casref key, e.g. 5A1E33DC-0B69-410F-B151-B7AC1D7E7C5D
         @param object Reply object we are modifying (in-place)
         @retval None
         """
@@ -140,6 +140,10 @@ class PubSubService(ServiceProcess):
         """
         @brief Query internal dictionaries, create reply message, send same. Helper for the
         various queries.
+        @param request Object containing a regex attribute
+        @param res_list Dictionary whose values we match against the regex
+        @param msg Ion message, with .reply_ok method to invoke
+        @retval None
         """
         # This is probably better written as a list comprehension. Or something.
         idlist = []
@@ -163,7 +167,7 @@ class PubSubService(ServiceProcess):
         """
         @brief Look for a given value in a provided dictionary, return key that corresponds.
         @note Probably a better way to solve this.
-        @note To emulate the python list, it raises KeyError if not found.
+        @note To emulate the python dictionary, it raises KeyError if not found.
         """
         rc = None
         if not search_value in data.values():
@@ -183,7 +187,19 @@ class PubSubService(ServiceProcess):
         log.debug('DXS starting')
         self._check_msg_type(request, XS_TYPE)
 
-        log.debug('Calling EMS to create the exchange space...')
+        # Already declared?
+        try:
+            key = self._reverse_find(self.xs_list, request.exchange_space_name)
+            log.info('Exchange space "%s" already created, returning' % request.exchange_space_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XS not found, will go ahead and create')
+
+        log.debug('Calling EMS to create the exchange space "%s"...'
+                % request.exchange_space_name)
         # For now, use timestamp as description
         description = str(time.time())
         xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
@@ -264,6 +280,18 @@ class PubSubService(ServiceProcess):
 
         log.debug('Starting DXP')
         self._check_msg_type(request, XP_TYPE)
+
+        # Already declared?
+        try:
+            key = self._reverse_find(self.xp_list, request.exchange_point_name)
+            log.info('Exchange point "%s" already created, returning' %
+                     request.exchange_point_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XP not found, will go ahead and create')
 
         # Lookup the XS ID in the dictionary
         try:
@@ -349,6 +377,17 @@ class PubSubService(ServiceProcess):
         log.debug('Declare topic starting')
         self._check_msg_type(request, TOPIC_TYPE)
 
+        # Already declared?
+        try:
+            key = self._reverse_find(self.topic_list, request.topic_name)
+            log.info('Topic "%s" already created, returning' % request.topic_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('Topic not found, will go ahead and create')
+
         try:
             xs_name = self.xs_list[request.exchange_space_id.key]
             xp_name = self.xp_list[request.exchange_point_id.key]
@@ -430,6 +469,18 @@ class PubSubService(ServiceProcess):
         log.debug('Starting DP')
         self._check_msg_type(request, PUBLISHER_TYPE)
 
+        # Already declared?
+        try:
+            key = self._reverse_find(self.pub_list, request.publisher_name)
+            log.info('Publisher "%s" already created, returning' % request.publisher_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XS not found, will go ahead and create')
+
+
         # Verify that IDs exist - not sure if this is the correct order or not...
         try:
             xs_name = self.xs_list[request.exchange_space_id.key]
@@ -490,6 +541,18 @@ class PubSubService(ServiceProcess):
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
+    def op_query_publishers(self, request, headers, msg):
+        log.debug('QP starting')
+        self._check_msg_type(request, REGEX_TYPE)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.pub_list, msg)
+
+    @defer.inlineCallbacks
     def op_subscribe(self, request, headers, msg):
         """
         @see PubSubClient.subscribe
@@ -506,13 +569,6 @@ class PubSubService(ServiceProcess):
             log.exception('Error looking up subscription context!')
             raise PSSException('Bad subscription request, cannot locate context',
                                request.ResponseCodes.BAD_REQUEST)
-
-
-        # Hmm, is EMS gonna return a string queue name/address or what?
-        # Assume a string for now.
-        # We return a resource ref, which then must be looked up. Hmm. Change
-        # to string return?
-        # @todo Declare queue and binding??!
 
         # Save into registry
         log.debug('Saving subscription into registry')
@@ -556,6 +612,18 @@ class PubSubService(ServiceProcess):
         # @todo Call EMS, delete from registry
         log.warn('Theres a wee bit of code left to do here....')
         yield self.reply_ok(msg)
+
+    @defer.inlineCallbacks
+    def op_query_subscribers(self, request, headers, msg):
+        log.debug('QS starting')
+        self._check_msg_type(request, REGEX_TYPE)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.sub_list, msg)
 
     @defer.inlineCallbacks
     def op_declare_queue(self, request, headers, msg):
@@ -609,6 +677,7 @@ class PubSubService(ServiceProcess):
     def op_undeclare_queue(self, request, headers, msg):
         """
         @see PubSubClient.undeclare_queue
+        @note Possible error if queue declared more than once and then deleted once
         """
         log.debug('Undeclare_q starting')
         self._check_msg_type(request, REQUEST_TYPE)
@@ -680,6 +749,8 @@ class PubSubClient(ServiceClient):
         """
         @brief Declare an exchange space, ok to call more than once (idempotent)
         @param params GPB, 2313/1, with exchange_space_name set to the desired string
+        @GPB{Input,2313,1}
+        @GPB{Returns,2312,1}
         @retval XS ID, GPB 2312/1, if zero-length then an error occurred
         """
         yield self._check_init()
@@ -693,6 +764,8 @@ class PubSubClient(ServiceClient):
         @brief Remove an exchange space by ID
         @param params Exchange space ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
+        @GPB{Returns,11,1}
         """
         yield self._check_init()
 
@@ -706,6 +779,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @GPB{Input,2306,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -719,6 +794,8 @@ class PubSubClient(ServiceClient):
         @note Must have parent exchange space id before calling this
         @param params GPB 2309/1, with exchange_point_name and exchange_space_id filled in
         @retval GPB 2312/1, zero length if error.
+        @GPB{Input,2309,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -731,6 +808,8 @@ class PubSubClient(ServiceClient):
         @brief Remove an exchange point by ID
         @param params Exchange point ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
+        @GPB{Returns,11,1}
         """
         yield self._check_init()
 
@@ -744,6 +823,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @GPB{Input,2306,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -756,6 +837,8 @@ class PubSubClient(ServiceClient):
         @brief Declare/create a topic in a given xs.xp. A topic is usually a dataset name.
         @param params GPB 2307/1, with xs and xp_ids set
         @retval GPB 2312/1, zero-length if error
+        @GPB{Input,2307,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -768,6 +851,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a topic by ID
         @param params Topic ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
+        @GPB{Returns,11,1}
         """
         yield self._check_init()
 
@@ -781,6 +866,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @GPB{Input,2306,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -793,6 +880,8 @@ class PubSubClient(ServiceClient):
         @brief Declare/create a publisher in a given xs.xp.topic.
         @param params GPB 2310/1, with xs, xp and topic_ids set
         @retval GPB 2312/1, zero-length if error
+        @GPB{Input,2310,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -805,6 +894,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a publisher by ID
         @param params Publisher ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
+        @GPB{Returns,11,1}
         """
         yield self._check_init()
 
@@ -818,6 +909,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @GPB{Input,2306,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -830,6 +923,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a publisher by ID
         @param params Publisher ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
+        @GPB{Returns,11,1}
         """
         yield self._check_init()
 
@@ -843,6 +938,8 @@ class PubSubClient(ServiceClient):
         @note Not fully fleshed out yet, interface subject to change
         @param params GPB 2311/1
         @retval GPB 2312/1, zero-length if a problem
+        @GPB{Input,2311,1}
+        @GPB{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -855,10 +952,26 @@ class PubSubClient(ServiceClient):
         @brief Remove a subscription by ID
         @param params Subscription ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @GPB{Input,10,1}
         """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('unsubscribe', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def query_subscribers(self, params):
+        """
+        @brief List subscriber that match a regular expression
+        @param params @GPB(2306, 1) with 'regex' filled in
+        @retval GPB, 2312/1, maybe zero-length if no matches.
+        @retval error return also possible
+        @GPB{Input,2306,1}
+        @GPB{Returns,2312,1}
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('query_subscribers', params)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -867,6 +980,7 @@ class PubSubClient(ServiceClient):
         @brief Create a listener queue for a subscription
         @param GPB 2308/1
         @retval None
+        @GPB{Input,2308,1}
         """
         yield self._check_init()
 
@@ -879,6 +993,7 @@ class PubSubClient(ServiceClient):
         @brief Undeclare (remove) a queue
         @param GPB 10/1, queue ID
         @retval OK or error
+        @GPB{Input,10,1}
         """
         yield self._check_init()
 
@@ -891,6 +1006,7 @@ class PubSubClient(ServiceClient):
         """
         @brief Add a binding to an existing queue
         @param params GPB 2314/1
+        @GPB{Input,2314,1}
         @retval None
         """
         yield self._check_init()

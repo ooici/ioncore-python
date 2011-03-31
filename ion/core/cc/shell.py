@@ -164,8 +164,10 @@ class Control(object):
 
     def add_term_name(self, key, value):
         if self.namespace:
+            log.debug("adding to pre_namespace: %s = %s" % (str(key), str(value)))
             self.namespace[key] = value
         else:
+            log.debug("adding to namespace: %s = %s" % (str(key), str(value)))
             self.pre_namespace[key] = value
 
 try:

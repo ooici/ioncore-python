@@ -2,19 +2,20 @@
 """
 @brief Test implementation of the workbench class
 
-@file ion/core/object
+@file ion/core/object/test/test_workbench
 @author David Stuebe
-@test The object managment WorkBench class
+@test The object management WorkBench test class
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from uuid import uuid4
 
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.test.iontest import IonTestCase
+import weakref
+import gc
+
 
 from net.ooici.play import addressbook_pb2
 
@@ -22,6 +23,12 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import repository
 from ion.core.object import workbench
 from ion.core.object import object_utils
+
+# For testing the message based ops of the workbench
+from ion.core.process.process import ProcessFactory, Process
+from ion.test.iontest import IonTestCase
+
+
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -75,76 +82,17 @@ class WorkBenchTest(unittest.TestCase):
         cref = self.repo.commit(comment='testing commit')
         self.assertEqual(cref, self.repo._current_branch.commitrefs[0].MyId)
         
-        self.assertIn(self.ab.MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.person[0].MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.person[1].MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.owner.MyId, self.wb._hashed_elements.keys())
+        self.assertIn(self.ab.MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.person[0].MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.person[1].MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.owner.MyId, self.repo.index_hash.keys())
         
-        self.assertIn(cref, self.wb._hashed_elements.keys())
+        self.assertIn(cref, self.repo.index_hash.keys())
         
-        cref_se = self.wb._hashed_elements.get(cref)
+        cref_se = self.repo.index_hash.get(cref)
         self.assertEqual(len(cref_se.ChildLinks),1)
         self.assertIn(self.ab.MyId, cref_se.ChildLinks)
-        
-    
-    def test_pack_mutable(self):
-        serialized = self.wb.pack_structure(self.repo._dotgit)
-        
-        
-    def test_pack_root_eq_unpack(self):
-        
-        serialized = self.wb.pack_structure(self.ab)
-            
-        res = self.wb.unpack_structure(serialized)
-        
-        self.assertEqual(res,self.ab)
-        
-    @defer.inlineCallbacks
-    def test_pack_mutable_eq_unpack(self):
-        """
-        This method packs everything in a repository!
-        """
-            
-        serialized = self.wb.pack_structure(self.repo._dotgit)
-            
-        heads = self.wb.unpack_structure(serialized)
-    
-        self.assertEqual(len(heads), 1)
-        
-        repo = self.wb._load_repo_from_mutable(heads[0])
-        
-        self.assertEqual(repo._dotgit, self.repo._dotgit)
-        
-        ab= yield repo.checkout(branchname='master')
-        
-        self.assertEqual(ab.person[0].name, 'David')
-            
-            
-    def test_unpack_error(self):
-        
-        self.assertRaises(workbench.WorkBenchError,self.wb.unpack_structure,'junk that is not a serialized container!')
-        
-    def test_pack_repository_commits(self):
-        """
-        This method packs only the mutable and the commits
-        """
-        self.repo.commit('testing repository packing')
-        
-        serialized = self.wb.pack_repository(self.repo)
-        
-        heads = self.wb.unpack_structure(serialized)
-    
-        self.assertEqual(len(heads), 1)
-        
-        repo = self.wb._load_repo_from_mutable(heads[0])
-        
-        self.assertEqual(repo._dotgit, self.repo._dotgit)
-        
-        commit = repo.branches[0].commitrefs[0]
-        
-        #Check that the commit came through in the current branch
-        self.assertEqual(commit, self.repo._current_branch.commitrefs[0])
-        
+
         
     def test_create_repo(self):
             
@@ -197,138 +145,449 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(association.root_object.predicate.key, predicate.repository_key)
         self.assertEqual(association.root_object.object.key, obj.repository_key)
 
-        
-class WorkBenchMergeTest(unittest.TestCase):
-        
-        
-    def test_fastforward_merge(self):
-        wb1 = workbench.WorkBench('No Process Test')
-        
-        repo1, ab = wb1.init_repository(addressbook_type)
-        
-        commit_ref1 = repo1.commit(comment='a')
-        commit_ref2 = repo1.commit(comment='b')
-        commit_ref3 = repo1.commit(comment='c')
-            
-        repo1.log_commits('master')
-            
-        # Serialize it
-        serialized = wb1.pack_repository(repo1)
-        
-        # Create a new, separate work bench and read it!
-        wb2 = workbench.WorkBench('No Process Test')
-        heads = wb2.unpack_structure(serialized)
-        
-        repo2 = wb2._load_repo_from_mutable(heads[0])
-        
-        repo2.log_commits('master')
-        
-        # Show that the state of the heads is the same
-        self.assertEqual(repo2._dotgit, repo1._dotgit)
-        
-        # Add more commits in repo 1
-        commit_ref4 = repo1.commit(comment='d')
-        commit_ref5 = repo1.commit(comment='e')
-        commit_ref6 = repo1.commit(comment='f')
-        
-        # Serialize it
-        serialized = wb1.pack_repository(repo1)
-        
-        # Create a new, separate work bench and read it!
-        heads = wb2.unpack_structure(serialized)
-        
-        repo2 = wb2._load_repo_from_mutable(heads[0])
-        
-        repo2.log_commits('master')
-        
-        self.assertEqual(repo2._dotgit, repo1._dotgit)
-        
-        
+
+    def test_clear_non_persistent(self):
+        """
+        Call clear on a non persistent repository and make sure it is gone from the workbench
+        """
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
+        self.wb.clear_non_persistent()
+
+        # make sure it is gone!
+        self.assertEqual(self.wb.get_repository(key), None)
+
+
+    def test_clear_persistent(self):
+        """
+        Call clear on a persistent repository and make sure it stays
+        """
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.persistent = True
+
+        self.wb.clear_non_persistent()
+
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
+class WorkBenchProcess(Process):
+    """
+    A test process which has the ops of the workbench
+    """
+
+
+    def __init__(self, *args, **kwargs):
+        # Service class initializer. Basic config, but no yields allowed.
+
+        Process.__init__(self, *args, **kwargs)
+
+
+
+        self.op_pull = self.workbench.op_pull
+        self.op_push = self.workbench.op_push
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
+
+
+
+factory = ProcessFactory(WorkBenchProcess)
+
+
+
+class WorkBenchProcessTest(IonTestCase):
+
+
+
     @defer.inlineCallbacks
-    def test_divergent_merge(self):
-        wb1 = workbench.WorkBench('No Process Test')
+    def setUp(self):
+        yield self._start_container()
+
+        processes = [
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+
+            {'name':'workbench_test2',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb2'}},
+        ]
+
+        sup = yield self._spawn_processes(processes)
+
+        child_proc1 = yield sup.get_child_id('workbench_test1')
+        log.info('Process ID:' + str(child_proc1))
+        workbench_process1 = self._get_procinstance(child_proc1)
+
+        child_proc2 = yield sup.get_child_id('workbench_test2')
+        log.info('Process ID:' + str(child_proc2))
+        workbench_process2 = self._get_procinstance(child_proc2)
+
+
+        repo = workbench_process1.workbench.create_repository(addresslink_type)
+
+        ab = repo.root_object
+
+        p = repo.create_object(person_type)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '123 456 7890'
+
+        ab.owner = p
+
+        ab.title = 'an addressbook'
+
+        self.cref1 = repo.commit('Made it - few!')
+
+        self.proc1 = workbench_process1
+        self.proc2 = workbench_process2
+        self.repo1 = repo
+
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_pull(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        self.assertEqual(repo2._workspace_root, None)
+
+        # Objects are sent in the pull (get_head_content is True by default)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        # The pull got the current head state...
+        self.assertEqual(crefs[0].objectroot.title, 'an addressbook')
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+    #@defer.inlineCallbacks
+    def test_pull_invalid(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
+
+
+    @defer.inlineCallbacks
+    def test_pull_latest(self):
+
+        # Get the current head object key - it will not be sent in the pull
+        old_key = self.repo1.root_object.MyId
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
         
-        repo1, ab1 = wb1.init_repository(addressbook_type)
+        self.assertEqual(repo2._workspace_root, None)
+
+        # Objects are sent in the pull (get_head_content is True)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        self.assertEqual(crefs[0].objectroot.title, 'New Addressbook')
+
+        # The old stuff is not there!
+        old_ref = crefs[0].parentrefs[0].commitref
+        self.assertRaises(KeyError, getattr, old_ref, 'objectroot')
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        self.assertNotIn(old_key, repo2.index_hash.keys())
+
+
+    @defer.inlineCallbacks
+    def test_pull_latest_checkout(self):
+
+        # Get the current head object key - it will not be sent in the pull
+        old_key = self.repo1.root_object.MyId
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key, get_head_content=False)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        self.assertEqual(repo2._workspace_root, None)
+        # Objects are not sent in the pull (get_head_content is False)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        self.assertRaises(KeyError, getattr, crefs[0], 'objectroot')
+
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        self.assertNotIn(old_key, repo2.index_hash.keys())
+
+
+        # Now check out the old version
+        yield repo2.checkout(branchname = 'master',commit_id=self.cref1)
+        yield self.repo1.checkout(branchname = 'master',commit_id=self.cref1)
+
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        self.assertIn(old_key, repo2.index_hash.keys())
+
+    @defer.inlineCallbacks
+    def test_pull_twice(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         
-        commit_ref_a1 = repo1.commit(comment='a1')
-        commit_ref_b1 = repo1.commit(comment='b1')
-        commit_ref_c1 = repo1.commit(comment='c1')
-            
-        #repo1.log_commits('master')
-            
-        # Serialize it
-        #serialized = wb1.pack_repository_commits(repo1)
-        serialized = wb1.pack_structure(repo1._dotgit)
+        # Can't easily test that the messaging works properly - but make sure result is good
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+
+    @defer.inlineCallbacks
+    def test_pull_update(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+
+        # Pull the repository again and watch the merge magic!
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        ab = yield repo2.checkout('master')
+
+        # Can't easily test that the messaging works properly - but make sure result is good
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_pull_branch(self):
+
+
+        self.branch_key = self.repo1.branch()
+
+        self.repo1.root_object.title = 'branch'
+
+        self.repo1.commit('Branched')
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        # Objects are sent in the pull (get_head_content is True)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 2)
+        # In this test we know the order but generally that is not true
+        self.assertEqual(crefs[0].objectroot.title, 'an addressbook')
+        self.assertEqual(crefs[1].objectroot.title, 'branch')
+
+
+        ab = yield repo2.checkout(branchname=self.branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+    @defer.inlineCallbacks
+    def test_pull_branch_same_head(self):
+        """
+        Test that we can have more than one branch point to the same commit!
+        """
+        self.first_branch_key = self.repo1.current_branch_key()
+        self.second_branch_key = self.repo1.branch()
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        # Objects are sent in the pull (get_head_content is True)
+        ab = yield repo2.checkout(branchname=self.first_branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        ab = yield repo2.checkout(branchname=self.second_branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push(self):
+
+        log.info('Pushing to: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push_two(self):
+
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        yield repo2.checkout(branchname = 'master',commit_id=self.cref1)
+        yield self.repo1.checkout(branchname = 'master',commit_id=self.cref1)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push_update(self):
+
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         
-        # Create a new, separate work bench and read it!
-        wb2 = workbench.WorkBench('No Process Test')
-        heads = wb2.unpack_structure(serialized)
-        
-        repo2 = wb2._load_repo_from_mutable(heads[0])
-        
-        self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
-        
-        #repo2.log_commits('master')
-        
-        ab2 = yield repo2.checkout('master')
-        
-        # Show that the state of the heads is the same
-        self.assertEqual(repo2._dotgit, repo1._dotgit)
-        
-        self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
-        
-        # add a commit on repo2!
-        commit_ref_d2 = repo2.commit(comment='d2')
-        
-        self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
-        
-        # Add more commits in repo 1
-        commit_ref_d1 = repo1.commit(comment='d1')
-        commit_ref_e1 = repo1.commit(comment='e1')
-        commit_ref_f1 = repo1.commit(comment='f1')
-        
-        # Serialize it
-        serialized = wb1.pack_structure(repo1._dotgit)
-        
-        self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
-        
-        # Read it in the other work bench!
-        heads = wb2.unpack_structure(serialized)
-        
-        repo2 = wb2._load_repo_from_mutable(heads[0])
-        
-        repo2.log_commits('master')
-        
-        self.assertEqual(repo2.repository_key, repo1.repository_key)
-        self.assertEqual(repo2.branches[0].branchkey, repo1.branches[0].branchkey)
-        self.assertEqual(repo2.branches[0].commitrefs[1], repo1.branches[0].commitrefs[0])
-        
-        # Merge the coflict
-        self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
-        
-        ab2 = repo2.checkout('master')
-        
-        # add a commit on repo2!
-        commit_ref_d2 = repo2.commit(comment='g2')
-        
-        
-        # Serialize it - to push back to repo1
-        serialized = wb2.pack_structure(repo2._dotgit)
-        
-        # Read it in the other work bench!
-        heads = wb1.unpack_structure(serialized)        
-        repo1 = wb1._load_repo_from_mutable(heads[0])
-        
-        
-        log.info('Showing merged history!')
-        repo1.log_commits('master')
-        
-        # Show that the state of the heads is the same
-        self.assertEqual(repo2._dotgit, repo1._dotgit)
-        
-        
-        
-                        
-        
-        
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+    @defer.inlineCallbacks
+    def test_push_branch_same_head(self):
+        """
+        Test that we can have more than one branch point to the same commit!
+        """
+        self.first_branch_key = self.repo1.current_branch_key()
+        self.second_branch_key = self.repo1.branch()
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        # Objects are sent in the pull (get_head_content is True)
+        ab = yield repo2.checkout(branchname=self.first_branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        ab = yield repo2.checkout(branchname=self.second_branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)

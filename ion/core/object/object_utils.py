@@ -194,6 +194,26 @@ def find_type_ids(query):
     clses = (type_name_cache[match] for match in matches)
     return dict((cls._ID, cls) for cls in clses)
 
+def return_proto_file(typeid):
+    """
+    Similar to open_proto, but instead return the contents of the proto file as a
+    simple string.
+    """
+    gpb_root = os.path.join('..', 'ion-object-definitions', 'net')
+    cls = get_gpb_class_from_type_id(typeid)
+    proto_pieces = cls.__module__.split('.')[1:]
+    filename = proto_pieces.pop()
+    proto = '%s.proto' % (filename.replace('_pb2', ''))
+    proto_dir = os.sep.join(proto_pieces)
+    proto_path = os.path.join(gpb_root, proto_dir, proto)
+    if os.path.exists(proto_path):
+        return open(proto_path).read()
+    else:
+        py_dir = __import__(cls.__module__).__path__[0]
+        py_file = '%s.py' % (filename)
+        py_path = os.path.join(py_dir, proto_dir, py_file)
+        return open(py_path).read()
+    
 def open_proto(typeid):
     """ Developer utility to open either the .proto if found, or the generated .py, for a GPB typeid. """
 

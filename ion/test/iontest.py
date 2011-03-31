@@ -54,13 +54,18 @@ class IonTestCase(unittest.TestCase):
         Starting and initialzing the container with a connection to a broker.
         """
         mopt = service.Options()
-        mopt['broker_host'] = CONF['broker_host']
+        if os.environ.has_key("ION_TEST_CASE_BROKER_HOST"):
+            host = os.environ["ION_TEST_CASE_BROKER_HOST"]
+            log.debug("Using environment set ION_TEST_CASE_BROKER_HOST (%s)" % host)
+            mopt["broker_host"] = host
+        else:
+            mopt['broker_host'] = CONF['broker_host']
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
         # This is where dependent apps can be included
-        mopt['script'] = CONF['start_app'] or start_app
+        mopt['scripts'] = [CONF['start_app']] or start_app
 
         # Little trick to have no consecutive failures if previous setUp() failed
         # @note This is not fail fast and does not always work. TEMPORARY.

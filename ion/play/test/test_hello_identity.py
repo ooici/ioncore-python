@@ -14,6 +14,8 @@ from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.core import ioninit
 
+import time
+
 from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -59,8 +61,11 @@ class HelloIdentityTest(IonTestCase):
         # Call service via service client.  Service client will use protected
         # RPC send, passing user id 'MYUSER'.
         # HelloIdentityClient ---> rpc_send_protected('MYUSER') ---> HelloIdentity 
-        result = yield self.hc.hello_request('hello_user_request', 'MYUSER', '99999999')
-        self.assertEqual(result, "{'value': 'Hello there MYUSER expiry: 99999999'}")
+        current_time = int(time.time())
+        expiry = str(current_time + 30)
+
+        result = yield self.hc.hello_request('hello_user_request', 'MYUSER', expiry)
+        self.assertEqual(result, "{'value': 'Hello there MYUSER'}")
 
     @defer.inlineCallbacks
     def test_hello_anonymous_delegate_request(self):
@@ -82,8 +87,11 @@ class HelloIdentityTest(IonTestCase):
         # Service will then use service client of "backend" service to send
         # standard RPC to complete request.
         # HelloIdentityDelegateClient ---> rpc_send_protected('MYUSER') ---> HelloIdentityDelegate  ---> HelloIdentityClient ---> rpc_send() ---> HelloIdentity
-        result = yield self.hcd.hello_request('hello_user_request_delegate', 'MYUSER', '99999999')
-        self.assertEqual(result, "{'value': 'Hello there MYUSER expiry: 99999999'}")
+        current_time = int(time.time())
+        expiry = str(current_time + 30)
+
+        result = yield self.hcd.hello_request('hello_user_request_delegate', 'MYUSER', expiry)
+        self.assertEqual(result, "{'value': 'Hello there MYUSER'}")
 
     @defer.inlineCallbacks
     def test_hello_user_delegate_request_switch_users(self):
@@ -95,8 +103,11 @@ class HelloIdentityTest(IonTestCase):
         # Service will then use service client of "backend" service to send
         # protected RPC to complete request.
         # HelloIdentityDelegateClient ---> rpc_send_protected('MYUSER') ---> HelloIdentityDelegate  ---> HelloIdentityClient ---> rpc_send_protected('NEWUSER') ---> HelloIdentity
-        result = yield self.hcd.hello_request('hello_user_request_delegate_switch_user', 'MYUSER', '99999999')
-        self.assertEqual(result, "{'value': 'Hello there NEWUSER expiry: 11111111'}")
+        current_time = int(time.time())
+        expiry = str(current_time + 30)
+
+        result = yield self.hcd.hello_request('hello_user_request_delegate_switch_user', 'MYUSER', expiry)
+        self.assertEqual(result, "{'value': 'Hello there NEWUSER'}")
 
                 
 

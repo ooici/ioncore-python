@@ -90,6 +90,8 @@ class IndexStoreService(ServiceProcess):
         @retval return a cassandra_rows type. The key attribute will be set and each row will contain one column 
         with the name value.
         """
+        log.debug("In op_query: request %s" % request)
+
         query_predicates = Query()    
         for attr in request.attrs:
             if attr.predicate_type == Query.EQ:
@@ -99,8 +101,6 @@ class IndexStoreService(ServiceProcess):
             else:
                 raise IndexStoreServiceException("Unhandled predicate type: %s " % (attr.predicate_type,))
                 
-
-
         results = yield self._indexed_store.query(query_predicates)
         #Now we have to put these back into a response
         response = yield self.message_client.create_instance(ROWS_TYPE)
@@ -120,7 +120,8 @@ class IndexStoreService(ServiceProcess):
                 col.column_name = name
                 col.column_value = val
         
-           
+        log.debug("op_query Result %s" % response)
+
         yield self.reply_ok(msg,response)
             
     @defer.inlineCallbacks
@@ -134,7 +135,7 @@ class IndexStoreService(ServiceProcess):
         index_attrs = {}
         for col in request.cols:
             index_attrs[col.column_name] = col.column_value
-        yield self._indexed_store.put(key,value,index_attrs)    
+        yield self._indexed_store.put(key=key,value=value,index_attributes=index_attrs)
 
         yield self.reply_ok(msg)
         
@@ -233,12 +234,12 @@ class IndexStoreServiceClient(ServiceClient):
         log.info("Called Index Store Service client: Query")
         
         request = yield self.mc.create_instance(QUERY_ATTRIBUTES_TYPE)
-        
+
         for attr_key,attr_value,pred_type in query_predicates.get_predicates():
             attr = request.attrs.add()                
-            attr.attribute_name = attr_key
-            attr.attribute_value = attr_value    
-            attr.predicate_type = pred_type
+            attr.attribute_name = str(attr_key)
+            attr.attribute_value = str(attr_value)
+            attr.predicate_type = str(pred_type)
 
         (result, headers, msg) = yield self.rpc_send('query', request)
 
@@ -256,8 +257,11 @@ class IndexStoreServiceClient(ServiceClient):
         defer.returnValue(results)
         
     @defer.inlineCallbacks
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         log.info("Called Index Store Service client: put")
+        
+        if index_attributes is None:
+            index_attributes = {}
         
         row = yield self.mc.create_instance(ROW_TYPE)
         row.key = key
@@ -340,4 +344,3 @@ class IndexStoreServiceClient(ServiceClient):
         defer.returnValue(result.attributes)
         
         
-           

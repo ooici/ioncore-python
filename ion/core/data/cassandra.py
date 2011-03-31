@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """
-@file ion/data/backends/cassandra.py
+@file ion/core/data/cassandra.py
 @author Paul Hubbard
 @author Michael Meisinger
 @author Paul Hubbard
 @author Dorian Raymer
 @author Matt Rodriguez
+@author David Stuebe
 @brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
@@ -157,6 +158,7 @@ class CassandraStore(TCPConnection):
         log.info('on_terminate: Lose TCP Connection')
     
 
+
 class CassandraIndexedStore(CassandraStore):
     """
     An Adapter class that provides the ability to use secondary indexes in Cassandra. It
@@ -171,7 +173,6 @@ class CassandraIndexedStore(CassandraStore):
         """
         log.info("CassandraIndexedStore.__init__")       
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
-        self._cache = cache
         
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
@@ -183,12 +184,15 @@ class CassandraIndexedStore(CassandraStore):
         @param index_attributes The dictionary contains keys for the column name and the index value
         """
         if index_attributes is None:
-            index_attributes = {}
-        log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
+            index_cols = {}
+        else:
+            index_cols = dict(**index_attributes)
+            
+        log.info("key: %s value: %s index_attributes %s" % (key,value,index_cols))
         yield self._check_index(index_attributes)
-        index_attributes.update({"value":value, "has_key":"1"})
+        index_cols.update({"value":value, "has_key":"1"})
         log.info("Adding value to the row")
-        yield self.client.batch_insert(key, self._cache_name, index_attributes)
+        yield self.client.batch_insert(key, self._cache_name, index_cols)
 
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
@@ -224,7 +228,7 @@ class CassandraIndexedStore(CassandraStore):
         defer.returnValue(None)
 
     @defer.inlineCallbacks    
-    def query(self, query_predicates):
+    def query(self, query_predicates, row_count=100):
         """
         Search for rows in the Cassandra instance.
     
@@ -250,8 +254,7 @@ class CassandraIndexedStore(CassandraStore):
         selection_predicates = map(fix_preds, predicates)
         log.info("selection_predicate %s " % (selection_predicates,))
 
-        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates)
-  
+        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates, count=row_count)
         result ={}
         for row in rows:
             row_vals = {}
@@ -268,15 +271,16 @@ class CassandraIndexedStore(CassandraStore):
         """
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
         log.debug("keyspace desc %s" % (keyspace_description,))
-        get_cfdef = lambda cfdef: cfdef.name == self._cache.name
+        get_cfdef = lambda cfdef: cfdef.name == self._cache_name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
         indexes = map(get_names, cfdef[0].column_metadata)
         
         
         defer.returnValue(indexes)
-    
-    
+
+
+
 
 class CassandraStorageResource:
     """

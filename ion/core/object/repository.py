@@ -15,9 +15,7 @@ Refactor Merge to use a proxy repository for the readonly objects - they must li
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-import sys
-
-import time
+import weakref
 from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
@@ -26,8 +24,8 @@ from ion.core.object import object_utils
 from ion.util import procutils as pu
 
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
-mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
-branch_type = object_utils.create_type_identifier(object_id=5, version=1)
+MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
+BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
 LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 
 
@@ -38,13 +36,119 @@ class RepositoryError(Exception):
     An exception class for errors in the object management repository 
     """
 
+class IndexHash(dict):
+    """
+    A dictionary class to contain the objects owned by a repository. All repository objects are accessible by other
+    repositories via the workbench which maintains a cache of all the local objects. Clean up is the responsibility of
+    each repository.
+    """
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+        self._workbench_cache = None
+        self._has_cache = False
+
+    def _set_cache(self,cache):
+        assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
+        self._workbench_cache = cache
+        self.has_cache = True
+
+
+    def _get_cache(self):
+        return self._workbench_cache
+
+    cache = property(_get_cache, _set_cache)
+
+    def _set_has_cache(self, val):
+
+        assert isinstance(val, bool), 'Invalid or non boolen value passed to set has_cache property!'
+        self._has_cache = val
+        # add everything currently in self to the cache!
+        if val:
+            self._workbench_cache.update(self)
+
+    def _get_has_cache(self):
+          return self._has_cache
+
+    has_cache = property(_get_has_cache, _set_has_cache)
+
+
+    def __getitem__(self, key):
+
+        if dict.has_key(self, key):
+            return dict.__getitem__(self, key)
+
+        elif self.has_cache:
+            # You get it - you own it!
+            val = self.cache[key]
+            # If it does not raise a KeyError - add it
+            dict.__setitem__(self, key, val)
+            return val
+        else:
+            raise KeyError('Key not found in index hash!')
+
+
+    def __setitem__(self, key, val):
+        dict.__setitem__(self, key, val)
+        if self.has_cache:
+            self.cache[key]=val
+
+
+    def copy(self):
+        """ D.copy() -> a shallow copy of D """
+        raise NotImplementedError('IndexHash does not support copy')
+
+    @staticmethod # known case
+    def fromkeys(S, v=None):
+        """
+        dict.fromkeys(S[,v]) -> New dict with keys from S and values equal to v.
+        v defaults to None.
+        """
+        raise NotImplementedError('IndexHash does not support fromkeys')
+
+    def get(self, key, d=None):
+        """ Get Item from the Index Hash"""
+        if dict.has_key(self, key):
+            return dict.__getitem__(self, key)
+
+        elif self.has_cache:
+            # You get it - you own it!
+            val = self.cache.get(key,d)
+
+            if val != d:
+                dict.__setitem__(self, key, val)
+
+            return val
+        else:
+            return d
+
+
+    def has_key(self, key):
+        """ Check to see if the Key exists """
+        if self.has_cache:
+            return dict.has_key(self, key) or self.cache.has_key(key)
+        else:
+            return dict.has_key(self, key)
+
+    def update(self, *args, **kwargs):
+        """
+        D.update(E, **F) -> None.  Update D from E and F: for k in E: D[k] = E[k]
+        (if E has keys else: for (k, v) in E: D[k] = v) then: for k in F: D[k] = F[k]
+        """
+        dict.update(self, *args, **kwargs)
+        if self.has_cache:
+            self.cache.update(*args, **kwargs)
+
+
+
+
 class Repository(object):
     
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
 
-    def __init__(self, head=None):
+    def __init__(self, head=None, repository_key=None, persistent=False):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -72,7 +176,7 @@ class Repository(object):
         A dictionary containing the commit objects - all immutable content hashed
         """
         
-        self._hashed_elements = None
+        self.index_hash = IndexHash()
         """
         All content elements are stored here - from incoming messages and
         new commits - everything goes here. Now it can be decoded for a checkout
@@ -112,29 +216,57 @@ class Repository(object):
         A place to stash the work space under a saved name.
         """
         
-        self._workbench=None
-        """
-        The work bench which this repository belongs to...
-        """
-        
         self._upstream={}
         """
         The upstream source of this repository. 
         """
-        
+
+        self._process=None
+        """
+        Need for access to sending messages!
+        """
+
+        if not isinstance(persistent, bool):
+            raise RepositoryError('Invalid argument type to set the persistent property of a repository')
+        self._persistent = persistent
+        """
+        Set the persistence of this repository. Any repository which is declared persistent will not be GC'd until
+        the persistent setting is changed to false
+        """
+
+        '''
+        Old method - where it was possible to load a repository from a serialized mutable head
         if head:
             self._dotgit = self._load_element(head)
             # Set it to modified and give it a new ID as soon as we get it!
             self._dotgit.Modified = True
             self._dotgit.MyId = self.new_id()
+            if repository_key:
+                raise RepositoryError('Can not pass both a serialized head and a repository key')
         else:
            
-            mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)
+            mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
             self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
-            self._dotgit.repositorykey = pu.create_guid()
+
+            if repository_key:
+                self._dotgit.repositorykey = repository_key
+            else:
+                self._dotgit.repositorykey = pu.create_guid()
+        '''
+
+
+        # New method to setup the mutable head of the repository
+        mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
+        self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
+
+        if repository_key:
+            self._dotgit.repositorykey = repository_key
+        else:
+            self._dotgit.repositorykey = pu.create_guid().upper()
+
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
-        It is not 'stored' in the index - it lives in the workspace
+        It is not 'stored' in the index - it lives in the repository
         """
     
     def __repr__(self):
@@ -161,7 +293,17 @@ class Repository(object):
         return self._upstream
     
     upstream = property(_get_upstream, _set_upstream)
-    
+
+    def _set_persistent(self, value):
+        if not isinstance(value, bool):
+            raise RepositoryError('Invalid argument type to set the persistent property of a repository')
+        self._persistent = value
+
+    def _get_persistent(self):
+        return self._persistent
+
+    persistent = property(_get_persistent, _set_persistent )
+
     def _get_root_object(self):
         return self._workspace_root
         
@@ -170,7 +312,7 @@ class Repository(object):
             raise RepositoryError('Can not set the root object of the repository to a value which is not an instance of Wrapper')
     
         if not value.Repository is self:
-            value = self._copy_from_other(value)
+            value = self.copy_object(value)
         
         if not value.MyId in self._workspace:
             self._workspace[value.MyId] = value
@@ -180,12 +322,38 @@ class Repository(object):
         
     root_object = property(_get_root_object, _set_root_object)
     
-    
+
+    def clear(self):
+        """
+        Clear the repository in preparation for python garbage collection
+        """
+         # Do some clean up!
+        for item in self._workspace.itervalues():
+            #print 'ITEM',item
+            item.Invalidate()
+        for item in self._commit_index.itervalues():
+            #print 'ITEM',item
+            item.Invalidate()
+
+        self._dotgit.Invalidate()
+
+        self._workspace = None
+        self.index_hash = None
+        self._commit_index = None
+        self._current_branch = None
+        self.branchnicknames = None
+        self._merge_from = None
+        self._stash = None
+        self._upstream = None
+        self._process = None
+
+
+
     def set_repository_reference(self, id_ref, current_state=False):
         """
         Fill in a IDREF Object using the current state of the repository
         """
-        # Don't worry about type checking here....        
+        # Don't worry about type checking here.... will cause an attribute error if incorrect
         id_ref.key = self.repository_key
         id_ref.branch = self._current_branch.branchkey
         
@@ -201,7 +369,8 @@ class Repository(object):
         Convience method to access the branches from the mutable head (dotgit object)
         """
         return self._dotgit.branches
-    
+
+
     @property
     def commit_head(self):
         """
@@ -209,9 +378,14 @@ class Repository(object):
         """
         if self._detached_head:
             log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
-        
+
+        if self._current_branch is None:
+            raise RepositoryError('No current branch in the repository. Must checkout first.')
+
         if len(self._current_branch.commitrefs) == 1:          
             return self._current_branch.commitrefs[0]
+        elif len(self._current_branch.commitrefs) == 0:
+            return None
         else:
             raise RepositoryError('Branch should merge on read. Invalid state with more than one commit at the head of a branch!')
 
@@ -223,9 +397,20 @@ class Repository(object):
 
         for branch in self.branches:
             heads.extend(branch.commitrefs)
+            # Do not error on multiple commit refs!
 
         return heads
 
+
+    def current_branch_key(self):
+
+        if self._detached_head:
+            log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
+
+        if self._current_branch is None:
+            raise RepositoryError('No current branch in the repository. Must checkout first.')
+
+        return self._current_branch.branchkey
 
 
     def branch(self, nickname=None):
@@ -239,11 +424,12 @@ class Repository(object):
         if self._current_branch != None and len(self._current_branch.commitrefs)==0:
             # Unless this is an uninitialized repository it is an error to create
             # a new branch from one which has no commits yet...
-            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
+            raise RepositoryError('The current branch is empty - a new one can not be created until there is a commit!')
         
         
-        brnch = self.branches.add()    
-        brnch.branchkey = pu.create_guid()
+        brnch = self.branches.add()
+        # Generate a short random string for the branch name
+        brnch.branchkey = object_utils.sha1hex(pu.create_guid())[:8]
         
         if nickname:
             if nickname in self.branchnicknames.keys():
@@ -252,14 +438,14 @@ class Repository(object):
 
         if self._current_branch:
             # Get the linked commit
-            
-            if len(brnch.commitrefs)>1:
+
+            if len(self._current_branch.commitrefs)>1:
                 raise RepositoryError('Branch should merge on read. Invalid state!')
-            elif len(brnch.commitrefs)==1:                
+            elif len(self._current_branch.commitrefs)==1:
                 cref = self._current_branch.commitrefs[0]
             
                 bref = brnch.commitrefs.add()
-            
+
                 # Set the new branch to point at the commit
                 bref.SetLink(cref)
             
@@ -268,7 +454,13 @@ class Repository(object):
             if self._detached_head:
                 self._workspace_root.SetStructureReadWrite()
                 self._detached_head = False
-                
+
+
+        else:
+            # This is a new repository with no commits yet!
+            pass
+
+
         self._current_branch = brnch
         return brnch.branchkey
     
@@ -283,6 +475,13 @@ class Repository(object):
                 break
         else:
             log.info('Branch %s not found!' % name)
+            return
+
+        # Clean up the branch nickname if any...
+        for k,v in self.branchnicknames.items():
+            if v == name:
+                del self.branchnicknames[k]
+
         
     def get_branch(self, name):
         
@@ -301,13 +500,15 @@ class Repository(object):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=[]):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
         Branch can be either a local nick name or a global branch key
+
+        @TODO implement exclude types list in fetching/loading objects!
         """
-        
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s"' % (branchname, commit_id, older_than))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -430,31 +631,33 @@ class Repository(object):
                 
         # Do some clean up!
         for item in self._workspace.itervalues():
-            #print 'ITEM',item
             item.Invalidate()
         self._workspace = {}
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
+
         rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
-        yield self._load_remote_links(rootobj)
-        
+        yield self.load_remote_links(rootobj)
+        # @TODO figure out if there is any point to checking the value of the result?
+
         
         self._detached_head = detached
         
         if detached:
-            branch_cls = object_utils.get_gpb_class_from_type_id(branch_type)
+            branch_cls = object_utils.get_gpb_class_from_type_id(BRANCH_TYPE)
             self._current_branch = self._create_wrapped_object(branch_cls, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
             
             rootobj.SetStructureReadOnly()
-            
+
+        log.debug('Checkout Complete!')
         defer.returnValue(rootobj)
-        return
+
         
         
     def merge_by_date(self, branch):
@@ -500,7 +703,7 @@ class Repository(object):
         self._commit_index[cref.MyId] = cref
 
         # update the hashed elements
-        self._hashed_elements.update(structure)
+        self.index_hash.update(structure)
         
         del branch.commitrefs[:]
         bref = branch.commitrefs.add()
@@ -530,7 +733,7 @@ class Repository(object):
         rootobj = cref.objectroot
         self._workspace_root = rootobj
         
-        self._load_links(rootobj)
+        self.load_links(rootobj)
                 
         return rootobj
         
@@ -543,22 +746,25 @@ class Repository(object):
         # If the repo is in a valid state - make the commit even if it is up to date
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
+
             self._workspace_root.RecurseCommit(structure)
-                                
+
             cref = self._create_commit_ref(comment=comment)
                 
             # Add the CRef to the hashed elements
             cref.RecurseCommit(structure)
-            
+
+
             # set the cref to be readonly
             cref.ReadOnly = True
             
-            # Add the cref to the active commit objects - for convienance
+            # Add the cref to the active commit objects - for convenience
             self._commit_index[cref.MyId] = cref
 
             # update the hashed elements
-            self._hashed_elements.update(structure)
-            log.info('Commited repository - Comment: cref.comment')
+            self.index_hash.update(structure)
+
+            log.debug('Commited repository - Comment: "%s"' % cref.comment)
                             
         else:
             raise RepositoryError('Repository in invalid state to commit')
@@ -684,7 +890,7 @@ class Repository(object):
             merge_root = rootobj
             merge_root.ReadOnly = True
             # The child objects inherit there ReadOnly setting from the root
-            yield self._load_remote_links(rootobj)
+            yield self.load_remote_links(rootobj)
             
             self._merge_root.append(merge_root)
         
@@ -799,7 +1005,9 @@ class Repository(object):
             obj = self._workspace.get(link.key)
             # Make sure the parent is set...
             #self.set_linked_object(link, obj)
+
             obj.AddParentLink(link)
+
             return obj
 
         elif self._commit_index.has_key(link.key):
@@ -808,9 +1016,9 @@ class Repository(object):
             obj.AddParentLink(link)
             return obj
 
-        elif self._hashed_elements.has_key(link.key):
-            
-            element = self._hashed_elements.get(link.key)
+        elif self.index_hash.has_key(link.key):
+            # @TODO - is this safe? Can the k/v be GC'd in the weakref dict inbetween haskey and get?
+            element = self.index_hash.get(link.key)
             
         else:
             
@@ -822,6 +1030,7 @@ class Repository(object):
             
         if not link.type.object_id == element.type.object_id and \
                 link.type.version == element.type.version:
+            #@TODO Consider removing this somewhat costly check...
             raise RepositoryError('The link type does not match the element type found!')
             
         obj = self._load_element(element)
@@ -864,66 +1073,74 @@ class Repository(object):
          
     @defer.inlineCallbacks
     def _fetch_remote_objects(self, links):
-    
-        if not self._workbench:
-                raise RepositoryError('Object not found and not work bench is present!')
-                
-        proc = self._workbench._process
-        # Check for Iprocess once defined outside process module?
-        if not proc:
-            raise RepositoryError('Linked Obect not found and work bench has no process to get it with!')
+
+        if not self._process:
+            raise RepositoryError('Linked Object not found and repository has no process to get it with!')
             
-        if hasattr(proc, 'fetch_linked_objects'):
+        if hasattr(self._process, 'fetch_links'):
             # Get the method from the process if it overrides workbench
-            fetch_linked_objects = proc.fetch_linked_objects
+            fetch_links = self._process.fetch_links
         else:
-            fetch_linked_objects = self._workbench.fetch_linked_objects
+            fetch_links = self._process.workbench.fetch_links
+
+        #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
+        elements = yield fetch_links(self.upstream['process'], links)
+
+        for element in elements:
+            self.index_hash[element.key] = element
+
             
-        #@TODO provide catch mechanism to use the service name instead of the
-        # process name if the process does not respond...
-        result = yield fetch_linked_objects(self.upstream['process'], links)
-        
-        defer.returnValue(result)
             
-            
-    def _load_links(self, obj):
+    def load_links(self, obj):
         """
-        Load the child objects into the work space
+        Load the child objects into the work space recursively
         """
         for link in obj.ChildLinks:
             child = self.get_linked_object(link)  
-            self._load_links(child)
+            self.load_links(child)
             
 
     @defer.inlineCallbacks
-    def _load_remote_links(self, obj):
+    def load_remote_links(self, items):
         """
         Load links which may require remote (deferred) access
         """
+        if not hasattr(items, '__iter__'):
+            items = [items,]
+
         remote_objects = []
-        for link in obj.ChildLinks:
-            try:
-                child = self.get_linked_object(link)
-                yield self._load_remote_links(child)
-            except KeyError, ex:
-                log.info('"_load_remote_links": Caught object not found:'+str(ex))
-                remote_objects.append(link)
-            
+        local_objects = []
+        for item in items:
+            for link in item.ChildLinks:
+                try:
+                    child = self.get_linked_object(link)
+                    local_objects.append(child)
+                except KeyError, ex:
+                    log.info('"load_remote_links": Caught object not found:'+str(ex))
+                    remote_objects.append(link)
             
         if remote_objects:
             res = yield self._fetch_remote_objects(remote_objects)
-            res = yield self._load_remote_links(obj)
-        defer.returnValue(True)
+            local_objects.append(link.Root)
+            # Rerun Load_remote_links after getting the child objects
+
+        if len(local_objects) >0:
+            res = yield self.load_remote_links(local_objects)
+        else:
+            res = True
+
+        defer.returnValue(res)
             
     def _load_element(self, element):
         
         #log.debug('_load_element' + str(element))
-        
-        # check that the caluclated value in element.sha1 matches the stored value
+
+        # check that the calculated value in element.sha1 matches the stored value
         if not element.key == element.sha1:
+            #@TODO Consider removing this somewhat costly check - it is already done when an object is read from a message
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
             'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
-        
+
         cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
         # Do not automatically load it into a particular space...
@@ -949,46 +1166,49 @@ class Repository(object):
         return obj
         
         
-    def _copy_from_other(self, value):
+    def copy_object(self, value, deep_copy=True):
         """
-        Copy an object from another repository. This method will serialize any
-        content which is not already in the hashed objects. Then read it back in
-        as new objects in this repository. The objects must not already exist in
-        the current repository or it will return an error
+        Copy an object. This method will serialize the current state of the value.
+        Then read it back in as new objects in the repository. The copies will all be
+        created in a modified state. Copy can move from one repository to another.
+        The deep_copy parameter determines whether all child objects are also copied.
         """
+
+        log.debug('Copy Object:')
         if not isinstance(value, gpb_wrapper.Wrapper):
             raise RepositoryError('Can not copy an object which is not an instance of Wrapper')    
         
         if not value.IsRoot:
             # @TODO provide for transfer by serialization and re instantiation
             raise RepositoryError('You can not copy only part of a gpb composite, only the root!')
-        
-        if value.Repository is self:
-            raise RepositoryError('Can not copy an object from the same repository')
             
-        if value.ObjectType.object_id <= 1000 and value.ObjectType.object_id != 4:
-            # This is a core object other than an IDRef to another repository.
-            # Generally this should not happen...
-            log.warn('Copying core objects is not an error but unexpected results may occur.')
-            
-        structure={}
-        value.RecurseCommit(structure)
-        self._hashed_elements.update(structure)
-        
-        # Get the element by creating a temporary link and loading links...
-        link_cls = object_utils.get_gpb_class_from_type_id(LINK_TYPE)
-        link = self._create_wrapped_object(link_cls, addtoworkspace=False)
-        link.key = value.MyId
-        object_utils.set_type_from_obj(value, link.type)
-        
-        self._load_links(link)
-        
-        obj = self.get_linked_object(link)
-        
-        # Get rid of the temporary link
-        obj.ParentLinks.discard(link)
-        
-        return obj
+
+        if value.Modified:
+            structure={}
+            value.RecurseCommit(structure)
+            value.Repository.index_hash.update(structure)
+
+
+        element = self.index_hash.get(value.MyId)
+
+        if element is None:
+            raise RepositoryError('Could not get element from the index hash during copy.')
+        new_obj = self._load_element(element)
+
+        new_obj._set_parents_modified()
+
+        if deep_copy:
+            # Deep copy from the original!
+            for link in new_obj.ChildLinks:
+                # Use the copies link to get the child - possibly from a different repo!
+
+                child = self.get_linked_object(link)
+                new_child = self.copy_object(child, True)
+                link.SetLink(new_child)
+
+        log.debug('Copy Object: Complete')
+
+        return new_obj
     
     
         
@@ -1012,7 +1232,7 @@ class Repository(object):
         # if this value is from another repository... you need to load it from the hashed objects into this repository
         if not value.Repository is self:
             
-            value = self._copy_from_other(value)
+            value = self.copy_object(value)
         
         
         if link.key == value.MyId:
