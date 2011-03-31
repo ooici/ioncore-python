@@ -138,7 +138,7 @@ class Receiver(BasicLifecycleObject):
         @brief Activate the consumer.
         @retval Deferred
         """
-        self.consumer.register_callback(self.receive)
+        self.consumer.register_callback(self._receive)
         yield self.consumer.iterconsume()
         #log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
@@ -149,7 +149,7 @@ class Receiver(BasicLifecycleObject):
         @retval Deferred
         """
         yield self.consumer.cancel()
-        self.consumer.callbacks.remove(self._receive)
+        self.consumer.callback = None
         self.completion_deferred = defer.Deferred()
 
     @defer.inlineCallbacks
