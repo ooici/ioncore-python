@@ -104,58 +104,61 @@ class AppIntegrationTest(IonTestCase):
         """
         log.debug('DHE: Calling findDataResources!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
-        log.debug('DHE: findDataResources returned:\n' + \
+        i = 0
+        while i < len(outcome1.message_parameters_reference[0].dataResourceSummary):
+            log.debug('DHE: findDataResources returned:\n' + \
                   'user_ooi_id: ' + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].user_ooi_id) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].user_ooi_id) + \
                   '\n' + \
                   str('resource_id: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].data_resource_id) + \
                   str('\n') + \
                   str('title: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].title) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].title) + \
                   str('\n') + \
                   str('institution: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].institution) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].institution) + \
                   str('\n') + \
                   str('source: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].source) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].source) + \
                   str('\n') + \
                   str('references: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].references) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].references) + \
                   str('\n') + \
                   str('ion_time_coverage_start: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_time_coverage_start) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_start) + \
                   str('\n') + \
                   str('ion_time_coverage_end: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_time_coverage_end) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_end) + \
                   str('\n') + \
                   str('summary: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].summary) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].summary) + \
                   str('\n') + \
                   str('comment: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].comment) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].comment) + \
                   str('\n') + \
                   str('ion_geospatial_lat_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lat_min) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_min) + \
                   str('\n') + \
                   str('ion_geospatial_lat_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lat_max) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_max) + \
                   str('\n') + \
                   str('ion_geospatial_lon_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lon_min) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_min) + \
                   str('\n') + \
                   str('ion_geospatial_lon_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lon_max) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_max) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_min) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_min) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_max) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_max) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_positive: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_positive) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_positive) + \
                   str('\n'))
+            i = i + 1
 
         
         self.dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id

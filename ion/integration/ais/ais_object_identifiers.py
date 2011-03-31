@@ -46,21 +46,82 @@ message ApplicationIntegrationServiceError{
 }
 """
 
-# AisDataResourceSummaryMsg GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_resource_summary.proto
-AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE = object_utils.create_type_identifier(object_id=9021, version=1)
+# AisDataResourceMetadata GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_resource_metadata.proto
+AIS_DATASET_METADATA_TYPE = object_utils.create_type_identifier(object_id=9021, version=1)
 """
-message AisDataResourceSummaryMsg {
+message AisDatasetMetadata {
    enum _MessageTypeIdentifier {
        _ID = 9021;
-       _VERSION = 1;
+       _VERSION = 1;	
    }
 
    optional string user_ooi_id      = 1;
-   optional string data_resource_id = 2;
-   optional string title            = 3;
+   optional string data_resource_id = 2; 
+   optional string title            = 3; 
    optional string institution      = 4;
-   optional string source           = 5;
+   optional string source           = 5; 
+   optional string references       = 6; 
+   optional string conventions      = 7; 
+   optional string summary          = 8; 
+   optional string comment          = 9; 
+   optional string ion_time_coverage_start = 10; 
+   optional string ion_time_coverage_end   = 11; 
+   optional double ion_geospatial_lat_min  = 12; 
+   optional double ion_geospatial_lat_max  = 13; 
+   optional double ion_geospatial_lon_min  = 14; 
+   optional double ion_geospatial_lon_max  = 15; 
+   optional double ion_geospatial_vertical_min      = 16; 
+   optional double ion_geospatial_vertical_max      = 17; 
+   optional string ion_geospatial_vertical_positive = 18;
+   
+}
+"""
 
+AIS_DATASOURCE_METADATA_TYPE = object_utils.create_type_identifier(object_id=9022, version=1)
+"""
+message AisDatasourceMetadata {
+   enum _MessageTypeIdentifier {
+       _ID = 9022;
+       _VERSION = 1;	
+   }
+   
+   optional net.ooici.services.sa.SourceType source_type = 1;
+   repeated string property   = 2;
+   repeated string station_id = 3;
+
+   optional net.ooici.services.sa.RequestType request_type = 4;
+   optional double top    = 5;
+   optional double bottom = 6;
+   optional double left   = 7;
+   optional double right  = 8;
+   optional string base_url    = 9;
+   optional string dataset_url = 10;
+   optional string ncml_mask   = 11;
+   optional uint64 max_ingest_millis = 12;
+
+   //'start_time' and 'end_time' are expected to be in the
+   // ISO8601 Date Format (yyyy-MM-dd'T'HH:mm:ss'Z')
+   optional string start_time = 13;
+   optional string end_time   = 14;
+   optional string institution_id = 15;
+
+}
+"""
+
+# AisDataVariable GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_variable.proto
+AIS_DATA_VARIABLE_TYPE = object_utils.create_type_identifier(object_id=9023, version=1)
+"""
+message AisDataVariableType {
+   enum _MessageTypeIdentifier {
+       _ID = 9023;
+       _VERSION = 1;	
+   }
+
+   optional string units         = 1; 
+   optional string standard_name = 2; 
+   optional string long_name     = 3;
+   repeated string other_attributes = 4;
+  
 }
 """
 
@@ -94,7 +155,7 @@ message FindDataResourcesRspMsg {
        _VERSION = 1;
    }
 
-   repeated net.ooici.core.link.CASRef dataResourceSummary = 1;
+   repeated net.ooici.integration.ais.aisDataResourceMetadata.AisDatasetMetadata dataResourceSummary = 1;
 }
 """
 
@@ -118,8 +179,9 @@ message GetDataResourceDetailRspMsg {
        _ID = 9034;
        _VERSION = 1;
    }
-
-   //repeated <put payload here>
+   optional string data_resource_id = 1; 
+   optional net.ooici.integration.ais.aisDataVariable.AisDataVariableType variable = 2;
+   optional net.ooici.integration.ais.aisDataResourceMetadata.AisDatasourceMetadata source = 3;
 }
 """
 
