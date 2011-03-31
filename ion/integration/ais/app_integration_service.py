@@ -16,11 +16,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 
-from ion.integration.ais.loadDummyDataset import LoadDummyDataset
-
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
-                                                       AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
 from ion.integration.ais.ais_object_identifiers import UPDATE_USER_EMAIL_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
@@ -48,14 +45,10 @@ class AppIntegrationService(ServiceProcess):
 
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        # Test for loadDummyData argument
-        self.loadDummyData = self.spawn_args.get('loadDummyData', False)
-        
         self.rc = ResourceClient(proc = self)
         self.mc = MessageClient(proc = self)
-        self.dsID = None
     
-        log.debug('AppIntegrationService.__init__(): loadDummyData == %s' % str(self.loadDummyData))
+        log.debug('AppIntegrationService.__init__()')
 
     def slc_init(self):
         pass
@@ -67,13 +60,8 @@ class AppIntegrationService(ServiceProcess):
         @param GPB containing OOID user ID, spatial, and temporal bounds.
         @retval GPB with list of resource IDs.
         """
+
         log.debug('op_findDataResources service method.')
-
-        log.debug('op_findDataResources calling LoadDummyDataset!!!.')
-        loader = LoadDummyDataset()
-        self.dsID = yield loader.loadDummyDataset(self.rc)
-        log.debug('op_findDataResources LoadDummyDataset!!! returned %s' % str(self.dsID))
-
         try:
             # Instantiate the worker class
             worker = FindDataResources(self)
@@ -94,22 +82,8 @@ class AppIntegrationService(ServiceProcess):
         @param GPB containing resource ID.
         @retval GPB containing detailed metadata.
         """
+
         log.info('op_getDataResourceDetail service method')
-
-        """
-        Change this: provide a service call that the testing entity (either
-        trial or a capability container) can use to add a test dataset.  But
-        for now...
-        """
-        if content.message_parameters_reference.IsFieldSet('data_resource_id'):
-            self.dsID = content.message_parameters_reference.data_resource_id
-        else:
-            log.info('DHE: getDataResourceDetail getting test dataset instance.')
-            log.debug('op_getDataResourceDetail calling LoadDummyDataset!!!.')
-            loader = LoadDummyDataset()
-            self.dsID = yield loader.loadDummyDataset(self.rc)
-            log.debug('op_getDataResourceDetail LoadDummyDataset!!! returned %s' % str(self.dsID))
-
         try:
             
             worker = GetDataResourceDetail(self)
@@ -131,6 +105,7 @@ class AppIntegrationService(ServiceProcess):
         @param GPB containing resource ID.
         @retval GPB containing download URL.
         """
+
         log.info('op_createDownloadURL: '+str(content))
         try:
             worker = CreateDownloadURL(self)
@@ -227,7 +202,6 @@ class AppIntegrationServiceClient(ServiceClient):
                                                                     message,
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
-        (content, headers, payload) = yield self.rpc_send('createDownloadURL', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
  

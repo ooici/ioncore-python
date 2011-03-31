@@ -33,7 +33,8 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
-                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE
+                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
+                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
 
 
 # Create CDM Type Objects
@@ -75,7 +76,6 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
-        self.dsID = None
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -84,11 +84,12 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_findDataResources(self):
 
+        log.debug('Testing getDataResourceDetail.')
+
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
         # Use the message client to create a message object
-        log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
@@ -97,12 +98,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minLongitude = -117.274609
         reqMsg.message_parameters_reference.maxLongitude = -117.174609
         
-        """
-        DHE: temporarily passing the identity of the dummied dataset just
-        created into the client so that it can access because currently there
-        is now way to search.
-        """
-        log.debug('DHE: Calling findDataResources!!...')
+        log.debug('Calling findDataResources to get list of resources.')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
         i = 0
         while i < len(outcome1.message_parameters_reference[0].dataResourceSummary):
@@ -160,29 +156,37 @@ class AppIntegrationTest(IonTestCase):
                   str('\n'))
             i = i + 1
 
-        
-        self.dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
-        
-
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):
 
-        # Create a message client        
+        log.debug('Testing getDataResourceDetail.')
+
+        # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
-        log.debug('DHE: testing getDataResourceDetail')
+        # Use the message client to create a message object
+        log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
+        reqMsg.message_parameters_reference.minLatitude = 32.87521
+        reqMsg.message_parameters_reference.maxLatitude = 32.97521
+        reqMsg.message_parameters_reference.minLongitude = -117.274609
+        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        
+        log.debug('Calling findDataResources!')
+        outcome1 = yield self.aisc.findDataResources(reqMsg)
 
-        log.debug('DHE: AppIntegrationService! instantiating GetDataResourceDetailMsg.\n')
+        dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
         
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
-        if self.dsID is not None:
-            reqMsg.message_parameters_reference.data_resource_id = self.dsID
+        if dsID is not None:
+            reqMsg.message_parameters_reference.data_resource_id = dsID
 
-        log.debug('DHE: Calling getDataResourceDetail!!...')
+        log.debug('Calling getDataResourceDetail.')
         outcome1 = yield self.aisc.getDataResourceDetail(reqMsg)
-        #log.debug('DHE: getDataResourceDetail returned:\n'+str(outcome1))
-        log.debug('DHE: getDataResourceDetail returned:\n' + \
+        log.debug('getDataResourceDetail returned:\n' + \
                   str('resource_id: ') + \
                   str(outcome1.message_parameters_reference[0].data_resource_id) + \
                   str('\n'))
@@ -196,22 +200,19 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_createDownloadURL(self):
 
+        log.debug('Testing createDownloadURL')
+
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
-        log.debug('DHE: testing createDownloadURL')
-
-        # Use the message client to create a message object
-        log.debug('DHE: AppIntegrationService! instantiating CreateDownloadURLMSG.\n')
-        
-        # CHANGE THIS TO CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.minLatitude = 32.87521
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(CREATE_DOWNLOAD_URL_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
 
-        log.debug('DHE: Calling createDownloadURL!!...')
+        log.debug('Calling createDownloadURL.')
         outcome1 = yield self.aisc.createDownloadURL(reqMsg)
-        log.debug('DHE: createDownloadURL returned:\n'+str(outcome1))
+        downloadURL = outcome1.message_parameters_reference[0].download_url
+        log.debug('DHE: createDownloadURL returned:\n' + downloadURL)
 
     @defer.inlineCallbacks
     def test_registerUser(self):
