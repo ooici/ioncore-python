@@ -181,3 +181,35 @@ class TestEventPublisher(IonTestCase):
         self.failUnlessEquals(self.lastmsg.name, "bram")
         self.failUnlessEquals(self.lastmsg.origin, "zxy-402")   # both set in the msg field named "origin" and used for routing key. interesting quirk. 
 
+class TestEventSubscriber(IonTestCase):
+    """
+    Tests the EventSubscriber and derived classes.
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        self._proc = Process()
+        yield self._proc.spawn()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        self._proc.terminate()
+        self._proc = None
+        yield self._stop_container()
+
+    #@defer.inlineCallbacks
+    def test_create(self):
+        """
+        Create several EventSubscribers and derived versions to ensure things are setup correctly.
+        """
+        sub1 = EventSubscriber(process=self._proc)
+        self.failUnless(sub1.event_id is None)
+        self.failUnlessEqual(sub1._binding_key, "*.*")
+
+        sub2 = ResourceLifecycleEventSubscriber(process=self._proc)
+        self.failUnlessEqual(sub2.event_id, RESOURCE_LIFECYCLE_EVENT_ID)
+        self.failUnlessEqual(sub2._binding_key, "%s.*" % str(RESOURCE_LIFECYCLE_EVENT_ID))
+
+        sub3 = ResourceLifecycleEventSubscriber(process=self._proc, origin="ucsd")
+        self.failUnlessEqual(sub3._binding_key, "%s.ucsd" % str(RESOURCE_LIFECYCLE_EVENT_ID))
+
