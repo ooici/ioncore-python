@@ -116,6 +116,7 @@ class PST(IonTestCase):
 
         yield self.psc.undeclare_exchange_space(msg)
 
+    #noinspection PyUnreachableCode
     @defer.inlineCallbacks
     def test_bad_xs_creation(self):
         raise unittest.SkipTest("EMS doesn't do paramater validation yet")
@@ -292,7 +293,7 @@ class PST(IonTestCase):
     def test_query_no_regex(self):
         msg = yield self.create_message(REGEX_TYPE)
         try:
-            idlist = yield self.psc.query_subscribers(msg)
+            yield self.psc.query_subscribers(msg)
         except ReceivedApplicationError:
             return
 
