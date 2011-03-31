@@ -23,10 +23,12 @@ from ion.core.messaging import message_client
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 ION_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
+INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=20024, version=1)
 
 
 class MessageInstanceTest(unittest.TestCase):
 
+    msg_type = None
     
     def setUp(self):
         
@@ -37,14 +39,15 @@ class MessageInstanceTest(unittest.TestCase):
         msg_object = msg_repo.root_object
         msg_object.identity = msg_repo.repository_key
 
-        print dir(msg_object.message_object)
-
-        msg_object.message_object = msg_repo.create_object(ADDRESSLINK_TYPE)
+        msg_object.message_object = msg_repo.create_object(self.msg_type)
 
         msg_repo.commit('Message object instantiated')
 
         self.msg = message_client.MessageInstance(msg_repo)
 
+
+class AddressbookMessageTest(MessageInstanceTest):
+    msg_type = ADDRESSLINK_TYPE
 
     def test_listsetfields(self):
         """ Testing for this Method is more through in the wrapper test
@@ -90,6 +93,25 @@ class MessageInstanceTest(unittest.TestCase):
         self.msg.person[0] = self.msg.CreateObject(PERSON_TYPE)
         self.assertEqual(self.msg.IsFieldSet('person'),True)
 
+    def test_field_props(self):
+        """
+        """
+
+        self.failUnlessEqual(self.msg._Properties['title'].field_type, "TYPE_STRING")
+        self.failUnless(self.msg._Properties['title'].field_enum is None)
+
+class InstrumentMessageTest(MessageInstanceTest):
+    msg_type = INSTRUMENT_TYPE
+
+    def test_field_enum(self):
+        """
+        """
+        self.failUnlessEqual(self.msg._Properties['type'].field_type, "TYPE_ENUM")
+        self.failIf(self.msg._Properties['type'].field_enum is None)
+        self.failUnless(hasattr(self.msg._Properties['type'].field_enum, 'ADCP'))
+        self.failUnless(self.msg._Enums.has_key('InstrumentType'))
+        self.failUnless(hasattr(self.msg._Enums['InstrumentType'], 'ADCP'))
+        self.failUnlessEqual(self.msg._Enums['InstrumentType'].ADCP, 1)
 
 
 

@@ -22,7 +22,7 @@ from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
@@ -169,9 +169,6 @@ class DatasetController(ServiceProcess):
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
 
         ### Check the type of the configuration request
-        if request.IsFieldSet('only_mine') and request.only_mine == True:
-           raise NotImplementedError('Search by owner is not complete yet!')
-
         query = yield self.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
         pair = query.pairs.add()
@@ -206,6 +203,29 @@ class DatasetController(ServiceProcess):
             state_ref = query.CreateObject(LCS_REFERENCE_TYPE)
             state_ref.lcs = request.by_life_cycle_state
             pair.object = state_ref
+
+        if request.IsFieldSet('only_mine') and request.only_mine == True:
+
+            pair = query.pairs.add()
+
+            # Set the predicate search term
+            pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+            pref.key = OWNED_BY_ID
+
+            pair.predicate = pref
+
+            # Set the Object search term
+
+            type_ref = query.CreateObject(IDREF_TYPE)
+
+            # Get the user to associate with this new resource
+            user_id = headers.get('user-id', 'ANONYMOUS')
+            if user_id ==  'ANONYMOUS':
+                user_id = ANONYMOUS_USER_ID
+
+            type_ref.key = user_id
+
+            pair.object = type_ref
 
         result = yield self.asc.get_subjects(query)
 

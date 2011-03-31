@@ -36,7 +36,29 @@ TEST_TYPE = object_utils.create_type_identifier(object_id=20010, version=1)
 
 class WrapperMethodsTest(unittest.TestCase):
     
-    
+    def test_field_props(self):
+        """
+        """
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+
+        self.failUnlessEqual(ab._Properties['title'].field_type, "TYPE_STRING")
+        self.failUnless(ab._Properties['title'].field_enum is None)
+
+    def test_field_enum(self):
+        """
+        """
+        p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
+        ph = p.phone.add()
+        self.failUnlessEqual(ph._Properties['type'].field_type, "TYPE_ENUM")
+        self.failIf(ph._Properties['type'].field_enum is None)
+
+        self.failUnless(hasattr(ph._Properties['type'].field_enum, 'WORK'))
+
+        self.failUnless(hasattr(ph, '_Enums'))
+        self.failUnless(ph._Enums.has_key('PhoneType'))
+        self.failUnless(hasattr(ph._Enums['PhoneType'], 'WORK'))
+        self.failUnlessEqual(ph._Enums['PhoneType'].WORK, 2)
+
     def test_object_setter(self):
         """
         Make sure that we can't mistakenly add attributes to wrapper objects

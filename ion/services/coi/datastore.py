@@ -44,7 +44,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -875,7 +875,10 @@ class DataStoreService(ServiceProcess):
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
-                    self._create_predicate(value)
+                    predicate_repo = self._create_predicate(value)
+                    if predicate_repo is None:
+                        raise DataStoreError('Failed to create predicate: %s' % str(value))
+                    self._create_ownership_association(predicate_repo, ROOT_USER_ID)
 
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
@@ -885,7 +888,10 @@ class DataStoreService(ServiceProcess):
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
-                    self._create_resource(value)
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to Resource Type Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
 
         if self.preload[ION_IDENTITIES_CFG]:
@@ -894,19 +900,20 @@ class DataStoreService(ServiceProcess):
             for key, value in ION_IDENTITIES.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
-                    self._create_resource(value)
-
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to Identity Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
+                    
         if self.preload[ION_DATASETS_CFG]:
             log.info('Preloading Data')
 
             for key, value in ION_DATASETS.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
-                    self._create_resource(value)
-#                    if (self._create_resource(value) is not None):
-#                        res_name = key
-#                        res_id = value[ID_CFG]
-#                        self.preloaded_datasets_dict[res_name] = res_id
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is not None:
+                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
 
         yield self.workbench.flush_initialization_to_backend()
 
@@ -914,16 +921,28 @@ class DataStoreService(ServiceProcess):
 
     def _create_predicate(self,description):
 
-        predicate_type = description[TYPE_CFG]
-        predicate_key = description[ID_CFG]
-        predicate_word = description[PREDICATE_CFG]
+        try:
+            predicate_type = description[TYPE_CFG]
+            predicate_key = description[ID_CFG]
+            predicate_word = description[PREDICATE_CFG]
+        except KeyError, ke:
+            log.info(ke)
+            return None
 
+        try:
+            predicate_repository = self.workbench.create_repository(root_type=predicate_type, repository_key=predicate_key)
+            predicate = predicate_repository.root_object
+            predicate.word = predicate_word
 
-        predicate_repository = self.workbench.create_repository(root_type=predicate_type, repository_key=predicate_key)
-        predicate = predicate_repository.root_object
-        predicate.word = predicate_word
-
-        predicate_repository.commit('Predicate instantiated by datastore bootstrap')
+            predicate_repository.commit('Predicate instantiated by datastore bootstrap')
+        except WorkBenchError, ex:
+            log.info(ex)
+            return None
+        except repository.RepositoryError, ex:
+            log.info(ex)
+            return None
+        
+        return predicate_repository
 
 
 
@@ -931,34 +950,48 @@ class DataStoreService(ServiceProcess):
         """
         Helper method to create resource objects during initialization
         """
+        try:
+            resource_key = description[ID_CFG]
+            resource_description = description[DESCRIPTION_CFG]
+            resource_name = description[NAME_CFG]
+            resource_type = description[TYPE_CFG]
+            content = description[CONTENT_CFG]
+        except KeyError, ke:
+            log.info(ke)
+            return None
 
-        resource_key = description[ID_CFG]
         # Create this resource with a constant ID from the config file
-        resource_repository = self.workbench.create_repository(root_type=RESOURCE_TYPE, repository_key=resource_key)
+        try:
+            resource_repository = self.workbench.create_repository(root_type=RESOURCE_TYPE, repository_key=resource_key)
+        except WorkBenchError, we:
+            log.info(we)
+            return None
+        except repository.RepositoryError, re:
+            log.info(re)
+            return None
+
         resource = resource_repository.root_object
 
-        assert resource_repository.repository_key == resource_key, 'Failure in repository creation!'
         # Set the identity of the resource
         resource.identity = resource_repository.repository_key
 
         # Create the new resource object
-        res_obj = resource_repository.create_object(description[TYPE_CFG])
+        res_obj = resource_repository.create_object(resource_type)
 
         # Set the object as the child of the resource
         resource.resource_object = res_obj
 
         # Name and Description is set by the resource client
-        resource.name = description[NAME_CFG]
-        resource.description = description[DESCRIPTION_CFG]
+        resource.name = resource_name
+        resource.description = resource_description
 
         # Set the type...
         object_utils.set_type_from_obj(res_obj, resource.object_type)
 
         res_type = resource_repository.create_object(IDREF_TYPE)
         # Get the resource type if it exists - otherwise a default will be set!
-        res_type.key = self.type_map.get(description[TYPE_CFG].object_id)
+        res_type.key = self.type_map.get(resource_type.object_id)
         resource.resource_type = res_type
-
 
         # State is set to new by default
         resource.lcs = resource.LifeCycleState.ACTIVE
@@ -967,7 +1000,6 @@ class DataStoreService(ServiceProcess):
 
         # Set the content
         set_content_ok = True
-        content = description[CONTENT_CFG]
         if isinstance(content, dict):
             # If it is a dictionary, set the content of the resource
             for k,v in content.items():
@@ -987,10 +1019,34 @@ class DataStoreService(ServiceProcess):
             return resource_instance
         else:
             self.workbench.clear_repository_key(resource_key)
-            log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % description[NAME_CFG])
+            log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % resource_name)
             return None
 
 
+
+    def _create_ownership_association(self, repo_object, user_id):
+
+        association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
+
+        # Set the subject
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        repo_object.set_repository_reference(id_ref, current_state=True)
+        association_repo.root_object.subject = id_ref
+
+        # Set the predicate
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        id_ref.key = OWNED_BY_ID
+        association_repo.root_object.predicate = id_ref
+
+        # Set teh Object
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        id_ref.key = user_id
+        association_repo.root_object.object = id_ref
+
+        association_repo.commit('Ownership association created for preloaded object.')
+
+
+        return association_repo
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)
