@@ -32,6 +32,8 @@ from ion.core.object import workbench
 from ion.core.object import object_utils
 from ion.core.data.store import Query
 
+from ion.util import procutils as pu
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
@@ -267,11 +269,12 @@ class IndexStoreTest(IStoreTest):
         """return a deferred which returns a initiated instance of a
         backend
         """
-
+        store.IndexStore.kvs={}
+        store.IndexStore.indices={}
         ds = store.IndexStore(indices=['full_name', 'state', 'birth_date'])
 
         return defer.succeed(ds)
-    
+
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         attrs = yield self.ds.get_query_attributes()

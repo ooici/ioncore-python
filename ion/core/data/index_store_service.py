@@ -75,7 +75,8 @@ class IndexStoreService(ServiceProcess):
         system!
         
         """
-        
+        IndexStore.kvs={}
+        IndexStore.indices={}
         self._indexed_store = IndexStore(indices=self.indices)
 
         log.info("Created Index Store Service")

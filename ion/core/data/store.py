@@ -296,9 +296,9 @@ class IndexStore(object):
 
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
-            if not kindex:
-                kindex = {}
-                self.indices[k] = kindex
+            #if not kindex:
+            #    kindex = {}
+            #    self.indices[k] = kindex
             # Create a set of keys if it does not already exist
             kindex[v] = kindex.get(v, set())
             kindex[v].add(key)
