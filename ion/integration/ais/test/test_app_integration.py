@@ -161,10 +161,17 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Testing getDataResourceDetail.')
 
+        #
         # Create a message client
+        #
         mc = MessageClient(proc=self.test_sup)
         
-        # Use the message client to create a message object
+        #
+        # In order to test getDataResourceDetail, we need a dataset resource
+        # ID.  So, first use findDataResources to get the instances of data
+        # resources that match some test criteria, and the first resource ID
+        # out of the results.
+        #
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
@@ -174,11 +181,16 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minLongitude = -117.274609
         reqMsg.message_parameters_reference.maxLongitude = -117.174609
         
-        log.debug('Calling findDataResources!')
+        log.debug('Calling findDataResources.')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
-
+        
         dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
         
+        #
+        # Now create a request message to get the metadata details about the
+        # source (i.e., where the dataset came from) of a particular dataset
+        # resource ID.
+        #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
         if dsID is not None:
@@ -193,7 +205,6 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Variables:\n')
         for var in outcome1.message_parameters_reference[0].variable:
-            #log.debug('  ' + str(var.standard_name) + ':' + str(var.units) + \
             for attrib in var.other_attributes:
                 log.debug('  ' + str(attrib) + str('\n'))
         
