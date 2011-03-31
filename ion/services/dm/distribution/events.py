@@ -42,6 +42,13 @@ class EventPublisher(Publisher):
     msg_type = None
     event_id = None
 
+    # enum Status for 'status' field
+    class Status:
+        IN_PROGRESS = 'IN_PROGRESS'
+        CACHED      = 'CACHED'
+        ERROR       = 'ERROR'
+        NO_CACHE    = 'NO_CACHE'
+
     def topic(self, origin):
         """
         Builds the topic that this event should be published to.
@@ -57,6 +64,28 @@ class EventPublisher(Publisher):
         routing_key = routing_key or "unknown"
 
         Publisher.__init__(self, xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
+
+    def _set_msg_fields(self, msg, msgargs):
+        """
+        Helper method to set fields of a Message instance. Used by create_event.
+
+        @param msg      The Message instance to set fields on.
+        @param msgargs  The dict of field -> values to set fields on the msg with. As fields are found in
+                        the message and set, they are removed from the msgarms param. Passed by ref from
+                        create_event. When an Enum field is discovered that we are trying to set, this method
+                        attempts to find the real enum value by the name of the enum member passed in.
+        """
+        for k,v in msgargs.items():
+            if hasattr(msg, k):
+                # is this an enum field and we've passed a string that looks like it could be a name?
+                if msg._Properties[k].field_type == "TYPE_ENUM" and isinstance(v, str):
+                    # translate v into the real value
+                    assert hasattr(msg._Properties[k].field_enum, v)
+                    v = getattr(msg._Properties[k].field_enum, v)
+                    log.debug("Setting enum field %s to %s" % (str(k), str(v)))
+
+                setattr(msg, k, v)
+                msgargs.pop(k)
 
     @defer.inlineCallbacks
     def create_event(self, **kwargs):
@@ -74,17 +103,11 @@ class EventPublisher(Publisher):
 
         # create base event message, assign values from kwargs
         event_msg = yield self._mc.create_instance(EVENT_MESSAGE_TYPE)
-        for k,v in msgargs.items():
-            if hasattr(event_msg, k):
-                setattr(event_msg, k, v)
-                msgargs.pop(k)
+        self._set_msg_fields(event_msg, msgargs)
 
         # create additional event msg (specific to this event notification), assign values from kwargs
         additional_event_msg = event_msg.CreateObject(self.msg_type)
-        for k, v in msgargs.items():
-            if hasattr(additional_event_msg, k):
-                setattr(additional_event_msg, k, v)
-                msgargs.pop(k)
+        self._set_msg_fields(additional_event_msg, msgargs)
 
         # error checking: see if we have any remaining kwargs
         if len(msgargs) > 0:
@@ -124,6 +147,14 @@ class ResourceLifecycleEventPublisher(EventPublisher):
 
     msg_type = RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE
     event_id = RESOURCE_LIFECYCLE_EVENT_ID
+
+    # enum for State
+    class State:
+        NEW           = 'NEW'
+        READY         = 'READY'
+        ACTIVE        = 'ACTIVE'
+        TERMINATED    = 'TERMINATED'
+        ERROR         = 'ERROR'
 
 class ContainerLifecycleEventPublisher(ResourceLifecycleEventPublisher):
     """
