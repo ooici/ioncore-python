@@ -105,7 +105,14 @@ class TestEventPublisher(IonTestCase):
         self.failUnlessEqual(msg4.additional_data.state, msg3.additional_data.State.ERROR)
         self.failUnlessEqual(msg4.additional_data.state, msg4.additional_data.State.ERROR)
 
-        # @TODO: expose the enums in the specialized publisher
+        msg5 = yield pub3.create_event(state=ResourceLifecycleEventPublisher.State.ACTIVE)
+        self.failUnlessEqual(msg5.additional_data.state, msg3.additional_data.State.ACTIVE)
+
+        self.failUnlessFailure(pub3.create_event(state='NOEXIST'), AssertionError)
+
+        msg6 = yield pub3.create_event(state=ResourceLifecycleEventPublisher.State.READY, status=ResourceLifecycleEventPublisher.Status.NO_CACHE)
+        self.failUnlessEqual(msg6.status, msg3.Status.NO_CACHE)
+        self.failUnlessEqual(msg6.additional_data.state, msg3.additional_data.State.READY)
 
     @defer.inlineCallbacks
     def test_publish_event(self):
