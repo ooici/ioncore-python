@@ -52,7 +52,10 @@ class ProcessManager(BasicLifecycleObject):
         """
         @retval Deferred
         """
-        return defer.succeed(None)
+        if self.supervisor and self.supervisor._get_state() != 'TERMINATED':
+            return self.supervisor.shutdown()
+        else:
+            return defer.succeed(None)
 
     def on_error(self, *args, **kwargs):
         raise RuntimeError("Illegal state change for ProcessManager")

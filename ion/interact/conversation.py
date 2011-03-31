@@ -72,6 +72,7 @@ class Conversation(object):
         """
         self.conv_id = conv_id
         self.conv_type = conv_type
+        self.protocol = conv_type.id
         self.role_bindings = {}
         self.local_role = None
         self.local_process = None

@@ -185,10 +185,10 @@ class IonTestCase(unittest.TestCase):
         """
         Shuts down spawned test processes.
         """
-        if proc:
+        if proc and proc != self.test_sup:
             return proc.shutdown()
         else:
-            return self.test_sup.shutdown()
+            return self.test_sup.shutdown_child_procs()
 
     def _declare_messaging(self, messaging):
         return bootstrap.declare_messaging(messaging)

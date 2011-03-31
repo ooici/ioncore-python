@@ -76,13 +76,14 @@ class RpcInitiator(ConversationRole):
         """
         @brief OUT msg. Send a request message
         """
-        log.debug("In Rpc.request (msg OUT)")
+        log.debug("OUT: Rpc.request")
 
     def failure(self, message, *args, **kwargs):
         """
         @brief IN msg. Receive a request message
         """
-        log.debug("In Rpc.failure (msg IN)")
+        log.debug("IN: Rpc.failure")
+        return self.inform_result(*args, **kweargs)
 
     @defer.inlineCallbacks
     def inform_result(self, message, *args, **kwargs):
@@ -99,15 +100,19 @@ class RpcInitiator(ConversationRole):
             log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
                 process.proc_name, headers['conv-id'], rpc_deferred, headers))
             return
-        rpc_deferred.rpc_call.cancel()
+        if rpc_deferred:
+            rpc_deferred.rpc_call.cancel()
         res = (content, headers, msg)
 
         yield msg.ack()
 
         status = headers.get(process.MSG_STATUS, None)
         if status == process.ION_OK:
-            #Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.callback(res))
+            if rpc_deferred:
+                #Cannot do the callback right away, because the message is not yet handled
+                reactor.callLater(0, lambda: rpc_deferred.callback(res))
+            else:
+                log.error("ERROR. Do not support non-blocking RPC yet")
 
         elif status == process.ION_ERROR:
             code = -1
@@ -122,8 +127,11 @@ class RpcInitiator(ConversationRole):
                 # Received Error is still the catch all!
                 err = failure.Failure(ReceivedError(headers, content))
 
-            # Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.errback(err))
+            if rpc_deferred:
+                # Cannot do the callback right away, because the message is not yet handled
+                reactor.callLater(0, lambda: rpc_deferred.errback(err))
+            else:
+                log.error("ERROR. Do not support non-blocking RPC yet")
 
         else:
             log.error('RPC reply is not well formed. Header "status" must be set!')
@@ -159,13 +167,13 @@ class RpcParticipant(ConversationRole):
         """
         @brief OUT msg. Reply with a failure in request processing
         """
-        log.debug("In Rpc.failure (msg OUT)")
+        log.debug("OUT: Rpc.failure")
 
     def inform_result(self, message, *args, **kwargs):
         """
         @brief OUT msg. Reply with a failure in request processing
         """
-        log.debug("In Rpc.inform_result (msg OUT)")
+        log.debug("OUT: Rpc.inform_result")
 
 class RpcType(ConversationType):
     """

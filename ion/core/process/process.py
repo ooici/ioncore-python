@@ -257,6 +257,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
 
     def shutdown(self):
+        log.debug("[%s] shutdown()" % self.proc_name)
         return self.terminate()
 
     @defer.inlineCallbacks
@@ -290,6 +291,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         yield self.on_terminate(*args, **kwargs)
 
+        # @todo There should be nothing after the terminate call
         yield self.backend_receiver.deactivate()
         yield self.backend_receiver._await_message_processing()
 
@@ -309,14 +311,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
         for lco in self._registered_life_cycle_objects:
             yield defer.maybeDeferred(lco.terminate)
 
-        if len(self.child_procs) > 0:
-            log.info("Shutting down child processes")
-        while len(self.child_procs) > 0:
-            child = self.child_procs.pop()
-            try:
-                res = yield self.shutdown_child(child)
-            except Exception, ex:
-                log.exception("Error terminating child %s" % child.proc_id)
+        # Terminate all child processes
+        yield self.shutdown_child_procs()
 
         yield defer.maybeDeferred(self.plc_terminate)
         log.info('----- Process %s TERMINATED -----' % (self.proc_name))
@@ -604,7 +600,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         if headers == None:
             headers = {}
-        headers['protocol'] = RpcType.CONV_TYPE_RPC
+        headers['protocol'] = rpc_conv.protocol
         headers['performative'] = 'request'
         return self._blocking_send(recv=recv, operation=operation,
                                    content=content, headers=headers,
@@ -626,7 +622,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         if headers == None:
             headers = {}
-        headers['protocol'] = RequestType.CONV_TYPE_REQUEST
+        headers['protocol'] = req_conv.protocol
         headers['performative'] = 'request'
         return self._blocking_send(recv=receiver, operation=action,
                                    content=content, headers=headers,
@@ -645,18 +641,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         @brief Sends a message and waits for conversation message reply.
         @retval a Deferred with the message value on receipt
         """
-        #if headers:
-        #    if 'user-id' in headers:
-        #        log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
-        #    else:
-        #        log.info('>>> [%s] rpc_send(): user-id not specified in headers <<<' % (self.proc_name))
-        #else:
-        #    log.info('>>> [%s] rpc_send(): headers not specified <<<' % (self.proc_name))
-        msgheaders = {}
-        if headers:
-            msgheaders.update(headers)
         assert conv, "Conversation instance must exist for blocking send"
-        msgheaders['conv-id'] = conv.conv_id
 
         # Create a new deferred that the caller can yield on to wait for RPC
         conv.blocking_deferred = defer.Deferred()
@@ -672,13 +657,14 @@ class Process(BasicLifecycleObject, ResponseCodes):
             conv.blocking_deferred.rpc_call = callto
 
         # Call to send()
-        d = self.send(recv, operation, content, msgheaders)
+        d = self.send(recv, operation, content, headers, reply=False, conv=conv)
         # d is a deferred. The actual send of the request message will happen
         # after this method returns. This is OK, because functions are chained
         # to call back the caller on the rpc_deferred when the receipt is done.
+
         return conv.blocking_deferred
 
-    def send(self, recv, operation, content, headers=None, reply=False):
+    def send(self, recv, operation, content, headers=None, reply=False, conv=None):
         """
         @brief Send a message via the process receiver to destination.
             Starts a new conversation.
@@ -688,6 +674,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
         msgheaders['sender-name'] = self.proc_name
         if headers:
             msgheaders.update(headers)
+        if conv is not None:
+            msgheaders['conv-id'] = conv.conv_id
 
         #log.debug("****SEND, headers %s" % str(msgheaders))
         if 'conv-id' in msgheaders:
@@ -889,6 +877,18 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
     def spawn_link(self, childproc, supervisor):
         pass
+
+    @defer.inlineCallbacks
+    def shutdown_child_procs(self):
+        if len(self.child_procs) > 0:
+            log.info("Shutting down child processes")
+        while len(self.child_procs) > 0:
+            child = self.child_procs.pop()
+            try:
+                res = yield self.shutdown_child(child)
+            except Exception, ex:
+                log.exception("Error terminating child %s" % child.proc_id)
+
 
     def shutdown_child(self, childproc):
         return childproc.shutdown()
