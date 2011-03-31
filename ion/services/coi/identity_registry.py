@@ -500,7 +500,7 @@ class IdentityRegistryService(ServiceProcess):
            identity = yield self.rc.get_instance(self._user_dict[cert_info['subject']])
            identity.certificate = request.configuration.certificate
            identity.rsa_private_key = request.configuration.rsa_private_key
-           self.rc.put_instance(identity, 'Updated user credentials')
+           yield self.rc.put_instance(identity, 'Updated user credentials')
            log.debug(str(identity.ResourceIdentity))
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
