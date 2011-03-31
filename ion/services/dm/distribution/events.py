@@ -36,14 +36,52 @@ class EventPublisher(Publisher):
     """
     Base publisher for Event Notifications.
 
-    Override msg_type and event_id in your derived classes.
+    Events are published by various items in the ION system with no knowledge or requirement that anything
+    be listening to them. The EventPublisher base class defines a specially derived Publisher class that
+    can be used to create and publish event notification messages. By default, events are published to the
+    exchange point 'events.topic'.
+
+    You should not use an instance of EventPublisher directly, rather, use one of its derived implementations.
+
+    Call create_event and then publish_event (or the combination method, create_and_publish_event) to send
+    an event notification into the system.
+
+    The create_event method takes kwargs which set the message fields. This is meant to be used in a convenience
+    fashion, you may still alter the message create_event returns using normal message semantics.
+
+    The message sent by EventPublisher is the basic EventMessage (id 2322) which contains common information
+    about an event, and the additional_data field is defined as another message, specific to the type of event
+    being published.
+
+    Implementers:
+        - Override msg_type and event_id in your derived classes. The event_id is unique to each type of event
+          notification, and the msg_type is the type of message that will occupy the additional_data field.
+        - If your message contains any enum fields, you should define convienence classes to allow the user to
+          set the value of those enum fields in create_event without needing to have an instance of the
+          message ahead of time. These classes should follow this model:
+              # enum Direction for 'direction' field in message
+              class Direction:
+                  NORTH = 'NORTH'
+                  SOUTH = 'SOUTH'
+                  EAST  = 'EAST'
+                  WEST  = 'WEST'
+
+          Then, when calling create_event, you can use:
+              SomePublisher.create_event(direction=SomePublisher.Direction.EAST)
+
+          Alternatly, you may set the field in two steps:
+              msg = yield SomePublisher.create_event()
+              msg.direction = msg.Direction.EAST        # using the enum as defined in the message
     """
 
     msg_type = None
     event_id = None
 
-    # enum Status for 'status' field
     class Status:
+        """
+        The enum Status as defined in the EventMessage object.
+        Use this to set the 'status' field using create_event.
+        """
         IN_PROGRESS = 'IN_PROGRESS'
         CACHED      = 'CACHED'
         ERROR       = 'ERROR'
@@ -57,6 +95,13 @@ class EventPublisher(Publisher):
         return "%s.%s" % (str(self.event_id), str(origin))
 
     def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, origin="unknown", *args, **kwargs):
+        """
+        Initializer override.
+        Sets defaults for the EventPublisher.
+
+        @param origin   Sets the origin used in the topic when publishing the event.
+                        This can be overridden when calling publish.
+        """
         self._origin = origin
         self._mc = MessageClient(proc=process)
 
@@ -122,6 +167,12 @@ class EventPublisher(Publisher):
 
     @defer.inlineCallbacks
     def publish_event(self, event_msg, origin=None, **kwargs):
+        """
+        Publishes an event notification.
+
+        @param event_msg    The event message to publish.
+        @param origin       The origin to use in the topic. If not set, uses the origin set in the initializer.
+        """
         origin = origin or self._origin
         assert origin and origin != "unknown"
 
@@ -133,6 +184,7 @@ class EventPublisher(Publisher):
     @defer.inlineCallbacks
     def create_and_publish_event(self, **kwargs):
         """
+        Convenience method which calls both create_event and publish_event in one shot.
         """
         msg = yield self.create_event(**kwargs)
         yield self.publish_event(msg, origin=kwargs.get('origin', None))
