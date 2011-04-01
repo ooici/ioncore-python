@@ -262,6 +262,19 @@ message RegisterIonUserResponse {
 }
 """
 
+# ManageResources GPBs from ion-object-definitions/net/ooici/integration/ais/manageResources/manage_resources.proto
+RESOURCE_TYPES_LIST_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9301, version=1)
+"""
+message ResourceTypesListResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9301;
+       _VERSION = 1;
+   }
+
+   repeated net.ooici.core.link.CASRef resourceTypesList = 1;
+}
+"""
+
 SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
 """
 message SubscriptionInfo {

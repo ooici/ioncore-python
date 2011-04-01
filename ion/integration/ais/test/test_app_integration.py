@@ -557,6 +557,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserEmail is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
+    @defer.inlineCallbacks
+    def test_getResourceTypes(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # create the empty request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourceTypes request')
+        reply = yield self.aisc.getResourceTypes(msg)
+        log.debug('getResourceTypes returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
