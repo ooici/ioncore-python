@@ -19,6 +19,11 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.object import object_utils
 
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
+
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
 message Dataset {
@@ -30,89 +35,20 @@ message Dataset {
 }
 """
 
-
-
-
-RESOURCE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 """
-package net.ooici.core.message;
-
-import "net/ooici/core/link/link.proto";
-
-message ResourceConfigurationRequest{
-    enum _MessageTypeIdentifier {
-      _ID = 10;
-      _VERSION = 1;
-    }
-
-    // The identifier for the resource to configure
-    optional net.ooici.core.link.CASRef resource_reference = 1;
-
-    // The desired configuration object
-    optional net.ooici.core.link.CASRef configuration = 2;
-
-    enum LifeCycleOperation {
-	Activate=1;
-	Deactivate=2;
-	Commission=3;
-	Decommission=4;
-	Retire=5;
-	Develope=6;
-    }
-
-    optional LifeCycleOperation life_cycle_operation = 3;
-
-}
-
-"""
-
-RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
-"""
-message ResourceConfigurationResponse{
-    enum _MessageTypeIdentifier {
-      _ID = 12;
-      _VERSION = 1;
-    }
-
-    // The identifier for the resource to configure
-    optional net.ooici.core.link.CASRef resource_reference = 1;
-
-    // The desired configuration object
-    optional net.ooici.core.link.CASRef configuration = 2;
-
-    optional string result = 3;
-}
-"""
-
-RESOURCE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
-"""
-package net.ooici.core.link;
-
-import "net/ooici/core/type/type.proto";
-
-message CASRef {
-    enum _MessageTypeIdentifier {
-        _ID = 3;
-        _VERSION = 1;
-    }
-	required bytes key = 1;
-	required net.ooici.core.type.GPBType type = 2;
-	required bool isleaf = 3;
-}
-
 message IDRef {
     enum _MessageTypeIdentifier {
         _ID = 4;
         _VERSION = 1;
     }
 	required string key = 1;
-	//required net.ooici.core.type.GPBType type = 2;
 	optional string branch = 3;
-	optional string commit = 4;
+	optional bytes commit = 4;
 }
 """
 
-FindDatasetRequest_TYPE = object_utils.create_type_identifier(object_id=2401, version=1)
+FINDDATASETREQUEST_TYPE = object_utils.create_type_identifier(object_id=2401, version=1)
 """
 message FindDatasetMessage {
     enum _MessageTypeIdentifier {
@@ -121,21 +57,24 @@ message FindDatasetMessage {
 	}
 
     optional bool only_mine = 1 ;
-    optional net.ooici.services.coi.LifeCycleState by_life_cycle_State = 2 [default = ACTIVE];
+    optional net.ooici.services.coi.LifeCycleState by_life_cycle_state = 2 [default = ACTIVE];
     }
 """
 
-ListFindResults_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
+QUERYRESULTS_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 """
 message QueryResult{
     enum _MessageTypeIdentifier {
       _ID = 22;
       _VERSION = 1;
     }
-    repeated net.ooici.core.link.CASRef idref = 1;
+    repeated net.ooici.core.link.CASRef idrefs = 1;
 }
 """
 
+
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 
 class DatasetControllerError(ApplicationError):
@@ -161,6 +100,8 @@ class DatasetController(ServiceProcess):
         # Can be called in __init__ or in slc_init... no yield required
         self.resource_client = ResourceClient(proc=self)
 
+        self.asc = AssociationServiceClient(proc=self)
+
         log.info('SLC_INIT Dataset Controller')
 
     @defer.inlineCallbacks
@@ -177,154 +118,35 @@ class DatasetController(ServiceProcess):
 
         # Check only the type received and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != RESOURCE_REQUEST_TYPE:
+        if request.MessageType != None:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message type ResourceConfigurationRequest, received %s'
+            raise DatasetControllerError('Expected Null message type, received %s'
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
-
-        ### Check the type of the configuration request
-        if request.IsFieldSet('resource_reference'):
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message with NO resource_reference field, received an illegal message!',
-                                     request.ResponseCodes.BAD_REQUEST)
-
-        # Attributes of a resource like name and description should be controlled
-        # by the service that manages them
 
         # Use the resource client to create a resource!
         resource = yield self.resource_client.create_instance(CMD_DATASET_RESOURCE_TYPE,
-                                                              ResourceName='dataset',
-                                                              ResourceDescription='Preposterous instrument resource!')
+                                                              ResourceName='CDM Dataset Resource',
+                                                              ResourceDescription='None')
 
-        ###
-        ### Do any required setup for the new resource object?
-        ###
-
-
-
-
-        ###
-        ### Call pubsub controller to create a topic for the dataset
-        ###
-
-        ###
-        ### Call the pubsub controller to create a binding for the ingestion service to the topic.
-        ###
-
-
-        ###
-        ### Create an association between the topic and the dataset?
-        ###
-
-
-        resource.ResourceLifeCycleState = resource.DEVELOPED
-
-        yield self.rc.put_instance(resource)
+        # What state should this be in at this point?
+        #resource.ResourceLifeCycleState = resource.DEVELOPED
+        #yield self.rc.put_instance(resource)
 
         log.info(str(resource))
 
-
-        response = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_RESPONSE_TYPE)
+        response = yield self.message_client.create_instance(MessageContentTypeID = IDREF_TYPE)
 
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller
 
         # pass the reference
-        response.resource_reference = self.rc.reference_instance(resource)
-
-        # pass the current configuration
-        response.configuration = resource.ResourceObject
+        response.MessageObject = self.resource_client.reference_instance(resource)
 
         # Set a response code in the message envelope
         response.MessageResponseCode = response.ResponseCodes.OK
-
+        
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
-
-
-    @defer.inlineCallbacks
-    def op_update_dataset_resource(self, request, headers, msg):
-        """
-        @Brief What does this mean for a dataset - the ingestion service handles ingesting supplemental data!
-
-        @param params request GPB, 10/1, a request to operate on a resource
-        @retval response, GPB 12/1, a response from the service which handles the resource
-        """
-
-
-
-
-    @defer.inlineCallbacks
-    def op_set_dataset_resource_life_cycle(self, request, headers, msg):
-        """
-        @Brief set the lifecycle state of the dataset resource
-
-        @param params request GPB, 10/1, a request to operate on a resource
-        @retval simple ack message
-        """
-
-        log.info('op_set_dataset_resource_life_cycle: ')
-
-        # Check only the type recieved and linked object types. All fields are
-        #strongly typed in google protocol buffers!
-        if request.MessageType != RESOURCE_REQUEST_TYPE:
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message type ResourceConfigurationRequest, received %s'
-                                     % str(request), request.ResponseCodes.BAD_REQUEST)
-
-        ### Check the type of the configuration request
-        if request.IsFieldSet('configuration'):
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message with NO configuration field, received an illegal message!',
-                                     request.ResponseCodes.BAD_REQUEST)
-
-        ### Check the type of the configuration request
-        if not request.IsFieldSet('resource_reference'):
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message with resource_reference field of type IDRef, received empty configuration!',
-                                     request.ResponseCodes.BAD_REQUEST)
-
-        if request.resource_reference.ObjectType != RESOURCE_REFERENCE_TYPE:
-
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message with resource_reference field of type IDRef, received %s; type %s'
-                    % (str(request.resource_reference), str(request.resource_reference.ObjectClass)),
-                                     request.ResponseCodes.BAD_REQUEST)
-
-        if not request.IsFieldSet('life_cycle_operation'):
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message with a life_cycle_operation field, received an illegal message!',
-                                     request.ResponseCodes.BAD_REQUEST)
-            ### Don't need to check the type of the lco field... it is gpb defined
-
-        # Get the current state of the resource
-        resource = yield self.rc.get_instance(request.resource_reference)
-
-
-        # Business logic to modify physical resources goes inside these if statements!
-        if request.life_cycle_operation == request.MessageObject.LifeCycleOperation.ACTIVATE:
-           resource.ResourceLifeCycleState = resource.ACTIVE
-
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.DEACTIVATE:
-           resource.ResourceLifeCycleState = resource.INACTIVE
-
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.COMMISSION:
-           resource.ResourceLifeCycleState = resource.COMMISSIONED
-
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Decommission:
-           resource.ResourceLifeCycleState = resource.DECOMMISSIONED
-
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Retire:
-           resource.ResourceLifeCycleState = resource.RETIRED
-
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Develop:
-           resource.ResourceLifeCycleState = resource.DEVELOPED
-
-        yield self.rc.put_instance(resource)
-
-        # Just reply ok...
-        yield self.reply_ok(msg)
-
 
 
     @defer.inlineCallbacks
@@ -336,15 +158,79 @@ class DatasetController(ServiceProcess):
         @retval ListFindResults Type, GPB 22/1, A list of Dataset Resource References that match the request
         """
 
-        # Request params:
-        #   By Owner
-        #   Assume LCS Active unless specified
-        #   By Name - What is name!!!
 
-        # Assumed - By type datast
+        log.info('op_find_dataset_resources: ')
 
-        # Return - a list of dataset resources!
+        # Check only the type recieved and linked object types. All fields are
+        #strongly typed in google protocol buffers!
+        if request.MessageType != FINDDATASETREQUEST_TYPE:
+            # This will terminate the hello service. As an alternative reply okay with an error message
+            raise DatasetControllerError('Expected message type FindDataSetRequest, received %s'
+                                     % str(request), request.ResponseCodes.BAD_REQUEST)
 
+        ### Check the type of the configuration request
+        query = yield self.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = query.pairs.add()
+
+        # Set the predicate search term
+        pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = query.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
+
+        ### Check the type of the configuration request
+        if request.IsFieldSet('by_life_cycle_state'):
+
+            # Add a life cycle state request
+            pair = query.pairs.add()
+
+            # Set the predicate search term
+            pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+            pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+            pair.predicate = pref
+
+
+            # Set the Object search term
+            state_ref = query.CreateObject(LCS_REFERENCE_TYPE)
+            state_ref.lcs = request.by_life_cycle_state
+            pair.object = state_ref
+
+        if request.IsFieldSet('only_mine') and request.only_mine == True:
+
+            pair = query.pairs.add()
+
+            # Set the predicate search term
+            pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+            pref.key = OWNED_BY_ID
+
+            pair.predicate = pref
+
+            # Set the Object search term
+
+            type_ref = query.CreateObject(IDREF_TYPE)
+
+            # Get the user to associate with this new resource
+            user_id = headers.get('user-id', 'ANONYMOUS')
+            if user_id ==  'ANONYMOUS':
+                user_id = ANONYMOUS_USER_ID
+
+            type_ref.key = user_id
+
+            pair.object = type_ref
+
+        result = yield self.asc.get_subjects(query)
+
+        # The result is the same type
+        self.reply_ok(msg, result)
 
 
 
@@ -367,20 +253,22 @@ class DatasetControllerClient(ServiceClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def update_dataset_resource(self, msg):
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('update_dataset_resource', msg)
-
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
     def set_dataset_resource_life_cycle(self, msg):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('set_dataset_resource_life_cycle', msg)
 
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def find_dataset_resources(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('find_dataset_resources', msg)
+
+        defer.returnValue(content)
+
+
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DatasetController)

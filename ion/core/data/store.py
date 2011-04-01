@@ -57,8 +57,10 @@ class Store(object):
     """
     implements(IStore)
 
+    kvs = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
+        pass
 
     def get(self, key):
         """
@@ -105,7 +107,7 @@ class IIndexStore(IStore):
         @retval Deferred, for value associated with key, or None if not existing.
         """
 
-    def put(key, value, index_attributes={}):
+    def put(key, value, index_attributes=None):
         """
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
@@ -134,14 +136,14 @@ class IIndexStore(IStore):
         @param index_attributes an update to the dictionary of attributes by which to index this value of this key
         """        
     
-    def has_key(self, key):
+    def has_key(key):
         """
         Checks to see if the key exists in the column family
         @param key is the key to check in the column family
         @retVal Returns a bool in a deferred
         """ 
     
-    def get_query_attributes():
+    def get_query_attributes( ):
         """
         Return the column names that are indexed.
         """
@@ -171,13 +173,17 @@ class IndexStore(object):
     """
     implements(IIndexStore)
 
+    kvs = {}
+    indices = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
-        self.indices = {}
+        #self.kvs = {}
+        #self.indices = {}
         
         if kwargs.has_key('indices'):
             for name in kwargs.get('indices'):
-                self.indices[name]={}
+                if not self.indices.has_key(name):
+                    self.indices[name]={}
 
     def get(self, key):
         """
@@ -189,12 +195,15 @@ class IndexStore(object):
         else:
             return defer.maybeDeferred(row.get, "value")
 
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         """
         @see IStore.put
         Raises an exception if index_attibutes contains attributes that are not indexed
         by the underlying store.
         """
+        if index_attributes is None:
+            index_attributes = {}
+            
         self._update_index(key, index_attributes)
                         
         return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})        
@@ -219,8 +228,10 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
+        log.debug("In query: predicates %s" % query_predicates)
+
         predicates = query_predicates.get_predicates()
-        
+
         eq_filter = lambda x: x[2] == Query.EQ
         preds_eq = filter(eq_filter, predicates)
         keys = set()
@@ -231,8 +242,9 @@ class IndexStore(object):
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
-        
+
         for k,v,p in predicates:
+
             kindex = self.indices.get(k,None)
             if p == Query.EQ:
                 
@@ -245,19 +257,20 @@ class IndexStore(object):
                     if attr_val > v:
                         matches.update(kindex.get(attr_val,set()))
                 keys.intersection_update(matches)
-        
-        log.info("keys: "+ str(keys))
+
+        #log.debug("keys: "+ str(keys))
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
-                result[k] = self.kvs.get(k)
-                
+                result[k] = self.kvs.get(k).copy()
+
+        log.debug("Query Results: %s" % result)
+
         return defer.succeed(result)                
     
     def _update_index(self, key, index_attributes):
-        log.debug("In _update_index")
-        log.debug("key %s index_attributes %s" % (key,index_attributes))
+        log.debug("In _update_index: key %s index_attributes %s" % (key,index_attributes))
         #Ensure that we are updating attributes that are indexed.
         query_attribute_names = set(self.indices.keys())
         index_attribute_names = set(index_attributes.keys())
@@ -265,12 +278,27 @@ class IndexStore(object):
         if not index_attribute_names.issubset(query_attribute_names):
             bad_attrs = index_attribute_names.difference(query_attribute_names)
             raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
-        
+
+        current_attrs = self.kvs.get(key)
+        if current_attrs is not None:
+
+            changed_attrs = {}
+            for k in index_attributes.keys():
+                if current_attrs.has_key(k):
+                    changed_attrs[k] = current_attrs.get(k)
+
+
+            for k,v in changed_attrs.items():
+                kindex = self.indices.get(k)
+                # Create a set of keys if it does not already exist
+                kindex[v].discard(key)
+
+
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
-            if not kindex:
-                kindex = {}
-                self.indices[k] = kindex
+            #if not kindex:
+            #    kindex = {}
+            #    self.indices[k] = kindex
             # Create a set of keys if it does not already exist
             kindex[v] = kindex.get(v, set())
             kindex[v].add(key)
@@ -313,6 +341,13 @@ class Query:
     GT = "GT"
     def __init__(self):
         self._predicates = []
+
+
+    def __repr__(self):
+        res = ''
+        for item in self._predicates:
+            res += str(item) + '\n'
+        return res
 
     def add_predicate_eq(self, name, value):
         self._predicates.append((name,value,Query.EQ))

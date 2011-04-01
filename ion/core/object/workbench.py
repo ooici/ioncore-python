@@ -134,7 +134,7 @@ class WorkBench(object):
         return repo, repo.root_object
 
 
-    def create_association(self, subject, predicate, obj):
+    def create_association(self, subject, predicate, obj, commit_msg=None):
         """
         @Brief Create an association repository object in your workbench
         @param subject is a resource instance or a repository object
@@ -149,7 +149,9 @@ class WorkBench(object):
         self._set_association(association_repo, predicate, 'predicate')
         self._set_association(association_repo, obj, 'object')
 
-
+        if commit_msg is None:
+            commit_msg = 'Created association'
+        association_repo.commit(commit_msg)
 
         return association_repo
 
@@ -269,9 +271,11 @@ class WorkBench(object):
         commit_list = []
         if repo is None:
             #if it does not exist make a new one
+            cloning = True
             repo = repository.Repository(repository_key=repo_name)
             self.put_repository(repo)
-        else: 
+        else:
+            cloning = False
             # If we have a current version - get the list of commits
             commit_list = self.list_repository_commits(repo)
 
@@ -289,6 +293,11 @@ class WorkBench(object):
 
             ex_msg = re.msg_content
             msg_headers = re.msg_headers
+
+            if cloning:
+                # Clear the repository that was created for the clone
+                self.clear_repository(repo)
+                del repo
 
             if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
 
@@ -351,7 +360,7 @@ class WorkBench(object):
 
         repo = self.get_repository(request.repository_key)
         if not repo:
-            raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.ResponseCodes.NOT_FOUND)
+            raise WorkBenchError('Repository Key "%s" not found' % request.repository_key, request.ResponseCodes.NOT_FOUND)
 
         if repo.status != repo.UPTODATE:
             raise WorkBenchError('Invalid pull request. Requested Repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
@@ -503,6 +512,12 @@ class WorkBench(object):
 
         #Iterate the list and build the message to send
         for repo in repos:
+
+            commit_head = repo.commit_head
+            if commit_head is None:
+                log.warning('No commits found in repository during push: \n' + str(repo))
+                raise WorkBenchError('Can not push a repository which has no commits!')
+
             repostate = pushmsg.repositories.add()
 
             repostate.repository_key = repo.repository_key
@@ -675,11 +690,13 @@ class WorkBench(object):
         The return value is a list of binary SHA1 keys
         """
 
+        '''
         if repo.status == repo.MODIFIED:
             log.warn('Automatic commit called during pull. Commit should be called first!')
             comment='Commiting to send message with wrapper object'
             repo.commit(comment=comment)
-
+        '''
+        
         cref_set = set()
         for branch in repo.branches:
 
@@ -714,12 +731,12 @@ class WorkBench(object):
 
         The method is a bit trivial - candidate for removal!
         """
-
+        '''
         if repo.status == repo.MODIFIED:
             log.warn('Automatic commit called during push. Commit should be called first!')
             comment='Commiting to push repo.'
             repo.commit(comment=comment)
-
+        '''
 
         return repo.index_hash.keys()
 

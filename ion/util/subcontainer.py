@@ -61,7 +61,8 @@ class Subcontainer(Process):
 
             OSProcess.__init__(self, binary=bintorun, spawnargs=spawnargs, startdir=pathtorun)
 
-        def spawn(self, binary=None, args=[]):
+        def spawn(self, binary=None, args=None):
+            if args is None: args = []
             self._defer_spawn = OSProcess.spawn(self, binary, args)
 
             # TODO: cannot figure out how to wait on stdout, it only goes to the log file and not stdout, can't figure

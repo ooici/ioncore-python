@@ -75,7 +75,7 @@ class LRUDict(object):
             self.size = size
 
 
-    def __init__(self, limit, pairs=[], use_size=False):
+    def __init__(self, limit, pairs=None, use_size=False):
         """ limit is either an integer item count or a size in bytes. """
 
         self.limit = max(limit, 1)
@@ -85,6 +85,7 @@ class LRUDict(object):
         self.use_size = use_size
         self.total_size = 0
 
+        if pairs is None: pairs = []
         for key, value in pairs:
             self[key] = value
 

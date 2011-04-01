@@ -11,7 +11,6 @@ services are not running yet.
 
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
-from ion.util.config import Config
 from ion.util.tcp_connections import TCPConnection
 
 from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore
@@ -26,7 +25,7 @@ class CassandraBootStrap:
         """
         Get init args from the bootstrap
         """
-        storage_conf = storage_configuration_utility.storage_conf
+        storage_conf = storage_configuration_utility.STORAGE_CONF_DICTIONARY
         #storage_conf = Config("res/config/storage.cfg")
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
@@ -34,7 +33,7 @@ class CassandraBootStrap:
         authorization_dictionary = {"username":username, "password":password}    
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
         TCPConnection.__init__(self,host, port, self._manager)
-        self.client = CassandraClient(self._manager) 
+        self.client = CassandraClient(self._manager)
 
 
 class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):

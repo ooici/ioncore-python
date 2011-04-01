@@ -16,16 +16,10 @@ from ion.util.state_object import BasicStates
 from ion.test.iontest import IonTestCase
 from ion.core import ioninit
 
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
 from ion.core.process.process import Process
 from ion.core.messaging.receiver import Receiver
 from ion.core.messaging import messaging
 import ion.util.procutils as pu
-
-from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
-
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -35,7 +29,32 @@ class TestPublisher(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -76,6 +95,15 @@ class TestPublisher(IonTestCase):
         yield proc.register_life_cycle_object(pub1)
 
         self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
+
+    @defer.inlineCallbacks
+    def test_psc_plus_factory(self):
+        # a Publisher is attached to a process
+        proc = Process()
+        yield proc.spawn()
+
+        fact = PublisherFactory(xp_name='science_data', process=proc)
+        yield fact.build('fubar')
 
     @defer.inlineCallbacks
     def test_publisher_factory_create(self):
@@ -127,7 +155,7 @@ class TestPublisher(IonTestCase):
             binding_key = kwargs.pop('binding_key', None)
             self.msgs = []
             Receiver.__init__(self, *args, **kwargs)
-            if binding_key == None:
+            if binding_key is None:
                binding_key = self.xname
 
             self.binding_key = binding_key
@@ -176,7 +204,32 @@ class TestSubscriber(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -225,9 +278,12 @@ class TestSubscriber(IonTestCase):
         args = [('xp_name','magnet.topic'),
                 ('process',proc)]
 
+        log.debug('This should fail')
         self.failUnlessFailure(sf.build(**dict([args[0]])), AssertionError)    # xp_name
+        log.debug('This should fail too')
         self.failUnlessFailure(sf.build(**dict([args[1]])), AssertionError)    # process
 
+        log.debug('this one should work')
         sub = yield sf.build(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
         self.failUnless(sub._get_state() == BasicStates.S_ACTIVE)
@@ -236,6 +292,7 @@ class TestSubscriber(IonTestCase):
         # now lets make a factory where we can specify the xp_name and process as defaults
         sf2 = SubscriberFactory(**dict(args))
 
+        log.debug('this one should also work')
         sub2 = yield sf2.build()
 
         self.failUnlessIsInstance(sub2, Subscriber)
@@ -244,6 +301,7 @@ class TestSubscriber(IonTestCase):
         self.failUnless(sub2._process == proc)
 
         # use the same factory to override the default xp_name
+        log.debug('failure is not an option')
         sub3 = yield sf2.build(xp_name="afakeexchange")
 
         self.failUnlessIsInstance(sub3, Subscriber)
@@ -290,7 +348,32 @@ class TestPublisherAndSubscriber(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -313,7 +396,7 @@ class TestPublisherAndSubscriber(IonTestCase):
             msgs.append(content['content'])
 
         pub = yield pf.build(routing_key='arf_test')
-        sub = yield sf.build(binding_key='arf_test', handler=handle_msg)
+        yield sf.build(binding_key='arf_test', handler=handle_msg)
 
         yield pub.publish('get stuck in')
         yield pu.asleep(1.0)

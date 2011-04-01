@@ -12,6 +12,7 @@ import re
 import time
 import uuid
 
+import os
 from twisted.internet import defer, reactor
 
 import ion.util.ionlog
@@ -176,3 +177,48 @@ def currenttime_ms():
     """
     return int(currenttime() * 1000)
 
+
+def get_ion_path(filename):
+    """
+    @brief running twisted and trial can do nasty things to the path and the current working directory. This method
+    solves that problem for a relative path to a file. It will normalize the results so that the path is accessible
+    in both trial test cases where the CWD is ioncore-python/bin and in a twistd -n cc case where the CWD is ioncore-python.
+    @param filename is a path to a file. If some funny business with the way ion is run mucks up the relative path,
+    this method tries to correct it.
+    @retval an absolute path to the first file found that fits the pattern specified in filename
+    """
+
+    # Deal with path problems - maybe too smart, there is room to get the wrong file this way!!!
+    if not os.path.exists(filename):
+
+        cwd = os.path.abspath('.')
+
+        myfile = filename
+
+        # Strip off any leading relative path stuff
+        if myfile[0:3] == '../':
+            while myfile[0:3] == '../':
+                myfile = myfile[3:]
+
+
+        # Now create an absolute path to the file - deal with the fact that the CWD may be
+        # ioncore-python or ioncore-python/bin
+        while cwd != '/':
+
+            head, tail = os.path.split(cwd)
+
+            test_name = os.path.join(head, myfile)
+
+            if os.path.exists(test_name):
+                filename = test_name
+                break
+            else:
+
+                cwd = head
+        else:
+            raise IOError('Could not find the data file you specified: "%s"' % filename)
+
+
+    log.info('Found file on path: "%s"' % filename)
+
+    return filename

@@ -13,25 +13,28 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-#from ion.integration.r1integration_service import R1IntegrationServiceClient
-from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
+from ion.core.exception import ReceivedApplicationError
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+
 from ion.test.iontest import IonTestCase
 
-from ion.core.object import object_utils
+from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
+from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
                                                        UPDATE_USER_EMAIL_TYPE,   \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
-                                                       OOI_ID_TYPE, \
+                                                       REGISTER_USER_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
-                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE
+                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
+                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
 
 
 # Create CDM Type Objects
@@ -58,8 +61,12 @@ class AppIntegrationTest(IonTestCase):
         yield self._start_container()
         services = [
             {'name':'app_integration','module':'ion.integration.ais.app_integration_service','class':'AppIntegrationService'},
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
+                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
+            {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
@@ -69,9 +76,6 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
-        #self.aisc = R1IntegrationServiceClient(proc=sup)
-        #self.rc = ResourceClient(proc=sup)
-        self.dsID = None
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -80,11 +84,100 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_findDataResources(self):
 
+        log.debug('Testing getDataResourceDetail.')
+
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
         
         # Use the message client to create a message object
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.minLatitude  = 32.87521
+        reqMsg.message_parameters_reference.maxLatitude  = 32.97521
+        reqMsg.message_parameters_reference.minLongitude = -117.274609
+        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
+
+        
+        log.debug('Calling findDataResources to get list of resources.')
+        outcome1 = yield self.aisc.findDataResources(reqMsg)
+        i = 0
+        while i < len(outcome1.message_parameters_reference[0].dataResourceSummary):
+            log.debug('DHE: findDataResources returned:\n' + \
+                  'user_ooi_id: ' + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].user_ooi_id) + \
+                  '\n' + \
+                  str('resource_id: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].data_resource_id) + \
+                  str('\n') + \
+                  str('title: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].title) + \
+                  str('\n') + \
+                  str('institution: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].institution) + \
+                  str('\n') + \
+                  str('source: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].source) + \
+                  str('\n') + \
+                  str('references: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].references) + \
+                  str('\n') + \
+                  str('ion_time_coverage_start: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_start) + \
+                  str('\n') + \
+                  str('ion_time_coverage_end: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_end) + \
+                  str('\n') + \
+                  str('summary: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].summary) + \
+                  str('\n') + \
+                  str('comment: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].comment) + \
+                  str('\n') + \
+                  str('ion_geospatial_lat_min: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_min) + \
+                  str('\n') + \
+                  str('ion_geospatial_lat_max: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_max) + \
+                  str('\n') + \
+                  str('ion_geospatial_lon_min: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_min) + \
+                  str('\n') + \
+                  str('ion_geospatial_lon_max: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_max) + \
+                  str('\n') + \
+                  str('ion_geospatial_vertical_min: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_min) + \
+                  str('\n') + \
+                  str('ion_geospatial_vertical_max: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_max) + \
+                  str('\n') + \
+                  str('ion_geospatial_vertical_positive: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_positive) + \
+                  str('\n'))
+            i = i + 1
+
+    @defer.inlineCallbacks
+    def test_getDataResourceDetail(self):
+
+        log.debug('Testing getDataResourceDetail.')
+
+        #
+        # Create a message client
+        #
+        mc = MessageClient(proc=self.test_sup)
+        
+        #
+        # In order to test getDataResourceDetail, we need a dataset resource
+        # ID.  So, first use findDataResources to get the instances of data
+        # resources that match some test criteria, and the first resource ID
+        # out of the results.
+        #
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
@@ -94,120 +187,49 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minLongitude = -117.274609
         reqMsg.message_parameters_reference.maxLongitude = -117.174609
         
-        """
-        DHE: temporarily passing the identity of the dummied dataset just
-        created into the client so that it can access because currently there
-        is now way to search.
-        """
-        log.debug('DHE: Calling findDataResources!!...')
+        log.debug('Calling findDataResources.')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
-        log.debug('DHE: findDataResources returned:\n' + \
-                  'user_ooi_id: ' + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].user_ooi_id) + \
-                  '\n' + \
-                  str('resource_id: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id) + \
-                  str('\n') + \
-                  str('title: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].title) + \
-                  str('\n') + \
-                  str('institution: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].institution) + \
-                  str('\n') + \
-                  str('source: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].source) + \
-                  str('\n') + \
-                  str('references: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].references) + \
-                  str('\n') + \
-                  str('ion_time_coverage_start: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_time_coverage_start) + \
-                  str('\n') + \
-                  str('ion_time_coverage_end: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_time_coverage_end) + \
-                  str('\n') + \
-                  str('summary: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].summary) + \
-                  str('\n') + \
-                  str('comment: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].comment) + \
-                  str('\n') + \
-                  str('ion_geospatial_lat_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lat_min) + \
-                  str('\n') + \
-                  str('ion_geospatial_lat_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lat_max) + \
-                  str('\n') + \
-                  str('ion_geospatial_lon_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lon_min) + \
-                  str('\n') + \
-                  str('ion_geospatial_lon_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lon_max) + \
-                  str('\n') + \
-                  str('ion_geospatial_vertical_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_min) + \
-                  str('\n') + \
-                  str('ion_geospatial_vertical_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_max) + \
-                  str('\n') + \
-                  str('ion_geospatial_vertical_positive: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_positive) + \
-                  str('\n'))
-
         
-        self.dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
+        dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
         
-
-    @defer.inlineCallbacks
-    def test_getDataResourceDetail(self):
-
-        # Create a message client        
-        mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
-        
-        log.debug('DHE: testing getDataResourceDetail')
-
-        log.debug('DHE: AppIntegrationService! instantiating GetDataResourceDetailMsg.\n')
-        
+        #
+        # Now create a request message to get the metadata details about the
+        # source (i.e., where the dataset came from) of a particular dataset
+        # resource ID.
+        #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
-        if self.dsID != None:
-            reqMsg.message_parameters_reference.data_resource_id = self.dsID
+        if dsID is not None:
+            reqMsg.message_parameters_reference.data_resource_id = dsID
 
-        log.debug('DHE: Calling getDataResourceDetail!!...')
+        log.debug('Calling getDataResourceDetail.')
         outcome1 = yield self.aisc.getDataResourceDetail(reqMsg)
-        #log.debug('DHE: getDataResourceDetail returned:\n'+str(outcome1))
-        log.debug('DHE: getDataResourceDetail returned:\n' + \
+        log.debug('getDataResourceDetail returned:\n' + \
                   str('resource_id: ') + \
                   str(outcome1.message_parameters_reference[0].data_resource_id) + \
                   str('\n'))
 
         log.debug('Variables:\n')
         for var in outcome1.message_parameters_reference[0].variable:
-            #log.debug('  ' + str(var.standard_name) + ':' + str(var.units) + \
             for attrib in var.other_attributes:
                 log.debug('  ' + str(attrib) + str('\n'))
         
     @defer.inlineCallbacks
     def test_createDownloadURL(self):
 
+        log.debug('Testing createDownloadURL')
+
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
         
-        log.debug('DHE: testing createDownloadURL')
-
-        # Use the message client to create a message object
-        log.debug('DHE: AppIntegrationService! instantiating CreateDownloadURLMSG.\n')
-        
-        # CHANGE THIS TO CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.minLatitude = 32.87521
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(CREATE_DOWNLOAD_URL_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
 
-        log.debug('DHE: Calling createDownloadURL!!...')
+        log.debug('Calling createDownloadURL.')
         outcome1 = yield self.aisc.createDownloadURL(reqMsg)
-        log.debug('DHE: createDownloadURL returned:\n'+str(outcome1))
+        downloadURL = outcome1.message_parameters_reference[0].download_url
+        log.debug('DHE: createDownloadURL returned:\n' + downloadURL)
 
     @defer.inlineCallbacks
     def test_registerUser(self):
@@ -217,7 +239,7 @@ class AppIntegrationTest(IonTestCase):
 
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -271,10 +293,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
+        if reply.message_parameters_reference[0].user_already_registered != False:
+            self.fail("response does not indicate user wasn't already registered")
+        if reply.message_parameters_reference[0].user_is_admin != True:
+            self.fail("response does not indicate user is administrator")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
             
         # try to re-register this user for a second time
         reply = yield self.aisc.registerUser(msg)
@@ -282,11 +308,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
+        if reply.message_parameters_reference[0].user_already_registered != True:
+            self.fail("response does not indicate user was already registered")
+        if reply.message_parameters_reference[0].user_is_admin != True:
+            self.fail("response does not indicate user is administrator")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
-        log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: re-registration received GPB = "+str(reply.message_parameters_reference[0]))
         
         # try to send registerUser the wrong GPB
         # create a bad request GPBs
@@ -302,7 +332,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o certificate
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         reply = yield self.aisc.registerUser(msg)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
@@ -318,9 +348,21 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
+        # test for authentication policy failure
+        # create the update dispatcher queue request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_DISPATCH_QUEUE_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.queue_name = "some_queue_name"
+        try:
+            reply = yield self.aisc.updateUserDispatcherQueue(msg)
+            self.fail('updateUserDispatcherQueue did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("updateUserDispatcherQueue correctly raised exception for ANONYMOUS ooi_id")
+
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -374,16 +416,20 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
 
         # create the updateUserDispatcherQueue request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserDispatcherQueue request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_DISPATCH_QUEUE_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         msg.message_parameters_reference.queue_name = "some_dispatcher_queue"
+        try:
+            reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserDispatcherQueue incorrectly raised exception for an authenticated ooi_id')
         reply = yield self.aisc.updateUserDispatcherQueue(msg)
         log.debug('updateUserDispatcherQueue returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -419,9 +465,21 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
+        # test for authentication policy failure
+        # create the update Email request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_EMAIL_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
+        try:
+            reply = yield self.aisc.updateUserEmail(msg)
+            self.fail('updateUserEmail did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("updateUserEmail correctly raised exception for ANONYMOUS ooi_id")
+
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -475,17 +533,20 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
-
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
+        
         # create the update Email request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_EMAIL_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
-        reply = yield self.aisc.updateUserEmail(msg)
+        try:
+            reply = yield self.aisc.updateUserEmail(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserEmail incorrectly raised exception for an authenticated ooi_id')
         log.debug('updateUserEmail returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')

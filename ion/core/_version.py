@@ -4,7 +4,7 @@
 @file ion/core/_version.py
 @author Dorian Raymer
 @author Michael Meisinger
-@brief sets the version for ION classes
+@brief Version-handling for ION classes
 """
 
 import os
@@ -158,5 +158,3 @@ class Version(object):
             return ''
         return ' (Git:%s)' % commit
 
-# VERSION !!! This is the main version !!!
-version = Version('ion', 0, 4, 3)

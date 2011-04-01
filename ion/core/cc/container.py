@@ -14,6 +14,7 @@ import os
 import sys
 
 from twisted.internet import defer
+from twisted.python import failure
 from zope.interface import implements, Interface
 
 import ion.util.ionlog
@@ -48,6 +49,8 @@ class Container(BasicLifecycleObject):
 
     def __init__(self):
         BasicLifecycleObject.__init__(self)
+
+        self._fatal_error_encountered = False
 
         # Config instance
         self.config = None
@@ -130,12 +133,10 @@ class Container(BasicLifecycleObject):
         Container._started = False
 
     def on_error(self, *args, **kwargs):
-        """this might be where reactor.stop should happen
-        reactor.stop should call stopService on the CapabilityContainer
-        Sevice, so we shouldn't need to do that here.
-        The only problem is, this gets called more than once...duh! ;-p
+        """An error here is always fatal.
         """
-        raise RuntimeError("Illegal state change for container")
+        #raise RuntimeError("Illegal state change for container")
+        self.fatalError()
 
     # --- Container API -----------
 
@@ -170,6 +171,29 @@ class Container(BasicLifecycleObject):
 
     # Container Events
 
+    def fatalError(self, ex=None):
+        """
+        Container event that componenets/processes can raise when something
+        goes really wrong. 
+        The result of the fatalError can cause the whole container to
+        shutdown by calling reactor.stop
+        reactor.stop will call stopService on CapabilityContainer Service 
+        which, in turn, will terminate this container lifecycleobject,
+        which then terminates its lifecycle objects.
+        """
+        log.warning('fatalError event')
+        log.warning(str(ex))
+        f = failure.Failure()
+        log.warning(str(f.getTraceback()))
+        f.printDetailedTraceback()
+        log.info("The container suffered a fatal error event and is crashing.") 
+        log.info("The last traceback, in full detail, was written to stdout.")
+        if not self._fatal_error_encountered:
+            self._fatal_error_encountered = True
+            from twisted.internet import reactor
+            reactor.stop()
+
+
     def exchangeConnectionLost(self, reason):
         """
         The exchange manager notifies the container when the amqp
@@ -178,8 +202,7 @@ class Container(BasicLifecycleObject):
         is terminated) or unexpected, indicating an error situation.
         """
         log.info('exchangeConnectionLost %s' % (str(reason),))
-        from twisted.internet import reactor
-        reactor.stop()
+        self.fatalError(reason)
 
     def __str__(self):
         return "CapabilityContainer(state=%s,%r)" % (

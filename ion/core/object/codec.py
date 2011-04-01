@@ -131,9 +131,11 @@ def pack_structure(content):
     obj_set.discard(root_obj)
 
     container_structure = _pack_container(root_obj, obj_set)
-    log.debug('pack_structure: Packing Complete!')
 
     serialized = container_structure.SerializeToString()
+
+    log.debug('pack_structure: Packing Complete!')
+
     return serialized
 
 def _pack_container(head, objects):

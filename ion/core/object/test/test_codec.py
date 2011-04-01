@@ -25,7 +25,7 @@ ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=
 ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
 
 
-class WorkBenchTest(unittest.TestCase):
+class CodecTest(unittest.TestCase):
 
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')

@@ -116,9 +116,10 @@ class PST(IonTestCase):
 
         yield self.psc.undeclare_exchange_space(msg)
 
+    #noinspection PyUnreachableCode
     @defer.inlineCallbacks
     def test_bad_xs_creation(self):
-        raise unittest.SkipTest('EMS doesnt do paramater validation yet')
+        raise unittest.SkipTest("EMS doesn't do paramater validation yet")
         # Make sure it fails if you skip the argument
 
         msg = yield self.create_message(XS_TYPE)
@@ -239,7 +240,16 @@ class PST(IonTestCase):
         msg.resource_reference = pid.id_list[0]
 
         yield self.psc.undeclare_publisher(msg)
-        
+
+    @defer.inlineCallbacks
+    def test_query_publishers(self):
+        yield self._declare_publisher()
+
+        msg = yield self.create_message(REGEX_TYPE)
+        msg.regex = '.+'
+        plist = yield self.psc.query_publishers(msg)
+        self.failUnless(len(plist.id_list) > 0)
+
     @defer.inlineCallbacks
     def _subscribe(self):
         xs_id, xp_id, topic_id = yield self._declare_topic()
@@ -268,6 +278,26 @@ class PST(IonTestCase):
         msg.resource_reference = rc.id_list[0]
 
         yield self.psc.unsubscribe(msg)
+
+    @defer.inlineCallbacks
+    def test_query_subscribers(self):
+        # Create an entry to find
+        yield self._subscribe()
+
+        msg = yield self.create_message(REGEX_TYPE)
+        msg.regex = '.+'
+        idlist = yield self.psc.query_subscribers(msg)
+        self.failUnless(len(idlist.id_list) > 0)
+
+    @defer.inlineCallbacks
+    def test_query_no_regex(self):
+        msg = yield self.create_message(REGEX_TYPE)
+        try:
+            yield self.psc.query_subscribers(msg)
+        except ReceivedApplicationError:
+            return
+
+        self.fail('Did not get the exception I expected on bad message')
 
     @defer.inlineCallbacks
     def _declare_q(self):

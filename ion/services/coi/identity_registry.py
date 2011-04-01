@@ -21,6 +21,8 @@ from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
+from ion.core.intercept.policy import subject_has_admin_role, map_ooid_to_subject
+
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
 from ion-object-definitions/net/ooici/services/coi/identity/identity_management.proto
@@ -89,7 +91,6 @@ message ResourceConfigurationResponse{
     optional string result = 3;
 }
 """
-
 
 class IdentityRegistryClient(ServiceClient):
     """
@@ -167,9 +168,10 @@ class IdentityRegistryClient(ServiceClient):
     #--#op_find_users = BaseRegistryService.base_find_resource
 
     @defer.inlineCallbacks
-    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=[]):
+    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=None):
         """
         """
+        #--if attnames is None: attnames = []
         #--#return self.base_find_resource('find_users',user_description,regex,ignore_defaults,attnames)
 
 
@@ -298,11 +300,6 @@ class IdentityRegistryException(ApplicationError):
     IdentityRegistryService exception class
     """
 
-class IdentityRegistryException(ApplicationError):
-    """
-    IdentityRegistryService exception class
-    """
-
 class IdentityRegistryService(ServiceProcess):
 
     # Declaration of service
@@ -386,7 +383,7 @@ class IdentityRegistryService(ServiceProcess):
         log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
         response = yield self.register_user_credentials(request)
-        
+
         yield self.reply_ok(msg, response)
 
         
@@ -409,7 +406,11 @@ class IdentityRegistryService(ServiceProcess):
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
-        
+
+        # Optionally map OOID to subject in admin role dictionary
+        if subject_has_admin_role(identity.subject):
+            map_ooid_to_subject(identity.subject, identity.ResourceIdentity)
+
         # Create the response object...
         Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
         Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
@@ -500,7 +501,7 @@ class IdentityRegistryService(ServiceProcess):
            identity = yield self.rc.get_instance(self._user_dict[cert_info['subject']])
            identity.certificate = request.configuration.certificate
            identity.rsa_private_key = request.configuration.rsa_private_key
-           self.rc.put_instance(identity, 'Updated user credentials')
+           yield self.rc.put_instance(identity, 'Updated user credentials')
            log.debug(str(identity.ResourceIdentity))
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
@@ -542,7 +543,7 @@ class IdentityRegistryService(ServiceProcess):
            identity = yield self.rc.get_instance(self._user_dict[request.configuration.subject])
            
            if request.configuration.IsFieldSet('certificate'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.certificate)
+              log.debug('update_user: setting certificate to %s'%request.configuration.certificate)
               identity.certificate = request.configuration.certificate
               
            if request.configuration.IsFieldSet('rsa_private_key'):
@@ -550,14 +551,14 @@ class IdentityRegistryService(ServiceProcess):
               identity.rsa_private_key = request.configuration.rsa_private_key
               
            if request.configuration.IsFieldSet('dispatcher_queue'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.dispatcher_queue)
+              log.debug('update_user: setting dispatcher queue to %s'%request.configuration.dispatcher_queue)
               identity.dispatcher_queue = request.configuration.dispatcher_queue
               
            if request.configuration.IsFieldSet('email'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.email)
+              log.debug('update_user: setting email to %s'%request.configuration.email)
               identity.email = request.configuration.email
               
-           self.rc.put_instance(identity, 'Updated user information')
+           yield self.rc.put_instance(identity, 'Updated user information')
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
            Response.result = "OK"

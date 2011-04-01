@@ -9,18 +9,22 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.util.itv_decorator import itv
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 from ion.test.iontest import IonTestCase
 
-from net.ooici.play import addressbook_pb2
-from ion.util import procutils as pu
 from ion.core.object import object_utils
+from ion.core.object import workbench
 
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
+# Pick three to test existence
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -32,26 +36,26 @@ class DataStoreTest(IonTestCase):
     """
     Testing example hello service.
     """
+    services = [
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+                },
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}
+                },
+        ]
+
 
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
 
-        services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
-                },
-            {'name':'workbench_test1',
-             'module':'ion.core.object.test.test_workbench',
-             'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
-        ]
 
 
-        self.sup = yield self._spawn_processes(services)
+
+        self.sup = yield self._spawn_processes(self.services)
 
 
         child_ds1 = yield self.sup.get_child_id('ds1')
@@ -100,6 +104,8 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        log.info('Tearing Down Test Container')
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -114,12 +120,40 @@ class DataStoreTest(IonTestCase):
         log.info('DataStore1 Push addressbook to DataStore1: complete')
 
 
-        
-        # Test to make sure pushing a non existent workbench fails
-        
-        # How do I test raises in a deferred call?
-        #self.assertRaises(KeyError,proc_ds1.push, 'ps2','NonExistentRepositoryName')
-        
+    @defer.inlineCallbacks
+    def test_existence(self):
+
+        # Test preloaded stuff:
+        is_there = yield self.ds1.workbench.test_existence(HAS_A_ID)
+        self.assertEqual(is_there,True)
+
+        is_there = yield self.ds1.workbench.test_existence(DATASET_RESOURCE_TYPE_ID)
+        self.assertEqual(is_there,True)
+
+        is_there = yield self.ds1.workbench.test_existence(ROOT_USER_ID)
+        self.assertEqual(is_there,True)
+
+        # Test the repo we just made but have not pushed
+        is_there = yield self.ds1.workbench.test_existence(self.repo_key)
+        self.assertEqual(is_there,False)
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+        # Now test that after the push it exists!
+        is_there = yield self.ds1.workbench.test_existence(self.repo_key)
+        self.assertEqual(is_there,True)
+
+
+    def test_pull_invalid(self):
+
+        self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
+
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):
@@ -139,6 +173,9 @@ class DataStoreTest(IonTestCase):
         self.ds1.workbench.clear_non_persistent()
 
 
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
         result = yield self.wb1.workbench.pull('datastore',self.repo_key)
 
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -150,6 +187,108 @@ class DataStoreTest(IonTestCase):
         ab = yield repo.checkout('master')
 
         self.assertEqual(ab.title,'Datastore Addressbook')
+
+    @defer.inlineCallbacks
+    def test_push_clear_pull_again(self):
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+
+
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        ab = yield repo.checkout('master')
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
+
+        
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        ab = yield repo.checkout('master')
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
+
+
+    @defer.inlineCallbacks
+    def test_push_clear_pull_branched(self):
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        branch1_key = repo.current_branch_key()
+        branch2_key = repo.branch()
+
+        # Delete the reference
+        del repo
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+
+
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        # Check that we got back both branches!
+        ab = yield repo.checkout(branchname=branch1_key)
+
+        ab = yield repo.checkout(branchname=branch2_key)
+
+
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
+
+
+
+
 
 
     @defer.inlineCallbacks
@@ -201,10 +340,96 @@ class DataStoreTest(IonTestCase):
 
         return key_list
 
+    @defer.inlineCallbacks
+    def test_checkout_defaults(self):
+
+        defaults={}
+        defaults.update(ION_RESOURCE_TYPES)
+        defaults.update(ION_DATASETS)
+        defaults.update(ION_IDENTITIES)
+
+        for key, value in defaults.items():
+
+            repo_name = value[ID_CFG]
+
+            c_args = value.get(CONTENT_ARGS_CFG)
+            if c_args and not c_args.get('filename'):
+                break
 
 
 
-    '''
+            result = yield self.wb1.workbench.pull('datastore',repo_name)
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            repo = self.wb1.workbench.get_repository(repo_name)
+
+            # Check that we got back both branches!
+            default_obj = yield repo.checkout(branchname='master')
+
+            self.assertEqual(default_obj.name, value[NAME_CFG])
+
+
+        for key, value in ION_PREDICATES.items():
+
+            repo_name = value[ID_CFG]
+
+            result = yield self.wb1.workbench.pull('datastore',repo_name)
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            repo = self.wb1.workbench.get_repository(repo_name)
+
+            # Check that we got back both branches!
+            default_obj = yield repo.checkout(branchname='master')
+
+            self.assertEqual(default_obj.word, value[PREDICATE_CFG])
+
+
+
+
+"""
+
+class StoreServiceBackedDataStoreTest(DataStoreTest):
+
+
+    services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
+            {'name':'store_service','module':'ion.core.data.store_service','class':'StoreService'},
+
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient',
+                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient',
+                          PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+                },
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+        ]
+"""
+
+'''
+class CassandraBackedDataStoreTest(DataStoreTest):
+
+
+    services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                },
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+        ]
+
+'''
+
+
+'''
     @defer.inlineCallbacks
     def test_push_associated(self):
 

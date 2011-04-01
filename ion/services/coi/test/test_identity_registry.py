@@ -42,7 +42,7 @@ message UserIdentity {
    optional string rsa_private_key=3;
    optional string dispatcher_queue=4;
    optional string email=5;
-   optional string life_cycle_state=6;
+   //optional string life_cycle_state=6;
 }
 """""
 
