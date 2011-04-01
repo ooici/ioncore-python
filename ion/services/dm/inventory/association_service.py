@@ -215,6 +215,9 @@ class AssociationService(ServiceProcess):
             
         log.info('Found %s subjects!' % len(subjects))
 
+        # Do we want to check for which current heads of each subject are descendents of the
+
+
         list_of_subjects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
 
         for subject in subjects:

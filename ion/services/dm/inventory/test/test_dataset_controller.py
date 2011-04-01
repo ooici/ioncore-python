@@ -11,6 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process import process
+from ion.core.data import store
 
 from ion.test.iontest import IonTestCase
 
@@ -65,6 +66,11 @@ class DateSetControllerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
+        yield self._shutdown_processes()
         yield self._stop_container()
 
 

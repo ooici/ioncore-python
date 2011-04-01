@@ -876,6 +876,7 @@ class DataStoreService(ServiceProcess):
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
+                    log.info('Preloading Predicate:' + str(value.get(PREDICATE_CFG)))
                     predicate_repo = self._create_predicate(value)
                     if predicate_repo is None:
                         raise DataStoreError('Failed to create predicate: %s' % str(value))
@@ -889,6 +890,8 @@ class DataStoreService(ServiceProcess):
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
+                    log.info('Preloading Resource Type:' + str(value.get(NAME_CFG)))
+
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
                         raise DataStoreError('Failed to Resource Type Resource: %s' % str(value))
@@ -901,6 +904,8 @@ class DataStoreService(ServiceProcess):
             for key, value in ION_IDENTITIES.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
+                    log.info('Preloading Identity:' + str(value.get(NAME_CFG)))
+
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
                         raise DataStoreError('Failed to Identity Resource: %s' % str(value))
@@ -912,6 +917,8 @@ class DataStoreService(ServiceProcess):
             for key, value in ION_DATASETS.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
+                    log.info('Preloading DataSet:' + str(value.get(NAME_CFG)))
+
                     resource_instance = self._create_resource(value)
                     if resource_instance is not None:
                         self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
