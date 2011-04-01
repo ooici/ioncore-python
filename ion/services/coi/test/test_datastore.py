@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_hello.py
+@file ion/services/coi/test/test_datastore.py
 @author David Stuebe
 """
 
@@ -37,8 +37,12 @@ association_type = object_utils.create_type_identifier(object_id=13, version=1)
 
 class DataStoreTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing Datastore service.
     """
+    # Hold references to preserve state between runs!
+    store_class = store.Store
+    index_store_class = store.IndexStore
+
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
@@ -109,6 +113,7 @@ class DataStoreTest(IonTestCase):
     def tearDown(self):
         log.info('Tearing Down Test Container')
 
+        #store.Store.clear()
         #store.IndexStore.indices.clear()
         #store.IndexStore.kvs.clear()
 

@@ -37,7 +37,7 @@ LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1
 
 class AssociationServiceTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing association service.
     """
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
@@ -72,6 +72,7 @@ class AssociationServiceTest(IonTestCase):
     def tearDown(self):
        log.info('Tearing Down Test Container')
 
+       store.Store.clear()
        store.IndexStore.kvs.clear()
        store.IndexStore.indices.clear()
 
