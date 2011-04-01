@@ -72,7 +72,7 @@ class AssociationServiceTest(IonTestCase):
     def tearDown(self):
        log.info('Tearing Down Test Container')
 
-       store.Store.clear()
+       store.Store.kvs.clear()
        store.IndexStore.kvs.clear()
        store.IndexStore.indices.clear()
 
