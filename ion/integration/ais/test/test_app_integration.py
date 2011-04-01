@@ -18,6 +18,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
 
+from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 
 from ion.test.iontest import IonTestCase
@@ -65,7 +66,7 @@ class AppIntegrationTest(IonTestCase):
                 'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
+                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
             {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
@@ -79,12 +80,19 @@ class AppIntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        log.info('Tearing Down Test Container')
+
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_findDataResources(self):
 
-        log.debug('Testing getDataResourceDetail.')
+        log.debug('Testing findDataResources.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)

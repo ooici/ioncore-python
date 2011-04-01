@@ -137,14 +137,23 @@ class FindDataResources(object):
             
             dSet = yield self.rc.get_instance(dSetResID)
             dSource = yield self.rc.get_instance(dSourceResID)
-    
-            self.__printRootAttributes(dSet)
-            self.__printRootVariables(dSet)
-            self.__printSourceMetadata(dSource)
 
-            rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+            #
+            # If the dataset's data is within the given criteria, include it
+            # in the list
+            #
+            if self.__isInBounds(dSetResID, bounds):
+                log.debug("isInBounds is TRUE")
+                self.__printRootAttributes(dSet)
+                self.__printRootVariables(dSet)
+                self.__printSourceMetadata(dSource)
     
-            self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+        
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+            else:
+                log.debug("isInBounds is FALSE")
+
             
             i = i + 1
 
@@ -177,6 +186,8 @@ class FindDataResources(object):
           - dSet
         """
         log.debug('__isInBounds')
+        result = True
+        return result
         
     def __printBounds(self, bounds):
         boundNames = list(bounds)
