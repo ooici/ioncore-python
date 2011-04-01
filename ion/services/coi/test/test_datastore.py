@@ -109,6 +109,9 @@ class DataStoreTest(IonTestCase):
         self.repo_key = repo.repository_key
 
 
+    def test_instantiate(self):
+        pass
+    
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
