@@ -463,24 +463,38 @@ class Process(BasicLifecycleObject, ResponseCodes):
                                                 message, initiator=initiator)
                 message['conversation'] = conv
 
-                # Detect and handle request to terminate process.
-                # This does not yet work properly with fail fast...
-                if not self._get_state() == "ACTIVE":
-                    if 'op' in payload and payload['op'] == 'terminate':
+                # Check some state conditions
+                if self._get_state() == BasicStates.S_TERMINATED:
+                    if payload.get('op',None) == 'terminate':
+                        yield self.reply_ok(msg)
+                        return
 
-                        if self._get_state() != BasicStates.S_TERMINATED:
-                            yield self.terminate()
-                        else:
-                            yield self.reply_ok(msg)
-
-                    text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
+                    text = "[%s] Process TERMINATED. Message refused!" % (self.proc_name)
                     log.error(text)
-
-                    # @todo: Requeue would be ok, but does not work (Rabbit or client limitation)
-                    #d = msg.requeue()
-
-                    # Let the error back handle the exception
                     raise ProcessError(text)
+
+                elif self._get_state() == BasicStates.S_ERROR:
+                    text = "[%s] Process in ERROR state. Message refused!" % (self.proc_name)
+                    log.error(text)
+                    raise ProcessError(text)
+
+                elif not self._get_state() == "ACTIVE":
+                    # Detect and handle request to terminate process.
+                    # This does not yet work properly with fail fast...
+                    if payload.get('op',None) == 'terminate':
+                        yield self.terminate()
+                        return
+
+                    # Non-request messages (e.g. RPC reply are OK before ACTIVE)
+                    if payload.get('performative', None) == 'request':
+                        text = "[%s] Process in invalid state: '%s'" % (self.proc_name, self._get_state())
+                        log.error(text)
+
+                        # @todo: Requeue would be ok, but does not work (Rabbit or client limitation)
+                        #d = msg.requeue()
+
+                        # Let the error back handle the exception
+                        raise ProcessError(text)
 
                 # Regular message handling in expected state
                 pu.log_message(msg)
