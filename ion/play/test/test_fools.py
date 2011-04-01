@@ -6,7 +6,6 @@
 """
 from twisted.internet import defer
 
-from time import sleep
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -17,6 +16,7 @@ from ion.util import procutils as pu
 
 class TestFool(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def test_april_fools(self):
 
         msg="""
@@ -28,5 +28,5 @@ class TestFool(unittest.TestCase):
       /_/
 """
         print msg
-        sleep(5)
+        yield pu.asleep(5)
         
