@@ -181,6 +181,7 @@ class ProcessManager(BasicLifecycleObject):
 
     @defer.inlineCallbacks
     def terminate_process(self, parent, pid):
+        # Must send this request from the backend receiver
         (content, headers, msg) = yield parent.rpc_send(str(pid),
                                                 'terminate', {}, {'quiet':True})
         defer.returnValue(headers)

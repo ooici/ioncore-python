@@ -61,6 +61,7 @@ class ProcessError(Exception):
     An exception class for errors that occur in Process
     """
 
+# @todo do NOT fill the process namespace with response codes; remove mixin!
 class Process(BasicLifecycleObject, ResponseCodes):
     """
     This is the base class for all processes. Processes can be spawned and
@@ -535,27 +536,36 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         request.proc_name = self.proc_name
         # Check if there is a user id in the header, stash if so
+        _pre_uid = payload.get('user-id', None)
+        _pre_exp = payload.get('expiry', None)
+        _action = ''
         if 'user-id' in payload:
-            log.info('[%s] receive(): payload user id [%s]' % (self.proc_name, payload['user-id']))
             request.user_id = payload.get('user-id')
-            log.info('[%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
+            _action = 'set user_id'
         else:
-            log.info('[%s] receive(): payload anonymous request' % (self.proc_name))
+            log.debug('[%s] receive(): payload anonymous request' % (self.proc_name))
             if request.get('user_id', 'Not set') == 'Not set':
                 request.user_id = 'ANONYMOUS'
-                log.info('[%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
+                _action = 'set ANONYMOUS user_id'
             else:
-                log.info('[%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+                _action = "keep stashed user_id='%s'" % request.get('user_id')
+        _post_uid = request.get('user_id')
+
         # User session expiry.
         if 'expiry' in payload:
             request.expiry = payload.get('expiry')
-            log.info('[%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
+            _action = _action + '/set expiry'
         else:
             if request.get('expiry', 'Not set') == 'Not set':
                 request.expiry = '0'
-                log.info('[%s] receive(): Set stashed expiry to 0' % (self.proc_name))
+                _action = _action + '/set 0 expiry'
             else:
-                log.info('[%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+                _action = _action + "/keep stashed expiry='%s'" % request.get('expiry')
+        _post_exp = request.get('expiry')
+
+        log.debug("[%s] receive(): IN:user-id='%s',expiry='%s' ACTION:%s SET:user-id='%s',expiry='%s'" % (
+            self.proc_name, _pre_uid, _pre_exp, _action, _post_uid, _post_exp))
+
 
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
@@ -598,7 +608,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
         rpc_conv.bind_role_local(RpcType.ROLE_INITIATOR.role_id, self)
         rpc_conv.bind_role(RpcType.ROLE_PARTICIPANT.role_id, recv)
 
-        if headers == None:
+        log.debug("[%s] request(): NEW conversation type=%s as initiator -> participant=%s" % (
+                self.proc_name, rpc_conv.protocol, recv))
+
+        if headers is None:
             headers = {}
         headers['protocol'] = rpc_conv.protocol
         headers['performative'] = 'request'
@@ -620,7 +633,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
         req_conv.bind_role_local(RequestType.ROLE_INITIATOR.role_id, self)
         req_conv.bind_role(RequestType.ROLE_PARTICIPANT.role_id, receiver)
 
-        if headers == None:
+        log.debug("[%s] request(): NEW conversation type=%s as initiator -> participant=%s" % (
+                self.proc_name, req_conv.protocol, receiver))
+
+        if headers is None:
             headers = {}
         headers['protocol'] = req_conv.protocol
         headers['performative'] = 'request'
@@ -657,14 +673,19 @@ class Process(BasicLifecycleObject, ResponseCodes):
             conv.blocking_deferred.rpc_call = callto
 
         # Call to send()
-        d = self.send(recv, operation, content, headers, reply=False, conv=conv)
+        d = self.send(recv=recv,
+                      operation=operation,
+                      headers=headers,
+                      content=content,
+                      conv=conv)
         # d is a deferred. The actual send of the request message will happen
         # after this method returns. This is OK, because functions are chained
         # to call back the caller on the rpc_deferred when the receipt is done.
 
         return conv.blocking_deferred
 
-    def send(self, recv, operation, content, headers=None, reply=False, conv=None):
+    @defer.inlineCallbacks
+    def send(self, recv, operation, content, headers=None, send_receiver=None, conv=None, quiet=False):
         """
         @brief Send a message via the process receiver to destination.
             Starts a new conversation.
@@ -672,8 +693,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
-        if headers:
-            msgheaders.update(headers)
+
         if conv is not None:
             msgheaders['conv-id'] = conv.conv_id
 
@@ -701,20 +721,160 @@ class Process(BasicLifecycleObject, ResponseCodes):
         else:
             log.debug('[%s] send(): using expiry from msgheaders [%s]' % (self.proc_name, msgheaders['expiry']))
 
+        if quiet:
+            msgheaders['quiet'] = True
+
+        # Now allow headers to override any of the precomputed headers
+        if headers:
+            msgheaders.update(headers)
+
+        # Assemble message content
+        if content is None:
+            content = yield self.message_client.create_instance(MessageContentTypeID=None)
+        if isinstance(content, MessageInstance):
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.OK
+
+        # Assemble the standard in-memory message object
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
                        performative=msgheaders.get('performative','request'),
                        process=self, conversation=conv)
 
         # Put the message through the conversation FSM
-        # @todo Must support deferred
-        self.conv_manager.msg_send(message)
+        res = None
+        try:
+            res1 = yield self.conv_manager.msg_send(message)
+            # FSM processed successfully
+            if send_receiver is None:
+                # The default case is to send out via the backend receiver
+                res2 = yield self.backend_receiver.send(**message)
+            else:
+                # Use given receiver (e.g. primary receiver for RPC replies)
+                res2 = yield send_receiver.send(**message)
 
-        if reply:
-            d = self.receiver.send(**message)
+            res = res1
+        except Exception, ex:
+            log.exception("ERROR [%s] send() in FSM - Message not sent" % self.proc_name)
+            raise ex
+
+        defer.returnValue(res)
+
+    def reply(self, msg, operation=None, content=None, headers=None, performative=None, quiet=False):
+        """
+        @brief Replies to a given message, continuing the ongoing conversation
+        @retval Deferred for message send
+        """
+        # The causing message we reply to
+        req_msg = msg.payload
+        recv = req_msg.get('reply-to', None)
+        recv_id = pu.get_process_id(recv)
+
+        # Assemble the reply message
+        msgheaders = {}
+
+        msgheaders['protocol'] = req_msg['protocol']
+
+        if recv is None:
+            log.error('No reply-to given for message '+str(msg))
         else:
-            d = self.backend_receiver.send(**message)
-        return d
+            msgheaders['conv-id'] = req_msg.get('conv-id','')
+            msgheaders['conv-seq'] = int(req_msg.get('conv-seq',0)) + 1
+
+        if performative:
+            msgheaders['performative'] = performative
+
+        # Now allow headers to override any of the precomputed headers
+        if headers is not None:
+            msgheaders.update(headers)
+
+        if operation is None:
+            operation = self.MSG_RESULT
+
+        return self.send(recv=recv_id,
+                         operation=operation,
+                         headers=msgheaders,
+                         content=content,
+                         send_receiver=self.receiver,
+                         quiet=quiet)
+
+    def reply_agree(self, msg, content=None, headers=None):
+        """
+        @brief Internal boilerplate method that replies to a given message with
+            an agree performative
+        @retval Deferred for send of reply
+        """
+        return self.reply(msg,
+                          performative='agree',
+                          operation=self.MSG_RESULT,
+                          headers=headers,
+                          content=content,
+                          quiet=True)
+
+    def reply_refuse(self, msg, content=None, headers=None):
+        """
+        @brief Internal boilerplate method that replies to a given message with
+            a refuse performative
+        @retval Deferred for send of reply
+        """
+        return self.reply(msg,
+                          performative='refuse',
+                          operation=self.MSG_RESULT,
+                          headers=headers,
+                          content=content)
+
+    def reply_ok(self, msg, content=None, headers=None):
+        """
+        @brief Internal boilerplate method that replies to a given message with
+            an inform-result performative
+        @retval Deferred for send of reply
+        """
+        return self.reply(msg,
+                          performative='inform_result',
+                          operation=self.MSG_RESULT,
+                          headers=headers,
+                          content=content,
+                          quiet=(content is None))
+
+    @defer.inlineCallbacks
+    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=None):
+        """
+        @brief Internal boilerplate method that replies to a given message with
+            a failure performative. Will result at the receiver end in an
+            application level error. The result can include content, a caught
+            exception and an application level error_code as an indication of the error.
+        @content Message content object
+        @exception an instance of Exception
+        @response_code an ION application level defined error code for a handled exception
+        @retval Deferred for send of reply
+        """
+        if content is None:
+            content = yield self.message_client.create_instance(MessageContentTypeID=None)
+
+        if isinstance(content, MessageInstance):
+            if not content.Message.IsFieldSet('response_code'):
+                if isinstance(exception, ApplicationError):
+                    content.MessageResponseCode = exception.response_code
+                elif response_code:
+                    content.MessageResponseCode = response_code
+                else:
+                    content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
+
+            if not content.Message.IsFieldSet('response_body'):
+                content.MessageResponseBody = str(exception)
+
+        msgheaders = {}
+        msgheaders[self.MSG_STATUS] = self.ION_ERROR
+
+        if headers != None:
+            msgheaders.update(headers)
+
+        res = yield self.reply(msg,
+                               performative='failure',
+                               operation=self.MSG_RESULT,
+                               headers=msgheaders,
+                               content=content)
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def receive_error(self, payload, msg, response_code=None):
@@ -727,117 +887,6 @@ class Process(BasicLifecycleObject, ResponseCodes):
             yield self.reply_err(msg=msg, response_code=response_code)
         yield msg.ack()
 
-    def reply(self, msg, operation=None, content=None, headers=None):
-        """
-        @brief Replies to a given message, continuing the ongoing conversation
-        @retval Deferred or None
-        """
-        if operation is None:
-            operation = self.MSG_RESULT
-
-        ionMsg = msg.payload
-        recv = ionMsg.get('reply-to', None)
-        if headers is None:
-            headers = {}
-
-        if recv == None:
-            log.error('No reply-to given for message '+str(msg))
-        else:
-            headers['conv-id'] = ionMsg.get('conv-id','')
-            headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
-        if not 'user-id' in headers:
-            headers['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.debug('[%s] reply(): set user id [%s]' % (self.proc_name, headers['user-id']))
-        if not 'expiry' in headers:
-            headers['expiry'] = request.get('expiry', '0')
-            log.debug('[%s] reply(): set expiry [%s]' % (self.proc_name, headers['expiry']))
-
-        return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
-
-    def reply_agree(self, msg, content=None, headers=None):
-        """
-        @brief Boilerplate method that replies to a given message with an agree
-        @retval Deferred for send of reply
-        """
-        msgheaders = {}
-        if headers != None:
-            msgheaders.update(headers)
-        msgheaders['performative'] = 'agree'
-        msgheaders['protocol'] = msg.payload['protocol']
-        # Note: Header status=OK is automatically set
-
-        if content is None:
-            content = yield self.message_client.create_instance(MessageContentTypeID=None)
-
-        if isinstance(content, MessageInstance):
-            if not content.Message.IsFieldSet('response_code'):
-                content.MessageResponseCode = content.ResponseCodes.OK
-
-        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=msgheaders)
-
-    @defer.inlineCallbacks
-    def reply_ok(self, msg, content=None, headers=None):
-        """
-        @brief Boilerplate method that replies to a given message with a success
-            message and a given result value
-        @content any sendable type to be converted to dict, or dict (untouched)
-        @retval Deferred for send of reply
-        """
-        msgheaders = {}
-        if headers is not None:
-            msgheaders.update(headers)
-        msgheaders['performative'] = 'inform_result'
-        msgheaders['protocol'] = msg.payload['protocol']
-        # Note: Header status=OK is automatically set
-
-        if content is None:
-            content = yield self.message_client.create_instance(MessageContentTypeID=None)
-
-        if isinstance(content, MessageInstance):
-            if not content.Message.IsFieldSet('response_code'):
-                content.MessageResponseCode = content.ResponseCodes.OK
-
-        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=msgheaders)
-
-
-    @defer.inlineCallbacks
-    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=None):
-        """
-        @brief Boilerplate method for reply to a message which lead to an
-            application level error. The result can include content, a caught
-            exception and an application level error_code as an indication of the error.
-        @content any sendable type to be converted to dict, or dict (untouched)
-        @exception an instance of Exception
-        @response_code an ION application level defined error code for a handled exception
-        @retval Deferred for send of reply
-        """
-        if content is None:
-            content = yield self.message_client.create_instance(MessageContentTypeID=None)
-
-        if isinstance(content, MessageInstance):
-
-            if not content.Message.IsFieldSet('response_code'):
-
-                if isinstance(exception, ApplicationError):
-                    content.MessageResponseCode = exception.response_code
-                elif response_code:
-                    content.MessageResponseCode = response_code
-                else:
-                    content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
-
-            if not content.Message.IsFieldSet('response_body'):
-                content.MessageResponseBody = str(exception)
-
-        reshdrs = {}
-        #reshdrs['performative'] = 'failure'
-        reshdrs['performative'] = 'inform_result'
-        reshdrs['protocol'] = msg.payload['protocol']
-        reshdrs[self.MSG_STATUS] = self.ION_ERROR
-
-        if headers != None:
-            reshdrs.update(headers)
-
-        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=reshdrs)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
@@ -881,7 +930,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
     @defer.inlineCallbacks
     def shutdown_child_procs(self):
         if len(self.child_procs) > 0:
-            log.info("Shutting down child processes")
+            log.info("Shutting down %s child processes" % (len(self.child_procs)))
         while len(self.child_procs) > 0:
             child = self.child_procs.pop()
             try:

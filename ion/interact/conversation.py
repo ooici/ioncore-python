@@ -134,7 +134,8 @@ class ConversationRole(StateObject):
 
     def _so_process(self, event, *args, **kwargs):
         log.debug("Processing Conversation event='%s' in state='%s'" % (event,self._get_state()))
-        return StateObject._so_process(self, event, *args, **kwargs)
+        d = StateObject._so_process(self, event, *args, **kwargs)
+        return d
 
     def error(self, *args, **kwargs):
         log.error("ERROR in Conversation: %r %r" % (args, kwargs))
@@ -270,6 +271,7 @@ class ProcessConversationManager(object):
         return self.conv_mgr.create_conversation_id(prefix=self.process.id.full)
 
     def new_conversation(self, conv_type_id, conv_id=None):
+        conv_id = conv_id or self.create_conversation_id()
         conv_inst = self.conv_mgr.new_conversation(conv_type_id, conv_id)
         self.conversations[conv_inst.conv_id] = conv_inst
         return conv_inst
@@ -290,7 +292,9 @@ class ProcessConversationManager(object):
         # If not existing, create new Conversation instance based on protocol header
         if not conv:
             conv_type = message['headers'].get('protocol', 'generic')
-            log.debug("Creating new local conversation for conv-id=%s: type=%s" % (conv_id, conv_type))
+
+            log.debug("[%s] NEW local conversation from conv-id=%s: type=%s" % (
+                    self.process.proc_name, conv_id, conv_type))
             conv = self.new_conversation(conv_type, conv_id)
 
             # Bind roles

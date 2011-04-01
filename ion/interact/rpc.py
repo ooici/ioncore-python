@@ -70,6 +70,9 @@ class Rpc(Conversation):
     """
 
 class RpcInitiator(ConversationRole):
+    """
+    Request Conversation Type. INITIATOR >>>> role.
+    """
     factory = RpcFSMFactory()
 
     def request(self, message, *args, **kwargs):
@@ -83,7 +86,7 @@ class RpcInitiator(ConversationRole):
         @brief IN msg. Receive a request message
         """
         log.debug("IN: Rpc.failure")
-        return self.inform_result(*args, **kweargs)
+        return self.inform_result(message, *args, **kwargs)
 
     @defer.inlineCallbacks
     def inform_result(self, message, *args, **kwargs):
@@ -145,6 +148,9 @@ class RpcInitiator(ConversationRole):
         log.debug('[%s] RPC inform_result done.' % (process.proc_name))
 
 class RpcParticipant(ConversationRole):
+    """
+    RPC Conversation Type. >>>> PARTICIPANT role.
+    """
     factory = RpcFSMFactory()
 
     @defer.inlineCallbacks
@@ -160,10 +166,7 @@ class RpcParticipant(ConversationRole):
 
         log.info('>>> [%s] Received RPC request for op=%s<<<' % (process.proc_name, headers['op']))
 
-        # Send an agree if a request message
-        conv_type = headers.get('protocol', GenericType.CONV_TYPE_GENERIC)
-
-        # Check for operation/action
+        # Invoke operation/action
         res = yield process._dispatch_message_op(headers, msg, conv)
         defer.returnValue(res)
 

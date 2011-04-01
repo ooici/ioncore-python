@@ -21,3 +21,9 @@ ION_LOCAL_CONF_FILENAME = 'res/config/ionlocal.config'
 # ION master version
 from ion.core.version import version
 VERSION = version.base()
+
+# ION Common Message Format - HEADERS
+IONMSG_HDR_PROTOCOL = 'protocol'
+IONMSG_HDR_PERFORMATIVE = 'performative'
+IONMSG_HDR_ACTION = 'op'
+

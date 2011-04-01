@@ -100,7 +100,7 @@ class IonTestCase(unittest.TestCase):
         self.procRegistry = process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
 
-        log.info("============ %s ===" % self.container)
+        log.info("============ %s UP ===" % ioninit.container_instance)
 
     @defer.inlineCallbacks
     def create_message(self, MessageContentTypeID, MessageName='', **kwargs):
@@ -133,7 +133,7 @@ class IonTestCase(unittest.TestCase):
         Taking down the container's connection to the broker an preparing for
         reinitialization.
         """
-        log.info("Closing ION container")
+        log.debug("============Closing ION container============")
         if self.twisted_container_service: #hack
             yield self.twisted_container_service.stopService()
 
@@ -185,6 +185,7 @@ class IonTestCase(unittest.TestCase):
         """
         Shuts down spawned test processes.
         """
+        log.debug("------------Shutting down test processes------------")
         if proc and proc != self.test_sup:
             return proc.shutdown()
         else:

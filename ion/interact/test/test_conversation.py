@@ -55,7 +55,7 @@ class ConversationTest(IonTestCase):
             log.debug("Successfully caught unregistered conversation type")
 
         conv_id = conv_mgr.create_conversation_id()
-        req_inst = req_type.new_conversation(conv_type=RequestType.CONV_TYPE_REQUEST, conv_id=conv_id)
+        req_inst = conv_mgr.new_conversation(conv_type_id=RequestType.CONV_TYPE_REQUEST, conv_id=conv_id)
         self.assertIsInstance(req_inst, Conversation)
         self.assertIsInstance(req_inst, Request)
 

@@ -48,7 +48,9 @@ class RequestConvTest(IonTestCase):
 
         req_content = {}
 
+        print "-------------------- TEST BEGIN"
         res = yield req1proc.request(receiver=req2pid, action="action1", content="my request")
+        print "-------------------- TEST END"
 
         yield self._shutdown_processes()
 
@@ -56,6 +58,7 @@ class ParticipantProcess(Process):
 
     @defer.inlineCallbacks
     def op_action1(self, content, headers, msg):
+        log.debug("Participant process action called. Sending reply")
         reply_content = "OK"
         yield self.reply_ok(msg, reply_content)
 

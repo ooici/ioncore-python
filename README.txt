@@ -178,17 +178,23 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
-2011-03-31:
+- TBD: Timeout as defined state transition of conversation
+- TBD: Interaction observer and generic receiver (for all operations on broker)
+- TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
+- TBD: proc.back.send-contid.sendpid.main.reccontid.recpid naming and bindings
+
+2011-04-01:
 - Introduced Conversations framework. Two standard conversation types: RPC, Request.
 - Refactored Process base class to use conversations. Made rpc_send retrofit
   RPC conversation.
 - Process now supports graceful terminate from active state; Receiver can
   gracefully handle deactivating the consumer followed by wait for all
   processing completion.
-- TBD: Process errors as failures in conversations
-- TBD: Timeout as defined state transition of conversation
-- TBD: Interaction observer and generic receiver (for all operations on broker)
-- TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
+- reply_err now sends a conversation failure (either rpc or request)
+- Receiver now shuts off consumer on deactivate/terminate and waits for still
+  in process messages.
+- Bug fixes to process terminate and life cycle handling.
+- Bug fixes to StateObject error handling and reporting.
 
 2011-01-28:
 - Switched to binary sha1 keys in all objects.

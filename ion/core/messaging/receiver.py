@@ -289,7 +289,9 @@ class Receiver(BasicLifecycleObject):
             log.exception("Send error")
         else:
             if inv1.status != Invocation.STATUS_DROP:
-                log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+                log.info("===Message SENT! >>>> %s -> %s: %s:%s:%s===" % (msg.get('sender',None),
+                                msg.get('receiver',None), msg.get('protocol',None),
+                                msg.get('performative',None), msg.get('op',None)))
                 #log.debug("msg"+str(msg))
 
     def __str__(self):

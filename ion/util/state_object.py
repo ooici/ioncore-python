@@ -57,6 +57,9 @@ class StateObject(Actionable):
         """
         @brief Trigger the FSM with an event. Leads to action functions being called.
             The complication is to make it deferred and non-deferred compliant.
+            (We do not want to use maybeDeferred to stay non-deferred).
+            This results in 2 (proc Def/non-Def) x 2 (proc succeed/fail) x
+            2 (error Def/non-Def) x 2 (error succeed/fail) = 16 combinations.
             The downside is now a dependency on Twisted. Alternative: subclass
         @retval Maybe a Deferred, or result of FSM process
         @todo Improve the error catching, forwarding and reporting
