@@ -25,7 +25,7 @@ class Publisher(BasicLifecycleObject):
     to be instantiated within another class/process/codebase, as an object for sending data to OOI.
     """
 
-    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, *args, **kwargs):
+    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None):
 
         BasicLifecycleObject.__init__(self)
 
@@ -116,7 +116,7 @@ class PublisherFactory(object):
         self._publisher_id = None
 
     @defer.inlineCallbacks
-    def build(self, routing_key, xp_name=None, credentials=None, process=None, publisher_type=None, *args, **kwargs):
+    def build(self, routing_key, xp_name=None, credentials=None, process=None, publisher_type=None):
         """
         Creates a publisher and calls register on it.
 
@@ -139,7 +139,7 @@ class PublisherFactory(object):
         publisher_type  = publisher_type or self._publisher_type or Publisher
         publisher_name  = 'Publisher'
 
-        pub = publisher_type(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
+        pub = publisher_type(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process)
         yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
 
         # Register does the PSC invocations
@@ -407,9 +407,11 @@ class SubscriberFactory(object):
         process         = process or self._process
         credentials     = credentials or self._credentials
 
-        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
+        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name,
+                              process=process, credentials=credentials)
         yield sub.register()
-        yield process.register_life_cycle_object(sub)        # brings the subscriber up to the same state as the process
+        # brings the subscriber up to the same state as the process
+        yield process.register_life_cycle_object(sub)
 
         if handler:
             sub.ondata = handler
