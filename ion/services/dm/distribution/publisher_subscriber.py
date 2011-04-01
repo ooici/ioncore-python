@@ -18,6 +18,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+#noinspection PyUnusedLocal
 class Publisher(BasicLifecycleObject):
     """
     @brief This represents publishers of (mostly) science data. Intended use is
@@ -89,20 +90,24 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, xp_name=None, credentials=None, process=None):
+    def __init__(self, xp_name=None, credentials=None, process=None, publisher_type=None):
         """
         Initializer. Sets default properties for calling the build method.
 
         These default are overridden by specifying the same named keyword arguments to the 
         build method.
 
-        @param  xp_name     Name of exchange point to use
-        @param  credentials Placeholder for auth* tokens
-        @param  process     Owning process of the Publisher.
+        @param  xp_name         Name of exchange point to use
+        @param  credentials     Placeholder for auth* tokens
+        @param  process         Owning process of the Publisher.
+        @param  publisher_type  Specific derived Publisher type to construct. You can define a custom
+                                Publisher derived class for any custom behavior. If left None, the standard
+                                Publisher class is used.
         """
         self._xp_name           = xp_name
         self._credentials       = credentials
         self._process           = process
+        self._publisher_type    = publisher_type
 
         self._topic_name = None
         self._xs_id = None
@@ -111,7 +116,7 @@ class PublisherFactory(object):
         self._publisher_id = None
 
     @defer.inlineCallbacks
-    def build(self, routing_key, xp_name=None, credentials=None, process=None, *args, **kwargs):
+    def build(self, routing_key, xp_name=None, credentials=None, process=None, publisher_type=None, *args, **kwargs):
         """
         Creates a publisher and calls register on it.
 
@@ -119,18 +124,22 @@ class PublisherFactory(object):
         was initialized. If None is specified for any of the parameters, or they are not filled out as
         keyword arguments, the defaults take precedence.
 
-        @param  routing_key The AMQP routing key that the Publisher will publish its data to.
-        @param  xp_name     Name of exchange point to use
-        @param  credentials Placeholder for auth* tokens
-        @param  process     Owning process of the Publisher.
+        @param  routing_key     The AMQP routing key that the Publisher will publish its data to.
+        @param  xp_name         Name of exchange point to use
+        @param  credentials     Placeholder for auth* tokens
+        @param  process         Owning process of the Publisher.
+        @param  publisher_type  Specific derived Publisher type to construct. You can define a custom
+                                Publisher derived class for any custom behavior. If left None, the standard
+                                Publisher class is used.
         """
         xp_name         = xp_name or self._xp_name
         credentials     = credentials or self._credentials
         process         = process or self._process
         topic_name      = routing_key or self._topic_name
+        publisher_type  = publisher_type or self._publisher_type or Publisher
         publisher_name  = 'Publisher'
 
-        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
+        pub = publisher_type(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
         yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
 
         # Register does the PSC invocations
@@ -222,6 +231,9 @@ def _psc_setup_subscriber(self, xs_name='swapmeet', xp_name='science_data',
     
     # Subscriber
     # @note Not using credentials yet
+    if credentials:
+        log.debug('Sorry, ignoring the credentials!')
+
     log.debug('Subscriber')
     msg = yield mc.create_instance(SUBSCRIBER_TYPE)
     msg.exchange_space_id = self._xs_id
@@ -240,7 +252,7 @@ class Subscriber(BasicLifecycleObject):
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None):
 
         BasicLifecycleObject.__init__(self)
 
@@ -288,13 +300,16 @@ class Subscriber(BasicLifecycleObject):
 
     @defer.inlineCallbacks
     def register(self):
+        """
+        Registers this Subscriber with the PSC.
+        Call this prior to calling initialize, as default initialize will try to create a queue.
+        """
         yield _psc_setup_subscriber(self, xp_name=self._xp_name, binding_key=self._binding_key)
 
     @defer.inlineCallbacks
     def subscribe(self):
         """
         """
-        yield self.register()
         yield self._recv.attach()
 
     def unsubscribe(self):
@@ -315,6 +330,7 @@ class Subscriber(BasicLifecycleObject):
         msg.ack()
         return self.ondata(data)
 
+    #noinspection PyUnusedLocal
     def ondata(self, data):
         """
         @brief Data callback, in the pattern of the current subscriber code
@@ -392,12 +408,11 @@ class SubscriberFactory(object):
         credentials     = credentials or self._credentials
 
         sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
-        yield process.register_life_cycle_object(sub)
-
-        if handler != None:
-            sub.ondata = handler
-
         yield sub.register()
+        yield process.register_life_cycle_object(sub)        # brings the subscriber up to the same state as the process
+
+        if handler:
+            sub.ondata = handler
 
         defer.returnValue(sub)
 

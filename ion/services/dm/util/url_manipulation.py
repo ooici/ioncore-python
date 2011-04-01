@@ -49,14 +49,14 @@ def generate_filename(dataset_url, local_dir=LOCAL_DIR):
     @retval Local filename
     @todo Complete refactor - directories, etc
     """
-    if local_dir == None:
+    if local_dir is None:
         local_dir = LOCAL_DIR
 
-    assert(local_dir != None)
+    assert(local_dir is not None)
     assert(len(local_dir) > 0)
 
     if local_dir[-1:] != '/':
-        local_dir = local_dir + '/'
+        local_dir += '/'
 
     basicName = os.path.basename(dataset_url)
 
@@ -83,10 +83,10 @@ def base_dap_url(src_url):
     # This covers normal DAP URLs, but fails on base URLs such as http://127.0.0.1:8001/etopo120.cdf
     mset = re.search('(http|https)://([^/]+)(.+)(\.d(a|d)s|\.dods|\.asc(ii)*)(\?.+)*',
                     src_url)
-    if mset == None:
+    if mset is None:
         # This regex works on just plain DAP URLs - dds/das/dods optional
         mset = re.search('(http|https)://([^/]+)(.+)(\.dds|\.das|\.dods|\.asc(i)*)*(\?.+)*', src_url)
-        if mset == None:
+        if mset is None:
             log.info('No URL match in "%s" % src_url')
             return None
         try:

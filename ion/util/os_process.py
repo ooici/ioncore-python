@@ -44,7 +44,7 @@ class OSProcess(protocol.ProcessProtocol):
       for graceful shutdown.
 
     """
-    def __init__(self, binary=None, spawnargs=[], startdir=None, **kwargs):
+    def __init__(self, binary=None, spawnargs=None, startdir=None, **kwargs):
         """
         @param  binary      The binary to run.
         @param  spawnargs   Arguments to give the binary. Does not need to have the binary as the first argument,
@@ -56,13 +56,13 @@ class OSProcess(protocol.ProcessProtocol):
         self.outlines           = []
 
         self.binary             = binary            # binary to run; set this in a derived class
-        self.spawnargs          = spawnargs         # arguments to spawn after binary
+        self.spawnargs          = spawnargs if spawnargs is not None else [] # arguments to spawn after binary
         self.deferred_exited    = defer.Deferred(self._cancel)  # is called back on process end
         self.used               = False             # do not allow anyone to use again
         self.close_timeout      = None
         self.startdir           = startdir
 
-    def spawn(self, binary=None, args=[]):
+    def spawn(self, binary=None, args=None):
         """
         Spawns an OS process via twisted's reactor.
 
@@ -71,6 +71,8 @@ class OSProcess(protocol.ProcessProtocol):
                     may never terminate! Use the close method to safely close a
                     process. You may yield on the deferred returned by that.
         """
+        if args is None: args = []
+        
         if self.used:
             raise RuntimeError("Already used this process protocol")
 

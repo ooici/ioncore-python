@@ -13,17 +13,22 @@ from twisted.internet import defer
 from twisted.python import reflect
 
 
-from ion.core.object import gpb_wrapper
-
+from ion.core.messaging import message_client
 from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-import ion.util.procutils as pu
+from ion.core.object import workbench
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID
+
 
 from ion.core.object import object_utils
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
+
+TYPEOBJECT_TYPE = object_utils.create_type_identifier(object_id=9, version=1)
+
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -44,9 +49,6 @@ class ResourceRegistryService(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
 
-    typeobject_type = object_utils.create_type_identifier(object_id=9, version=1)
-    RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
-    RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -65,27 +67,55 @@ class ResourceRegistryService(ServiceProcess):
         log.info('ResourceRegistryService.__init__()')
         
     @defer.inlineCallbacks
-    def op_register_resource_instance(self, content, headers, msg):
+    def op_register_resource_instance(self, request, headers, msg):
         """
         Service operation: Register a resource instance with the registry.
         The interceptor will unpack a resource description object. The registry
         will create a new resource of the described type and return the
         identifier for it to the process that requested it.
         """
-        
-        # Check that we got the correct kind of content!
-        assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.ObjectType == self.RESOURCE_DESCRIPTION_TYPE
-        
-       
-        response = yield self._register_resource_instance(content)
+
+
+        if not isinstance(request, message_client.MessageInstance) or request.MessageType != RESOURCE_DESCRIPTION_TYPE:
+            # This will terminate the hello service. As an alternative reply okay with an error message
+            raise ResourceRegistryError('Expected message type RESOURCE_DESCRIPTION_TYPE, received %s'
+                                     % type(request))#, request.ResponseCodes.BAD_REQUEST)
+
+
+        response = yield self._register_resource_instance(request, headers)
        
         
         yield self.reply_ok(msg, response)
-        
+
     @defer.inlineCallbacks
-    def _register_resource_instance(self, resource_description):
-        
+    def slc_init(self):
+
+        yield self.pull(self.datastore_service, OWNED_BY_ID)
+        self.owned_by = self.workbench.get_repository(OWNED_BY_ID)
+        self.owned_by.checkout('master')
+
+
+    @defer.inlineCallbacks
+    def _register_resource_instance(self, resource_description, headers):
+
+        # Get the user to associate with this new resource
+        user_id = headers.get('user-id', 'ANONYMOUS')
+        if user_id ==  'ANONYMOUS':
+            user_id = ANONYMOUS_USER_ID
+
+        # Always get the latest
+        try:
+            yield self.pull(self.datastore_service, user_id)
+            user = self.workbench.get_repository(user_id)
+        except workbench.WorkBenchError, we:
+
+            log.debug('Caught Workbench Error:'+str(we))
+            raise ResourceRegistryError('User ID does not exist. Can not create resource!', resource_description.ResponseCodes.BAD_REQUEST)
+
+        # Make sure we are associating to the latest state of the user
+        user.checkout('master')
+
+
         # Create the response object...
         response = yield self.message_client.create_instance(MessageContentTypeID=None)
         
@@ -120,10 +150,14 @@ class ResourceRegistryService(ServiceProcess):
         
         resource_repository.commit('Created a new resource!')
 
+        # Add the association to the user
+
+        ownership_association = self.workbench.create_association(resource_repository, self.owned_by, user)
+
+
         # push the new resource to the data store        
-        result = yield self.push(self.datastore_service, resource_repository)
-        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
-            
+        yield self.push(self.datastore_service, [resource_repository, ownership_association])
+        # If the push fails hand back the workbench error
         
         response.MessageResponseCode = response.ResponseCodes.OK
         response.MessageResponseBody = resource.identity

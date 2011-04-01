@@ -16,16 +16,10 @@ from ion.util.state_object import BasicStates
 from ion.test.iontest import IonTestCase
 from ion.core import ioninit
 
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
 from ion.core.process.process import Process
 from ion.core.messaging.receiver import Receiver
 from ion.core.messaging import messaging
 import ion.util.procutils as pu
-
-from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
-
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -161,7 +155,7 @@ class TestPublisher(IonTestCase):
             binding_key = kwargs.pop('binding_key', None)
             self.msgs = []
             Receiver.__init__(self, *args, **kwargs)
-            if binding_key == None:
+            if binding_key is None:
                binding_key = self.xname
 
             self.binding_key = binding_key
@@ -402,7 +396,7 @@ class TestPublisherAndSubscriber(IonTestCase):
             msgs.append(content['content'])
 
         pub = yield pf.build(routing_key='arf_test')
-        sub = yield sf.build(binding_key='arf_test', handler=handle_msg)
+        yield sf.build(binding_key='arf_test', handler=handle_msg)
 
         yield pub.publish('get stuck in')
         yield pu.asleep(1.0)

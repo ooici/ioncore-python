@@ -86,47 +86,49 @@ class FindDataResources(object):
         
     @defer.inlineCallbacks
     def findDataResources(self, msg):
-        log.debug('findDataResources Worker Class')
-
         """
-        Need to build up a GPB Message;
-         - get request message object from message client
-         - build up request message to dataset_controller based on incoming
-           request message
-         - send to dataset_controller client to get list of resource ids
-         - get results
-         - for each resource id: determine if in bounds
-         - use cdm dataset helper methods (resource_client) to get pertinent
-           metadata; determine if in bounds of spatial/temporal parms.
-         - get response message object from message client
-         - build up response message
-         - get response message payload
-         - build up response message payload
-         - return response message to ais service
+        Worker class method called by app_integration_service to implement
+        findDataResources.  Finds all dataset resources that are "published"
+        and returns their IDs along with a load of metadata.
         """
 
+        log.debug('findDataResources Worker Class Method')
+
+        #
+        # I don't think this is needed, but leaving it in for now
+        #
+        userID = msg.message_parameters_reference.user_ooi_id
+
+        bounds = {}
+        self.__loadBounds(bounds, msg)
+        self.__printBounds(bounds)
         
-        """
-        This is currently a call to a stub; the msg contains the actual resource
-        id.
-        """
-
-        userID = msg.message_parameters_reference.user_ooi_id        
-
-        """
-        Create the response message that we will attach the list of
-        resource IDs to
-        """
+        #
+        # Create the response message to which we will attach the list of
+        # resource IDs
+        #
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
+        # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         log.debug('Found ' + str(len(dSetResults.idrefs)) + 'datasets.')
 
+        # Get the list of datasource resource IDs
         dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
         log.debug('Found ' + str(len(dSourceResults.idrefs)) + 'datasources.')
 
+        #
+        # Now iterate through the list if dataset resource IDs and for each ID:
+        #   - get the dataset instance
+        #   - get the associated datasource instance
+        #   - check that spatial and temporal criteria are met:
+        #   - if not:
+        #     - continue
+        #   - if so:
+        #     - add the metadata to the response GPB
+        #
         i = 0
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
@@ -135,20 +137,64 @@ class FindDataResources(object):
             
             dSet = yield self.rc.get_instance(dSetResID)
             dSource = yield self.rc.get_instance(dSourceResID)
-    
-            self.__printRootAttributes(dSet)
-            self.__printRootVariables(dSet)
-            self.__printSourceMetadata(dSource)
 
-            rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+            #
+            # If the dataset's data is within the given criteria, include it
+            # in the list
+            #
+            if self.__isInBounds(dSetResID, bounds):
+                log.debug("isInBounds is TRUE")
+                self.__printRootAttributes(dSet)
+                self.__printRootVariables(dSet)
+                self.__printSourceMetadata(dSource)
     
-            self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+        
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+            else:
+                log.debug("isInBounds is FALSE")
+
             
             i = i + 1
 
 
         defer.returnValue(rspMsg)
 
+    def __loadBounds(self, bounds, msg):
+        """
+        Load up the bounds dictionary object with the given spatial and temporal
+        parameters.
+        """
+        log.debug('__loadBounds')
+        
+        bounds['minLat'] = msg.message_parameters_reference.minLatitude
+        bounds['maxLat'] = msg.message_parameters_reference.maxLatitude
+        bounds['minLon'] = msg.message_parameters_reference.minLongitude
+        bounds['maxLon'] = msg.message_parameters_reference.maxLongitude
+        bounds['minVert'] = msg.message_parameters_reference.minVertical
+        bounds['maxVert'] = msg.message_parameters_reference.maxVertical
+        bounds['posVert'] = msg.message_parameters_reference.posVertical
+        bounds['minTime'] = msg.message_parameters_reference.minTime
+        bounds['maxTime'] = msg.message_parameters_reference.maxTime
+
+        
+    def __isInBounds(self, bounds, dSet):
+        """
+        Determine if dataset resource is in bounds.
+        Input:
+          - bounds
+          - dSet
+        """
+        log.debug('__isInBounds')
+        result = True
+        return result
+        
+    def __printBounds(self, bounds):
+        boundNames = list(bounds)
+        log.debug('Spatial and Temporal Bounds: ')
+        for boundName in boundNames:
+            log.debug('   %s = %s'  % (boundName, bounds[boundName]))
+    
     def __printRootAttributes(self, ds):
         for atrib in ds.root_group.attributes:
             log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))

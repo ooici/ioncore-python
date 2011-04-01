@@ -57,8 +57,10 @@ class Store(object):
     """
     implements(IStore)
 
+    kvs = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
+        pass
 
     def get(self, key):
         """
@@ -105,7 +107,7 @@ class IIndexStore(IStore):
         @retval Deferred, for value associated with key, or None if not existing.
         """
 
-    def put(key, value, index_attributes={}):
+    def put(key, value, index_attributes=None):
         """
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
@@ -171,13 +173,17 @@ class IndexStore(object):
     """
     implements(IIndexStore)
 
+    kvs = {}
+    indices = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
-        self.indices = {}
+        #self.kvs = {}
+        #self.indices = {}
         
         if kwargs.has_key('indices'):
             for name in kwargs.get('indices'):
-                self.indices[name]={}
+                if not self.indices.has_key(name):
+                    self.indices[name]={}
 
     def get(self, key):
         """
@@ -189,12 +195,15 @@ class IndexStore(object):
         else:
             return defer.maybeDeferred(row.get, "value")
 
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         """
         @see IStore.put
         Raises an exception if index_attibutes contains attributes that are not indexed
         by the underlying store.
         """
+        if index_attributes is None:
+            index_attributes = {}
+            
         self._update_index(key, index_attributes)
                         
         return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})        
@@ -287,9 +296,9 @@ class IndexStore(object):
 
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
-            if not kindex:
-                kindex = {}
-                self.indices[k] = kindex
+            #if not kindex:
+            #    kindex = {}
+            #    self.indices[k] = kindex
             # Create a set of keys if it does not already exist
             kindex[v] = kindex.get(v, set())
             kindex[v].add(key)

@@ -138,9 +138,11 @@ class MessageInstanceError(Exception):
     
 class MessageFieldProperty(object):
     
-    def __init__(self, name, doc=None):
+    def __init__(self, name, msg_prop, doc=None):
         self.name = name
         if doc: self.__doc__ = doc
+        self.field_type = msg_prop.field_type
+        self.field_enum = msg_prop.field_enum
         
     def __get__(self, message_instance, objtype=None):
         return getattr(message_instance._repository.root_object.message_object, self.name)
@@ -202,23 +204,21 @@ class MessageInstanceType(type):
             # Get the class name
             clsName = '%s_%s' % (cls.__name__, msgType.__name__)
             clsDict = {}
-                
-            # Now setup the properties to map through to the GPB object
-            resDict = msgType.__dict__
-            
-            for fieldName, message_field in resDict.items():
-                #print 'Key: %s; Type: %s' % (fieldName, type(message_field))
-                if isinstance(message_field, gpb_wrapper.WrappedProperty):
-                    prop = MessageFieldProperty(fieldName )
-                    
-                    clsDict[fieldName] = prop
-                    
-                elif isinstance(message_field, gpb_wrapper.EnumObject):
-                    prop = MessageEnumProperty(fieldName )
-                    
-                    clsDict[fieldName] = prop
-                
-                
+
+            if msgType is not type(None):
+                # Now setup the properties to map through to the GPB object
+                for propName, msgProp in msgType._Properties.items():
+                    #print 'Key: %s; Type: %s' % (fieldName, type(message_field))
+                    prop = MessageFieldProperty(propName, msgProp)
+                    clsDict[propName] = prop
+
+                for enumName, enumProp in msgType._Enums.items():
+                    enum = MessageEnumProperty(enumName)
+                    clsDict[enumName] = enum
+
+                clsDict['_Properties'] = msgType._Properties
+                clsDict['_Enums'] = msgType._Enums
+
             # Try rewriting using slots - would be more efficient...
             def obj_setter(self, k, v):
                 if self._init and not hasattr(self, k):
