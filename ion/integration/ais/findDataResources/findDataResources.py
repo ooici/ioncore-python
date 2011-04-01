@@ -97,8 +97,12 @@ class FindDataResources(object):
         #
         # I don't think this is needed, but leaving it in for now
         #
-        userID = msg.message_parameters_reference.user_ooi_id        
+        userID = msg.message_parameters_reference.user_ooi_id
 
+        bounds = {}
+        self.__loadBounds(bounds, msg)
+        self.__printBounds(bounds)
+        
         #
         # Create the response message to which we will attach the list of
         # resource IDs
@@ -147,6 +151,39 @@ class FindDataResources(object):
 
         defer.returnValue(rspMsg)
 
+    def __loadBounds(self, bounds, msg):
+        """
+        Load up the bounds dictionary object with the given spatial and temporal
+        parameters.
+        """
+        log.debug('__loadBounds')
+        
+        bounds['minLat'] = msg.message_parameters_reference.minLatitude
+        bounds['maxLat'] = msg.message_parameters_reference.maxLatitude
+        bounds['minLon'] = msg.message_parameters_reference.minLongitude
+        bounds['maxLon'] = msg.message_parameters_reference.maxLongitude
+        bounds['minVert'] = msg.message_parameters_reference.minVertical
+        bounds['maxVert'] = msg.message_parameters_reference.maxVertical
+        bounds['posVert'] = msg.message_parameters_reference.posVertical
+        bounds['minTime'] = msg.message_parameters_reference.minTime
+        bounds['maxTime'] = msg.message_parameters_reference.maxTime
+
+        
+    def __isInBounds(self, bounds, dSet):
+        """
+        Determine if dataset resource is in bounds.
+        Input:
+          - bounds
+          - dSet
+        """
+        log.debug('__isInBounds')
+        
+    def __printBounds(self, bounds):
+        boundNames = list(bounds)
+        log.debug('Spatial and Temporal Bounds: ')
+        for boundName in boundNames:
+            log.debug('   %s = %s'  % (boundName, bounds[boundName]))
+    
     def __printRootAttributes(self, ds):
         for atrib in ds.root_group.attributes:
             log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))

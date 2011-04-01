@@ -92,11 +92,17 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude = 32.87521
-        reqMsg.message_parameters_reference.maxLatitude = 32.97521
+        reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.minLatitude  = 32.87521
+        reqMsg.message_parameters_reference.maxLatitude  = 32.97521
         reqMsg.message_parameters_reference.minLongitude = -117.274609
         reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
+
         
         log.debug('Calling findDataResources to get list of resources.')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
