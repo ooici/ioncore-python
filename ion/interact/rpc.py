@@ -31,12 +31,17 @@ class RpcFSMFactory(ConversationTypeFSMFactory):
     S_REQUESTED = "REQUESTED"
     S_FAILED = "FAILED"
     S_DONE = "DONE"
-    S_ERROR = BasicStates.S_ERROR
+    S_ERROR = BasicStates.S_ERROR  # On processing error, automatically called
+    S_UNEXPECTED = "UNEXPECTED"    # When an event happens that is undefined
+    S_TIMEOUT = "TIMEOUT"
 
     E_REQUEST = "request"
     E_FAILURE = "failure"
     E_RESULT = "inform_result"
     E_ERROR = "error"
+    E_TIMEOUT = "timeout"
+
+    A_UNEXPECTED = "unexpected"
 
     def create_fsm(self, target, memory=None):
         fsm = ConversationTypeFSMFactory.create_fsm(self, target, memory)
@@ -58,9 +63,17 @@ class RpcFSMFactory(ConversationTypeFSMFactory):
         actionfct = self._create_action_func(actf, self.E_RESULT)
         fsm.add_transition(self.E_RESULT, self.S_REQUESTED, actionfct, self.S_DONE)
 
+        # REQUESTED ^timeout -->  TIMEOUT /timeout
+        actionfct = self._create_action_func(actf, self.E_TIMEOUT)
+        fsm.add_transition(self.E_TIMEOUT, self.S_REQUESTED, actionfct, self.S_TIMEOUT)
+
         # ANY ^error -->  ERROR /error
         actionfct = self._create_action_func(actf, self.E_ERROR)
-        fsm.set_default_transition(actionfct, self.S_ERROR)
+        fsm.add_transition_catch(self.E_ERROR, actionfct, self.S_ERROR)
+
+        # ANY ^(undefined) -->  UNEXPECTED /unexpected
+        actionfct = self._create_action_func(actf, self.A_UNEXPECTED)
+        fsm.set_default_transition(actionfct, self.S_UNEXPECTED)
 
         return fsm
 

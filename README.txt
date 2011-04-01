@@ -179,6 +179,8 @@ Change log:
 ===========
 
 - TBD: Timeout as defined state transition of conversation
+- TBD: Conversation garbage collection and final/error state detection - tombstone
+- TBD: Conversation FSM cloning (instead of always new creation)
 - TBD: Interaction observer and generic receiver (for all operations on broker)
 - TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
 - TBD: proc.back.send-contid.sendpid.main.reccontid.recpid naming and bindings
@@ -195,6 +197,7 @@ Change log:
   in process messages.
 - Bug fixes to process terminate and life cycle handling.
 - Bug fixes to StateObject error handling and reporting.
+- FSM now handles catch events and post state change action methods
 
 2011-01-28:
 - Switched to binary sha1 keys in all objects.

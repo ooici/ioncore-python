@@ -69,6 +69,7 @@ class StateObject(Actionable):
         self.__fsm.input_kwargs = kwargs
         self.__fsm.error_cause = None
         try:
+            old_state = self.__fsm.current_state
             # This is the main invocation of the FSM. It will lead to calls to
             # the _action function in normal configuration.
             res = self.__fsm.process(event)

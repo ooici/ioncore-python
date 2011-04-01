@@ -35,8 +35,11 @@ class FSM(object):
 
         # Map (input_symbol, current_state) --> (action, next_state).
         self.state_transitions = {}
+        # Map (input_symbol) --> (action, next_state).
+        self.state_transitions_catch = {}
         # Map (current_state) --> (action, next_state).
         self.state_transitions_any = {}
+        # (action, next_state).
         self.default_transition = None
 
         self.input_symbol = None
@@ -59,9 +62,13 @@ class FSM(object):
 
     def add_transition(self, input_symbol, state, action=None, next_state=None):
         """
-        This adds a transition
-        """
+        This adds a transition that associates:
+            (input_symbol, current_state) --> (action, next_state)
 
+        The action may be set to None in which case the process() method will
+        ignore the action and only set the next_state. The next_state may be
+        set to None in which case the current state will be unchanged.
+        """
         if next_state is None:
             next_state = state
         self.state_transitions[(input_symbol, state)] = (action, next_state)
@@ -69,37 +76,97 @@ class FSM(object):
     def add_transition_list(self, list_input_symbols, state, action=None, next_state=None):
         """
         This adds the same transition for a list of input symbols.
-        """
+        You can pass a list or a string. Note that it is handy to use
+        string.digits, string.whitespace, string.letters, etc. to add
+        transitions that match character classes.
 
+        The action may be set to None in which case the process() method will
+        ignore the action and only set the next_state. The next_state may be
+        set to None in which case the current state will be unchanged.
+        """
         if next_state is None:
             next_state = state
         for input_symbol in list_input_symbols:
             self.add_transition (input_symbol, state, action, next_state)
 
+    def add_transition_catch(self, input_symbol, action=None, next_state=None):
+        """
+        This adds a transition that associates:
+            (input_symbol, ANY state) --> (action, next_state)
+
+        That is, the input symbol will match any current state.
+        The process() method checks the "catch" event associations after it first
+        checks for an exact match of (input_symbol, current_state) and before
+        the "any" associations.
+
+        The action may be set to None in which case the process() method will
+        ignore the action and only set the next_state. The next_state may be
+        set to None in which case the current state will be unchanged.
+        """
+        if next_state is None:
+            return
+        self.state_transitions_catch[input_symbol] = (action, next_state)
+
     def add_transition_any(self, state, action=None, next_state=None):
         """
-        This adds a transition
-        """
+        This adds a transition that associates:
+            (current_state) --> (action, next_state)
 
+        That is, any input symbol will match the current state.
+        The process() method checks the "any" state associations after it first
+        checks for an exact match of (input_symbol, current_state).
+
+        The action may be set to None in which case the process() method will
+        ignore the action and only set the next_state. The next_state may be
+        set to None in which case the current state will be unchanged.
+        """
         if next_state is None:
             next_state = state
-        self.state_transitions_any [state] = (action, next_state)
+        self.state_transitions_any[state] = (action, next_state)
 
     def set_default_transition(self, action, next_state):
         """
-        This sets the default transition.
-        """
+        This sets the default transition. This defines an action and
+        next_state if the FSM cannot find the input symbol and the current
+        state in the transition list and if the FSM cannot find the
+        current_state in the transition_any list. This is useful as a final
+        fall-through state for catching errors and undefined states.
 
+        The default transition can be removed by setting the attribute
+        default_transition to None.
+        """
         self.default_transition = (action, next_state)
 
     def get_transition(self, input_symbol, state):
         """
         This returns (action, next state) given an input_symbol and state.
-        """
+        This does not modify the FSM state, so calling this method has no side
+        effects. Normally you do not call this method directly. It is called by
+        process().
 
+        The sequence of steps to check for a defined transition goes from the
+        most specific to the least specific.
+
+        1. Check state_transitions[] that match exactly the tuple,
+        (input_symbol, state)
+
+        2. Check state_transitions_catch[] that match (input_symbol)
+        In other words, match ANY state and a specific input_symbol.
+
+        3. Check state_transitions_any[] that match (state)
+        In other words, match a specific state and ANY input_symbol.
+
+        4. Check if the default_transition is defined.
+        This catches any input_symbol and any state.
+        This is a handler for errors, undefined states, or defaults.
+
+        5. No transition was defined. If we get here then raise an exception.
+        """
         if self.state_transitions.has_key((input_symbol, state)):
             return self.state_transitions[(input_symbol, state)]
-        elif self.state_transitions_any.has_key (state):
+        elif self.state_transitions_catch.has_key(input_symbol):
+            return self.state_transitions_catch[input_symbol]
+        elif self.state_transitions_any.has_key(state):
             return self.state_transitions_any[state]
         elif self.default_transition is not None:
             return self.default_transition
@@ -109,9 +176,14 @@ class FSM(object):
 
     def process(self, input_symbol):
         """
-        This is the main method that you call to process input.
+        This is the main method that you call to process input. This may
+        cause the FSM to change state and call an action. This method calls
+        get_transition() to find the action and next_state associated with the
+        input_symbol and current_state. If the action is None then the action
+        is not called and only the current state is changed. This method
+        processes one complete input symbol. You can process a list of symbols
+        (or a string) by calling process_list().
         """
-
         self.input_symbol = input_symbol
         (self.action, self.next_state) = self.get_transition(self.input_symbol, self.current_state)
 
