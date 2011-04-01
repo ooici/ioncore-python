@@ -837,6 +837,7 @@ class DataStoreService(ServiceProcess):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
 
+            print ''
             self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self, **{'indices':COMMIT_INDEXED_COLUMNS})
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):

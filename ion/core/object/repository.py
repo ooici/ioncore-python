@@ -269,7 +269,7 @@ class Repository(object):
         It is not 'stored' in the index - it lives in the repository
         """
     
-    def __repr__(self):
+    def __str__(self):
         output  = '============== Repository (status: %s) ==============\n' % self.status
         output += str(self._dotgit) + '\n'
         output += '============== Root Object ==============\n'

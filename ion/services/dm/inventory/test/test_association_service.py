@@ -39,14 +39,11 @@ class AssociationServiceTest(IonTestCase):
     Testing example hello service.
     """
     services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}
                 },
-            
+
             {'name':'association_service',
              'module':'ion.services.dm.inventory.association_service',
              'class':'AssociationService'

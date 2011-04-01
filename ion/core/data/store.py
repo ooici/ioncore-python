@@ -57,8 +57,10 @@ class Store(object):
     """
     implements(IStore)
 
+    kvs = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
+        pass
 
     def get(self, key):
         """
@@ -171,13 +173,17 @@ class IndexStore(object):
     """
     implements(IIndexStore)
 
+    kvs = {}
+    indices = {}
+
     def __init__(self, *args, **kwargs):
-        self.kvs = {}
-        self.indices = {}
+        #self.kvs = {}
+        #self.indices = {}
         
         if kwargs.has_key('indices'):
             for name in kwargs.get('indices'):
-                self.indices[name]={}
+                if not self.indices.has_key(name):
+                    self.indices[name]={}
 
     def get(self, key):
         """
@@ -290,9 +296,9 @@ class IndexStore(object):
 
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
-            if not kindex:
-                kindex = {}
-                self.indices[k] = kindex
+            #if not kindex:
+            #    kindex = {}
+            #    self.indices[k] = kindex
             # Create a set of keys if it does not already exist
             kindex[v] = kindex.get(v, set())
             kindex[v].add(key)

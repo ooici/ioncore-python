@@ -36,12 +36,9 @@ class DateSetControllerTest(IonTestCase):
         yield self._start_container()
 
         services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
 
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},}
                 },
 
             {'name':'association_service',

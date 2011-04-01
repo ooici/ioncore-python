@@ -386,7 +386,7 @@ class DataStoreTest(IonTestCase):
 
 
 
-
+"""
 
 class StoreServiceBackedDataStoreTest(DataStoreTest):
 
@@ -407,7 +407,7 @@ class StoreServiceBackedDataStoreTest(DataStoreTest):
              'class':'WorkBenchProcess',
              'spawnargs':{'proc-name':'wb1'}},
         ]
-
+"""
 
 '''
 class CassandraBackedDataStoreTest(DataStoreTest):
