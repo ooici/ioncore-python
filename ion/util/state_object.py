@@ -7,6 +7,7 @@
 """
 
 from twisted.internet import defer
+from twisted.python import failure
 import traceback
 
 import ion.util.ionlog
@@ -70,64 +71,77 @@ class StateObject(Actionable):
             res = self.__fsm.process(event)
 
             if isinstance(res, defer.Deferred):
+                d_post = defer.Deferred()
                 def _cb(result):
-                    return result
+                    # Process to NEXT state was successful (after Deferred)
+                    #log.debug("FSM post-state" + str(self._get_state()))
+                    d_post.callback(result)
                 def _err(result):
-                    log.error("ERROR in StateObject process(event=%s):\n%s" % (event, result))
+                    # Process to NEXT state failed (after Deferred) -> forward to ERROR
+                    log.error("ERROR in StateObject process(event=%s), D:\n%s" % (event, result))
                     try:
-                        d1 = self._so_error(result)
-                        if isinstance(d1, defer.Deferred):
+                        res1 = self._so_error(result)
+                        if isinstance(res1, defer.Deferred):
                             # FSM error action deferred too
                             def _cb1(result1):
-                                return result1
-                            res.addCallbacks(_cb1,log.error)
+                                # Process to ERROR state was successful (after Deferred)
+                                d_post.errback(result)
+                            def _err1(result1):
+                                # Process to ERROR state failed (after Deferred)
+                                log.error("Subsequent ERROR in StateObject error(), D-D:\n%s" % (result1))
+                                d_post.errback(result)
+                            res1.addCallbacks(_cb1,_err1)
                         else:
-                            return result
+                            # Process to ERROR state was successful (no Deferred)
+                            d_post.errback(result)
                     except Exception, ex:
-                        log.exception("Subsequent ERROR in StateObject error()")
-                        return result
+                        # Process to ERROR state failed (no Deferred)
+                        log.exception("Subsequent ERROR in StateObject error(), D-ND")
+                        d_post.errback(result)
                 res.addCallbacks(_cb,_err)
+                res = d_post
+            else:
+                # Process to NEXT state was successful (no Deferred) -- YAY!
+                pass
 
-            #if isinstance(res, defer.Deferred):
-            #    d1 = defer.Deferred()
-            #    def _cb(result):
-            #        #log.debug("FSM post-state" + str(self._get_state()))
-            #        d1.callback(result)
-            #    def _err(result):
-            #        log.error("ERROR in StateObject process(event=%s): %s" % (event, result))
-            #        # @todo Improve the error catching, forwarding and reporting
-            #        try:
-            #            d2 = self._so_error(result)
-            #            if isinstance(d2, defer.Deferred):
-            #                # FSM error action deferred too
-            #                def _cb2(result1):
-            #                    d1.errback(result)
-            #                d2.addCallbacks(_cb2,log.error)
-            #            else:
-            #                d1.errback(result)
-            #        except Exception, ex:
-            #            log.exception("ERROR in StateObject error() after exception %s" % result)
-            #            d1.errback(result)
-            #    res.addCallbacks(_cb,_err)
-            #    res = d1
-            #else:
-            #    pass
-            #    #log.debug("FSM post-state" + str(self._get_state()))
         except StandardError, ex:
+            # Process to NEXT state failed (no Deferred) -> forward to ERROR
             log.exception("ERROR in StateObject process(event=%s)" % (event))
-            # This catches only if not deferred
-            # @todo Improve the error catching, forwarding and reporting
-            res = self._so_error(ex)
-            raise ex
+            try:
+                res1 = self._so_error(ex)
+                if isinstance(res1, defer.Deferred):
+                    result = failure.Failure(ex)
+                    d_post = defer.Deferred()
+                    # FSM error action deferred
+                    def _cb1(result1):
+                        # Process to ERROR state was successful (after Deferred)
+                        d_post.errback(result)
+                    def _err1(result1):
+                        # Process to ERROR state failed (after Deferred)
+                        log.error("Subsequent ERROR in StateObject error(), ND-D:\n%s" % (result1))
+                        d_post.errback(result)
+                    res1.addCallbacks(_cb1,_err1)
+                    res = d_post
+                else:
+                    raise ex
+            except Exception, ex1:
+                log.exception("Subsequent ERROR in StateObject error(), ND-ND")
+                raise ex
 
         return res
 
-    def _so_error(self, error=None):
+    def _so_error(self, *args, **kwargs):
         """
         @brief Brings the StateObject explicitly into the error state, because
             of some action error.
         """
+        error = args[0] if args else None
         self.__fsm.error_cause = error
+
+        # Is it OK to override the original args?
+        self.__fsm.input_args = args
+        self.__fsm.input_kwargs = kwargs
+
         return self.__fsm.process(BasicStates.E_ERROR)
 
     def _action(self, action, fsm):

@@ -135,8 +135,12 @@ class RpcInitiator(ConversationRole):
 
         else:
             log.error('RPC reply is not well formed. Header "status" must be set!')
-            #Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.callback(res))
+            if rpc_deferred:
+                #Cannot do the callback right away, because the message is not yet handled
+                reactor.callLater(0, lambda: rpc_deferred.callback(res))
+            else:
+                log.error("ERROR. Do not support non-blocking RPC yet")
+
 
         log.debug('[%s] RPC inform_result done.' % (process.proc_name))
 
