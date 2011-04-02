@@ -113,11 +113,11 @@ class FindDataResources(object):
 
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSetResults.idrefs)) + 'datasets.')
+        log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
         # Get the list of datasource resource IDs
         dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + 'datasources.')
+        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
 
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
@@ -133,16 +133,19 @@ class FindDataResources(object):
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
             dSourceResID = dSourceResults.idrefs[i].key
-            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID:' + dSourceResID)
+            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID: ' + dSourceResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
             dSource = yield self.rc.get_instance(dSourceResID)
+
+            minMetaData = {}
+            self.__loadMinMetaData(dSet, minMetaData)
 
             #
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.__isInBounds(dSetResID, bounds):
+            if self.__isInBounds(dSet, bounds):
                 log.debug("isInBounds is TRUE")
                 self.__printRootAttributes(dSet)
                 self.__printRootVariables(dSet)
@@ -150,7 +153,7 @@ class FindDataResources(object):
     
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
         
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], minMetaData, userID, dSetResID)
             else:
                 log.debug("isInBounds is FALSE")
 
@@ -159,6 +162,40 @@ class FindDataResources(object):
 
 
         defer.returnValue(rspMsg)
+
+    def __loadMinMetaData(self, dSet, minMetaData):
+        for attrib in dSet.root_group.attributes:
+            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            if attrib.name == 'title':
+                minMetaData['title'] = attrib.GetValue()
+            elif attrib.name == 'institution':                
+                minMetaData['institution'] = attrib.GetValue()
+            elif attrib.name == 'source':                
+                minMetaData['source'] = attrib.GetValue()
+            elif attrib.name == 'references':                
+                minMetaData['references'] = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_start':                
+                minMetaData['ion_time_coverage_start'] = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_end':                
+                minMetaData['ion_time_coverage_end'] = attrib.GetValue()
+            elif attrib.name == 'summary':                
+                minMetaData['summary'] = attrib.GetValue()
+            elif attrib.name == 'comment':                
+                minMetaData['comment'] = attrib.GetValue()
+            elif attrib.name == 'ion_geospatial_lat_min':                
+                minMetaData['ion_geospatial_lat_min'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lat_max':                
+                minMetaData['ion_geospatial_lat_max'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lon_min':                
+                minMetaData['ion_geospatial_lon_min'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lon_max':                
+                minMetaData['ion_geospatial_lon_max'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_min':                
+                minMetaData['ion_geospatial_vertical_min'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_max':                
+                minMetaData['ion_geospatial_vertical_max'] = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_positive':                
+                minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
 
     def __loadBounds(self, bounds, msg):
         """
@@ -178,7 +215,7 @@ class FindDataResources(object):
         bounds['maxTime'] = msg.message_parameters_reference.maxTime
 
         
-    def __isInBounds(self, bounds, dSet):
+    def __isInBounds(self, dSet, bounds):
         """
         Determine if dataset resource is in bounds.
         Input:
@@ -186,6 +223,10 @@ class FindDataResources(object):
           - dSet
         """
         log.debug('__isInBounds')
+        if dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue() < bounds['minLat']:
+            log.debug('%s is < than %s' % (str(float(dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())), str(bounds['minLat'])))
+        else:            
+            log.debug('%s is !< than %s' % (str(float(dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())), str(bounds['minLat'])))
         result = True
         return result
         
@@ -218,30 +259,41 @@ class FindDataResources(object):
         log.debug('base_url: ' + dSource.base_url)
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
-    def __loadRootAttributes(self, rootAttributes, ds, userID, resID):
-        try:
-            rootAttributes.user_ooi_id = userID
-            rootAttributes.data_resource_id = resID
-            rootAttributes.title = ds.root_group.FindAttributeByName('title').GetValue()
-            rootAttributes.institution = ds.root_group.FindAttributeByName('institution').GetValue()
-            rootAttributes.source = ds.root_group.FindAttributeByName('source').GetValue()
-            rootAttributes.references = ds.root_group.FindAttributeByName('references').GetValue()
-            rootAttributes.ion_time_coverage_start = ds.root_group.FindAttributeByName('ion_time_coverage_start').GetValue()
-            rootAttributes.ion_time_coverage_end = ds.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-            rootAttributes.summary = ds.root_group.FindAttributeByName('summary').GetValue()
-            rootAttributes.comment = ds.root_group.FindAttributeByName('comment').GetValue()
-            rootAttributes.ion_geospatial_lat_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())
-            rootAttributes.ion_geospatial_lat_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue())
-            rootAttributes.ion_geospatial_lon_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_min').GetValue())
-            rootAttributes.ion_geospatial_lon_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_max').GetValue())
-            rootAttributes.ion_geospatial_vertical_min = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_min').GetValue())
-            rootAttributes.ion_geospatial_vertical_max = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_max').GetValue())
-            rootAttributes.ion_geospatial_vertical_positive = ds.root_group.FindAttributeByName('ion_geospatial_vertical_positive').GetValue()
-        
-        except:
-            estr = 'Object ERROR!'
-            log.exception(estr)
-
+    def __loadRootAttributes(self, rootAttributes, minMetaData, userID, resID):
+        rootAttributes.user_ooi_id = userID
+        rootAttributes.data_resource_id = resID
+        for attrib in minMetaData:
+            log.debug('Root Attribute: %s = %s'  % (attrib, minMetaData[attrib]))
+            if  attrib == 'title':
+                rootAttributes.title = minMetaData[attrib]
+            elif attrib == 'institution':                
+                rootAttributes.institution = minMetaData[attrib]
+            elif attrib == 'source':                
+                rootAttributes.source = minMetaData[attrib]
+            elif attrib == 'references':                
+                rootAttributes.references = minMetaData[attrib]
+            elif attrib == 'ion_time_coverage_start':                
+                rootAttributes.ion_time_coverage_start = minMetaData[attrib]
+            elif attrib == 'ion_time_coverage_end':                
+                rootAttributes.ion_time_coverage_end = minMetaData[attrib]
+            elif attrib == 'summary':                
+                rootAttributes.summary = minMetaData[attrib]
+            elif attrib == 'comment':                
+                rootAttributes.comment = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_lat_min':                
+                rootAttributes.ion_geospatial_lat_min = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_lat_max':                
+                rootAttributes.ion_geospatial_lat_max = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_lon_min':                
+                rootAttributes.ion_geospatial_lon_min = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_lon_max':                
+                rootAttributes.ion_geospatial_lon_max = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_vertical_min':                
+                rootAttributes.ion_geospatial_vertical_min = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_vertical_max':                
+                rootAttributes.ion_geospatial_vertical_max = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_vertical_positive':                
+                rootAttributes.ion_geospatial_vertical_positive = minMetaData[attrib]
 
     """
     def __loadRootVariable(self, rootVariable, ds, var):
