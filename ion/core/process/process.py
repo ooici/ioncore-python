@@ -431,7 +431,37 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         try:
             # Establish security context for request processing
-            self._establish_request_context(payload, msg)
+            request.proc_name = self.proc_name
+            # Check if there is a user id in the header, stash if so
+            _pre_uid = payload.get('user-id', None)
+            _pre_exp = payload.get('expiry', None)
+            _action = ''
+            if 'user-id' in payload:
+                request.user_id = payload.get('user-id')
+                _action = 'set user_id'
+            else:
+                log.debug('[%s] receive(): payload anonymous request' % (self.proc_name))
+                if request.get('user_id', 'Not set') == 'Not set':
+                    request.user_id = 'ANONYMOUS'
+                    _action = 'set ANONYMOUS user_id'
+                else:
+                    _action = "keep stashed user_id='%s'" % request.get('user_id')
+            _post_uid = request.get('user_id')
+
+            # User session expiry.
+            if 'expiry' in payload:
+                request.expiry = payload.get('expiry')
+                _action = _action + '/set expiry'
+            else:
+                if request.get('expiry', 'Not set') == 'Not set':
+                    request.expiry = '0'
+                    _action = _action + '/set 0 expiry'
+                else:
+                    _action = _action + "/keep stashed expiry='%s'" % request.get('expiry')
+            _post_exp = request.get('expiry')
+
+            log.debug("[%s] receive(): IN:user-id='%s',expiry='%s' ACTION:%s SET:user-id='%s',expiry='%s'" % (
+                self.proc_name, _pre_uid, _pre_exp, _action, _post_uid, _post_exp))
 
             # Extract some headers and make log statement.
             fromname = payload['sender']
@@ -542,44 +572,6 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 # Only if msg has not been ack/reject/requeued before
                 log.debug("<<< ACK msg")
                 yield msg.ack()
-
-    def _establish_request_context(self, payload, msg):
-        """
-        @brief Establish security context for request processing.
-            Extract and set user-id, session expiry based on incoming headers
-        """
-        request.proc_name = self.proc_name
-        # Check if there is a user id in the header, stash if so
-        _pre_uid = payload.get('user-id', None)
-        _pre_exp = payload.get('expiry', None)
-        _action = ''
-        if 'user-id' in payload:
-            request.user_id = payload.get('user-id')
-            _action = 'set user_id'
-        else:
-            log.debug('[%s] receive(): payload anonymous request' % (self.proc_name))
-            if request.get('user_id', 'Not set') == 'Not set':
-                request.user_id = 'ANONYMOUS'
-                _action = 'set ANONYMOUS user_id'
-            else:
-                _action = "keep stashed user_id='%s'" % request.get('user_id')
-        _post_uid = request.get('user_id')
-
-        # User session expiry.
-        if 'expiry' in payload:
-            request.expiry = payload.get('expiry')
-            _action = _action + '/set expiry'
-        else:
-            if request.get('expiry', 'Not set') == 'Not set':
-                request.expiry = '0'
-                _action = _action + '/set 0 expiry'
-            else:
-                _action = _action + "/keep stashed expiry='%s'" % request.get('expiry')
-        _post_exp = request.get('expiry')
-
-        log.debug("[%s] receive(): IN:user-id='%s',expiry='%s' ACTION:%s SET:user-id='%s',expiry='%s'" % (
-            self.proc_name, _pre_uid, _pre_exp, _action, _post_uid, _post_exp))
-
 
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
@@ -797,6 +789,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         if performative:
             msgheaders['performative'] = performative
+        elif 'performative' not in msgheaders:
+            msgheaders['performative'] = 'inform_result'
 
         # Now allow headers to override any of the precomputed headers
         if headers is not None:

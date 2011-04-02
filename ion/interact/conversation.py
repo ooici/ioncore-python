@@ -138,13 +138,13 @@ class ConversationRole(StateObject):
         return d
 
     def error(self, *args, **kwargs):
-        log.error("PROCESSING ERROR in Conversation: %r %r" % (args, kwargs))
+        log.error("Conversation ERROR: Exception %r %r" % (args, kwargs))
 
     def unexpected(self, *args, **kwargs):
-        log.error("UNEXPECTED MSG ERROR in Conversation: %r %r" % (args, kwargs))
+        log.error("Conversation ERROR: UNEXPECTED MSG")
 
     def timeout(self, *args, **kwargs):
-        log.error("TIMEOUT ERROR in Conversation")
+        log.error("Conversation ERROR: TIMEOUT")
 
 class ConversationTypeSpec(object):
     """
