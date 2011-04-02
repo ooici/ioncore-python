@@ -32,6 +32,8 @@ from ion.core.object import workbench
 from ion.core.object import object_utils
 from ion.core.data.store import Query
 
+from ion.util import procutils as pu
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
@@ -70,6 +72,9 @@ class IStoreTest(unittest.TestCase):
         backend
         """
         return defer.maybeDeferred(store.Store)
+
+    def tearDown(self):
+        store.Store.kvs.clear()
 
     #def test_instantiate(self):
     #    pass
@@ -155,6 +160,8 @@ class StoreServiceTest(IStoreTest, IonTestCase):
     def tearDown(self):
         log.info("In tearDown")
 
+        IStoreTest.tearDown(self)
+
         yield self._shutdown_processes()
         yield self._stop_container()
 
@@ -168,22 +175,6 @@ class BootstrapStoreTest(IStoreTest):
     @itv(CONF)
     def _setup_backend(self):
         store = CassandraStoreBootstrap("ooiuser", "oceans11")
-        store.initialize()
-        store.activate()
-        return defer.succeed(store)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        try:
-            yield self.ds.terminate()
-        except Exception, ex:
-            log.info("Exception raised in tearDown %s" % (ex,))
-
-class BootstrapIndexedStoreTest(IStoreTest):
-
-    @itv(CONF)
-    def _setup_backend(self):
-        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
         store.initialize()
         store.activate()
         return defer.succeed(store)
@@ -267,10 +258,15 @@ class IndexStoreTest(IStoreTest):
         """return a deferred which returns a initiated instance of a
         backend
         """
-
         ds = store.IndexStore(indices=['full_name', 'state', 'birth_date'])
 
         return defer.succeed(ds)
+
+    def tearDown(self):
+
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
 
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
@@ -516,8 +512,27 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
     def tearDown(self):
         log.info("In tearDown")
 
+        IndexStoreTest.tearDown(self)
+
         yield self._shutdown_processes()
         yield self._stop_container()
+
+
+class BootstrapIndexedStoreTest(IndexStoreTest):
+
+    @itv(CONF)
+    def _setup_backend(self):
+        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
+        store.initialize()
+        store.activate()
+        return defer.succeed(store)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        try:
+            yield self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))
 
 
 class CassandraIndexedStoreTest(IndexStoreTest):
