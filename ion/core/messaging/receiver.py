@@ -285,6 +285,7 @@ class Receiver(BasicLifecycleObject):
             else:
                 # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
                 yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
+                defer.returnValue(msg)
         except Exception, ex:
             log.exception("Send error")
         else:

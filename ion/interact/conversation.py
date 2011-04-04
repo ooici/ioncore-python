@@ -16,6 +16,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.exception import ConversationError
 from ion.util.state_object import FSMFactory, StateObject, BasicStates
+import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 CF_basic_conv_types = CONF['basic_conv_types']
@@ -43,8 +44,14 @@ class ConversationType(object):
     """
     implements(IConversationType)
 
+    # Role id for the default initator of this conv
     DEFAULT_ROLE_INITIATOR = None
+
+    # Role id for the default counterparty of this conv
     DEFAULT_ROLE_PARTICIPANT = None
+
+    # List of state ids for conversation final states
+    FINAL_STATES = ()
 
     def __init__(self, id):
         """
@@ -81,6 +88,7 @@ class Conversation(object):
         self.blocking_deferred = None
         # Marks a timeout in the conversation processing
         self.timeout = None
+        self.conv_log = []
 
     def bind_role_local(self, role_id, process):
         self.bind_role(role_id, process.id)
@@ -100,6 +108,23 @@ class Conversation(object):
         assert not role_id in self.role_bindings, "Cannot bind role %s twice" % role_id
 
         self.role_bindings[role_id] = process_id
+
+    def get_conv_log_str(self):
+        res = "CONV_LOG[type=%s, id=%s, state=%s, @process=%s, #messages=%s:\n" % (
+            self.protocol, self.conv_id, self.local_fsm._get_state(), self.local_process.proc_name, len(self.conv_log))
+        for msg_rec in self.conv_log:
+            (ts, mtype, cstate, mhdrs) = msg_rec
+            hstr = "%s -> %s %s:%s:%s; uid=%s, status=%s" % (mhdrs.get('sender',None),
+                    mhdrs.get('receiver',None), mhdrs.get('protocol',None),
+                    mhdrs.get('performative',None), mhdrs.get('op',None),
+                    mhdrs.get('user-id',None), mhdrs.get('status',None))
+            mstr = " %d %s: %s >> %s\n" % (ts, mtype, hstr, cstate)
+            res = res + mstr
+        res = res + "]"
+        return res
+
+    def __str__(self):
+        return "Conversation(%s)" % self.__dict__
 
 class RoleSpec(object):
     """
@@ -315,3 +340,33 @@ class ProcessConversationManager(object):
                 log.debug("Binding roles initiator=%s, participant(local)=%s" % (sender, self.process.id))
 
         return conv
+
+    def log_conv_message(self, conv, message, msgtype):
+        # Tuple of Timestamp (MS), type, message
+        if conv is None:
+            return
+        mhdrs = message.get('headers',{}).copy()
+        if 'content' in mhdrs:
+            del mhdrs['content']
+        msg_rec = (pu.currenttime_ms(), msgtype, conv.local_fsm._get_state(), mhdrs)
+        conv.conv_log.append(msg_rec)
+
+    def check_conversation_state(self, conv):
+        """
+        @brief Check a conversation state after an event (send, receive) for
+            final and error state.
+        """
+        if conv is None:
+            return
+        conv_id = conv.conv_id
+        #log.debug("check_conversation_state(), conv=%s, conv_id=%s, state=%s" % (conv, conv_id, conv.local_fsm._get_state()))
+        # Check for final state
+        if conv.local_fsm._get_state() in conv.conv_type.FINAL_STATES:
+            del self.conversations[conv_id]
+            log.info("Conversation FINAL: id=%s. Active conversations: %s" % (
+                conv_id, len(self.conversations)))
+            log.info("Conversation FINAL log:\n%s" % (conv.get_conv_log_str()))
+
+        # Create a tombstone for later messages and timeouts with this conv_id
+
+        # GC tombstones and conversations

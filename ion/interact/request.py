@@ -34,6 +34,8 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
     S_FAILED = "FAILED"
     S_DONE = "DONE"
     S_ERROR = BasicStates.S_ERROR
+    S_UNEXPECTED = "UNEXPECTED"    # When an event happens that is undefined
+    S_TIMEOUT = "TIMEOUT"
 
     E_REQUEST = "request"
     E_REFUSE = "refuse"
@@ -41,7 +43,10 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
     E_FAILURE = "failure"
     E_RESULT = "inform_result"
     E_ERROR = "error"
+    E_TIMEOUT = "timeout"
 
+    A_UNEXPECTED = "unexpected"
+    
     def create_fsm(self, target, memory=None):
         fsm = ConversationTypeFSMFactory.create_fsm(self, target, memory)
 
@@ -231,6 +236,9 @@ class RequestType(ConversationType):
 
     DEFAULT_ROLE_INITIATOR = ROLE_INITIATOR.role_id
     DEFAULT_ROLE_PARTICIPANT = ROLE_PARTICIPANT.role_id
+
+    FINAL_STATES = (RequestFSMFactory.S_DONE, RequestFSMFactory.S_FAILED,
+                    RequestFSMFactory.S_ERROR, RequestFSMFactory.S_TIMEOUT, RequestFSMFactory.S_UNEXPECTED)
 
     def new_conversation(self, **kwargs):
         conv = Request(**kwargs)

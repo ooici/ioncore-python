@@ -178,13 +178,6 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
-- TBD: Timeout as defined state transition of conversation
-- TBD: Conversation garbage collection and final/error state detection - tombstone
-- TBD: Conversation FSM cloning (instead of always new creation)
-- TBD: Interaction observer and generic receiver (for all operations on broker)
-- TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
-- TBD: proc.back.send-contid.sendpid.main.reccontid.recpid naming and bindings
-
 2011-04-01:
 - Introduced Conversations framework. Two standard conversation types: RPC, Request.
 - Refactored Process base class to use conversations. Made rpc_send retrofit
@@ -371,5 +364,50 @@ Change log:
 - Provided an easier to use BaseServiceClient, which uses a default service
   name lookup. Accepts BaseProcess instance as argument to use for sending/
   receiving service calls.
+
+TODO:
+
+- TBD: Timeout as defined state transition of conversation
+- TBD: Conversation garbage collection and final/error state detection - tombstone
+- TBD: Conversation FSM cloning (instead of always new creation)
+- TBD: Interaction observer and generic receiver (for all operations on broker)
+- TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
+- TBD: proc.back.send-contid.sendpid.main.reccontid.recpid naming and bindings
+
+Apps:
+- Declare which apps to load in a test case
+- Easier to use app-supervisor
+- Generic app with configured file
+- Logs in apps
+- App dependencies
+- Distributed apps
+Conversations:
+- send inside FSM
+- timeout handing inside FSM
+- timeout transition
+- request as process default
+- distinguish failure and result
+- non-blocking rpc
+- refactor common pieces of rpc and request out
+- guard FSM vs observer FSM vs interceptor
+- State repo for conversations
+- Tombstones and timeouts
+- FSM keeps list of recent messages (for logging)
+- FSM caching, cloning
+Interactions/messaging:
+- Generic receiver, no dispatch
+- Process observer keeps list of recent messages
+- Routing key for processes
+- Public to private relay (or guard/interceptor) for processes as service
+- Conversation observer
+Misc:
+- Better FSM semantics: pre, post actions,
+- Correct handling of error conditions, timeouts, tombstones
+Testing:
+- optional process shutdown
+- msg observer usable / queriable in test
+Exchange Spaces:
+- separate process/service from data from events
+- use VHOST instead of sysname
 
 .

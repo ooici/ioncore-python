@@ -534,6 +534,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 # @see ion.interact.rpc, ion.interact.request
                 res = yield self.conv_manager.msg_received(message)
 
+                self.conv_manager.log_conv_message(conv, message, msgtype='RECV')
+
+                self.conv_manager.check_conversation_state(conv)
+
             elif convid and protocol == CONV_TYPE_NONE:
                 # Case of one-off messages
                 log.debug("Received simple protocol=='none' message")
@@ -758,6 +762,11 @@ class Process(BasicLifecycleObject, ResponseCodes):
             else:
                 # Use given receiver (e.g. primary receiver for RPC replies)
                 res2 = yield send_receiver.send(**message)
+
+            message['headers'] = res2
+            self.conv_manager.log_conv_message(conv, message, msgtype='SENT')
+
+            self.conv_manager.check_conversation_state(conv)
 
             res = res1
         except Exception, ex:

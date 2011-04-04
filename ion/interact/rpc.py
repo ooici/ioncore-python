@@ -215,6 +215,9 @@ class RpcType(ConversationType):
     DEFAULT_ROLE_INITIATOR = ROLE_INITIATOR.role_id
     DEFAULT_ROLE_PARTICIPANT = ROLE_PARTICIPANT.role_id
 
+    FINAL_STATES = (RpcFSMFactory.S_DONE, RpcFSMFactory.S_FAILED,
+                    RpcFSMFactory.S_ERROR, RpcFSMFactory.S_TIMEOUT, RpcFSMFactory.S_UNEXPECTED)
+
     def new_conversation(self, **kwargs):
         conv = Rpc(**kwargs)
         return conv
@@ -238,6 +241,8 @@ class GenericFSMFactory(ConversationTypeFSMFactory):
 
 class GenericInitiator(ConversationRole):
     factory = GenericFSMFactory()
+
+    FINAL_STATES = ()
 
     def request(self, message, *args, **kwargs):
         log.debug("In Generic.request (IN)")
