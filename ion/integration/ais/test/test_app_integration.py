@@ -67,6 +67,7 @@ class AppIntegrationTest(IonTestCase):
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
                           COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
             {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
+            {'name':'dataset_controller', 'module':'ion.services.dm.inventory.dataset_controller', 'class':'DatasetControllerClient'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
@@ -579,6 +580,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
         raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
+
+    @defer.inlineCallbacks
+    def test_createDataResource_failInputs(self):
+        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
 
     @defer.inlineCallbacks
     def test_createDataResource_failSource(self):
