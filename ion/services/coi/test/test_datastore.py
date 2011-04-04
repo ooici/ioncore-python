@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_hello.py
+@file ion/services/coi/test/test_datastore.py
 @author David Stuebe
 """
 
@@ -26,6 +26,9 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
 
+
+from ion.core.data import store
+
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
@@ -34,8 +37,12 @@ association_type = object_utils.create_type_identifier(object_id=13, version=1)
 
 class DataStoreTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing Datastore service.
     """
+    # Hold references to preserve state between runs!
+    store_class = store.Store
+    index_store_class = store.IndexStore
+
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
@@ -102,9 +109,17 @@ class DataStoreTest(IonTestCase):
         self.repo_key = repo.repository_key
 
 
+    def test_instantiate(self):
+        pass
+    
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
+
+        #store.Store.kvs.clear()
+        #store.IndexStore.indices.clear()
+        #store.IndexStore.kvs.clear()
+
         yield self._shutdown_processes()
         yield self._stop_container()
 
