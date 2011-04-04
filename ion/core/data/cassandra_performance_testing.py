@@ -24,7 +24,7 @@ MB = 1024 * 1024
 
 class CassandraPerformanceTester:
     
-    def __init__(self, index=False, num_rows = 100, blob_size=MB):
+    def __init__(self,  num_rows = 100, blob_size=MB, index=False,):
         self.index = index
         self.blob_size = blob_size
         if self.index:
@@ -264,14 +264,13 @@ class CassandraPerformanceTester:
           
 class CassandraBenchmarkTests(CassandraPerformanceTester):
     
-    def __init__(self, index=False, num_rows = 100, blob_size=MB):
-        CassandraPerformanceTester.__init__(self, index, num_rows, blob_size)
+    def __init__(self, num_rows = 100, blob_size=MB, index=False):
+        CassandraPerformanceTester.__init__(self, num_rows, blob_size, index)
         
-    def runTests(self):
-        self.runBenchmarkTests()
+
             
     @defer.inlineCallbacks
-    def runBenchmarkTests(self):
+    def runBenchMarks(self):
         yield self.setUp()
         
         yield self.get_benchmark(50)
@@ -342,8 +341,8 @@ class CassandraBenchmarkTests(CassandraPerformanceTester):
         
 class CassandraQueryBenchmarks(CassandraPerformanceTester):
     
-    def __init__(self, index=False, num_rows = 100, blob_size=MB):
-        CassandraPerformanceTester.__init__(self, index, num_rows, blob_size)
+    def __init__(self,  num_rows = 100, blob_size=MB, index=True):
+        CassandraPerformanceTester.__init__(self, num_rows, blob_size, index)
     
     def runTests(self):
         self.runQueryBenchMarks()
@@ -401,7 +400,7 @@ class CassandraQueryBenchmarks(CassandraPerformanceTester):
         yield self.runQuery(q2, "1EQ_1GT")  
     
     @defer.inlineCallbacks
-    def runQueryBenchMarks(self):
+    def runBenchMarks(self):
         self.query_blobs = dict(**self.blobs)
         f = open("/dev/urandom")
         t1 = time.time()
@@ -434,10 +433,12 @@ def main():
     parser.add_option("-q", "--query", action="store_true", dest="query", default=False, help="Run the query benchmarks, assumes we are using indexes")
     opts, args = parser.parse_args()
     if opts.query:
-        tester = CassandraQueryBenchmarks(index=opts.indexed, num_rows=int(opts.blobs),blob_size=int(opts.size))
+        tester = CassandraQueryBenchmarks(num_rows=int(opts.blobs),blob_size=int(opts.size))
+        
     else:
-        tester = CassandraBenchmarkTests(index=True, num_rows=int(opts.blobs),blob_size=int(opts.size))
-    tester.runQueryBenchMarks()
+        tester = CassandraBenchmarkTests(num_rows=int(opts.blobs),blob_size=int(opts.size),index=opts.indexed)
+    
+    tester.runBenchMarks()
     reactor.run() 
     
 if __name__ == "__main__":
