@@ -518,7 +518,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class BootstrapIndexedStoreTest(IndexStoreTest):
+class BootstrapIndexedStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
