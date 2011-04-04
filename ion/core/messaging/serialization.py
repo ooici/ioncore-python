@@ -206,10 +206,11 @@ def raw_encode(data):
 
 def register_json():
     """Register a encoder/decoder for JSON serialization."""
-    from anyjson import serialize as json_serialize
-    from anyjson import deserialize as json_deserialize
+    #from anyjson import serialize as json_serialize
+    #from anyjson import deserialize as json_deserialize
+    from simplejson import dumps, loads
 
-    registry.register('json', json_serialize, json_deserialize,
+    registry.register('json', dumps, loads,
                       content_type='application/json',
                       content_encoding='utf-8')
 
@@ -244,10 +245,10 @@ def register_pickle():
 
 
 # Register the base serialization methods.
-register_json()
-register_pickle()
-register_yaml()
+#register_json()
+#register_pickle()
+#register_yaml()
 
 # JSON is assumed to always be available, so is the default.
 # (this matches the historical use of carrot.)
-registry._set_default_serializer('json')
+#registry._set_default_serializer('json')
