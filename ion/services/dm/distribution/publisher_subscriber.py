@@ -407,9 +407,11 @@ class SubscriberFactory(object):
         process         = process or self._process
         credentials     = credentials or self._credentials
 
-        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
+        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name,
+                              process=process, credentials=credentials, *args, **kwargs)
         yield sub.register()
-        yield process.register_life_cycle_object(sub)        # brings the subscriber up to the same state as the process
+        # brings the subscriber up to the same state as the process
+        yield process.register_life_cycle_object(sub)
 
         if handler:
             sub.ondata = handler

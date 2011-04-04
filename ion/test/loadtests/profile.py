@@ -2,7 +2,7 @@ import cProfile
 import pstats
 import re
 from cStringIO import StringIO
-from guppy import hpy
+#from guppy import hpy
 
 from twisted.internet import defer, protocol, reactor
 from ion.test.load_runner import LoadTestRunner
@@ -35,20 +35,26 @@ def run():
     reactor.callWhenRunning(testrunner.load_runner_main)
     reactor.run()
 
-h = hpy()
+#h = hpy()
 cProfile.run('run()', 'brokerload')
 
 pstats.Stats('brokerload').sort_stats('time').print_stats(100)
-pstats.Stats('brokerload').sort_stats('cumulative').print_callers('isinstance')
+pstats.Stats('brokerload').sort_stats('cumulative').print_callers('ListFields')
+#pstats.Stats('brokerload').sort_stats('cumulative').print_stats(100)
+#pstats.Stats('brokerload').sort_stats('time').print_stats('google/protobuf')
+#pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
+#pstats.Stats('brokerload').sort_stats('cumulative').print_callers('isinstance')
 #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('(gpb_wrapper|object_utils)')
 #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
 
-'''
-percentTime('brokerload', 'gpb_wrapper', printResult=True)
-percentTime('brokerload', 'protobuf', printResult=True)
-percentTime('brokerload', 'twisted', printResult=True)
-percentTime('brokerload', '{isinstance}', printResult=True)
-percentTime('brokerload', '{select.select}', printResult=True)
 
-print h.heap()
-'''
+#percentTime('brokerload', 'gpb_wrapper', printResult=True)
+#percentTime('brokerload', 'protobuf', printResult=True)
+#percentTime('brokerload', 'twisted', printResult=True)
+#percentTime('brokerload', '{isinstance}', printResult=True)
+#percentTime('brokerload', '{select.select}', printResult=True)
+
+#print h.heap()
+
+
+#run()
