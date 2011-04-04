@@ -61,6 +61,7 @@ class ExchangeManager(BasicLifecycleObject):
         """
         # Initiate the broker connection
         yield self.message_space.activate()
+        self.client = self.message_space.client
         self.exchange_space = ProcessExchangeSpace(
                 message_space=self.message_space,
                 name=DEFAULT_EXCHANGE_SPACE)

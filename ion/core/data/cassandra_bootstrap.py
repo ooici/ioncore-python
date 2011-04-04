@@ -30,17 +30,21 @@ class CassandraBootStrap:
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
         self._keyspace = storage_conf["persistent archive"]["name"]
-        authorization_dictionary = {"username":username, "password":password}    
+        authorization_dictionary = {"username":username, "password":password}  
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)
-
+        log.info("Created Cassandra Client")
 
 class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):
     
     def __init__(self, username, password):
         CassandraBootStrap.__init__(self, username, password)
+        #We must set self._query_attribute_names, because we don't call 
+        #CassandraIndexedStore.__init__
+        self._query_attribute_names = None
         self._cache_name = COMMIT_CACHE
+        log.info("leaving CassandraIndexedStoreBootstrap.__init__")
 
 class CassandraStoreBootstrap(CassandraBootStrap, CassandraStore):
 

@@ -6,12 +6,15 @@
 @brief AMQP configuration factories as a function of application/service level names.
 """
 
+import uuid
+
 from twisted.internet import defer
 
-from carrot import connection
-from carrot import messaging
 from txamqp.client import TwistedDelegate
+from txamqp.content import Content
 
+from ion.core.messaging import amqp
+from ion.core.messaging import serialization
 from ion.core.exception import FatalError
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
@@ -29,17 +32,9 @@ class AMQPEvents(TwistedDelegate):
         self.manager = manager
 
     def basic_deliver(self, ch, msg):
-        """notify container when an error occurs during message delivery
-
-        ch._deliver comes from carrot.backends.txamqplib. Delivered
-        messages are routed to their endpoint receiver via the amqp channel
-        that the receivers consumer was created with.
-        This delivery plumbing is definitely messy and hacky. We used to
-        use a TwistedDelegate subclass called
-        carrot.backends.txamqplib.InterceptionPoint, where the ch._deliver
-        made slightly more sense. 
         """
-        d = defer.maybeDeferred(ch._deliver, msg)
+        """
+        d = defer.maybeDeferred(ch.deliver_callback, msg)
         d.addErrback(self.manager.delivery_error, msg) #XXX
 
     def basic_return(self, ch, msg):
@@ -76,31 +71,45 @@ class MessageSpace(BasicLifecycleObject):
     Follows a basic life cycle.
     """
 
-    def __init__(self, exchange_manager, *args, **kwargs):
+    def __init__(self, exchange_manager, hostname='localhost', port=5672,
+            virtual_host='/', heartbeat=0):
         """
         @param exchange_manager So we can link our states. If I'm in a bad
         state, then I need to notify ExchangeManager.
         """
         BasicLifecycleObject.__init__(self)
-        self.connection = None
+        self.client = None
         self.exchange_manager = exchange_manager
+        self.hostname = hostname
+        self.port = port
+        self.virtual_host = virtual_host
+        self.heartbeat = heartbeat
 
         # Immediately transition to READY state
-        self.initialize(*args, **kwargs)
+        self.initialize()
         self.closing = False # State that determines if we expect a close event
 
     def on_initialize(self, *args, **kwargs):
         """
-        Initializes a MessageSpace analogous to a Carrot BrokerConnection
-        instance.
+        Nothing to do here. What needed to be done was done in __init__
         """
-        self.connection = connection.BrokerConnection(*args, **kwargs)
-        self.closing = False # State that determines if we expect a close event
+        #self.connection = connection.BrokerConnection(*args, **kwargs)
+        #self.closing = False # State that determines if we expect a close event
 
     def on_activate(self, *args, **kwargs):
-        assert not self.connection._connection, "Already connected to broker"
+        #assert not self.connection._connection, "Already connected to broker"
+        from twisted.internet import reactor # This could be the process
+                                             # interface...one day 
         amqpEvents = AMQPEvents(self)
-        d = self.connection.connect(amqpEvents)
+        clientCreator = amqp.ConnectionCreator(reactor,
+                                    vhost=self.virtual_host,
+                                    delegate=amqpEvents,
+                                    heartbeat=self.heartbeat)
+        d = clientCreator.connectTCP(self.hostname, self.port)
+        def connected(client):
+            log.info('connected')
+            self.client = client
+        d.addCallback(connected)
         d.addErrback(self.connectionLost)
         return d
 
@@ -109,7 +118,19 @@ class MessageSpace(BasicLifecycleObject):
 
     def on_terminate(self, *args, **kwargs):
         self.closing = True
-        return defer.maybeDeferred(self.connection.close)
+        return defer.maybeDeferred(self.close_connection)
+
+    def close_connection(self):
+        """Close the AMQP broker connection by calling connection_close on
+        channel 0"""
+        if self.client.closed:
+            return
+        def connection_close_ok(result):
+            self.client.transport.loseConnection()
+        chan0 = self.client.channel(0)
+        d = chan0.connection_close(reply_code=200, reply_text='Normal Shutdown')
+        d.addCallback(connection_close_ok)
+        return d
 
     def on_error(self, *args, **kwargs):
         #raise RuntimeError("Illegal state change for MessageSpace")
@@ -156,7 +177,8 @@ class ExchangeSpace(object):
     def __init__(self, message_space, name):
         self.name = name
         self.message_space = message_space
-        self.connection = self.message_space.connection
+        #self.connection = self.message_space.connection
+        self.client = self.message_space.client
 
         # @todo remove: Store of messaging names
         self.store = Store()
@@ -235,20 +257,158 @@ class Exchange(object):
                             'auto_delete':self.auto_delete,
                             }
 
-class Consumer(messaging.Consumer):
+##################################################################
+## Transition code copied from carrot
+ACKNOWLEDGED_STATES = frozenset(["ACK", "REJECTED", "REQUEUED"])
+
+
+class MessageStateError(Exception):
+    """The message has already been acknowledged."""
+
+
+class Message(object):
+    """A message received by the broker.
+    This re-presents the amqp basic content message from txamp. This is
+    kind of a vestige from carrot. This also adds functionality to the
+    received message; actions take place in the context of an amqp channel.
+    """
+
+    def __init__(self, channel, amqp_message, **kwargs):
+        self.channel = channel
+        self._amqp_message = amqp_message
+        self.body = amqp_message.content.body
+        self.delivery_tag = amqp_message.delivery_tag
+        self._decoded_cache = None
+        self._state = "RECEIVED"
+        for attr_name in (
+                          "content type",
+                          "content encoding",
+                          "headers",
+                          "delivery mode",
+                          "priority",
+                          "correlation id",
+                          "reply to",
+                          "expiration",
+                          "message id",
+                          "timestamp",
+                          "type",
+                          "user id",
+                          "app id",
+                          "cluster id",
+                          ):
+            setattr(self, attr_name.replace(' ', '_'),
+                            amqp_message.content.properties.get(attr_name, None))
+    def decode(self):
+        """Deserialize the message body, returning the original
+        python structure sent by the publisher."""
+        return serialization.decode(self.body, self.content_type,
+                                    self.content_encoding)
+
+    @property
+    def payload(self):
+        """The decoded message."""
+        if not self._decoded_cache:
+            self._decoded_cache = self.decode()
+        return self._decoded_cache
+
+    def ack(self):
+        """Acknowledge this message as being processed.,
+        This will remove the message from the queue.
+
+        :raises MessageStateError: If the message has already been
+            acknowledged/requeued/rejected.
+
+        """
+        if self.acknowledged:
+            raise self.MessageStateError(
+                "Message already acknowledged with state: %s" % self._state)
+        d = self.channel.basic_ack(self.delivery_tag)
+        self._state = "ACK"
+        return d
+
+    def reject(self):
+        """Reject this message.
+
+        The message will be discarded by the server.
+
+        :raises MessageStateError: If the message has already been
+            acknowledged/requeued/rejected.
+
+        """
+        if self.acknowledged:
+            raise self.MessageStateError(
+                "Message already acknowledged with state: %s" % self._state)
+        d = self.channel.basic_reject(self.delivery_tag, requeue=False)
+        self._state = "REJECTED"
+        return d
+
+    def requeue(self):
+        """Reject this message and put it back on the queue.
+
+        You must not use this method as a means of selecting messages
+        to process.
+
+        :raises MessageStateError: If the message has already been
+            acknowledged/requeued/rejected.
+
+        """
+        if self.acknowledged:
+            raise self.MessageStateError(
+                "Message already acknowledged with state: %s" % self._state)
+        d = self.channel.basic_reject(self.delivery_tag, requeue=True)
+        self._state = "REQUEUED"
+        return d
+
+    @property
+    def acknowledged(self):
+        return self._state in ACKNOWLEDGED_STATES
+
+##
+##############################################################
+
+
+class Consumer(object):
     """
     Consumer for AMQP.
     """
 
+    def __init__(self, chan, queue=None, 
+                             exchange=None, 
+                             routing_key=None,
+                             exchange_type="direct",
+                             durable=False,
+                             exclusive=False,
+                             auto_delete=True,
+                             no_ack=True,
+                             binding_key=None,
+                             **kwargs): # **kwargs is a sloppy hack
+        self.channel = chan
+        self.queue = queue
+        self.exchange = exchange
+        self.routing_key = routing_key
+        self.exchange_type = exchange_type
+        self.durable = durable
+        self.exclusive = exclusive
+        self.auto_delete = auto_delete
+        self.no_ack = no_ack
+        self.consumer_tag = uuid.uuid4().hex
+        self.callback = None
+        self._closed = False # Assuming we were given an open channel
+
     @classmethod
-    def new(cls, space, **kwargs):
+    def new(cls, client, **kwargs):
         """
         Use this creator for deferred instantiation.
         inst.declare returns a deferred that will fire with the Consumer
         instance.
         """
-        inst = cls(space, **kwargs)
-        return inst.declare()
+        chan = client.channel()
+        d = chan.channel_open()
+        def instantiate(result, chan, **kwargs):
+            inst = cls(chan, **kwargs)
+            return inst.declare()
+        d.addCallback(instantiate, chan, **kwargs)
+        return d
 
     @defer.inlineCallbacks
     def declare(self):
@@ -259,37 +419,35 @@ class Consumer(messaging.Consumer):
 
         # In the current design, exchange is always defined
         if self.exchange:
-            yield self.backend.exchange_declare(exchange=self.exchange,
+            yield self.channel.exchange_declare(exchange=self.exchange,
                                           type=self.exchange_type,
                                           durable=self.durable,
                                           auto_delete=self.auto_delete)
 
         if self.queue:
             # Specific queue name given
-            yield self.backend.queue_declare(queue=self.queue,
+            yield self.channel.queue_declare(queue=self.queue,
                                        durable=self.durable,
                                        exclusive=self.exclusive,
-                                       auto_delete=self.auto_delete,
-                                       warn_if_exists=self.warn_if_exists)
+                                       auto_delete=self.auto_delete)
         else:
             # Generate internal unique name
-            reply = yield self.backend.queue_declare(queue="",
+            reply = yield self.channel.queue_declare(queue="",
                                        durable=self.durable,
                                        exclusive=self.exclusive,
-                                       auto_delete=self.auto_delete,
-                                       warn_if_exists=self.warn_if_exists)
+                                       auto_delete=self.auto_delete)
             # remember the queue name the broker made for us
             self.queue = reply.queue
 
         if routing_key != None:
-            yield self.backend.queue_bind(queue=self.queue,
+            yield self.channel.queue_bind(queue=self.queue,
                                         exchange=self.exchange,
                                         routing_key=routing_key,
                                         arguments=arguments)
 
-        yield self.qos(prefetch_count=1)
+        yield self.channel.basic_qos(prefetch_size=0, prefetch_count=1,
+                                                        global_=False)
 
-        self._closed = False
         defer.returnValue(self)
 
     @classmethod
@@ -300,21 +458,75 @@ class Consumer(messaging.Consumer):
         the exchange information.
         @param config is a dict of amqp options that __init__ extracts.
         """
-        connection = ex_space.connection # broker connection
+        client = ex_space.client # amqp client
         full_config = ex_space.exchange.config_dict.copy()
         full_config.update(config)
-        inst = cls(connection, **full_config)
-        return inst.declare()
+        chan = client.channel()
+        d = chan.channel_open()
+        def instantiate(result, chan, **kwargs):
+            inst = cls(chan, **kwargs)
+            return inst.declare()
+        d.addCallback(instantiate, chan, **full_config)
+        return d
 
-class Publisher(messaging.Publisher):
+    def receive(self, amqp_message):
+        message = Message(self.channel, amqp_message)
+        return self.callback(message) 
+
+    def consume(self, callback, limit=None):
+        self.callback = callback
+        self.channel.set_consumer_callback(self.receive)
+        d = self.channel.basic_consume(queue=self.queue,
+                                        no_ack=self.no_ack,
+                                        consumer_tag=self.consumer_tag,
+                                        nowait=False)
+        return d
+
+    def close(self):
+        """
+        Close the amqp channel, deactivating the Consumer.
+        """
+        if not self._closed:
+            d = self.channel.channel_close()
+            self._closed = True
+            return d
+        return defer.succeed(None)
+
+class Publisher(object):
     """
     Publisher for one message
+
+    delivery_modes:
+    1 - non persistent
+    2 - persistent 
     """
+
+    def __init__(self, chan, exchange=None, 
+                             routing_key=None,
+                             exchange_type="direct",
+                             delivery_mode=1,
+                             durable=False,
+                             exclusive=False,
+                             auto_delete=True,
+                             immediate=False,
+                             mandatory=False,
+                             **kwargs): # **kwargs is a sloppy hack
+        self.channel = chan
+        self.exchange = exchange
+        self.routing_key = routing_key
+        self.exchange_type = exchange_type
+        self.delivery_mode = delivery_mode
+        self.durable = durable
+        self.exclusive = exclusive
+        self.auto_delete = auto_delete
+        self.mandatory = mandatory
+        self.immediate = immediate
+        self._closed = False # Assuming we were given an open channel
 
     @defer.inlineCallbacks
     def declare(self):
 
-        yield self.backend.exchange_declare(exchange=self.exchange,
+        yield self.channel.exchange_declare(exchange=self.exchange,
                                       type=self.exchange_type,
                                       durable=self.durable,
                                       auto_delete=self.auto_delete)
@@ -325,16 +537,130 @@ class Publisher(messaging.Publisher):
         """
         Factory to create new Publisher instance from given params
         """
-        connection = ex_space.connection # broker connection
         if not config:
             raise RuntimeError("Publisher.name(): No config given")
-
         full_config = ex_space.exchange.config_dict.copy()
         full_config.update(config)
-        inst = cls(connection, **full_config)
 
+        client = ex_space.client # amqp client
+        full_config = ex_space.exchange.config_dict.copy()
+        full_config.update(config)
+        chan = client.channel()
+        d = chan.channel_open()
         # Are we doing an exchange declare on every send???
-        return inst.declare()
+        def instantiate(result, chan, **kwargs):
+            inst = cls(chan, **kwargs)
+            return inst.declare()
+        d.addCallback(instantiate, chan, **full_config)
+        return d
+
+    def create_message(self, message_data, delivery_mode=None, priority=None,
+                       content_type=None, content_encoding=None,
+                       serializer=None, reply_to=None):
+        """With any data, serialize it and encapsulate it in a AMQP
+        message with the proper headers set."""
+
+        delivery_mode = delivery_mode or self.delivery_mode
+
+        # No content_type? Then we're serializing the data internally.
+        if not content_type:
+            (content_type, content_encoding,
+             message_data) = serialization.encode(message_data,
+                                                  serializer=serializer)
+        else:
+            # If the programmer doesn't want us to serialize,
+            # make sure content_encoding is set.
+            if isinstance(message_data, unicode):
+                if not content_encoding:
+                    content_encoding = 'utf-8'
+                message_data = message_data.encode(content_encoding)
+
+            # If they passed in a string, we can't know anything
+            # about it.  So assume it's binary data.
+            elif not content_encoding:
+                content_encoding = 'binary'
+
+        return self.prepare_message(message_data, delivery_mode,
+                                            priority=priority,
+                                            content_type=content_type,
+                                            content_encoding=content_encoding,
+                                            reply_to=reply_to)
+
+    def prepare_message(self, message_data, delivery_mode, priority=None,
+                              content_type=None, content_encoding=None, headers=None,
+                              reply_to=None, correlation_id=None, expiration=None,
+                              message_id=None, timestamp=None, type=None, user_id=None,
+                              app_id=None, cluster_id=None):
+        """Encapsulate data into a AMQP message.
+        This method should be reconciled with interceptor functionality and
+        the ion message format. 
+        """
+        if headers is None:
+            headers = {}
+
+        properties = {
+                  'content type':content_type,
+                  'content encoding':content_encoding,
+                  'application headers':headers,
+                  'delivery mode':delivery_mode,
+                  'priority':priority,
+                  'correlation id':correlation_id,
+                  'reply to':reply_to,
+                  'expiration':expiration,
+                  'message id':message_id,
+                  'timestamp':timestamp,
+                  'type':type,
+                  'user id':user_id,
+                  'app id':app_id,
+                  'cluster id':cluster_id,
+                  }
+        message = Content(message_data, properties=properties)
+        return message
+
+    def send(self, message_data, routing_key=None, delivery_mode=None,
+                mandatory=False, immediate=False, priority=0, 
+                content_type=None, content_encoding=None, reply_to=None, 
+                headers=None, serializer=None):
+        """Send a message.
+
+        :keyword content_type: The messages content_type. If content_type
+            is set, no serialization occurs as it is assumed this is either
+            a binary object, or you've done your own serialization.
+            Leave blank if using built-in serialization as our library
+            properly sets content_type.
+
+        :keyword content_encoding: The character set in which this object
+            is encoded. Use "binary" if sending in raw binary objects.
+            Leave blank if using built-in serialization as our library
+            properly sets content_encoding.
+
+        """
+        if headers is None:
+            headers = {}
+        routing_key = routing_key or self.routing_key
+
+        message = self.create_message(message_data, priority=priority,
+                                      delivery_mode=delivery_mode,
+                                      content_type=content_type,
+                                      content_encoding=content_encoding,
+                                      serializer=serializer,
+                                      reply_to=reply_to)
+        return self.channel.basic_publish(content=message,
+                                        exchange=self.exchange, 
+                                        routing_key=routing_key,
+                                        mandatory=self.mandatory, 
+                                        immediate=self.immediate)
+
+
+    def close(self):
+        """
+        Close the amqp channel, deactivating the Consumer.
+        """
+        if not self._closed:
+            d = self.channel.channel_close()
+            self._closed = True
+            return d
+        return defer.succeed(None)
 
 def worker(name):
 
@@ -343,7 +669,6 @@ def worker(name):
            'binding_key' : name,
            'exclusive' : False,
            'mandatory' : True,
-           'warn_if_exists' : True,
            'no_ack' : False,
            'auto_delete' : True,
            'routing_key' : name,
@@ -357,7 +682,6 @@ def direct(name):
            'binding_key' : name,
            'exclusive' : True,
            'mandatory' : True,
-           'warn_if_exists' : True,
            'no_ack' : False,
            'auto_delete' : True,
            'routing_key' : name,
@@ -374,7 +698,6 @@ def fanout(name):
            'binding_key' : name,
            'exclusive' : True,
            'mandatory' : True,
-           'warn_if_exists' : True,
            'no_ack' : False,
            'auto_delete' : True,
            'routing_key' : name,

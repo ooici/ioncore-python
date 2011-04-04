@@ -88,7 +88,7 @@ def adjust_dir(filename):
         return filename
 
 def install_msgpacker():
-    from carrot.serialization import registry
+    from ion.core.messaging.serialization import registry
     import msgpack
     registry.register('msgpack', msgpack.packb, msgpack.unpackb, content_type='application/msgpack', content_encoding='binary')
     registry._set_default_serializer('msgpack')

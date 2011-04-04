@@ -16,6 +16,7 @@ from zope.interface import Attribute
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core.exception import FatalError
 from ion.core.cc.container_api import IContainer
 from ion.core.exception import ConfigurationError, FatalError, StartupError
 from ion.util.config import Config

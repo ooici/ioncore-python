@@ -32,8 +32,6 @@ from ion.core.object import workbench
 from ion.core.object import object_utils
 from ion.core.data.store import Query
 
-from ion.util import procutils as pu
-
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
@@ -518,7 +516,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class BootstrapIndexedStoreTest(IndexStoreTest):
+class BootstrapIndexedStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
