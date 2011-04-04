@@ -32,7 +32,8 @@ setup( name = 'ioncore',
        package_data = {
            'twisted.plugins' : [
                'twisted/plugins/cc.py'
-                               ]
+                               ],
+           'ion':['core/messaging/*.xml']
                       },
        test_suite = 'ion',
        install_requires = [
