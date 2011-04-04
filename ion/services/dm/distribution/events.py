@@ -94,7 +94,7 @@ class EventPublisher(Publisher):
         assert self.event_id and origin
         return "%s.%s" % (str(self.event_id), str(origin))
 
-    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, origin="unknown"):
+    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, origin="unknown", *args, **kwargs):
         """
         Initializer override.
         Sets defaults for the EventPublisher.
@@ -108,7 +108,7 @@ class EventPublisher(Publisher):
         xp_name = xp_name or EVENTS_EXCHANGE_POINT
         routing_key = routing_key or "unknown"
 
-        Publisher.__init__(self, xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process)
+        Publisher.__init__(self, xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
 
     def _set_msg_fields(self, msg, msgargs):
         """
@@ -166,7 +166,7 @@ class EventPublisher(Publisher):
         defer.returnValue(event_msg)
 
     @defer.inlineCallbacks
-    def publish_event(self, event_msg, origin=None):
+    def publish_event(self, event_msg, origin=None, **kwargs):
         """
         Publishes an event notification.
 
@@ -308,8 +308,7 @@ class EventSubscriber(Subscriber):
 
         return "%s.%s" % (str(event_id), str(origin))
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None,
-                 event_id=None, origin=None):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, event_id=None, origin=None, *args, **kwargs):
         """
         Initializer.
 
@@ -322,8 +321,7 @@ class EventSubscriber(Subscriber):
         xp_name = xp_name or EVENTS_EXCHANGE_POINT
         binding_key = binding_key or self.topic(origin)
 
-        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name,
-                            credentials=credentials, process=process)
+        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials, process=process, *args, **kwargs)
 
     def on_activate(self, *args, **kwargs):
         log.debug("Listening to events on %s" % self._binding_key)
