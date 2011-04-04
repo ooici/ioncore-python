@@ -39,6 +39,16 @@ class ConsoleManhole(manhole.ColoredManhole):
         """
         # self.terminal.reset()
         self.terminal.write('\r\n')
+        msg = """
+    ____                ______                    ____        __  __
+   /  _/____  ____     / ____/____  ________     / __ \__  __/ /_/ /_  ____  ____
+   / / / __ \/ __ \   / /    / __ \/ ___/ _ \   / /_/ / / / / __/ __ \/ __ \/ __ \ 
+ _/ / / /_/ / / / /  / /___ / /_/ / /  /  __/  / ____/ /_/ / /_/ / / / /_/ / / / /
+/___/ \____/_/ /_/   \____/ \____/_/   \___/  /_/    \__, /\__/_/ /_/\____/_/ /_/
+                                                    /____/                         
+(Happy April Fools!)"""
+        # Make new banners using: http://patorjk.com/software/taag/
+        self.terminal.write(msg)
         self.terminal.write('ION Python Capability Container (version %s)\r\n' % (ionconst.VERSION))
         self.terminal.write('%s \r\n' % get_virtualenv())
         self.terminal.write('[container id: %s@%s.%d] \r\n' % (os.getlogin(), os.uname()[1], os.getpid()))

@@ -22,6 +22,7 @@ from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, 
 
 from ion.services.coi.resource_registry_beta import resource_client
 
+from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, RESOURCE_TYPE_TYPE_ID
@@ -36,17 +37,14 @@ LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1
 
 class AssociationServiceTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing association service.
     """
     services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}
                 },
-            
+
             {'name':'association_service',
              'module':'ion.services.dm.inventory.association_service',
              'class':'AssociationService'
@@ -73,6 +71,11 @@ class AssociationServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
        log.info('Tearing Down Test Container')
+
+       store.Store.kvs.clear()
+       store.IndexStore.kvs.clear()
+       store.IndexStore.indices.clear()
+
        yield self._shutdown_processes()
        yield self._stop_container()
 

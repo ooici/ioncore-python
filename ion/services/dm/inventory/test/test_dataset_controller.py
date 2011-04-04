@@ -11,6 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process import process
+from ion.core.data import store
 
 from ion.test.iontest import IonTestCase
 
@@ -36,12 +37,9 @@ class DateSetControllerTest(IonTestCase):
         yield self._start_container()
 
         services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
 
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},}
                 },
 
             {'name':'association_service',
@@ -68,6 +66,11 @@ class DateSetControllerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
+        yield self._shutdown_processes()
         yield self._stop_container()
 
 
