@@ -44,7 +44,8 @@
     <body>
         <div id='header'>
             <input type="button" id="stopupdates" value="Stop" />
-            <input type="button" id="logreg" value="Log Reg" />
+            <input type="button" id="regsub" value="Create Resource Lifecycle Event Subscriber" />
+            <input type="button" id="getdata" value="Get Data" />
         </div>
         <ul id="log"></ul>
     </body>
@@ -65,7 +66,8 @@
                 });
             }
 
-            dowork('', function(data) {
+            if (0) {
+            dowork('0', function(data) {
                 console.log(data);
 
                 // find existing ul with name
@@ -106,14 +108,24 @@
                     }
                 }
             });
+            }
 
             $('input#stopupdates').click(function() { 
                 window.clearTimeout(intervalID);
             });
 
-            $('input#logreg').click(function() {
-                $.getJSON('/ctl/_log', function(data) {});
+            $('input#regsub').click(function() {
+                $.getJSON('/ctl/sub/1001', function(data) {
+                    console.log(data);
+                });
             });
+
+            $('input#getdata').click(function() {
+                dowork('0', function(data) {
+                    console.log(data)
+                });
+            });
+
         });
     </script>
 </html>

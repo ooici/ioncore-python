@@ -8,13 +8,20 @@
 from ion.core.messaging.receiver import Receiver
 from twisted.internet import defer, reactor
 from twisted.web import server, resource, static
+from twisted.web.server import NOT_DONE_YET
 from pkg_resources import resource_filename
 import os, time
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.process.process import Process, ProcessFactory
-from ion.services.dm.distribution.notification import LoggingReceiver
+#from ion.services.dm.distribution.notification import LoggingReceiver
+
+from ion.services.dm.distribution.eventmonitor import EventMonitorServiceClient
+
+EVENTMONITOR_GETDATA_MESSAGE_TYPE       = object_utils.create_type_identifier(object_id=2338, version=1)
+EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE     = object_utils.create_type_identifier(object_id=2335, version=1)
+EVENTMONITOR_UNSUBSCRIBE_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=2337, version=1)
 
 import string
 try:
@@ -22,55 +29,142 @@ try:
 except:
     import simplejson as json
 
-class LoggingWebResource(resource.Resource):
+class EventMonitorWebResource(resource.Resource):
 
-    class DataRequest(resource.Resource):
+    class AsyncResource(resource.Resource):
         isLeaf = True
-        #def __init__(self, msgslice, lastindex):
-        def __init__(self, msgs, request):
-            resource.Resource.__init__(self)
 
-            self._msgs = msgs
-            self._request = request
-            #self._msgslice = msgslice
-            #self._lastindex = lastindex
+        @defer.inlineCallbacks
+        def _do_action(self, request):
+            """
+            inlineCallbacks decorated action handler called from render_GET.
+            Override this in your derived class.
+            """
+            raise NotImplementedError("You must override _do_action in your derived class")
 
         def render_GET(self, request):
-            #msgs = ""
-            #for m in self._msgslice:
-            #    msgs += "<li>%s</li>" % str(m['content'].additional_data.message)
+            """
+            Common handler for get requests. Calls into _do_action which you must override.
+            """
+            def finish_req(res, request):
+                request.write(res)
+                request.finish()
 
-            #data = { 'html': msgs,
-            #         'lastindex': self._lastindex }
+            def_action = self._do_action(request)
+            def_action.addCallback(finish_req, request)
 
-            print str(request)
-            print str(self._request)
+            return NOT_DONE_YET
+
+    class DataRequest(AsyncResource):
+        isLeaf = True
+
+        def __init__(self, mc, ec, session_id, timestamp, subscription_ids=None):
+            """
+            @param  mc          The MessageClient.
+            @param  ec          The EventMonitorService client.
+            @param  session_id  The user's session id. Passed to the request to the EventMonitorService.
+            @param  timestamp   The timestamp to request messages after.
+            @param  subscription_ids    Unused. Limit data request to these subscription ids.
+            """
+            resource.Resource.__init__(self)
+
+            self._mc = mc
+            self._ec = ec
+            self._session_id = session_id
+            self._timestamp = timestamp
+            self._subscription_ids = subscription_ids or []
+
+        @defer.inlineCallbacks
+        def _do_action(self, request):
             try:
-                since = float("".join(self._request))
+                timestamp = float("".join(self._timestamp))
             except Exception:
-                since = 0.0
+                timestamp = 0.0
 
-            data = []
-            for recv, msgs in self._msgs.items():
-                thisdata = { 'name': recv.name,
-                             'data': [] }
+            msg = yield self._mc.create_instance(EVENTMONITOR_GETDATA_MESSAGE_TYPE)
+            msg.session_id  = self._session_id
+            msg.timestamp   = str(timestamp)
+            # @TODO: subids
 
-                # filter messages for time
-                filtered = [msg for msg in msgs if float(msg['content'].additional_data.createdtime) > since]
-                for msg in filtered:
-                    logentry = [{ 'content': str(msg['content'].additional_data.levelname),
-                                  'class': 'log ' + str(msg['content'].additional_data.levelname) },
-                                { 'content' : str(msg['content'].additional_data.asctime),
-                                  'class': 'time' },
-                                { 'content': str(msg['content'].additional_data.message),
-                                  'class': 'logmsg' }]
-                    thisdata['data'].append(logentry)
+            msgdata = yield self._ec.getdata(msg)
+            data = {}
 
-                data.append(thisdata)
+            for sub in msgdata.data:
+                print(sub)
+                print(len(sub.events))
 
+                data[sub.subscription_id] = { 'subscription_id' : sub.subscription_id,
+                                             'subscription_desc' : sub.subscription_desc,
+                                             'events' : [] }
+
+                for event in sub.events:
+
+                    # @TODO: totally needs to be generic here
+                    evhash = { 'origin' : event.origin,
+                              'state' : event.additional_data.state,
+                              'datetime' : event.datetime }
+
+                    data[sub.subscription_id]['events'].append(evhash)
+
+            # build json response
             response = { 'data': data,
-                         'lasttime': time.time() }
-            return json.dumps(response);
+                        'lasttime': time.time() }
+
+            defer.returnValue(json.dumps(response))
+
+    class ControlRequest(AsyncResource):
+        isLeaf = True
+        def __init__(self, mc, ec, session_id):
+            resource.Resource.__init__(self)
+
+            self._mc = mc
+            self._ec = ec
+            self._session_id = session_id
+
+        @defer.inlineCallbacks
+        def _do_action(self, request):
+
+            command = request.postpath.pop(0)
+
+            if command == "sub":
+
+                event_id = request.postpath.pop(0)
+                origin = None
+                if len(request.postpath) > 0:
+                    origin = request.postpath.pop(0)
+
+                msg = yield self._mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
+
+                msg.session_id = self._session_id
+                msg.event_id = int(event_id)
+                if origin:
+                    msg.origin = origin
+
+                resp = yield self._ec.subscribe(msg)
+
+                response = {'status':'ok',
+                            'subscription_id': resp.subscription_id }
+
+                defer.returnValue(json.dumps(response))
+
+            elif command == "unsub":
+
+                sub_id = None
+                if len(request.postpath) > 0:
+                    sub_id = request.postpath.pop(0)
+
+                msg = yield self._mc.create_instance(EVENTMONITOR_UNSUBSCRIBE_MESSAGE_TYPE)
+                msg.session_id = self._session_id
+                if sub_id:
+                    msg.subscriber_id = sub_id
+
+                yield self._ec.unsubscribe(msg)
+                response = {'status':'ok'}
+                defer.returnValue(json.dumps(response))
+
+            print "UNKNOWN CTL REQUEST"
+            response = {'status':'bad'}
+            defer.returnValue(json.dumps(response))
 
     class GenericRequest(resource.Resource):
         isLeaf = True
@@ -83,44 +177,21 @@ class LoggingWebResource(resource.Resource):
 
     page_template = """
         """
-    def __init__(self, parentproc):
-        self._msgs = {}
-        self._receivers = []
+    def __init__(self, mc, ec):
         resource.Resource.__init__(self)
-        self._parentproc = parentproc
 
-        #self._mainpage = static.File(resource_filename(__file__, "data/notify_web_monitor.html"))
+        self._mc = mc
+        self._ec = ec
+
         self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "notify_web_monitor.html"))
 
     def getChild(self, name, request):
 
         if name == "data":
-            #try:
-            #    since = int(''.join(request.postpath))
-            #except ValueError:
-            #    since = 0
-
-            #return self.DataRequest(self._msgs[since:], len(self._msgs))
-            return self.DataRequest(self._msgs, request.postpath)
+            return self.DataRequest(self._mc, self._ec, request.getSession().uid, request.postpath)
 
         elif name == "ctl":
-            action = request.postpath.pop(0)
-
-            if action == "_log":
-                print "hi making a log monitor"
-
-                lr = LoggingReceiver("anonhandler%d" % len(self._receivers), process=self._parentproc, loglevel="DEBUG")
-                def handle_log(payload, msg):
-                    if not self._msgs.has_key(lr):
-                        self._msgs[lr] = []
-
-                    self._msgs[lr].append(payload)
-
-                lr.add_handler(handle_log)
-                self._receivers.append(lr)
-                lr.attach()
-
-                return self.GenericRequest({'status':'ok'})
+            return self.ControlRequest(self._mc, self._ec, request.getSession().uid)
 
         return self
 
@@ -140,7 +211,10 @@ class NotificationWebMonitorService(Process):
     def plc_init(self):
         Process.plc_init(self)
 
-        self._web = LoggingWebResource(self)
+        self._mc = MessageClient(proc=self)
+        self._ec = EventMonitorServiceClient(proc=self)
+
+        self._web = EventMonitorWebResource(self._mc, self._ec)
         self._site = server.Site(self._web)
         reactor.listenTCP(9999, self._site)
         print "Listening on http://localhost:9999"
