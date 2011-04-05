@@ -15,6 +15,7 @@ from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory
 from ion.services.dm.distribution.events import EventSubscriber
 from uuid import uuid4
 from ion.core.exception import ApplicationError
+import time
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -47,6 +48,12 @@ class EventMonitorService(ServiceProcess):
 
         self._subs[session_id]['subscribers'][subid]['msgs'].append(msg)
 
+    def _bump_timestamp(self, session_id):
+        assert self._subs.has_key(session_id)
+        curtime = time.time()
+        self._subs[session_id]['last_request_time'] = curtime
+        return curtime
+
     @defer.inlineCallbacks
     def op_subscribe(self, content, headers, msg):
         """
@@ -75,6 +82,7 @@ class EventMonitorService(ServiceProcess):
                                        'subscribers' : {} }
 
         self._subs[session_id]['subscribers'][subid] = { 'subscriber': sub, 'msgs': [] }
+        self._bump_timestamp(session_id)
 
         # generate response
         response = yield self._mc.create_instance(EVENTMONITOR_SUBSCRIBE_RESPONSE_TYPE)
@@ -122,16 +130,21 @@ class EventMonitorService(ServiceProcess):
         if not self._subs.has_key(session_id):
             raise ApplicationError("session_id %s is unknown" % session_id)
 
+        if not timestamp or len(timestamp) == 0:
+            timestamp = self._subs[session_id]['last_request_time']
+            self._bump_timestamp(session_id)
+
+        log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
+
         # generate response
         response = yield self._mc.create_instance(EVENTMONITOR_DATA_MESSAGE_TYPE)
         response.session_id = session_id
 
-        # TODO: time filtering
         for subid, subdata in self._subs[session_id]['subscribers'].items():
             dataobj = response.data.add()
             dataobj.subscription_id = subid
             dataobj.subscription_desc = "none for now"
-            for event in subdata['msgs']:
+            for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
                 link = dataobj.events.add()
                 link.SetLink(event['content'].MessageObject)
 
