@@ -112,7 +112,7 @@ class Receiver(BasicLifecycleObject):
             raise RuntimeError("Messaging name undefined: "+self.xname)
 
         yield self._init_receiver(name_config)
-        #log.debug("Receiver %s initialized (queue attached) cfg=%s" % (self.xname,name_config))
+        log.debug("Receiver %s initialized (queue attached) cfg=%s" % (self.xname,name_config))
 
     @defer.inlineCallbacks
     def _init_receiver(self, receiver_config, store_config=False):
@@ -134,9 +134,9 @@ class Receiver(BasicLifecycleObject):
         @brief Activate the consumer.
         @retval Deferred
         """
-        self.consumer.register_callback(self.receive)
-        yield self.consumer.iterconsume()
-        #log.debug("Receiver %s activated (consumer enabled)" % self.xname)
+        #self.consumer.register_callback(self.receive)
+        yield self.consumer.consume(self.receive)
+        log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
     @defer.inlineCallbacks
     def on_deactivate(self, *args, **kwargs):
