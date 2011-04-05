@@ -22,7 +22,7 @@ class AppSupervisor(Supervisor):
     """
 
     @defer.inlineCallbacks
-    def plc_init(self):
+    def plc_activate(self):
         spawn_procs = self.spawn_args.get('spawn-procs', None)
         log.debug("spawn-procs: %r" % spawn_procs)
         if spawn_procs:
