@@ -22,11 +22,18 @@
                 padding: 2%;
             }
 
+            div.recv span {
+                margin: 0px 3px;
+            }
+
             div.recv span.decorate {
                 background-color: blue;
                 color: white;
             }
-            div.recv li span.time {
+            div.recv li span.label {
+                color: red;
+            }
+            div.recv li span.datetime {
                 color: black;
                 background-color: #ffff00;
                 padding: 3px;
@@ -66,7 +73,6 @@
                 });
             }
 
-            if (0) {
             dowork('0', function(data) {
                 console.log(data);
 
@@ -75,13 +81,14 @@
                 for (var i = 0; i < data.data.length; i++)
                 {
                     var curdata = data.data[i]; 
+                    //console.log(curdata);
                     //console.log("name: " + curdata.name + " msgs: " + curdata.logs.length);
-                    ul = $('div#' + curdata.name + ' > ul');
+                    ul = $('div#' + curdata.subscription_id + ' > ul');
                     if (ul.length == 0)
                     {
-                        el = $('<div/>', { 'id':curdata.name, 
+                        el = $('<div/>', { 'id':curdata.subscription_id, 
                                            'class':'recv' });
-                        dec = $('<span>' + curdata.name + '</span>').addClass('decorate');
+                        dec = $('<span>' + curdata.subscription_id + '</span>').addClass('decorate');
                         ul = $('<ul/>');
 
                         dec.appendTo(el);
@@ -89,14 +96,18 @@
                         el.appendTo('body');
                     }
 
-                    for (var j = 0; j < curdata.data.length; j++)
+                    for (var j = 0; j < curdata.events.length; j++)
                     {
                         li = $('<li/>');
                         li.appendTo(ul);
-                        console.log(curdata.data[j]);
-                        for (var k = 0; k < curdata.data[j].length; k++)
+                        console.log(curdata.events[j]);
+                        for (var k = 0; k < curdata.events[j].length; k++)
                         {
-                            var cchild = curdata.data[j][k];
+                            var cchild = curdata.events[j][k];
+
+                            cid = $('<span class=\'label\'>' + cchild.id + '</span>');
+                            cid.appendTo(li);
+
                             cel = $('<span>' + cchild.content + '</span>');
                             if (cchild.class)
                                 cel.addClass(cchild.class);
@@ -108,7 +119,6 @@
                     }
                 }
             });
-            }
 
             $('input#stopupdates').click(function() { 
                 window.clearTimeout(intervalID);

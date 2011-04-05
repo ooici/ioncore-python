@@ -87,24 +87,31 @@ class EventMonitorWebResource(resource.Resource):
             # @TODO: subids
 
             msgdata = yield self._ec.getdata(msg)
-            data = {}
+            data = []
 
             for sub in msgdata.data:
-                print(sub)
-                print(len(sub.events))
-
-                data[sub.subscription_id] = { 'subscription_id' : sub.subscription_id,
-                                             'subscription_desc' : sub.subscription_desc,
-                                             'events' : [] }
+                subdata = { 'subscription_id' : sub.subscription_id,
+                            'subscription_desc' : sub.subscription_desc,
+                            'events' : [] }
 
                 for event in sub.events:
-
                     # @TODO: totally needs to be generic here
-                    evhash = { 'origin' : event.origin,
-                              'state' : event.additional_data.state,
-                              'datetime' : event.datetime }
+                    evlist = []
+                    for propname, propval in event._Properties.iteritems():
+                        if propname == "additional_data":
+                            continue
+                        evlist.append({'class':'',
+                                       'content':str(getattr(event, propname)),
+                                       'id': propname})
 
-                    data[sub.subscription_id]['events'].append(evhash)
+                    for propname, propval in event.additional_data._Properties.iteritems():
+                        evlist.append({'class':'',
+                                       'content':str(getattr(event.additional_data, propname)),
+                                       'id': propname})
+
+                    subdata['events'].append(evlist)
+
+                data.append(subdata)
 
             # build json response
             response = { 'data': data,
