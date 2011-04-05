@@ -11,6 +11,8 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from decimal import Decimal
+
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
@@ -58,7 +60,6 @@ class FindDataResources(object):
         pair.predicate = pref
 
         # Set the Object search term
-
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
         
@@ -72,7 +73,6 @@ class FindDataResources(object):
         pref.key = HAS_LIFE_CYCLE_STATE_ID
 
         pair.predicate = pref
-
 
         # Set the Object search term
         state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
@@ -145,7 +145,7 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.__isInBounds(dSet, bounds):
+            if self.__isInBounds(minMetaData, bounds):
                 log.debug("isInBounds is TRUE")
                 self.__printRootAttributes(dSet)
                 self.__printRootVariables(dSet)
@@ -183,17 +183,17 @@ class FindDataResources(object):
             elif attrib.name == 'comment':                
                 minMetaData['comment'] = attrib.GetValue()
             elif attrib.name == 'ion_geospatial_lat_min':                
-                minMetaData['ion_geospatial_lat_min'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_lat_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lat_max':                
-                minMetaData['ion_geospatial_lat_max'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_lat_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lon_min':                
-                minMetaData['ion_geospatial_lon_min'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_lon_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lon_max':                
-                minMetaData['ion_geospatial_lon_max'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_lon_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_min':                
-                minMetaData['ion_geospatial_vertical_min'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_vertical_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_max':                
-                minMetaData['ion_geospatial_vertical_max'] = float(attrib.GetValue())
+                minMetaData['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_positive':                
                 minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
 
@@ -204,18 +204,17 @@ class FindDataResources(object):
         """
         log.debug('__loadBounds')
         
-        bounds['minLat'] = msg.message_parameters_reference.minLatitude
-        bounds['maxLat'] = msg.message_parameters_reference.maxLatitude
-        bounds['minLon'] = msg.message_parameters_reference.minLongitude
-        bounds['maxLon'] = msg.message_parameters_reference.maxLongitude
-        bounds['minVert'] = msg.message_parameters_reference.minVertical
-        bounds['maxVert'] = msg.message_parameters_reference.maxVertical
+        bounds['minLat'] = Decimal(str(msg.message_parameters_reference.minLatitude))
+        bounds['maxLat'] = Decimal(str(msg.message_parameters_reference.maxLatitude))
+        bounds['minLon'] = Decimal(str(msg.message_parameters_reference.minLongitude))
+        bounds['maxLon'] = Decimal(str(msg.message_parameters_reference.maxLongitude))
+        bounds['minVert'] = Decimal(str(msg.message_parameters_reference.minVertical))
+        bounds['maxVert'] = Decimal(str(msg.message_parameters_reference.maxVertical))
         bounds['posVert'] = msg.message_parameters_reference.posVertical
         bounds['minTime'] = msg.message_parameters_reference.minTime
         bounds['maxTime'] = msg.message_parameters_reference.maxTime
 
-        
-    def __isInBounds(self, dSet, bounds):
+    def __isInBounds(self, minMetaData, bounds):
         """
         Determine if dataset resource is in bounds.
         Input:
@@ -223,12 +222,32 @@ class FindDataResources(object):
           - dSet
         """
         log.debug('__isInBounds')
-        if dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue() < bounds['minLat']:
-            log.debug('%s is < than %s' % (str(float(dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())), str(bounds['minLat'])))
-        else:            
-            log.debug('%s is !< than %s' % (str(float(dSet.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())), str(bounds['minLat'])))
-        result = True
-        return result
+        log.debug('%s : %s' % (type(minMetaData['ion_geospatial_lat_min']), type(bounds['minLat'])))
+        if minMetaData['ion_geospatial_lat_min'] > bounds['minLat']:
+            log.debug(' %f is outside bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
+            return False
+            
+        if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
+            return False
+            
+        if minMetaData['ion_geospatial_lon_min'] > bounds['minLon']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
+            return False
+            
+        if minMetaData['ion_geospatial_lon_max'] > bounds['maxLon']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
+            return False
+        
+        if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
+            return False
+            
+        if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
+            return False
+        
+        return True
         
     def __printBounds(self, bounds):
         boundNames = list(bounds)
@@ -281,17 +300,17 @@ class FindDataResources(object):
             elif attrib == 'comment':                
                 rootAttributes.comment = minMetaData[attrib]
             elif attrib == 'ion_geospatial_lat_min':                
-                rootAttributes.ion_geospatial_lat_min = minMetaData[attrib]
+                rootAttributes.ion_geospatial_lat_min = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_lat_max':                
-                rootAttributes.ion_geospatial_lat_max = minMetaData[attrib]
+                rootAttributes.ion_geospatial_lat_max = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_lon_min':                
-                rootAttributes.ion_geospatial_lon_min = minMetaData[attrib]
+                rootAttributes.ion_geospatial_lon_min = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_lon_max':                
-                rootAttributes.ion_geospatial_lon_max = minMetaData[attrib]
+                rootAttributes.ion_geospatial_lon_max = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_vertical_min':                
-                rootAttributes.ion_geospatial_vertical_min = minMetaData[attrib]
+                rootAttributes.ion_geospatial_vertical_min = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_vertical_max':                
-                rootAttributes.ion_geospatial_vertical_max = minMetaData[attrib]
+                rootAttributes.ion_geospatial_vertical_max = float(minMetaData[attrib])
             elif attrib == 'ion_geospatial_vertical_positive':                
                 rootAttributes.ion_geospatial_vertical_positive = minMetaData[attrib]
 
