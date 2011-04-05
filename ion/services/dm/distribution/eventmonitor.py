@@ -43,7 +43,7 @@ class EventMonitorService(ServiceProcess):
         ServiceProcess.slc_init(self, *args, **kwargs)
 
     def _handle_msg(self, session_id, subid, msg):
-        log.debug("message for you sir %s %s" % (session_id, subid))
+        log.debug("message for you sir %s %s %s" % (session_id, subid, str(msg['content'].datetime)))
         assert self._subs.has_key(session_id) and self._subs[session_id]['subscribers'].has_key(subid)
 
         self._subs[session_id]['subscribers'][subid]['msgs'].append(msg)
@@ -133,6 +133,11 @@ class EventMonitorService(ServiceProcess):
         if not timestamp or len(timestamp) == 0:
             timestamp = self._subs[session_id]['last_request_time']
             self._bump_timestamp(session_id)
+
+        try:
+            timestamp = float(timestamp)
+        except:
+            timestamp = 0.0
 
         log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
 
