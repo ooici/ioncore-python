@@ -11,6 +11,6 @@
     "registered": [
     ],
     "applications": [
-        "ioncore","ccagent"
+        "ioncore","ccagent","eventmonitor"
     ]
 }
