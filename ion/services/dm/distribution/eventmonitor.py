@@ -127,36 +127,34 @@ class EventMonitorService(ServiceProcess):
         timestamp       = content.timestamp
         subscriber_ids  = content.subscriber_id  # may be empty
 
-        if not self._subs.has_key(session_id):
-            raise ApplicationError("session_id %s is unknown" % session_id)
-
-        if not timestamp or len(timestamp) == 0:
-            timestamp = self._subs[session_id]['last_request_time']
-            self._bump_timestamp(session_id)
-
-        try:
-            timestamp = float(timestamp)
-        except:
-            timestamp = 0.0
-
-        log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
-
-        # generate response
+        # generate response. We give back a nearly empty response if the session id does not exist
         response = yield self._mc.create_instance(EVENTMONITOR_DATA_MESSAGE_TYPE)
         response.session_id = session_id
 
-        for subid, subdata in self._subs[session_id]['subscribers'].iteritems():
+        if self._subs.has_key(session_id):
+            if not timestamp or len(timestamp) == 0:
+                timestamp = self._subs[session_id]['last_request_time']
+                self._bump_timestamp(session_id)
 
-            # skip if we have a list of sub ids to give back and this subid is not in the list
-            if len(subscriber_ids) > 0 and not subid in subscriber_ids:
-                continue
+            try:
+                timestamp = float(timestamp)
+            except:
+                timestamp = 0.0
 
-            dataobj = response.data.add()
-            dataobj.subscription_id = subid
-            dataobj.subscription_desc = "none for now"
-            for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
-                link = dataobj.events.add()
-                link.SetLink(event['content'].MessageObject)
+            log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
+
+            for subid, subdata in self._subs[session_id]['subscribers'].iteritems():
+
+                # skip if we have a list of sub ids to give back and this subid is not in the list
+                if len(subscriber_ids) > 0 and not subid in subscriber_ids:
+                    continue
+
+                dataobj = response.data.add()
+                dataobj.subscription_id = subid
+                dataobj.subscription_desc = "none for now"
+                for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
+                    link = dataobj.events.add()
+                    link.SetLink(event['content'].MessageObject)
 
         yield self.reply_ok(msg, response)
 
