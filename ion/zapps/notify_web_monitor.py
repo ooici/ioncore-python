@@ -40,6 +40,6 @@ def start(container, starttype, app_definition, *args, **kwargs):
 def stop(container, state):
     log.info("state:" +str(state) )
     supdesc = state[0]
-    log.info("Terminating CC agent")
+    log.info("Terminating Notify Web Monitor")
     yield supdesc.terminate()
 
