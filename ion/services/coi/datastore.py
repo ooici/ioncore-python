@@ -893,6 +893,9 @@ class DataStoreService(ServiceProcess):
                     predicate_repo = self._create_predicate(value)
                     if predicate_repo is None:
                         raise DataStoreError('Failed to create predicate: %s' % str(value))
+                    #@TODO make associations to predicates!
+
+
 
         # Load the Root User!
         if self.preload[ION_IDENTITIES_CFG]:
