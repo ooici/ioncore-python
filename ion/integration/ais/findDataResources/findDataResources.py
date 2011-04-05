@@ -130,6 +130,7 @@ class FindDataResources(object):
         #     - add the metadata to the response GPB
         #
         i = 0
+        j = 0
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
             dSourceResID = dSourceResults.idrefs[i].key
@@ -153,7 +154,8 @@ class FindDataResources(object):
     
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
         
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], minMetaData, userID, dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+                j = j + 1
             else:
                 log.debug("isInBounds is FALSE")
 
