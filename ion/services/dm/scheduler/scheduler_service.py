@@ -27,13 +27,18 @@ message AddTaskRequest {
       _VERSION = 1;
     }
 
-    // target is destination address
-    // interval is fractional seconds between messages
+    // desired_origin is where the event notification will originate from
+    //   this is not required to be sent... one will be generated if not
+    // interval is seconds between messages
     // payload is string
 
-    optional string target    = 1;
-    optional double interval  = 2;
-    optional string payload   = 3;
+    optional string desired_origin    = 1;
+    optional uint64 interval_seconds  = 2;
+    optional string payload           = 3;
+
+    //these are actually optional: epoch times for start/end
+    optional uint64 time_start_unix   = 4;
+    optional uint64 time_end_unix     = 5;
 }
 """
 
@@ -46,10 +51,10 @@ message AddTaskResponse {
     }
 
     // the string guid
-    // interval is fractional seconds between messages
-    // payload is string
+    // the origin  is where the event notifications will come from
 
     optional string task_id = 1;
+    optional string origin  = 2;
 }
 
 """
@@ -71,6 +76,33 @@ message RmTaskRequest {
 
 RMTASK_RSP_TYPE   = object_utils.create_type_identifier(object_id=2604, version=1)
 
+
+QUERYTASK_REQ_TYPE   = object_utils.create_type_identifier(object_id=2605, version=1)
+"""
+message QueryTaskRequest {
+    enum _MessageTypeIdentifier {
+      _ID = 2605;
+      _VERSION = 1;
+    }
+
+    optional string task_regex = 1;
+
+}
+"""
+
+QUERYTASK_RSP_TYPE   = object_utils.create_type_identifier(object_id=2606, version=1)
+"""
+message QueryTaskResponse {
+    enum _MessageTypeIdentifier {
+      _ID = 2606;
+      _VERSION = 1;
+    }
+
+    // can be an empty list
+    repeated string task_ids = 1;
+
+}
+"""
 
 
 class SchedulerService(ServiceProcess):
@@ -106,7 +138,7 @@ class SchedulerService(ServiceProcess):
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
-        @brief Add a new task to the crontab. Interval is in seconds, fractional.
+        @brief Add a new task to the crontab. Interval is in seconds.
         @param content Message payload, must be a GPB #2601
         @param headers Ignored here
         @param msg Ignored here
@@ -114,7 +146,7 @@ class SchedulerService(ServiceProcess):
         """
         try:
             task_id = str(uuid4())
-            msg_interval = content.interval
+            msg_interval = content.interval_seconds
         except KeyError, ke:
             log.exception('Required keys in payload not found!')
             yield self.reply_err(msg, {'value': str(ke)})
@@ -122,15 +154,19 @@ class SchedulerService(ServiceProcess):
 
         log.debug('ok, gotta task to save')
 
+
+        #FIXME, generate origin if desired_origin was not provided
+        if not content.HasField('desired_origin'):
+            log.debug('FIXME, generate an origin because one was not provided')
+            content.desired_origin = 'SOMEONE PLEASE FIXME' + str(uuid4())
+
+        #create the response: task_id and actual origin
+        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
+        resp.task_id = task_id
+        resp.origin = content.desired_origin
+
         # Just drop the entire message payload in
-
-        # convert back to dictionary for now, but store.put should eventually 
-        #   take a protobuf
-        msg_dict = {'target':   content.target, 
-                    'interval': content.interval,
-                    'payload':  content.payload}
-
-        rc = yield self.store.put(task_id, msg_dict)
+        rc = yield self.store.put(task_id, msg)
         if re.search('rror', rc):
             yield self.reply_err(msg, 'Error "%s" adding task to registry!' % rc)
             return
@@ -140,8 +176,6 @@ class SchedulerService(ServiceProcess):
         reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
         log.debug('Add completed OK')
 
-        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
-        resp.task_id = task_id
 
         yield self.reply_ok(msg, resp)
 
@@ -174,9 +208,12 @@ class SchedulerService(ServiceProcess):
         Query tasks registered, returns a maybe-empty list
         """
         log.debug('Looking for matching tasks')
-        tlist = yield self.store.query(content)
+        tlist = yield self.store.query(content.task_regex)
 
         log.debug(tlist)
+
+        resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
+
 
         self.reply_ok(msg,  {'value': tlist})
 
@@ -227,54 +264,48 @@ class SchedulerServiceClient(ServiceClient):
         self.mc = MessageClient(proc=proc)
 
     @defer.inlineCallbacks
-    def add_task(self, target, interval, payload):
+    def add_task(self, msg):
         """
         @brief Add a recurring task to the scheduler
-        @param target Destination address, available via self._get_procid
-        @param interval Time, in fractional seconds, between messages
-        @param payload Optional payload to include in the scheduled messages
-        @retval Task ID, a GUID used as a key for rm_task
+        @param msg protocol buffer
+        @GPB(Input,2601,1)
+        @GPB(Output,2602,1)
+        @retval Task ID and origin
         """
         yield self._check_init()
 
-        msg_buf = yield self.mc.create_instance(ADDTASK_REQ_TYPE,  
-                                                MessageName='Scheduler AddTask')
-
-        msg_buf.target    = target
-        msg_buf.payload   = payload
-        msg_buf.interval  = interval
-
-        (content, headers, msg) = yield self.rpc_send('add_task', msg_buf)
-        defer.returnValue(content.task_id)
+        ret = yield self.rpc_send('add_task', msg)
+        defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def rm_task(self, taskid):
+    def rm_task(self, msg):
         """
         @brief Remove a task from the scheduler
         @note If using cassandra, writes are delayed
-        @param taskid Task ID, as returned from add_task
+        @param msg protocol buffer
+        @GPB(Input,2603,1)
+        @GPB(Output,2604,1)
         @retval OK or error
         """
         #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
 
-        msg_buf = yield self.mc.create_instance(RMTASK_REQ_TYPE,  
-                                                MessageName='Scheduler RmTask')
 
-        msg_buf.task_id = taskid
-
-        (content, headers, msg) = yield self.rpc_send('rm_task', msg_buf)
-        defer.returnValue(content)
+        ret = yield self.rpc_send('rm_task', msg)
+        defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def query_tasks(self, task_regex):
+    def query_tasks(self, msg):
         """
         @brief Query tasks in the scheduler by regex. Use '.+' to return all.
-        @retval List, possibly zero-length.
+        @param msg protocol buffer
+        @GPB(Input,2605,1)
+        @GPB(Output,2606,1)
+        @retval GPB containing a list, possibly zero-length.
         """
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('query_tasks', task_regex)
-        defer.returnValue(content)
+        ret = yield self.rpc_send('query_tasks', msg)
+        defer.returnValue(ret)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(SchedulerService)
