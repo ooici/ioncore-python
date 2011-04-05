@@ -178,6 +178,12 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
+2011-04-02:
+- App files support an entry "config" of type dict with ion.config override
+  values
+- Apps support loading of dependent apps from res/apps by using the
+  "applications" entry of type list.
+
 2011-04-01:
 - Introduced Conversations framework. Standard conversation types: rpc (request,
   inform-result/failure), request (request, agree/refuse, inform-result/failure),
