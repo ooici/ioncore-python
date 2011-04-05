@@ -60,6 +60,11 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
+
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
         services = [
             {'name':'app_integration','module':'ion.integration.ais.app_integration_service','class':'AppIntegrationService'},
             {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
@@ -102,10 +107,10 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude  = 32.87521
-        reqMsg.message_parameters_reference.maxLatitude  = 32.97521
-        reqMsg.message_parameters_reference.minLongitude = -117.274609
-        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
+        reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
+        reqMsg.message_parameters_reference.minLongitude = -74.13
+        reqMsg.message_parameters_reference.maxLongitude = -73.50
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
@@ -191,10 +196,10 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude = 32.87521
-        reqMsg.message_parameters_reference.maxLatitude = 32.97521
-        reqMsg.message_parameters_reference.minLongitude = -117.274609
-        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minLatitude = 40.2216682434
+        reqMsg.message_parameters_reference.maxLatitude = 40.2216682434
+        reqMsg.message_parameters_reference.minLongitude = -74.13
+        reqMsg.message_parameters_reference.maxLongitude = -73.50
         
         log.debug('Calling findDataResources.')
         outcome1 = yield self.aisc.findDataResources(reqMsg)

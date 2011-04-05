@@ -62,6 +62,12 @@ class AppManager(BasicLifecycleObject):
         #raise RuntimeError("Illegal state change for AppManager")
         self.container.error(*args, **kwargs)
 
+    def is_app_started(self, appname):
+        for app in self.applications:
+            if app.name == appname:
+                return True
+        return False
+
     # API
 
     def start_app(self, app_filename):
@@ -73,10 +79,9 @@ class AppManager(BasicLifecycleObject):
         log.info("Starting app: %s" % app_filename)
 
         appdef = AppLoader.load_app_definition(app_filename)
-        for app in self.applications:
-            if app.name == appdef.name:
-                raise StartupError('Application %s already started' % appdef.name)
+        if (self.is_app_started(appdef.name)):
+            raise StartupError('Application %s already started' % appdef.name)
 
         self.applications.append(appdef)
-        d = AppLoader.start_application(self.container, appdef)
+        d = AppLoader.start_application(self.container, appdef, app_manager=self)
         return d

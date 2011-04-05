@@ -59,115 +59,103 @@ class WrapperMethodsTest(unittest.TestCase):
         self.failUnless(hasattr(ph._Enums['PhoneType'], 'WORK'))
         self.failUnlessEqual(ph._Enums['PhoneType'].WORK, 2)
 
-    def test_object_setter(self):
-        """
-        Make sure that we can't mistakenly add attributes to wrapper objects
-        """
-        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
-        
-        # set a string field of the wrapper
-        ab.title = 'String'
-                
-        # Check that you can't set properties that don't exist
-        self.assertRaises(AttributeError, setattr, ab, 'foobar', 'bar')
-        
-    
+
     def test_derived_wrappers(self):
-        
+
         ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
         # Derived wrappers is still empty
         self.assertEqual(ab.DerivedWrappers, {})
-        
+
         # Setting scalar fields does not do anything here...
-        ab.title = 'name'    
+        ab.title = 'name'
         self.assertEqual(ab.DerivedWrappers, {})
-        
+
         persons = ab.person
         self.assertIn(persons, ab.DerivedWrappers.values())
-        self.assertIn(persons._gpbcontainer.__hash__(), ab.DerivedWrappers.keys())
-        
+        self.assertIn(persons._gpbcontainer, ab.DerivedWrappers)
+
         owner = ab.owner
         self.assertIn(owner, ab.DerivedWrappers.values())
-        self.assertIn(owner.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
-        
+        self.assertIn(owner.GPBMessage, ab.DerivedWrappers)
+
         ref_to_persons = ab.person
         self.assertEqual(len(ab.DerivedWrappers),2)
-        
+
         person = ab.person.add()
         self.assertIn(person, ab.DerivedWrappers.values())
-        self.assertIn(person.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
-        
+        self.assertIn(person.GPBMessage, ab.DerivedWrappers)
+
     def test_set_get_del(self):
-        
+
         ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
-        
+
         # set a string field
         ab.title = 'String'
-        
+
         # Can not set a string field to an integer
         self.assertRaises(TypeError, setattr, ab , 'title', 6)
-        
+
         # Get a string field
         self.assertEqual(ab.title, 'String')
-        
+
         # Del ?
         try:
             del ab.title
         except AttributeError, ae:
             return
-        
+
         self.fail('Attribute Error not raised by invalid delete request')
-            
-        
-        
+
+
+
     def test_set_composite(self):
-        
+
         ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
-            
+
         ab.person.add()
         ab.person.add()
-            
+
         ab.person[1].name = 'David'
         ab.person[0].name = 'John'
         ab.person[0].id = 5
-        
+
         p = ab.person[0]
-        
+
         ph = ab.person[0].phone.add()
         ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
-            
+
         self.assertEqual(ab.person[1].name, 'David')
         self.assertEqual(ab.person[0].name, 'John')
         self.assertEqual(ab.person[0].id, 5)
-            
+
         self.assertNotEqual(ab.person[0],ab.person[1])
-        
-        
+
+
     def test_enum_access(self):
-        
+
         p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
-        
+
         # Get an enum
         self.assertEqual(p.PhoneType.MOBILE,0)
         self.assertEqual(p.PhoneType.HOME,1)
         self.assertEqual(p.PhoneType.WORK,2)
-        
+
         # error to set an enum
         self.assertRaises(AttributeError, setattr, p.PhoneType, 'MOBILE', 5)
-        
+
     def test_imported_enum_access(self):
-        
-        
+
+
         att = gpb_wrapper.Wrapper._create_object(ATTRIBUTE_TYPE)
-        
+
         att.data_type = att.DataType.BOOLEAN
-        
+
         self.assertEqual(att.data_type, att.DataType.BOOLEAN)
-        
+
         self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
-        
-        
+
+
     def test_listsetfields_message_type(self):
 
         p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
@@ -1113,14 +1101,12 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.assertEqual(len(p.ParentLinks),2)
         
         # Get the link object which will be cleared
-        owner_link = self.ab.GetLink('owner')
-        
-        owner_link_hash = owner_link.GPBMessage.__hash__()
-        owner_type_hash = owner_link.type.GPBMessage.__hash__()
-        
+        owner_link = self.ab.GetLink('owner').GPBMessage
+        owner_type = self.ab.GetLink('owner').type.GPBMessage
+
         # Assert that the derived wrappers dictionary contains these objects
-        self.assertIn(owner_link_hash, self.ab.DerivedWrappers.keys())
-        self.assertIn(owner_type_hash, self.ab.DerivedWrappers.keys())
+        self.assertIn(owner_link, self.ab.DerivedWrappers)
+        self.assertIn(owner_type, self.ab.DerivedWrappers)
         
         # ***Clear the field***
         self.ab.ClearField('owner')
@@ -1135,22 +1121,21 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         # Assert that there is only one parent link
         self.assertIn(self.ab.person.GetLink(0),p.ParentLinks)
         self.assertEqual(len(p.ParentLinks),1)
-                    
+
+
         # Assert that the derived wrappers refs are gone!
-        self.assertNotIn(owner_link_hash, self.ab.DerivedWrappers.keys())
-        self.assertNotIn(owner_type_hash, self.ab.DerivedWrappers.keys())
+        self.assertNotIn(owner_link, self.ab.DerivedWrappers)
+        self.assertNotIn(owner_type, self.ab.DerivedWrappers)
         
         # Now try removing the person
         
         # Get the person link in the composite container
-        p0_link = self.ab.person.GetLink(0)
-        
-        p0_link_hash = p0_link.GPBMessage.__hash__()
-        p0_type_hash = p0_link.type.GPBMessage.__hash__()
+        p0_link = self.ab.person.GetLink(0).GPBMessage
+        p0_type = self.ab.person.GetLink(0).type.GPBMessage
         
         # Assert that the derived wrappers dictionary contains these objects
-        self.assertIn(p0_link_hash, self.ab.DerivedWrappers.keys())
-        self.assertIn(p0_type_hash, self.ab.DerivedWrappers.keys())
+        self.assertIn(p0_link, self.ab.DerivedWrappers)
+        self.assertIn(p0_type, self.ab.DerivedWrappers)
         
         # ***Clear the field***
         self.ab.ClearField('person')
@@ -1165,9 +1150,9 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.assertEqual(len(self.ab.ChildLinks),0)
         
         # Assert that the derived wrappers dictionary is empty!
-        self.assertNotIn(p0_link_hash, self.ab.DerivedWrappers.keys())
-        self.assertNotIn(p0_type_hash, self.ab.DerivedWrappers.keys())
-        self.assertEqual(len(self.ab.DerivedWrappers.keys()),1)
+        self.assertNotIn(p0_link, self.ab.DerivedWrappers)
+        self.assertNotIn(p0_type, self.ab.DerivedWrappers)
+        self.assertEqual(len(self.ab.DerivedWrappers),1)
         
         
     
@@ -1257,8 +1242,8 @@ class RecurseCommitTest(unittest.TestCase):
             
         ab.RecurseCommit(strct)
         
-        self.assertIn(ab.MyId, strct.keys())
-        self.assertIn(p.MyId, strct.keys())
+        self.assertIn(ab.MyId, strct)
+        self.assertIn(p.MyId, strct)
         
         # Get the committed structure element
         ab_se = strct.get(ab.MyId)
@@ -1293,7 +1278,7 @@ class RecurseCommitTest(unittest.TestCase):
         self.assertEqual(repo.root_object.Modified, False)
         
         # there should be only two objects once hashed!
-        self.assertEqual(len(strct.keys()), 2)
+        self.assertEqual(len(strct), 2)
         
         # Show that the old references are now invalid
         self.assertEqual(p0.Invalid, True)
