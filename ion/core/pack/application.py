@@ -59,26 +59,28 @@ class AppLoader(object):
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
 
+        # @todo The backward reference to the app_manager is not nice at all
+        
         # Load dependent apps
-        if appdef.applications and app_manager:
-            if type(appdef.applications) in (list, tuple):
-                for new_appname in appdef.applications:
-                    print app_manager.applications
-                    if app_manager.is_app_started(new_appname):
-                        continue
-                    log.debug("Loading dependent app %s" % new_appname)
-                    app_file_name = "%s/%s.app" % (CF_app_dir_path, new_appname)
-                    if not os.path.isfile(app_file_name):
-                        log.error("App dependency %s in file %s not found" % (
-                            new_appname, app_file_name))
-                        continue
-
-                    # Recursive call to startapp
-                    # @todo Detect cycles.
-                    yield app_manager.start_app(app_file_name)
-            else:
-                raise ConfigurationError("Application %s app config not a list: %s" %(
-                    appdef.name, type(appdef.applications)))
+        #if appdef.applications and app_manager:
+        #    if type(appdef.applications) in (list, tuple):
+        #        for new_appname in appdef.applications:
+        #            print app_manager.applications
+        #            if app_manager.is_app_started(new_appname):
+        #                continue
+        #            log.debug("Loading dependent app %s" % new_appname)
+        #            app_file_name = "%s/%s.app" % (CF_app_dir_path, new_appname)
+        #            if not os.path.isfile(app_file_name):
+        #                log.error("App dependency %s in file %s not found" % (
+        #                    new_appname, app_file_name))
+        #                continue
+        #
+        #            # Recursive call to startapp
+        #            # @todo Detect cycles.
+        #            yield app_manager.start_app(app_file_name)
+        #    else:
+        #        raise ConfigurationError("Application %s app config not a list: %s" %(
+        #            appdef.name, type(appdef.applications)))
 
         # Overriding ion configuration with config entries
         if appdef.config:
