@@ -16,7 +16,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH, OBJECT_COMMIT
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_LIFE_CYCLE_STATE_ID, TYPE_OF_ID
 
@@ -129,22 +129,54 @@ class AssociationService(ServiceProcess):
 
             rows = yield self.index_store.query(q)
 
-            pair_subjects = set()
+            # subject_pointers is the resulting set of pointers to the current state of the association subject
+            subjects_pointers = set()
+
+            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+            subject_keys = set()
             for key, row in rows.items():
 
-                # Invert the index so we can find the associations by subject repository & key
-                totalkey = (row[SUBJECT_KEY] , row[SUBJECT_BRANCH], row[SUBJECT_COMMIT])
 
-                # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
-                pair_subjects.add(totalkey)
+                #@TODO - check for divergence and branches in the association and in the object - not just the subject
+
+                if not first_pair and row[SUBJECT_KEY] not in subject_keys:
+                    # The result we are looking for is an intersection operation. If this key is not here escape!
+                    continue
+
+                # Get the latest commits for the Subject_Key
+                subject_query = store.Query()
+                # Get only the head or get all? Hmmm not sure...
+                subject_query.add_predicate_gt(BRANCH_NAME,'')
+                subject_query.add_predicate_eq(REPOSITORY_KEY,row[SUBJECT_KEY])
+                subject_heads = yield self.index_store.query(subject_query)
+
+                branches = []
+                for commit_key, commit_row in subject_heads.items():
+
+                    if commit_row[BRANCH_NAME] in branches:
+                        raise NotImplementedError('Dealing with divergence in an associated Subject is not yet supported')
+
+                    else:
+                        branches.append(commit_row[BRANCH_NAME])
+
+                    if commit_row[BRANCH_NAME] == row[SUBJECT_BRANCH]:
+                        # We do not need to determine ancestry - the branch name is the same!
+
+                        # return the pointer to this commit - this is the latest version of the associated subject!
+                        totalkey = (row[SUBJECT_KEY] , row[SUBJECT_BRANCH])
+
+                        # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
+                        subjects_pointers.add(totalkey)
+                    else:
+                        raise NotImplementedError('Dealing with associations to a subject with multiple branches is not yet supported')
 
 
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
-                subjects = pair_subjects
+                subjects = subjects_pointers
                 first_pair = False
             else:
-                subjects.intersection_update(pair_subjects)
+                subjects.intersection_update(subjects_pointers)
 
 
         # Now apply any search by type or lcs!
@@ -173,7 +205,7 @@ class AssociationService(ServiceProcess):
             # This is a simple search - just add the results!
             for key, row in rows.items():
 
-                totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME], key)
+                totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME])
 
                 subjects.add(totalkey)
 
@@ -205,7 +237,7 @@ class AssociationService(ServiceProcess):
 
                 for key, row in rows.items():
 
-                    totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME], key)
+                    totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME])
 
                     new_set.add(totalkey)
 
@@ -214,8 +246,6 @@ class AssociationService(ServiceProcess):
 
             
         log.info('Found %s subjects!' % len(subjects))
-
-        # Do we want to check for which current heads of each subject are descendents of the
 
 
         list_of_subjects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
@@ -227,7 +257,7 @@ class AssociationService(ServiceProcess):
             idref= list_of_subjects.CreateObject(IDREF_TYPE)
             idref.key = subject[0]
             idref.branch = subject[1]
-            idref.commit = subject[2]
+            #idref.commit = subject[2]
 
             link.SetLink(idref)
 
@@ -243,9 +273,95 @@ class AssociationService(ServiceProcess):
             raise AssociationServiceError('Unexpected type received \n %s' % str(subject_predicate_query), subject_predicate_query.ResponseCodes.BAD_REQUEST)
 
 
+        if len(subject_predicate_query.pairs) is 0:
+            raise AssociationServiceError('Invalid Subject Predicate Query received - zero length pairs!', subject_predicate_query.ResponseCodes.BAD_REQUEST)
+
+        # The resulting set of Objects
+        objects = set()
+
+        first_pair = True
+
+        for pair in subject_predicate_query.pairs:
+
+
+            q = store.Query()
+            # Get only the latest version of the association!
+            q.add_predicate_gt(BRANCH_NAME,'')
+
+            # Build a query for the predicate of the search
+            if pair.predicate.ObjectType != PREDICATE_REFERENCE_TYPE:
+                raise AssociationServiceError('Invlalid predicate type in subject predicate pairs request to get_objects.', subject_predicate_query.ResponseCodes.BAD_REQUEST)
+
+
+            q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
+
+            q.add_predicate_eq(SUBJECT_KEY, pair.subject.key)
+
+            rows = yield self.index_store.query(q)
+
+            # subject_pointers is the resulting set of pointers to the current state of the association subject
+            objects_pointers = set()
+
+            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+            object_keys = set()
+            for key, row in rows.items():
+
+                if not first_pair and row[OBJECT_KEY] not in object_keys:
+                    # The result we are looking for is an intersection operation. If this key is not her escape!
+                    continue
+
+                # Get the latest commits for the Subject_Key
+                object_query = store.Query()
+                # Get only the head or get all? Hmmm not sure...
+                object_query.add_predicate_gt(BRANCH_NAME,'')
+                object_query.add_predicate_eq(REPOSITORY_KEY,row[OBJECT_KEY])
+                object_heads = yield self.index_store.query(object_query)
+
+                branches = []
+                for commit_key, commit_row in object_heads.items():
+
+                    if commit_row[BRANCH_NAME] in branches:
+                        raise NotImplementedError('Dealing with divergence in an associated Object is not yet supported')
+
+                    else:
+                        branches.append(commit_row[BRANCH_NAME])
+
+                    if commit_row[BRANCH_NAME] == row[OBJECT_BRANCH]:
+                        # We do not need to determine ancestry - the branch name is the same!
+
+                        # return the pointer to this commit - this is the latest version of the associated subject!
+                        totalkey = (row[SUBJECT_KEY] , row[OBJECT_BRANCH])
+
+                        # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
+                        objects_pointers.add(totalkey)
+                    else:
+                        raise NotImplementedError('Dealing with associations to a Object with multiple branches is not yet supported')
+
+
+            # Now - at the end of the loop over the pairs - take the intersection with the current search results!
+            if first_pair:
+                objects = objects_pointers
+                first_pair = False
+            else:
+                objects.intersection_update(objects_pointers)
+
+        log.info('Found %s objects!' % len(subjects))
+
 
         list_of_objects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        for obj in objects:
+
+            link = list_of_objects.idrefs.add()
+
+            idref= list_of_objects.CreateObject(IDREF_TYPE)
+            idref.key = obj[0]
+            idref.branch = obj[1]
+
+            link.SetLink(idref)
+
         yield self.reply_ok(msg, list_of_objects)
+
 
 
     @defer.inlineCallbacks
@@ -255,7 +371,50 @@ class AssociationService(ServiceProcess):
         if object_reference.MessageType != IDREF_TYPE:
             raise AssociationServiceError('Unexpected type received \n %s' % str(object_reference), object_reference.ResponseCodes.BAD_REQUEST)
 
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        q.add_predicate_eq(OBJECT_KEY, object_reference.key)
+
+        rows = yield self.index_store.query(q)
+
+
         list_of_associations = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        # Make a place to store the branches found for each association
+        repo_branches={}
+
+        for key, row in rows:
+
+            branches = repo_branches.get(row[REPOSITORY_KEY],None)
+            if branches is None:
+                branches = set()
+                repo_branches[row[REPOSITORY_KEY]] = branches
+
+            if row[BRANCH_NAME] in branches:
+                raise NotImplementedError('Divergent state in an association is not yet supported')
+            else:
+                branches.add(row[BRANCH_NAME])
+
+
+            if row[OBJECT_BRANCH] == object_reference.branch:
+                pass
+
+            else:
+                # Get the objects commits and check in parents!
+                raise NotImplementedError('Branches in an association are not yet supported')
+
+
+            link = list_of_associations.idrefs.add()
+
+            idref= list_of_associations.CreateObject(IDREF_TYPE)
+            idref.key = row[REPOSITORY_KEY]
+            idref.branch = row[BRANCH_NAME]
+
+            link.SetLink(idref)
+
         yield self.reply_ok(msg, list_of_associations)
 
 
@@ -267,7 +426,47 @@ class AssociationService(ServiceProcess):
         if subject_reference.MessageType != IDREF_TYPE:
             raise AssociationServiceError('Unexpected type received \n %s' % str(subject_reference), subject_reference.ResponseCodes.BAD_REQUEST)
 
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        q.add_predicate_eq(SUBJECT_KEY, subject_reference.key)
+
+        rows = yield self.index_store.query(q)
+
         list_of_associations = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        # Make a place to store the branches found for each association
+        repo_branches={}
+
+        for key, row in rows:
+
+            branches = repo_branches.get(row[REPOSITORY_KEY],None)
+            if branches is None:
+                branches = set()
+                repo_branches[row[REPOSITORY_KEY]] = branches
+
+            if row[BRANCH_NAME] in branches:
+                raise NotImplementedError('Divergent state in an association is not yet supported')
+            else:
+                branches.add(row[BRANCH_NAME])
+
+            if row[SUBJECT_BRANCH] == subject_reference.branch:
+                pass
+
+            else:
+                # Get the objects commits and check in parents!
+                raise NotImplementedError('Branches in an association are not yet supported')
+
+
+            link = list_of_associations.idrefs.add()
+
+            idref= list_of_associations.CreateObject(IDREF_TYPE)
+            idref.key = row[REPOSITORY_KEY]
+            idref.branch = row[BRANCH_NAME]
+
+            link.SetLink(idref)
+
         yield self.reply_ok(msg, list_of_associations)
 
 

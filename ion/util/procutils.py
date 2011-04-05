@@ -39,7 +39,9 @@ def log_message(msg):
     body = msg.payload
     lstr = ""
     procname = str(body.get('receiver',None))
-    lstr += "===Message=== receiver=%s op=%s===" % (procname, body.get('op', None))
+    lstr += "===IN Message=== %s(%s) -> %s: %s:%s:%s===" % (body.get('sender-name', None),
+                    body.get('sender', None), procname, body.get('protocol', None),
+                    body.get('performative', None), body.get('op', None))
     if body.get('quiet', False):
         lstr += " (Q)"
     else:

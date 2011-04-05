@@ -7,6 +7,8 @@
 @see OTP design principles: applications
 """
 
+import os.path
+
 from twisted.internet import defer
 from twisted.python.reflect import namedAny
 
@@ -16,10 +18,15 @@ from zope.interface import Attribute
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
 from ion.core.exception import FatalError
 from ion.core.cc.container_api import IContainer
-from ion.core.exception import ConfigurationError, StartupError
+from ion.core.exception import ConfigurationError, FatalError, StartupError
+from ion.core.ioninit import ion_config
 from ion.util.config import Config
+
+CONF = ioninit.config(__name__)
+CF_app_dir_path = CONF['app_dir_path']
 
 START_PERMANENT = "permanent"
 
@@ -41,7 +48,7 @@ class AppLoader(object):
 
     @classmethod
     @defer.inlineCallbacks
-    def start_application(cls, container, appdef):
+    def start_application(cls, container, appdef, app_manager=None):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
 
@@ -51,6 +58,38 @@ class AppLoader(object):
         appmod = namedAny(modname)
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
+
+        # @todo The backward reference to the app_manager is not nice at all
+        
+        # Load dependent apps
+        #if appdef.applications and app_manager:
+        #    if type(appdef.applications) in (list, tuple):
+        #        for new_appname in appdef.applications:
+        #            print app_manager.applications
+        #            if app_manager.is_app_started(new_appname):
+        #                continue
+        #            log.debug("Loading dependent app %s" % new_appname)
+        #            app_file_name = "%s/%s.app" % (CF_app_dir_path, new_appname)
+        #            if not os.path.isfile(app_file_name):
+        #                log.error("App dependency %s in file %s not found" % (
+        #                    new_appname, app_file_name))
+        #                continue
+        #
+        #            # Recursive call to startapp
+        #            # @todo Detect cycles.
+        #            yield app_manager.start_app(app_file_name)
+        #    else:
+        #        raise ConfigurationError("Application %s app config not a list: %s" %(
+        #            appdef.name, type(appdef.applications)))
+
+        # Overriding ion configuration with config entries
+        if appdef.config:
+            if type(appdef.config) is dict:
+                log.debug("Applying app %s configuration" % appdef.name)
+                ion_config.update(appdef.config)
+            else:
+                raise ConfigurationError("Application %s app config not a dict: %s" %(
+                    appdef.name, type(appdef.config)))
 
         log.debug("Application '%s' starting" % appdef.name)
         try:
@@ -106,6 +145,8 @@ class AppDefinition(object):
             self.registered = []
         if not hasattr(self, "applications"):
             self.applications = []
+        if not hasattr(self, "config"):
+            self.config = {}
 
 class IAppModule(Interface):
     """

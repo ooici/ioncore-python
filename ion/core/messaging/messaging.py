@@ -54,7 +54,7 @@ class AMQPEvents(TwistedDelegate):
         """implement this to handle a broker channel.alert notification.
         """
         log.warning('channel.alert event received')
-        
+
     def close(self, reason):
         """The AMQClient protocol calls this as a result of a
         connectionLost event. The TwistedDelegate.close method finishes
@@ -99,7 +99,7 @@ class MessageSpace(BasicLifecycleObject):
     def on_activate(self, *args, **kwargs):
         #assert not self.connection._connection, "Already connected to broker"
         from twisted.internet import reactor # This could be the process
-                                             # interface...one day 
+                                             # interface...one day
         amqpEvents = AMQPEvents(self)
         clientCreator = amqp.ConnectionCreator(reactor,
                                     vhost=self.virtual_host,
@@ -163,10 +163,7 @@ class MessageSpace(BasicLifecycleObject):
                 'password',
                 'virtual_host',
                 ]
-        s = "MessageSpace("
-        for param in params:
-            s += param + "='%s', " % getattr(self.connection, param)
-        s += "port=%d" % self.connection.port
+        s = "MessageSpace(hostname=%s,port=%s,virtual_host=%s" % (self.hostname, self.port, self.virtual_host)
         s += ")"
         return s
 
@@ -197,7 +194,7 @@ class ProcessExchangeSpace(ExchangeSpace):
     @defer.inlineCallbacks
     def send(self, to_name, message_data, publisher_config=None, **kwargs):
         if publisher_config is None: publisher_config = {}
-        
+
         pub_config = {'routing_key' : str(to_name)}
         pub_config.update(publisher_config)
         publisher = yield Publisher.name(self, pub_config)
@@ -372,8 +369,8 @@ class Consumer(object):
     Consumer for AMQP.
     """
 
-    def __init__(self, chan, queue=None, 
-                             exchange=None, 
+    def __init__(self, chan, queue=None,
+                             exchange=None,
                              routing_key=None,
                              exchange_type="direct",
                              durable=False,
@@ -471,7 +468,7 @@ class Consumer(object):
 
     def receive(self, amqp_message):
         message = Message(self.channel, amqp_message)
-        return self.callback(message) 
+        return self.callback(message)
 
     def consume(self, callback, limit=None):
         self.callback = callback
@@ -498,10 +495,10 @@ class Publisher(object):
 
     delivery_modes:
     1 - non persistent
-    2 - persistent 
+    2 - persistent
     """
 
-    def __init__(self, chan, exchange=None, 
+    def __init__(self, chan, exchange=None,
                              routing_key=None,
                              exchange_type="direct",
                              delivery_mode=1,
@@ -593,7 +590,7 @@ class Publisher(object):
                               app_id=None, cluster_id=None):
         """Encapsulate data into a AMQP message.
         This method should be reconciled with interceptor functionality and
-        the ion message format. 
+        the ion message format.
         """
         if headers is None:
             headers = {}
@@ -618,8 +615,8 @@ class Publisher(object):
         return message
 
     def send(self, message_data, routing_key=None, delivery_mode=None,
-                mandatory=False, immediate=False, priority=0, 
-                content_type=None, content_encoding=None, reply_to=None, 
+                mandatory=False, immediate=False, priority=0,
+                content_type=None, content_encoding=None, reply_to=None,
                 headers=None, serializer=None):
         """Send a message.
 
@@ -646,9 +643,9 @@ class Publisher(object):
                                       serializer=serializer,
                                       reply_to=reply_to)
         return self.channel.basic_publish(content=message,
-                                        exchange=self.exchange, 
+                                        exchange=self.exchange,
                                         routing_key=routing_key,
-                                        mandatory=self.mandatory, 
+                                        mandatory=self.mandatory,
                                         immediate=self.immediate)
 
 

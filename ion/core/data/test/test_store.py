@@ -46,7 +46,7 @@ cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, ver
 cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, version=1)
 
 
-        
+
 
 class IStoreTest(unittest.TestCase):
 
@@ -97,7 +97,7 @@ class IStoreTest(unittest.TestCase):
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
         defer.returnValue(None)
-        
+
     @defer.inlineCallbacks
     def test_put_get_delete(self):
         # Write, then read to verify same
@@ -169,81 +169,81 @@ class StoreServiceTest(IStoreTest, IonTestCase):
 
 
 class BootstrapStoreTest(IStoreTest):
-    
+
     @itv(CONF)
     def _setup_backend(self):
         store = CassandraStoreBootstrap("ooiuser", "oceans11")
         store.initialize()
         store.activate()
         return defer.succeed(store)
-        
-    @defer.inlineCallbacks
-    def tearDown(self):
-        try:
-            yield self.ds.terminate()
-        except Exception, ex:
-            log.info("Exception raised in tearDown %s" % (ex,))    
 
-
-class CassandraStoreTest(IStoreTest):
-    
-
-    @itv(CONF)
-    def _setup_backend(self):
-        
-        ### This is a short cut to use resource objects without a process 
-        wb = workbench.WorkBench('No Process: Testing only')
-        
-        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
-        
-        # Set only one host and port in the host list for now
-        cas_host = cassandra_cluster.hosts.add()
-        #cas_host.host = 'amoeba.ucsd.edu'
-        #cas_host.host = 'localhost'
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-        cas_host.port = 9160
-        
-        ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
-        # only the name of the keyspace is required
-        cassandra_keyspace.name = 'StoreTestKeyspace'
-        #cassandra_keyspace.name = 'Keyspace1'
-        
-        ### Create a Credentials resource - for cassandra a SimplePassword object
-        cache_repository, simple_password  = wb.init_repository(simple_password_type)
-        # only the name of the column family is required
-        simple_password.username = 'ooiuser'
-        simple_password.password = 'oceans11'
-        
-        ### Create a Cache resource - for cassandra a ColumnFamily object
-        cache_repository, column_family  = wb.init_repository(column_family_type)
-        # only the name of the column family is required
-        column_family.name = 'TestCF'
-        
-        
-        store = cassandra.CassandraStore(cassandra_cluster, \
-                                         cassandra_keyspace, \
-                                         simple_password, \
-                                         column_family)
-        
-        
-        store.initialize()
-        store.activate()
-        
-        
-        return defer.succeed(store)
-
-
-    
     @defer.inlineCallbacks
     def tearDown(self):
         try:
             yield self.ds.terminate()
         except Exception, ex:
             log.info("Exception raised in tearDown %s" % (ex,))
-            
-            
+
+
+class CassandraStoreTest(IStoreTest):
+
+
+    @itv(CONF)
+    def _setup_backend(self):
+
+        ### This is a short cut to use resource objects without a process
+        wb = workbench.WorkBench('No Process: Testing only')
+
+        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
+        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
+
+        # Set only one host and port in the host list for now
+        cas_host = cassandra_cluster.hosts.add()
+        #cas_host.host = 'amoeba.ucsd.edu'
+        #cas_host.host = 'localhost'
+        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        cas_host.port = 9160
+
+        ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
+        # only the name of the keyspace is required
+        cassandra_keyspace.name = 'StoreTestKeyspace'
+        #cassandra_keyspace.name = 'Keyspace1'
+
+        ### Create a Credentials resource - for cassandra a SimplePassword object
+        cache_repository, simple_password  = wb.init_repository(simple_password_type)
+        # only the name of the column family is required
+        simple_password.username = 'ooiuser'
+        simple_password.password = 'oceans11'
+
+        ### Create a Cache resource - for cassandra a ColumnFamily object
+        cache_repository, column_family  = wb.init_repository(column_family_type)
+        # only the name of the column family is required
+        column_family.name = 'TestCF'
+
+
+        store = cassandra.CassandraStore(cassandra_cluster, \
+                                         cassandra_keyspace, \
+                                         simple_password, \
+                                         column_family)
+
+
+        store.initialize()
+        store.activate()
+
+
+        return defer.succeed(store)
+
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        try:
+            yield self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))
+
+
 class IndexStoreTest(IStoreTest):
 
     @defer.inlineCallbacks
@@ -251,7 +251,7 @@ class IndexStoreTest(IStoreTest):
         yield IStoreTest.setUp(self)
         yield self.put_stuff_for_tests()
         defer.returnValue(None)
-        
+
     def _setup_backend(self):
         """return a deferred which returns a initiated instance of a
         backend
@@ -280,7 +280,7 @@ class IndexStoreTest(IStoreTest):
     @defer.inlineCallbacks
     def test_query_single(self):
 
-        
+
         query = Query()
         query.add_predicate_eq('birth_date', '1973')
         rows = yield self.ds.query(query)
@@ -289,7 +289,7 @@ class IndexStoreTest(IStoreTest):
         self.assertEqual(len(rows),1)
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
-        
+
         defer.returnValue(None)
     # Test a single query, multiple result
     @defer.inlineCallbacks
@@ -312,12 +312,12 @@ class IndexStoreTest(IStoreTest):
         for key in self.d4.keys():
             self.assertIn(key, rows['jstewart'])
 
-            
-   
+
+
     # Tests multiple atts
     @defer.inlineCallbacks
     def test_query_multiple(self):
-        
+
         query = Query()
         query.add_predicate_eq('birth_date','1973')
         query.add_predicate_eq('state','WI')
@@ -325,19 +325,19 @@ class IndexStoreTest(IStoreTest):
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
         self.assertEqual(len(rows),1)
-        
+
 
     # Tests no result
     @defer.inlineCallbacks
     def test_query_no_resuluts(self):
         query = Query()
-        
+
         query.add_predicate_eq('birth_date', '1978')
         query.add_predicate_eq('state', 'WI')
         rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),0)
-        
+
 
     # Tests greater than 1970 and state == UT
     @defer.inlineCallbacks
@@ -354,33 +354,33 @@ class IndexStoreTest(IStoreTest):
         for key in self.d1.keys():
             self.assertIn(key, rows['bsanderson'])
 
-        
-        
+
+
     # Tests greater than
     @defer.inlineCallbacks
     def test_query_greater_and_eq_2(self):
-        
+
         query = Query()
         query.add_predicate_gt('birth_date','')
         query.add_predicate_eq('state','UT')
-        
+
         rows = yield self.ds.query(query)
 
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),2)
         self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
         self.assertEqual(rows['htayler']['value'], self.binary_value3)
-        
+
         for key in self.d1.keys():
             self.assertIn(key, rows['bsanderson'])
 
         for key in self.d3.keys():
             self.assertIn(key, rows['htayler'])
-        
 
 
-        
-        
+
+
+
     @defer.inlineCallbacks
     def put_stuff_for_tests(self):
         """
@@ -398,7 +398,7 @@ class IndexStoreTest(IStoreTest):
         self.binary_value3 = 'BinaryValue for Howard Tayler'
 
         self.binary_value4 = 'BinaryValue for John Stewart'
-        
+
         yield self.ds.remove('bsanderson')
         yield self.ds.remove('prothfuss')
         yield self.ds.remove('htayler')
@@ -410,7 +410,7 @@ class IndexStoreTest(IStoreTest):
 
         yield self.ds.put('jstewart',self.binary_value4, self.d4)
 
-        
+
 
 
     @defer.inlineCallbacks
@@ -422,8 +422,8 @@ class IndexStoreTest(IStoreTest):
         self.failUnlessEqual(val1, self.binary_value1)
         self.failUnlessEqual(val2, self.binary_value2)
         self.failUnlessEqual(val3, self.binary_value3)
-        
-        
+
+
 
     @defer.inlineCallbacks
     def test_update_index_blank(self):
@@ -442,7 +442,7 @@ class IndexStoreTest(IStoreTest):
 
         for key in self.d4.keys():
             self.assertIn(key, rows['jstewart'])
-        
+
 
     @defer.inlineCallbacks
     def test_update_index_existing(self):
@@ -462,8 +462,8 @@ class IndexStoreTest(IStoreTest):
 
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
-        
-    
+
+
     @defer.inlineCallbacks
     def test_update_index_value_error(self):
 
@@ -476,7 +476,7 @@ class IndexStoreTest(IStoreTest):
             defer.returnValue(None)
 
         self.fail('Did not raise Index Store Error')
-        
+
 
 
 class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
@@ -486,7 +486,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield IStoreTest.setUp(self)
         yield self.put_stuff_for_tests()
         defer.returnValue(None)
-        
+
     @defer.inlineCallbacks
     def _setup_backend(self):
         """
@@ -541,44 +541,44 @@ class CassandraIndexedStoreTest(IndexStoreTest):
         yield IStoreTest.setUp(self)
         yield self.put_stuff_for_tests()
         defer.returnValue(None)
-    
+
     def _setup_backend(self):
         """
-        @note The column_metadata in the cache is not correct. The column family on the 
-        server has a few more indexes.  
+        @note The column_metadata in the cache is not correct. The column family on the
+        server has a few more indexes.
         """
-        
-        ### This is a short cut to use resource objects without a process 
+
+        ### This is a short cut to use resource objects without a process
         wb = workbench.WorkBench('No Process: Testing only')
-        
+
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
-        
+
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
         #cas_host.host = 'amoeba.ucsd.edu'
         #cas_host.host = 'localhost'
         cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
         cas_host.port = 9160
-        
+
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
-        
+
         ### Create a Credentials resource - for cassandra a SimplePassword object
         cache_repository, simple_password  = wb.init_repository(simple_password_type)
         # only the name of the column family is required
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
-        
+
         ### Create a Cache resource - for Cassandra a ColumnFamily object
 
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
         column_family.name = 'TestCF'
-        
+
         self.cache = column_family
         self.cache_repository = cache_repository
         column = cache_repository.create_object(columndef_type)
@@ -590,25 +590,20 @@ class CassandraIndexedStoreTest(IndexStoreTest):
         column.index_name = 'stateIndex'
         self.cache.column_metadata.add()
         self.cache.column_metadata[0] = column
-        
-        
+
+
         store = cassandra.CassandraIndexedStore(cassandra_cluster, \
                                                 cassandra_keyspace, \
                                                 simple_password, \
                                                 column_family)
-        
+
         store.initialize()
         store.activate()
-        
-        
+
+
         return defer.succeed(store)
-        
-    
-    @defer.inlineCallbacks  
+
+
+    @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.terminate()
-        
-             
-
-
-

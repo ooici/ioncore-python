@@ -32,13 +32,16 @@ class StartupError(IonError):
 class IllegalStateError(IonError):
     pass
 
+class ConversationError(IonError):
+    pass
+
 class ApplicationError(IonError):
     """
     @Brief An Exception class for use in service business logic which will not result in the service
     being terminated. Any exception thrown which is not a subclass of Application Error will
     cause the process to terminate.
     """
-    
+
     def __init__(self, reason, response_code=500):
         """
         @param reason a string explaining the cause of the exception
@@ -47,13 +50,12 @@ class ApplicationError(IonError):
         ReceivedApplicationError in the originating process. A 500 level code will result in a
         ReceivedContainerError.
         """
-        
+
         # Set up the exception
         IonError.__init__(self, reason)
-        
+
         # Set the response code
         self.response_code = response_code
-
 
 class ReceivedError(IonError):
 
@@ -67,7 +69,7 @@ class ReceivedContainerError(ReceivedError):
     """
     An exception to throw when a 5XX response code is received during RPC messaging
     """
-    
+
 class ReceivedApplicationError(ReceivedError):
     """
     An exception to throw for 4XX response code is received during RPC messaging

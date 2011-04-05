@@ -10,7 +10,6 @@ import os
 import types
 
 from zope.interface import implements, Interface
-
 from twisted.internet import defer
 
 import ion.util.ionlog
@@ -89,6 +88,11 @@ class Receiver(BasicLifecycleObject):
 
         self.xname = pu.get_scoped_name(self.name, self.scope)
 
+        # A dict of messages in current processing. NOTE: Should be a queue
+        self.processing_messages = {}
+        # A Deferred to await processing completion after of deactivate
+        self.completion_deferred = None
+
     @defer.inlineCallbacks
     def attach(self, *args, **kwargs):
         """
@@ -138,14 +142,15 @@ class Receiver(BasicLifecycleObject):
         yield self.consumer.consume(self.receive)
         log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def on_deactivate(self, *args, **kwargs):
         """
         @brief Deactivate the consumer.
         @retval Deferred
         """
-        yield self.consumer.cancel()
-        self.consumer.callbacks.remove(self._receive)
+        #yield self.consumer.cancel()
+        self.consumer.callback = None
+        self.completion_deferred = defer.Deferred()
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
@@ -160,6 +165,16 @@ class Receiver(BasicLifecycleObject):
             pass
         else:
             raise RuntimeError("Illegal state change")
+
+    def _await_message_processing(self, term_msg_id=None):
+        # HACK: Ignore the current op_terminate message
+        if term_msg_id in self.processing_messages:
+            del self.processing_messages[term_msg_id]
+
+        if len(self.processing_messages) == 0:
+            return
+
+        return self.completion_deferred
 
     def add_handler(self, callback):
         self.handlers.append(callback)
@@ -191,11 +206,17 @@ class Receiver(BasicLifecycleObject):
         if self.rec_shutoff:
             log.warn("MESSAGE RECEIVED AFTER SHUTOFF - DROPPED")
             log.warn("Dropped message: "+str(msg.payload))
+            # @todo ACK for now. Should be requeue.
+            yield msg.ack()
             return
 
         assert not id(msg) in self.rec_messages, "Message already consumed"
         self.rec_messages[id(msg)] = msg
+        assert not id(msg) in self.processing_messages, "Message already consumed"
+        self.processing_messages[id(msg)] = msg
 
+        # Put message through the container interceptor system
+        org_msg = msg
         data = msg.payload
         if not self.raw:
             inv = Invocation(path=Invocation.PATH_IN,
@@ -228,6 +249,11 @@ class Receiver(BasicLifecycleObject):
                     if msg._state == "RECEIVED":
                         log.error("Message has not been ACK'ed at the end of processing")
                     del self.rec_messages[id(msg)]
+                    if id(org_msg) in self.processing_messages:
+                        del self.processing_messages[id(org_msg)]
+                    if self.completion_deferred and len(self.processing_messages) == 0:
+                        self.completion_deferred.callback(None)
+                        self.completion_deferred = None
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
@@ -259,11 +285,14 @@ class Receiver(BasicLifecycleObject):
             else:
                 # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
                 yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
+                defer.returnValue(msg)
         except Exception, ex:
             log.exception("Send error")
         else:
             if inv1.status != Invocation.STATUS_DROP:
-                log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+                log.info("===Message SENT! >>>> %s -> %s: %s:%s:%s===" % (msg.get('sender',None),
+                                msg.get('receiver',None), msg.get('protocol',None),
+                                msg.get('performative',None), msg.get('op',None)))
                 #log.debug("msg"+str(msg))
 
     def __str__(self):
@@ -326,4 +355,3 @@ class NameReceiver(Receiver):
 
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
-
