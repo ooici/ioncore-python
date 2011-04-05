@@ -142,13 +142,13 @@ class Receiver(BasicLifecycleObject):
         yield self.consumer.consume(self.receive)
         log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def on_deactivate(self, *args, **kwargs):
         """
         @brief Deactivate the consumer.
         @retval Deferred
         """
-        yield self.consumer.cancel()
+        #yield self.consumer.cancel()
         self.consumer.callback = None
         self.completion_deferred = defer.Deferred()
 
