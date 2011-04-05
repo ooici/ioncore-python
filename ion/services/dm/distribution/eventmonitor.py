@@ -140,7 +140,12 @@ class EventMonitorService(ServiceProcess):
         response = yield self._mc.create_instance(EVENTMONITOR_DATA_MESSAGE_TYPE)
         response.session_id = session_id
 
-        for subid, subdata in self._subs[session_id]['subscribers'].items():
+        for subid, subdata in self._subs[session_id]['subscribers'].iteritems():
+
+            # skip if we have a list of sub ids to give back and this subid is not in the list
+            if len(subscriber_ids) > 0 and not subid in subscriber_ids:
+                continue
+
             dataobj = response.data.add()
             dataobj.subscription_id = subid
             dataobj.subscription_desc = "none for now"
