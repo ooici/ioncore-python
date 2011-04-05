@@ -56,6 +56,10 @@ class AssociationServiceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
 
         self.sup = yield self._spawn_processes(self.services)
 
