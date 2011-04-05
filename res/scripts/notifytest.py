@@ -72,31 +72,30 @@ def start():
     proc = Process()
     yield proc.spawn()
 
-    if None:
-        mc = MessageClient(proc=proc)
-        msg = yield mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
+    mc = MessageClient(proc=proc)
+    msg = yield mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
 
-        msg.session_id="uno"
-        msg.event_id=RESOURCE_LIFECYCLE_EVENT_ID
-        msg.origin = "*"
+    msg.session_id="uno"
+    msg.event_id=RESOURCE_LIFECYCLE_EVENT_ID
+    msg.origin = "*"
 
-        ec = EventMonitorServiceClient()
-        resp = yield ec.subscribe(msg)
+    ec = EventMonitorServiceClient()
+    resp = yield ec.subscribe(msg)
 
-        print "Set up subscriber", resp.subscription_id
+    print "Set up subscriber", resp.subscription_id
 
     # start publishing every 5 seconds
     reactor.callLater(5, publish, proc)
 
-    #control.add_term_name("mc", mc)
-    #control.add_term_name("ec", ec)
+    control.add_term_name("mc", mc)
+    control.add_term_name("ec", ec)
     control.add_term_name("stop_publishing", stop_publishing)
-    #control.add_term_name("get_data", get_data)
-    #control.add_term_name("makeresp", makeresp)
-    #control.add_term_name("getcount", getcount)
+    control.add_term_name("get_data", get_data)
+    control.add_term_name("makeresp", makeresp)
+    control.add_term_name("getcount", getcount)
 
-    #print "'ec', 'mc', 'stop_publishing()', 'get_data()', 'makeresp()', 'getcount()' available."
-    print "'stop_publishing()' available"
+    print "'ec', 'mc', 'stop_publishing()', 'get_data()', 'makeresp()', 'getcount()' available."
+    #print "'stop_publishing()' available"
 
 start()
 
