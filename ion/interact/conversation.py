@@ -345,9 +345,13 @@ class ProcessConversationManager(object):
         # Tuple of Timestamp (MS), type, message
         if conv is None:
             return
-        mhdrs = message.get('headers',{}).copy()
-        if 'content' in mhdrs:
-            del mhdrs['content']
+        hdrs = message.get('headers',{})
+        if hdrs and type(hdrs) is dict:
+            mhdrs = hdrs.copy()
+            if 'content' in mhdrs:
+                del mhdrs['content']
+        else:
+            mhdrs = {}
         msg_rec = (pu.currenttime_ms(), msgtype, conv.local_fsm._get_state(), mhdrs)
         conv.conv_log.append(msg_rec)
 
