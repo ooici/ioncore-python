@@ -179,17 +179,20 @@ Change log:
 ===========
 
 2011-04-01:
-- Introduced Conversations framework. Two standard conversation types: RPC, Request.
+- Introduced Conversations framework. Standard conversation types: rpc (request,
+  inform-result/failure), request (request, agree/refuse, inform-result/failure),
+  generic (any message is processed). Also conversation-less one-off messages.
 - Refactored Process base class to use conversations. Made rpc_send retrofit
-  RPC conversation.
+  RPC conversation; reply_err now sends a conversation failure (either rpc or
+  request); other reply methods also supported.
+- Conversations log messages; they are garbage collected in final state.
 - Process now supports graceful terminate from active state; Receiver can
   gracefully handle deactivating the consumer followed by wait for all
   processing completion.
-- reply_err now sends a conversation failure (either rpc or request)
-- Receiver now shuts off consumer on deactivate/terminate and waits for still
-  in process messages.
 - Bug fixes to process terminate and life cycle handling.
-- Bug fixes to StateObject error handling and reporting.
+- Bug fixes to StateObject error handling and reporting (the moment of the state
+  change current->next was not exactly clear in the handler code; now it is
+  either before or after)
 - FSM now handles catch events and post state change action methods
 
 2011-01-28:
