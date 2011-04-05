@@ -52,7 +52,7 @@ def stop_publishing():
 def get_data(mc, ec):
     msg = yield mc.create_instance(EVENTMONITOR_GETDATA_MESSAGE_TYPE)
     msg.session_id="uno"
-    msg.timestamp = "not implmeneted"
+    #msg.timestamp = ""
 
     data = yield ec.getdata(msg)
     defer.returnValue(data)
