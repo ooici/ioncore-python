@@ -391,6 +391,7 @@ class Consumer(object):
         self.consumer_tag = uuid.uuid4().hex
         self.callback = None
         self._closed = False # Assuming we were given an open channel
+        self._consuming = False
 
     @classmethod
     def new(cls, client, **kwargs):
@@ -471,6 +472,7 @@ class Consumer(object):
         return self.callback(message)
 
     def consume(self, callback, limit=None):
+        self._consuming = True
         self.callback = callback
         self.channel.set_consumer_callback(self.receive)
         d = self.channel.basic_consume(queue=self.queue,
@@ -478,6 +480,12 @@ class Consumer(object):
                                         consumer_tag=self.consumer_tag,
                                         nowait=False)
         return d
+
+    def cancel(self):
+        if self._consuming:
+            self._consuming = False
+            return self.channel.basic_cancel(consumer_tag=self.consumer_tag)
+        return defer.succeed(None)
 
     def close(self):
         """
