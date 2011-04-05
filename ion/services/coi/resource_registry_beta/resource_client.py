@@ -231,48 +231,109 @@ class ResourceClient(object):
         # Get the repository
         repository = instance.Repository
 
-        repository.commit(comment=comment)
+        if repository.status == repository.MODIFIED:
+            repository.commit(comment=comment)
 
         result = yield self.workbench.push(self.datastore_service, repository)
 
         if not result.MessageResponseCode == result.ResponseCodes.OK:
             raise ResourceClientError('Push to datastore failed during put_instance')
 
-
     @defer.inlineCallbacks
-    def find_instance(self, **kwargs):
+    def put_resource_transaction(self, instance, comment=None):
         """
-        Use the index to find resource instances that match a set of constraints
-        For R1 the constraints that may be used are very limited
+        @breif Write the current state of the resource to the data store
+        @param instance is a ResourceInstance object. All associations and all associated objects will be pushed.
+        @param comment is a comment to add about the current state of the resource
+
+        @TODO push the associations that go with this resource
         """
         yield self._check_init()
 
-        raise NotImplementedError, "Interface Method Not Implemented"
+        if not comment:
+            comment = 'Resource client default commit message'
 
-    def create_association(self, subject, predicate, obj):
-        """
-        This method is still experimental
-        """
-        # @TODO  yield self._check_init() 
 
-        association = self.workbench.create_association(subject, predicate, obj)
+        transaction_repos = {}
+
+        # Get the repository
+        repository = instance.Repository
+
+        transaction_repos[repository.repository_key] = repository
+
+        for association in instance._associations:
+
+            transaction_repos[association.repository_key] = association
+
+            if association.subject.key not in transaction_repos:
+                subject = self.workbench.get_repository(association.subject.key)
+
+                if subject is not None:
+                    transaction_repos[subject.repository_key] = subject
+
+            if association.object.key not in transaction_repos:
+                object = self.workbench.get_repository(association.object.key)
+
+                if object is not None:
+                    transaction_repos[object.repository_key] = object
+
+        for repo in transaction_repos.itervalues():
+
+            if repo.status != repo.UPTODATE:
+                repo.commit(comment=comment)
+
+        result = yield self.workbench.push(self.datastore_service, transaction_repos.values())
+
+        if not result.MessageResponseCode == result.ResponseCodes.OK:
+            raise ResourceClientError('Push to datastore failed during put_instance')
+
+
+
+    @defer.inlineCallbacks
+    def create_association(self, subject, predicate_id, obj):
+        """
+        @Brief Create an association between two resource instances
+        @param subject is a resource instance which is to be the subject of the association
+        @param predicate_id is the predicate id to use in creating the association
+        @param obj is a resource instance which is to be the object of the association
+        """
+        yield self._check_init()
+
+        if not isinstance(ResourceInstance, subject):
+            raise TypeError('The subject argument in the resource client, create_association method must be a resource instance.')
+
+        if not isinstance(ResourceInstance, obj):
+            raise TypeError('The obj argument in the resource client, create_association method must be a resource instance.')
+
+        yield self.workbench.pull(self.datastore_service, predicate_id)
+        predicate_repo = self.workbench.get_repository(predicate_id)
+        yield predicate_repo.checkout('master')
+
+        association = self.workbench.create_association(subject, predicate_repo, obj)
 
         # @TODO Now what - what should we do with the association? Stash it in the workbench?
 
-        """
         # For now - put a reference to it in the resource instance
-        if isinstance(subject, ResourceInstance):
-            subject._associations.append(association)
-
-        if isinstance(predicate, ResourceInstance):
-            predicate._associations.append(association)
-
-        if isinstance(object, ResourceInstance):
-            object._associations.append(association)
+        subject._associations.append(association)
+        obj._associations.append(association)
 
         # No return val - don't touch the associations in the process!
+
+        defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def get_associations(self, subject=None, obj=None, predicate_or_predicates=None):
         """
-        return association
+        @Brief Get association to a resource instances as either subject or object. Specify a predicate or predicates to limit the results
+        """
+
+        if subject is None and obj is None:
+            raise ResourceClientError('Either the subject and/or the obj must be specified in get associations')
+
+
+
+
+
 
 
     def reference_instance(self, instance, current_state=False):
@@ -285,7 +346,7 @@ class ResourceClient(object):
         @retval an Identity Reference object to the resource
         """
 
-        # @TODO  yield self._check_init() 
+        # @TODO  yield self._check_init()
         return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
 
 

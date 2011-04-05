@@ -33,6 +33,10 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16, version=1)
 PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
+ASSOCIATION_QUERY_MSG_TYPE = object_utils.create_type_identifier(object_id=27, version=1)
+BOOL_MSG_TYPE = object_utils.create_type_identifier(object_id=30, version=1)
+
+
 QUERY_RESULT_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
@@ -484,6 +488,71 @@ class AssociationService(ServiceProcess):
 
 
 
+    @defer.inlineCallbacks
+    def op_get_association(self, association_query, headers, msg):
+        log.info('op_get_association: ')
+
+        rows = yield self._get_association(association_query)
+
+        print 'ROWS',rows
+        if len(rows) == 1:
+
+            key, row = rows.popitem()
+            response = yield self.message_client.create_instance(IDREF_TYPE)
+            response.key = row[REPOSITORY_KEY]
+            response.branch = row[BRANCH_NAME]
+
+        elif len(rows)==0:
+
+            raise AssociationServiceError('No association found for the specified triple!', association_query.ResponseCodes.NOT_FOUND)
+
+        else:
+
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_association_exists(self, association_query, headers, msg):
+        log.info('op_association_exists: ')
+
+        rows = yield self._get_association(association_query)
+
+        response = yield self.message_client.create_instance(MessageContentTypeID=BOOL_MSG_TYPE)
+        if not rows:
+            response.result = False
+        elif len(rows)==1:
+            repsonse.result = True
+        else:
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+
+
+    def _get_association(self, association_query):
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        return self.index_store.query(q)
+
+
+
 
 class AssociationServiceClient(ServiceClient):
     """
@@ -528,7 +597,21 @@ class AssociationServiceClient(ServiceClient):
 
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def get_association(self, msg):
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('get_association', msg)
+
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def association_exists(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('association_exists', msg)
+
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AssociationService)

@@ -27,6 +27,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.test.iontest import IonTestCase
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
 
+from ion.core.data import store
 
 
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -39,10 +40,20 @@ class ResourceClientTest(IonTestCase):
     """
     Testing service classes of resource registry
     """
-        
+
+    # Hold references to preserve state between runs!
+    store_class = store.Store
+    index_store_class = store.IndexStore
         
     @defer.inlineCallbacks
     def setUp(self):
+
+
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
+
         yield self._start_container()
         #self.sup = yield self._start_core_services()
         services = [

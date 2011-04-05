@@ -266,6 +266,10 @@ class WorkBench(object):
         targetname = self._process.get_scoped_name('system', origin)
 
         log.info('Target Name "%s"' % str(targetname))
+
+
+        if not isinstance(repo_name, (str, unicode)):
+            raise TypeError('Invalid argument (repo_nae) type to workbench pull. Should be string, received: "%s"' % type(repo_name))
         repo = self.get_repository(repo_name)
         
         commit_list = []
