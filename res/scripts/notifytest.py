@@ -36,6 +36,12 @@ def publish(proc):
     global callbackid
     callbackid = reactor.callLater(5, publish, proc)
 
+@defer.inlineCallbacks
+def getcount(mc, ec):
+    data = yield get_data(mc, ec)
+
+    print "MESSAGES : %d" % len(data.data[0].events)
+
 def stop_publishing():
     global callbackid
     callbackid.cancel()
@@ -86,8 +92,9 @@ def start():
     control.add_term_name("stop_publishing", stop_publishing)
     control.add_term_name("get_data", get_data)
     control.add_term_name("makeresp", makeresp)
+    control.add_term_name("getcount", getcount)
 
-    print "'ec', 'mc', 'stop_publishing()', 'get_data()', 'makeresp()' available."
+    print "'ec', 'mc', 'stop_publishing()', 'get_data()', 'makeresp()', 'getcount()' available."
 
 start()
 
