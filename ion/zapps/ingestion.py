@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/zapps/eoi_ingester.py
+@file ion/zapps/ingestion.py
 @author Dave Foster <dfoster@asascience.com>
 @brief EOI Ingestion service
 """
@@ -16,8 +16,8 @@ from ion.core.pack import app_supervisor
 
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
-    as_services =[{ 'name':'eoi_ingester',
-                     'module':'ion.services.dm.ingestion.eoi_ingester',
+    as_services =[{ 'name':'ingestion',
+                     'module':'ion.services.dm.ingestion.ingestion',
                      'class':'IngestionService'}]
 
     app_sup_desc = ProcessDesc(name="app-supervisor-" + app_definition.name,

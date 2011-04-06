@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/ingestion/eoi_ingester.py
+@file ion/services/dm/ingestion/ingestion.py
 @author Michael Meisinger
 @author David Stuebe
 @author Dave Foster <dfoster@asascience.com>
@@ -67,7 +67,7 @@ class IngestionService(ServiceProcess):
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='eoi_ingest', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='ingestion', version='0.1.0', dependencies=[])
 
     #TypeClassType = gpb_wrapper.get_type_from_obj(type_pb2.ObjectType())
 
@@ -250,7 +250,7 @@ class IngestionService(ServiceProcess):
         Generate a notification/event that an ingest succeeded.
         @TODO: this is temporary, to be replaced
         """
-        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest", process=self)
+        pub = Publisher(xp_name="event.topic", routing_key="_not.ingestion.ingest", process=self)
         yield pub.initialize()
         yield pub.activate()
         yield pub.publish(True)
@@ -283,7 +283,7 @@ class IngestionClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         # Step 1: Delegate initialization to parent "ServiceClient"
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "eoi_ingest"
+            kwargs['targetname'] = "ingestion"
         ServiceClient.__init__(self, proc, **kwargs)
         
         # Step 2: Perform Initialization
@@ -353,7 +353,7 @@ class IngestionClient(ServiceClient):
         begin_msg.ingest_service_timeout    = ingest_service_timeout
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Sending 'perform_ingest' RPC message to eoi_ingest service")
+        log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
         content = ""
         (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
         
@@ -395,9 +395,9 @@ bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
 #----------------------------#
 # Begin_Ingest Testing
 #----------------------------#
-from ion.services.dm.ingestion.eoi_ingester import IngestionClient
+from ion.services.dm.ingestion.ingestion import IngestionClient
 client = IngestionClient()
-spawn('eoi_ingest')
+spawn('ingestion')
 
 client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
 

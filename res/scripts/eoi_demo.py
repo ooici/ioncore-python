@@ -37,7 +37,7 @@ def start():
          'module':'ion.services.coi.resource_registry_beta.resource_registry',
          'class':'ResourceRegistryService',
          'spawnargs':{'datastore_service':'datastore'}},
-            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'IngestionService'},
+            {'name':'ingestion1','module':'ion.services.dm.ingestion.ingestion','class':'IngestionService'},
             ]#{'name':'javaint','module':'ion.demo.lca.javaint_service','class':'JavaIntegrationService'}]
  
     startsvcs.extend(services)
