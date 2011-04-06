@@ -189,8 +189,7 @@ class ManageResources(object):
     
 
    def __PrintDatasetAttributes(self, ds):
-      Descriptor = ds.GetDescriptor()
-      Descriptor.ListFields()
+      print ds.ListSetFields()
       log.debug("Dataset = \n"+str(ds))
       for atrib in ds.root_group.attributes:
          log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
