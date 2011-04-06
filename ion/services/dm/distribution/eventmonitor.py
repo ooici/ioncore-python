@@ -71,10 +71,10 @@ class EventMonitorService(ServiceProcess):
         subid           = str(uuid4())[:6]
 
         # create the subscriber
-        sub = self._subfactory.build(subscriber_type=EventSubscriber,
-                                     event_id=event_id,
-                                     origin=origin,
-                                     handler=lambda m: self._handle_msg(session_id, subid, m))
+        sub = yield self._subfactory.build(subscriber_type=EventSubscriber,
+                                           event_id=event_id,
+                                           origin=origin,
+                                           handler=lambda m: self._handle_msg(session_id, subid, m))
 
         # store this subscriber locally (TODO: for now)
         if not self._subs.has_key(session_id):
@@ -151,7 +151,7 @@ class EventMonitorService(ServiceProcess):
 
                 dataobj = response.data.add()
                 dataobj.subscription_id = subid
-                dataobj.subscription_desc = "none for now"
+                dataobj.subscription_desc = subdata['subscriber']._binding_key #"none for now"
                 for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
                     link = dataobj.events.add()
                     link.SetLink(event['content'].MessageObject)
