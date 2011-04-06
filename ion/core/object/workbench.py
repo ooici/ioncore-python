@@ -154,9 +154,9 @@ class WorkBench(object):
             commit_msg = 'Created association'
         association_repo.commit(commit_msg)
 
-        association_manager.AssociationInstance(association_repo, self)
+        association = association_manager.AssociationInstance(association_repo, self)
 
-        return association_repo
+        return association
 
 
     def _set_association(self,  association_repo, thing, partname):
@@ -343,8 +343,6 @@ class WorkBench(object):
         repo.upstream['service'] = origin
         repo.upstream['process'] = headers.get('reply-to')
 
-        print 'REPO STATUS:', repo.status
-
 
         defer.returnValue(result)
 
@@ -513,24 +511,32 @@ class WorkBench(object):
         if not hasattr(repo_or_repos, '__iter__'):
             repos = [repo_or_repos,]
 
+        for item in repos:
+            if not hasattr(item, 'Repository'):
+                raise WorkBenchError('Invalid argument to push. Only Repositories or Instance objects which wrap a repository may be pushed!')
+
         # Get any associations that we may need to push
         repositories_and_associations = set()
         for repo in repos:
             repositories_and_associations.add(repo)
 
-            set_of_subject_associations = repo.associations_as_subject.get_associations()
+            set_of_subject_associations = repo.Repository.associations_as_subject.get_associations()
             repositories_and_associations.update(set_of_subject_associations)
 
-            set_of_object_associations = repo.associations_as_object.get_associations()
+            set_of_object_associations = repo.Repository.associations_as_object.get_associations()
             repositories_and_associations.update(set_of_object_associations)
 
-        repos = list(repositories_and_associations)
+        instances = list(repositories_and_associations)
+
 
         # Create push message
         pushmsg = yield self._process.message_client.create_instance(PUSH_MESSAGE_TYPE)
 
         #Iterate the list and build the message to send
-        for repo in repos:
+        for instance in instances:
+
+            # Just in case this thing is an instance object
+            repo = instance.Repository
 
             commit_head = repo.commit_head
             if commit_head is None:

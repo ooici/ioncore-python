@@ -37,3 +37,5 @@ invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
 
 
 class AssociationManagerTest(unittest.TestCase):
+
+    pass

@@ -122,6 +122,8 @@ class AssociationManager(object):
         """
         if predicate in self.predicate_map:
             predicate_id = self.predicate_map.get(predicate)
+        else:
+            predicate_id = predicate
 
         return self.predicate_sorted_associations.get(predicate_id,set())
 

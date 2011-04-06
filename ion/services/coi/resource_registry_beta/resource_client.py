@@ -451,8 +451,8 @@ class ResourceInstance(object):
     """
     __metaclass__ = ResourceInstanceType
 
-    predicate_map = ion_preload_config.PredicateMap()
-
+    #predicate_map = ion_preload_config.PredicateMap()
+    predicate_map={}
 
     # Life Cycle States
     NEW = 'New'
@@ -481,8 +481,8 @@ class ResourceInstance(object):
 
         self._repository = resource_repository
 
-        self.ResourceAssociationsAsObject.update_predicate_map(predicate_map)
-        self.ResourceAssociationsAsSubject.update_predicate_map(predicate_map)
+        self.ResourceAssociationsAsObject.update_predicate_map(self.predicate_map)
+        self.ResourceAssociationsAsSubject.update_predicate_map(self.predicate_map)
 
         # association list
         object.__setattr__(self, '_associations', {})
@@ -494,11 +494,11 @@ class ResourceInstance(object):
 
     @property
     def ResourceAssociationsAsSubject(self):
-        return self._repository.associaitons_as_subject
+        return self._repository.associations_as_subject
 
     @property
     def ResourceAssociationsAsObject(self):
-        return self._repository.associaitons_as_object
+        return self._repository.associations_as_object
 
     @property
     def Resource(self):
