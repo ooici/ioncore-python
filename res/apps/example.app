@@ -13,5 +13,8 @@
     ],
     "applications": [
         "ioncore",
-    ]
+    ],
+    "config":{
+        "key":"value"
+    }
 }
