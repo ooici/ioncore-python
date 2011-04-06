@@ -27,13 +27,18 @@ message AddTaskRequest {
       _VERSION = 1;
     }
 
-    // target is destination address
-    // interval is fractional seconds between messages
+    // desired_origin is where the event notification will originate from
+    //   this is not required to be sent... one will be generated if not
+    // interval is seconds between messages
     // payload is string
 
-    optional string target    = 1;
-    optional double interval  = 2;
-    optional string payload   = 3;
+    optional string desired_origin    = 1;
+    optional uint64 interval_seconds  = 2;
+    optional string payload           = 3;
+
+    //these are actually optional: epoch times for start/end
+    optional uint64 time_start_unix   = 4;
+    optional uint64 time_end_unix     = 5;
 }
 """
 
@@ -114,7 +119,7 @@ class SchedulerService(ServiceProcess):
         """
         try:
             task_id = str(uuid4())
-            msg_interval = content.interval
+            msg_interval = content.interval_seconds
         except KeyError, ke:
             log.exception('Required keys in payload not found!')
             yield self.reply_err(msg, {'value': str(ke)})
@@ -124,10 +129,10 @@ class SchedulerService(ServiceProcess):
 
         # Just drop the entire message payload in
 
-        # convert back to dictionary for now, but store.put should eventually 
+        # convert back to dictionary for now, but store.put should eventually
         #   take a protobuf
-        msg_dict = {'target':   content.target, 
-                    'interval': content.interval,
+        msg_dict = {'target':   content.desired_origin,
+                    'interval': content.interval_seconds,
                     'payload':  content.payload}
 
         rc = yield self.store.put(task_id, msg_dict)
@@ -237,12 +242,12 @@ class SchedulerServiceClient(ServiceClient):
         """
         yield self._check_init()
 
-        msg_buf = yield self.mc.create_instance(ADDTASK_REQ_TYPE,  
+        msg_buf = yield self.mc.create_instance(ADDTASK_REQ_TYPE,
                                                 MessageName='Scheduler AddTask')
 
-        msg_buf.target    = target
-        msg_buf.payload   = payload
-        msg_buf.interval  = interval
+        msg_buf.desired_origin    = target
+        msg_buf.payload           = payload
+        msg_buf.interval_seconds  = interval
 
         (content, headers, msg) = yield self.rpc_send('add_task', msg_buf)
         defer.returnValue(content.task_id)
@@ -258,7 +263,7 @@ class SchedulerServiceClient(ServiceClient):
         #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
 
-        msg_buf = yield self.mc.create_instance(RMTASK_REQ_TYPE,  
+        msg_buf = yield self.mc.create_instance(RMTASK_REQ_TYPE,
                                                 MessageName='Scheduler RmTask')
 
         msg_buf.task_id = taskid
