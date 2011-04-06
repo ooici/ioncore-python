@@ -191,8 +191,8 @@ class PubSubService(ServiceProcess):
         response = yield self.mc.create_instance(IDLIST_TYPE)
         response.MessageResponseCode = response.ResponseCodes.OK
 
-        for key in idlist:
-            self._key_to_idref(cur_ref.key, response)
+        for cur_key in idlist:
+            self._key_to_idref(cur_key, response)
                                 
         log.debug('dtrq done')
         yield self.reply_ok(msg, response)
