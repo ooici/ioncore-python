@@ -841,6 +841,7 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Cassandra Index Store")
             self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE],  **{"username": self._username, "password": self._password})
+            self.c_store.initialize()
             yield self.register_life_cycle_object(self.c_store)
             
         else:
@@ -852,6 +853,7 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Store")
             self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE],  **{"username": self._username, "password": self._password})
+            self.b_store.initialize()
             yield self.register_life_cycle_object(self.b_store)
         else:
             log.info("Instantiating In Memory Store")
@@ -872,7 +874,6 @@ class DataStoreService(ServiceProcess):
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
-
 
 
     @defer.inlineCallbacks
