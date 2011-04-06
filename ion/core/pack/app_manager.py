@@ -96,6 +96,7 @@ class AppManager(BasicLifecycleObject):
             app_name = app_def.get('name', None)
             app_ver = app_def.get('version', None)
             app_config = app_def.get('config', None)
+            app_args = app_def.get('args', None)
             mult = app_def.get('mult', False)
 
             if app_config and not type(app_config) is dict:
@@ -105,9 +106,11 @@ class AppManager(BasicLifecycleObject):
                                  app_name=app_name,
                                  app_version=app_ver,
                                  app_config=app_config,
+                                 app_args=app_args,
                                  start_mult=mult)
 
-    def start_app(self, app_filename, app_name=None, app_version=None, app_config=None, start_mult=False):
+    def start_app(self, app_filename, app_name=None, app_version=None,
+                  app_config=None, app_args=None, start_mult=False):
         """
         @brief Start a Capability Container application from an .app file.
         @see OTP design principles, applications
@@ -133,5 +136,5 @@ class AppManager(BasicLifecycleObject):
 
         self.applications.append(appdef)
         d = AppLoader.start_application(self.container, appdef, app_manager=self,
-                                        app_config=app_config)
+                                        app_config=app_config, app_args=app_args)
         return d

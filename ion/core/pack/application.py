@@ -45,12 +45,15 @@ class AppLoader(object):
 
     @classmethod
     @defer.inlineCallbacks
-    def start_application(cls, container, appdef, app_manager=None, app_config=None):
+    def start_application(cls, container, appdef, app_manager=None, app_config=None, app_args=None):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
 
         modname = appdef.mod[0]
-        modargs = appdef.mod[1]
+        modargs = appdef.mod[1] if len(appdef.mod) >= 2 else None
+        modkwargs = appdef.mod[2] if len(appdef.mod) >= 3 else {}
+        if app_args and type(modkwargs) is dict and type(app_args) is dict:
+            modkwargs.update(app_args)
 
         appmod = namedAny(modname)
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
@@ -99,7 +102,8 @@ class AppLoader(object):
         log.debug("Application '%s' starting" % appdef.name)
         try:
             res = yield defer.maybeDeferred(appmod.start,
-                                container, START_PERMANENT, appdef, *modargs)
+                                container, START_PERMANENT, appdef,
+                                *modargs, **modkwargs)
         except Exception, ex:
             log.exception("Application %s start failed" % appdef.name)
             appdef._state = None
@@ -152,6 +156,8 @@ class AppDefinition(object):
             self.applications = []
         if not hasattr(self, "config"):
             self.config = {}
+        if not hasattr(self, "args"):
+            self.args = {}
 
 class IAppModule(Interface):
     """

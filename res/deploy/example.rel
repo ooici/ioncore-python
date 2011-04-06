@@ -1,4 +1,5 @@
 # Example Python Capability Container release
+# See https://confluence.oceanobservatories.org/display/syseng/Python+CC+Startup
 {
     "type":"release",
     "name":"ExampleRel",
@@ -8,6 +9,6 @@
     "apps":[
         {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
         {'name':'example', 'version':'0.1', 'config':{'hello':'one'}},
-        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'mult':True},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'args':{'more':'here'}, 'mult':True},
     ]
 }

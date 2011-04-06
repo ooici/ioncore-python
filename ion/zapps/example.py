@@ -13,7 +13,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 def start(container, starttype, *args, **kwargs):
-    log.info("App Example starting, starttype %s" % starttype)
+    log.info("App Example starting, starttype %s. args=%s, kwargs=%s" % (starttype,args,kwargs))
     res = ('pid', [])
     return defer.succeed(res)
 
