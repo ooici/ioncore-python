@@ -43,7 +43,7 @@ from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID
 
@@ -776,16 +776,6 @@ class DataStoreService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-#    @defer.inlineCallbacks
-#    def op_get_preloaded_datasets_dict(self, content, headers, msg):
-#        log.info("<<<---@@@ DataStoreService: Incoming call to op_get_preloaded_datasets_dict()")
-#        log.debug('DataStoreService.op_get_preloaded_datasets_dict(): returning the preloaded datasets dictionary')
-##        return self.preloaded_datasets_dict
-#        log.info("@@@--->>> DataStoreService: Sending preloaded datasets dictionary to sender")
-#        res = yield self.reply_ok(msg, self.preloaded_datasets_dict)
-##        defer.returnValue(res)
-
-
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
     type_map = TypeMap()
@@ -894,8 +884,23 @@ class DataStoreService(ServiceProcess):
                     predicate_repo = self._create_predicate(value)
                     if predicate_repo is None:
                         raise DataStoreError('Failed to create predicate: %s' % str(value))
-                    self._create_ownership_association(predicate_repo, ROOT_USER_ID)
+                    #@TODO make associations to predicates!
 
+
+
+        # Load the Root User!
+        if self.preload[ION_IDENTITIES_CFG]:
+            log.info('Preloading Identities')
+
+            root_description = ION_IDENTITIES.get(root_name)
+            exists = yield self.workbench.test_existence(ROOT_USER_ID)
+            if not exists:
+                log.info('Preloading ROOT USER')
+
+                resource_instance = self._create_resource(root_description)
+                if resource_instance is None:
+                    raise DataStoreError('Failed to Identity Resource: %s' % str(root_description))
+                self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
             log.info('Preloading Resource Types')
@@ -1057,12 +1062,16 @@ class DataStoreService(ServiceProcess):
 
         # Set the predicate
         id_ref = association_repo.create_object(IDREF_TYPE)
-        id_ref.key = OWNED_BY_ID
+        owned_by_repo = self.workbench.get_repository(OWNED_BY_ID)
+        owned_by_repo.set_repository_reference(id_ref, current_state=True)
+
         association_repo.root_object.predicate = id_ref
 
         # Set teh Object
         id_ref = association_repo.create_object(IDREF_TYPE)
-        id_ref.key = user_id
+        owner_repo = self.workbench.get_repository(user_id)
+        owner_repo.set_repository_reference(id_ref, current_state=True)
+
         association_repo.root_object.object = id_ref
 
         association_repo.commit('Ownership association created for preloaded object.')
