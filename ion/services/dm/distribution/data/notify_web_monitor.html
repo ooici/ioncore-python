@@ -21,7 +21,7 @@
             }
             div.recv {
                 float: left;
-                width: 48%;
+                width: 46%;
                 padding: 2%;
             }
 
@@ -108,10 +108,17 @@
                                            'class':'recv' });
                         dec = $('<span>' + curdata.subscription_id + '</span>').addClass('decorate');
                         dec2 = $('<span>' + curdata.subscription_desc + '</span>').addClass('decorate');
+
+                        unsubspan = $('<span class="unsubwrapper" />');
+                        unsub = $('<input type="button" class="unsub" value="Unsub"/>');
+
                         ul = $('<ul/>');
 
                         dec.appendTo(el);
                         dec2.appendTo(el);
+                        unsub.appendTo(unsubspan);
+                        unsubspan.appendTo(el);
+
                         ul.appendTo(el);
                         el.appendTo('body');
                     }
@@ -166,6 +173,17 @@
 
                 $.getJSON('/ctl/sub/' + poststr, function(data) {
                     console.log(data);
+                });
+            });
+
+            // have to use the live method here as these buttons don't exist at this time,
+            // they are added dynamically.
+            $('input.unsub').live('click', function() {
+                subdiv = $(this).parent().parent()
+                subid = subdiv[0].id
+                
+                $.getJSON('/ctl/unsub/' + subid, function(data) {
+                    subdiv.remove();
                 });
             });
 

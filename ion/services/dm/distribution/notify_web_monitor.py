@@ -163,7 +163,7 @@ class EventMonitorWebResource(resource.Resource):
                 msg = yield self._mc.create_instance(EVENTMONITOR_UNSUBSCRIBE_MESSAGE_TYPE)
                 msg.session_id = self._session_id
                 if sub_id:
-                    msg.subscriber_id = sub_id
+                    msg.subscription_id = sub_id
 
                 yield self._ec.unsubscribe(msg)
                 response = {'status':'ok'}

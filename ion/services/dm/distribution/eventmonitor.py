@@ -100,18 +100,18 @@ class EventMonitorService(ServiceProcess):
 
         # extract message contents
         session_id      = content.session_id
-        subscriber_id   = content.subscriber_id
+        subscription_id = content.subscription_id
 
         # try to look it up
         termsubs = []
         if self._subs.has_key(session_id):
-            if subscriber_id is None:
+            if subscription_id is None:
                 termsubs.extend([y['subscriber'] for y in [x for x in self._subs[session_id]['subscribers'].values()]])
                 del(self._subs[session_id])
             else:
-                if self._subs[session_id]['subscribers'].has_key(subscriber_id):
-                    termsubs.append(self.subs[session_id]['subscribers'][subscriber_id]['subscriber'])
-                    del(self._subs[session_id]['subscribers'][subscriber_id])
+                if self._subs[session_id]['subscribers'].has_key(subscription_id):
+                    termsubs.append(self._subs[session_id]['subscribers'][subscription_id]['subscriber'])
+                    del(self._subs[session_id]['subscribers'][subscription_id])
 
         # terminate collected active subscribers
         for sub in termsubs:
