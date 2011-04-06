@@ -10,17 +10,20 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
-# DHE Temporarily pulling DatasetControllerClient from scaffolding
-from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
 #from ion.integration.ais.getDataResourceDetail.cfdata import cfData
+
+# Temporary, until assocation of dataset and datasource are there.
+from ion.integration.ais.findDataResources.findDataResources import FindDataResources
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
 
 from ion.integration.ais.ais_object_identifiers import GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import DATASOURCE_RESOURCE_TYPE_ID
 
 class GetDataResourceDetail(object):
     
@@ -29,7 +32,6 @@ class GetDataResourceDetail(object):
         self.ais = ais
         self.rc = ResourceClient()
         self.mc = ais.mc
-        self.dscc = DatasetControllerClient()
 
         
     @defer.inlineCallbacks
@@ -45,10 +47,8 @@ class GetDataResourceDetail(object):
             Response.error_str = "Required field [data_resource_id] not found in message"
             defer.returnValue(Response)
             
-        log.debug('DHE: getDataResourceDetail will get dataset instance: ' + str(resID))
-
         try:        
-            log.debug('DHE: getDataResourceDetail getting resource instance')
+            log.debug('getDataResourceDetail getting dataset resource instance')
             ds = yield self.rc.get_instance(resID)
 
             for atrib in ds.root_group.attributes:
@@ -70,6 +70,33 @@ class GetDataResourceDetail(object):
             RspMsg.error_str = ex.msg_content.MessageResponseBody
             defer.returnValue(RspMsg)
 
+        #
+        # Currently there is no association for dataset to datasource.
+        #
+        log.debug('getDataResourceDetail getting datasource resource instance')
+        worker = FindDataResources(self.ais)
+        dSourceResults = yield worker.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
+
+
+        #
+        # Currently forcing to index 0 to fake association
+        #
+        if len(dSourceResults.idrefs) > 0:
+            dSourceResID = dSourceResults.idrefs[0].key
+            log.debug('Working on dSourceResID: ' + dSourceResID)
+            
+            dSource = yield self.rc.get_instance(dSourceResID)
+        else:            
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS getDataResourceDetail error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "No Associated Data Source Found"
+            defer.returnValue(Response)
+
+        self.__printSourceMetadata(dSource)
+        
+        
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE)
@@ -81,31 +108,49 @@ class GetDataResourceDetail(object):
         for var in ds.root_group.variables:
             print 'Working on variable: %s' % str(var.name)
             rspMsg.message_parameters_reference[0].variable.add()
-            self.__loadRootVariable(rspMsg.message_parameters_reference[0].variable[i], ds, var)
+            self.__loadGPBVariable(rspMsg.message_parameters_reference[0].variable[i], ds, var)
             i = i + 1
+
+        self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource)
         
         defer.returnValue(rspMsg)
 
 
-    def __loadRootVariable(self, rootVariable, ds, var):
-        for atrib in var.attributes:
-            tmpstr = str(atrib.name) + '::' + str(atrib.GetValue())
-            rootVariable.other_attributes.append(tmpstr)
+    def __loadGPBVariable(self, gpbVariable, ds, var):
+        i = 0
+        for attrib in var.attributes:
+            if attrib.name == 'standard_name':
+                gpbVariable.standard_name = attrib.GetValue()
+            elif attrib.name == 'long_name':
+                gpbVariable.long_name = attrib.GetValue()
+            elif attrib.name == 'units':
+                gpbVariable.units = attrib.GetValue()
+            else:
+                if i > 0:
+                    tmpstr = '::'
+                else:
+                    tmpstr = ''
+                tmpstr = tmpstr + str(attrib.name) + '=' + str(attrib.GetValue())
+                gpbVariable.other_attributes.append(tmpstr)
+                i = i + 1
 
-        """
-        try:
-            rootVariable.standard_name  = var.GetStandardName()
-            rootVariable.units = var.GetUnits()
-            
-        except:            
-            estr = 'Object ERROR!'
-            log.exception(estr)
-         """
 
-    def __loadSourceMetaData(self, source, ds, var):
-        log.debug(__loadSourceMetaData)
+    def __loadGPBSourceMetaData(self, GPBSource, dSource):
+        log.debug("__loadGPSSourceMetaData()")
     
+        #for attrib in var.attributes:
+        for property in dSource.property:
+            GPBSource.property.append(property)
+            
+        for station_id in dSource.station_id:
+            GPBSource.station_id.append(station_id)
+ 
+        GPBSource.request_type = dSource.request_type
+        GPBSource.base_url = dSource.base_url
+        GPBSource.max_ingest_millis = dSource.max_ingest_millis
+
         """
+        This is the actual GPB
         optional net.ooici.services.sa.SourceType source_type = 1;
         repeated string property   = 2;
         repeated string station_id = 3;
@@ -124,5 +169,16 @@ class GetDataResourceDetail(object):
         optional string end_time   = 14;
         optional string institution_id = 15;
         """
+        
+    def __printSourceMetadata(self, dSource):
+        log.debug('source_type: ' + str(dSource.source_type))
+        for property in dSource.property:
+            log.debug('Property: ' + property)
+        for sid in dSource.station_id:
+            log.debug('Station ID: ' + sid)
+        log.debug('request_type: ' + str(dSource.request_type))
+        log.debug('base_url: ' + dSource.base_url)
+        log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
+        
 
 

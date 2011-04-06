@@ -238,8 +238,26 @@ class AppIntegrationTest(IonTestCase):
 
                 log.debug('Minimum Metadata Variables:\n')
                 for var in rspMsg.message_parameters_reference[0].variable:
+                    log.debug('  Variable:\n')
+                    log.debug('    standard_name: ' + var.standard_name + '\n')
+                    log.debug('    long_name: ' + var.long_name + '\n')
+                    log.debug('    units: ' + var.units + '\n')
                     for attrib in var.other_attributes:
-                        log.debug('  ' + str(attrib) + str('\n'))
+                        log.debug('    Other Attributes:\n')
+                        log.debug('      ' + str(attrib) + str('\n'))
+
+                dSource = rspMsg.message_parameters_reference[0].source
+                log.debug('Source Metadata for Dataset:\n')
+                for property in dSource.property:
+                    log.debug('  Property: ' + property)
+                for station_id in dSource.station_id:
+                    log.debug('  Station_ID: ' + station_id)
+ 
+                log.debug('  RequestType: ' + str(dSource.request_type))
+                log.debug('  Base URL: ' + dSource.base_url)
+                log.debug('  Max Ingest Millis: ' + str(dSource.max_ingest_millis))
+
+
         
     @defer.inlineCallbacks
     def test_createDownloadURL(self):

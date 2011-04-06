@@ -47,7 +47,8 @@ class FindDataResources(object):
         self.dsID = dsID
 
     @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType):
+    #def __findResourcesOfType(self, resourceType):
+    def findResourcesOfType(self, resourceType):
 
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
@@ -112,11 +113,11 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
         # Get the list of dataset resource IDs
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        dSetResults = yield self.findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
         # Get the list of datasource resource IDs
-        dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
         log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
 
         #
