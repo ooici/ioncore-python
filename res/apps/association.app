@@ -1,12 +1,12 @@
 # Example Python Capability Container application
 {
     "type":"application",
-    "name":"resources",
-    "description": "ION resource management application",
+    "name":"association",
+    "description": "ION association management application",
     "version": "0.1",
-    "mod": ("ion.zapps.resources", []),
+    "mod": ("ion.zapps.association", []),
     "modules": [
-        "ion.zapps.resources",
+        "ion.zapps.association",
     ],
     "registered": [
         "example"
