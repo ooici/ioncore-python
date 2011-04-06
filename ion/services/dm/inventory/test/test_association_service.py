@@ -17,6 +17,7 @@ from ion.test.iontest import IonTestCase
 from ion.core.object import object_utils
 
 from ion.core.process.process import Process
+from ion.core.exception import ReceivedApplicationError
 
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
 
@@ -25,10 +26,10 @@ from ion.services.coi.resource_registry_beta import resource_client
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, RESOURCE_TYPE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 
 
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
@@ -235,6 +236,66 @@ class AssociationServiceTest(IonTestCase):
 
         self.assertIn(SAMPLE_PROFILE_DATASET_ID, key_list)
 
+    @defer.inlineCallbacks
+    def test_association_by_2_owners(self):
+
+        # Add a second owner...
+        rc = resource_client.ResourceClient()
+
+        ds_res = yield rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
+
+        yield rc.workbench.pull('datastore', OWNED_BY_ID)
+        owner_repo = rc.workbench.get_repository(OWNED_BY_ID)
+        owner_repo.checkout('master')
+
+        user_res = yield rc.get_instance(ROOT_USER_ID)
+
+        assoc = rc.workbench.create_association(ds_res, owner_repo, user_res)
+        yield rc.workbench.push('datastore',assoc)
+
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+
+
+        pair = request.pairs.add()
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ROOT_USER_ID
+
+        pair.object = type_ref
+
+
+        result = yield self.asc.get_subjects(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.assertIn(SAMPLE_PROFILE_DATASET_ID, key_list)
+
 
     @defer.inlineCallbacks
     def test_association_by_owner_and_type_find_1(self):
@@ -376,4 +437,291 @@ class AssociationServiceTest(IonTestCase):
         self.assertIn(SAMPLE_PROFILE_DATASET_ID, key_list)
 
 
+
+
+    @defer.inlineCallbacks
+    def test_association_subject_predicate(self):
+
+        request = yield self.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+
+        # Set the Subbject search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+        pair.subject = type_ref
+
+        # make the request
+        result = yield self.asc.get_objects(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.assertIn(ANONYMOUS_USER_ID, key_list)
+
+
+    @defer.inlineCallbacks
+    def test_association_subject_predicate_2(self):
+
+        request = yield self.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+
+        # Set the Subbject search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+        pair.subject = type_ref
+
+
+        # Test a second association
+        pair = request.pairs.add()
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+
+        # Set the Subbject search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+        pair.subject = type_ref
+
+
+        # make the request
+        result = yield self.asc.get_objects(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.assertIn(ANONYMOUS_USER_ID, key_list)
+
+
+    @defer.inlineCallbacks
+    def test_association_subject_predicate_updated_object(self):
+
+
+         # Update the owner
+        rc = resource_client.ResourceClient()
+
+        id_res = yield rc.get_instance(ANONYMOUS_USER_ID)
+
+        id_res.email = 'junk@spam.com'
+
+        yield rc.put_instance(id_res)
+
+        request = yield self.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+
+        # Set the Subbject search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+        pair.subject = type_ref
+
+        # make the request
+        result = yield self.asc.get_objects(request)
+
+        self.assertEqual(len(result.idrefs)==1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.assertIn(ANONYMOUS_USER_ID, key_list)
+
+
+    @defer.inlineCallbacks
+    def test_association_subject_predicate_updated_subject(self):
+
+
+         # Update the owner
+        rc = resource_client.ResourceClient()
+
+        ds_res = yield rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
+
+        ds_res.ResourceName = 'my junky data'
+
+        yield rc.put_instance(ds_res)
+
+        request = yield self.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+
+        # Set the Subject search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+        pair.subject = type_ref
+
+        # make the request
+        result = yield self.asc.get_objects(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.assertIn(ANONYMOUS_USER_ID, key_list)
+
+
+    @defer.inlineCallbacks
+    def test_get_object_associations(self):
+
+        request = yield self.proc.message_client.create_instance(IDREF_TYPE)
+
+        request.key = ANONYMOUS_USER_ID
+
+        # make the request
+        result = yield self.asc.get_object_associations(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+        # what to test about the associations?
+
+
+    @defer.inlineCallbacks
+    def test_get_subject_associations(self):
+
+        request = yield self.proc.message_client.create_instance(IDREF_TYPE)
+
+        request.key = ANONYMOUS_USER_ID
+
+        # make the request
+        result = yield self.asc.get_subject_associations(request)
+
+        self.assertEqual(len(result.idrefs)>=1,True)
+
+
+
+    @defer.inlineCallbacks
+    def test_get_association_one(self):
+
+        # Add a second owner...
+        rc = resource_client.ResourceClient()
+
+        ds_res = yield rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
+
+        yield rc.workbench.pull('datastore', OWNED_BY_ID)
+        owner_repo = rc.workbench.get_repository(OWNED_BY_ID)
+        owner_repo.checkout('master')
+
+        user_res = yield rc.get_instance(ROOT_USER_ID)
+
+        assoc = rc.workbench.create_association(ds_res, owner_repo, user_res)
+        yield rc.workbench.push('datastore',assoc)
+
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+        request.object = request.CreateObject(IDREF_TYPE)
+        request.object.key = ROOT_USER_ID
+
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = OWNED_BY_ID
+
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = SAMPLE_PROFILE_DATASET_ID
+
+        # make the request
+        result = yield self.asc.get_association(request)
+        self.assertEqual(result.MessageType, IDREF_TYPE)
+        self.assertEqual(result.key, assoc.Repository.repository_key)
+        self.assertEqual(result.branch, assoc.Repository.current_branch_key())
+
+    def test_get_association_none(self):
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+        request.object = request.CreateObject(IDREF_TYPE)
+        request.object.key = ANONYMOUS_USER_ID
+
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = OWNED_BY_ID
+
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = ROOT_USER_ID
+
+        self.failUnlessFailure(self.asc.get_association(request), ReceivedApplicationError)
+
+
+    @defer.inlineCallbacks
+    def test_association_true(self):
+
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+        request.object = request.CreateObject(IDREF_TYPE)
+        request.object.key = ROOT_USER_ID
+
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = OWNED_BY_ID
+
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = SAMPLE_PROFILE_DATASET_ID
+
+        # make the request
+        result = yield self.asc.association_exists(request)
+        self.assertEqual(result.result, False)
+
+    def test_association_true(self):
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+        request.object = request.CreateObject(IDREF_TYPE)
+        request.object.key = ANONYMOUS_USER_ID
+
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = OWNED_BY_ID
+
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = SAMPLE_PROFILE_DATASET_ID
+
+        # make the request
+        result = yield self.asc.association_exists(request)
+        self.assertEqual(result.result, True)
 
