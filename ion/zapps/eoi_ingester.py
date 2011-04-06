@@ -18,7 +18,7 @@ from ion.core.pack import app_supervisor
 def start(container, starttype, app_definition, *args, **kwargs):
     as_services =[{ 'name':'eoi_ingester',
                      'module':'ion.services.dm.ingestion.eoi_ingester',
-                     'class':'EOIIngestionService'}]
+                     'class':'IngestionService'}]
 
     app_sup_desc = ProcessDesc(name="app-supervisor-" + app_definition.name,
                                module=app_supervisor.__name__,
@@ -27,12 +27,12 @@ def start(container, starttype, app_definition, *args, **kwargs):
     supid = yield app_sup_desc.spawn()
 
     res = (supid.full, [app_sup_desc])
-    log.info("Started EOIIngestionService")
+    log.info("Started IngestionService")
     defer.returnValue(res)
 
 @defer.inlineCallbacks
 def stop(container, state):
-    log.info("Stopping EOIIngestionService")
+    log.info("Stopping IngestionService")
     supdesc = state[0]
     yield supdesc.terminate()
 

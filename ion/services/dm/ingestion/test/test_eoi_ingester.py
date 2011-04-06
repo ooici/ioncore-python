@@ -15,11 +15,11 @@ from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
 
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.dm.ingestion.eoi_ingester import IngestionClient
 from ion.test.iontest import IonTestCase
 
 
-class EOIIngestionTest(IonTestCase):
+class IngestionTest(IonTestCase):
     """
     Testing service classes of resource registry
     """
@@ -31,10 +31,10 @@ class EOIIngestionTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'EOIIngestionService'}]
+            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'IngestionService'}]
         sup = yield self._spawn_processes(services)
 
-        self.eoi_ic = EOIIngestionClient(proc=sup)
+        self.eoi_ic = IngestionClient(proc=sup)
         self.sup = sup
 
     @defer.inlineCallbacks
