@@ -451,8 +451,7 @@ class ResourceInstance(object):
     """
     __metaclass__ = ResourceInstanceType
 
-    #predicate_map = ion_preload_config.PredicateMap()
-    predicate_map={}
+    predicate_map = ion_preload_config.PredicateMap()
 
     # Life Cycle States
     NEW = 'New'
