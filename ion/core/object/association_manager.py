@@ -265,6 +265,9 @@ class AssociationInstance(object):
 
 
     def set_null(self):
+        """
+        @Brief Set an associations subject and object to null. The Association must now be pushed explicitly using the resource client!
+        """
 
         previous_object = self._repository._workspace_root.object
         previous_object_repository = self._workbench.get_repository(previous_object.key)

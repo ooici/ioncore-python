@@ -326,8 +326,7 @@ class PredicateMap(dict):
         predicate_map = {}
         for predicate_name, description in ION_PREDICATES.items():
             preidcate_cfg = description.get(CONTENT_CFG)
-            obj_type_id = preidcate_cfg.get('object_identifier')
-            predicate_map[obj_type_id] = description.get(ID_CFG)
+            predicate_map[description.get(ID_CFG)] =  preidcate_cfg
 
         self.update(predicate_map)
 
