@@ -12,6 +12,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.pack.application import AppLoader, AppDefinition
+from ion.core.pack.release import ReleaseLoader, ReleaseDefinition
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -26,3 +27,14 @@ class AppLoaderTest(IonTestCase):
         log.debug(app)
         self.assertTrue(app)
         self.assertIsInstance(app, AppDefinition)
+
+    """
+    Tests the app loader.
+    """
+    def test_load_resfile(self):
+        # Tests run in <main>/_trial_temp
+        filename = '../res/deploy/example.rel'
+        rel = ReleaseLoader.load_rel_definition(filename)
+        log.debug(rel)
+        self.assertTrue(rel)
+        self.assertIsInstance(rel, ReleaseDefinition)

@@ -1,0 +1,14 @@
+# Example Python Capability Container release
+# See https://confluence.oceanobservatories.org/display/syseng/Python+CC+Startup
+{
+    "type":"release",
+    "name":"ExampleRel",
+    "version": "0.1",
+    "description": "ION Example Container deployment release",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'args':{'more':'here'}, 'mult':True},
+    ]
+}
