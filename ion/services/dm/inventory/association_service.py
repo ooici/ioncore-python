@@ -494,7 +494,6 @@ class AssociationService(ServiceProcess):
 
         rows = yield self._get_association(association_query)
 
-        print 'ROWS',rows
         if len(rows) == 1:
 
             key, row = rows.popitem()
@@ -552,6 +551,43 @@ class AssociationService(ServiceProcess):
         return self.index_store.query(q)
 
 
+    @defer.inlineCallbacks
+    def op_get_associations(self, association_query, headers, msg):
+        log.info('op_get_association: ')
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        if association_query.IsFieldSet('subject'):
+            q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        if association_query.IsFieldSet('predicate'):
+            q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        if association_query.IsFieldSet('object'):
+            q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        rows = yield self.index_store.query(q)
+
+        response = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        for key, row in rows.iteritems():
+            
+            link = response.idrefs.add()
+
+            idref= response.CreateObject(IDREF_TYPE)
+            idref.key = row[REPOSITORY_KEY]
+            idref.branch = row[BRANCH_NAME]
+
+            link.SetLink(idref)
+
+        yield self.reply_ok(msg, response)
+
+
 
 
 class AssociationServiceClient(ServiceClient):
@@ -604,6 +640,15 @@ class AssociationServiceClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('get_association', msg)
 
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations', msg)
+
+        defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def association_exists(self, msg):

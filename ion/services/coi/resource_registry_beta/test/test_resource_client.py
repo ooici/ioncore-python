@@ -26,6 +26,9 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, ANONYMOUS_USER_ID
+
+
 
 from ion.core.data import store
 
@@ -346,7 +349,20 @@ class ResourceClientTest(IonTestCase):
             resource = yield self.rc.get_instance(value[ID_CFG])
             self.assertEqual(resource.ResourceName, value[NAME_CFG])
             #print resource
-            
+
+    '''
+    @defer.inlineCallbacks
+    def test_get_associated(self):
+
+        user_id = yield self.rc.get_instance(ANONYMOUS_USER_ID)
+
+        associations = yield self.rc.get_associations(subject=user_id)
+    '''
+        
+
+
+
+
 
 class ResourceInstanceTest(unittest.TestCase):
 

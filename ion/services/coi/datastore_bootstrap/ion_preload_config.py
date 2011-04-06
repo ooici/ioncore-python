@@ -196,8 +196,6 @@ ROOT_USER_ID = ION_IDENTITIES[root_name][ID_CFG]
 ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
 
 
-
-
 ##### Define Datasets and data sources #####:
 
 # Dataset names
@@ -317,6 +315,30 @@ class TypeMap(dict):
         '''
 
         return dict.get(self,key, DEFAULT_RESOURCE_TYPE_ID)
+
+
+
+class PredicateMap(dict):
+
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+        predicate_map = {}
+        for predicate_name, description in ION_PREDICATES.items():
+            preidcate_cfg = description.get(CONTENT_CFG)
+            obj_type_id = preidcate_cfg.get('object_identifier')
+            predicate_map[obj_type_id] = description.get(ID_CFG)
+
+        self.update(predicate_map)
+
+
+    def get(self, key):
+        '''
+        Get the resource type given an object type id #
+        '''
+
+        return dict.get(self,key, 'Unknown Predicate!')
+
 
 
 
