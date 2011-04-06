@@ -39,6 +39,7 @@ from ion.core.exception import ApplicationError
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
 from ion.services.dm.distribution.publisher_subscriber import Publisher
+from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
 
 
 from ion.core import ioninit
@@ -86,6 +87,8 @@ class EOIIngestionService(ServiceProcess):
 
         self.mc = MessageClient(proc=self)
 
+        self._pscclient = PubSubClient(proc=self)
+
         log.info('EOIIngestionService.__init__()')
 
     @defer.inlineCallbacks
@@ -130,6 +133,29 @@ class EOIIngestionService(ServiceProcess):
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
         """
+
+        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
+        msg = yield self.mc.create_instance(XS_TYPE)
+
+        msg.exchange_space_name = 'swapmeet'
+
+        rc = yield self._pscclient.declare_exchange_space(msg)
+        #self._xs_id = rc.id_list[0]
+
+        msg = yield self.mc.create_instance(XP_TYPE)
+        msg.exchange_point_name = 'science_data'
+        msg.exchange_space_id = self._xs_id
+
+        rc = yield self._pscclient.declare_exchange_point(msg)
+        #self._xp_id = rc.id_list[0]
+
+        msg = yield self.mc.create_instance(TOPIC_TYPE)
+        msg.topic_name = content.dataset_id
+        msg.exchange_space_id = self._xs_id
+        msg.exchange_point_id = self._xp_id
+
+        rc = yield self._pscclient.declare_topic(msg)
+
         yield self.reply_ok(msg)
 
     class IngestSubscriber(Subscriber):
@@ -144,7 +170,7 @@ class EOIIngestionService(ServiceProcess):
     def _ingest_data_topic_valid(self, ingest_data_topic):
         """
         Determines if the ingestion data topic is a valid topic for ingestion.
-        The topic should have been registered via op_create_dataset_topics prior to 
+        The topic should have been registered via op_create_dataset_topics prior to
         ingestion.
         @TODO: this
         """
@@ -333,10 +359,18 @@ class EOIIngestionClient(ServiceClient):
         
 
         defer.returnValue(content)
-        
+
+    @defer.inlineCallbacks
+    def create_dataset_topics(self, msg):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('create_dataset_topics', msg)
+        defer.returnValue(content)
         
     @defer.inlineCallbacks
     def demo(self, ds_ingest_topic):
+        """
+        This is a temporary method used for testing.
+        """
         yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
 
         yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
