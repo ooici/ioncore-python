@@ -48,7 +48,12 @@ def start(container, starttype, app_definition, *args, **kwargs):
         print 'Import Dataset IDs from "ion.services.coi.datastore_bootstrap.ion_preload_config"'
         print '================================================================='
 
-        ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+        ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True,
+                                          'blobs': 'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
+                                          'commits': 'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                                          'username':'ooiuser',
+                                          'password':'oceans11'}
+                        }
 
 
     resource_proc = [
