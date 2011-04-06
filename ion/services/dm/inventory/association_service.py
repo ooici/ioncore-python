@@ -33,6 +33,10 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16, version=1)
 PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
+ASSOCIATION_QUERY_MSG_TYPE = object_utils.create_type_identifier(object_id=27, version=1)
+BOOL_MSG_TYPE = object_utils.create_type_identifier(object_id=30, version=1)
+
+
 QUERY_RESULT_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
@@ -86,6 +90,9 @@ class AssociationService(ServiceProcess):
 
         subjects = set()
 
+        # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+        subject_keys = set()
+
         first_pair = True
 
         for pair in predicate_object_query.pairs:
@@ -132,8 +139,7 @@ class AssociationService(ServiceProcess):
             # subject_pointers is the resulting set of pointers to the current state of the association subject
             subjects_pointers = set()
 
-            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
-            subject_keys = set()
+            current_keys = set()
             for key, row in rows.items():
 
 
@@ -142,6 +148,7 @@ class AssociationService(ServiceProcess):
                 if not first_pair and row[SUBJECT_KEY] not in subject_keys:
                     # The result we are looking for is an intersection operation. If this key is not here escape!
                     continue
+                current_keys.add(row[SUBJECT_KEY])
 
                 # Get the latest commits for the Subject_Key
                 subject_query = store.Query()
@@ -174,8 +181,10 @@ class AssociationService(ServiceProcess):
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
                 subjects = subjects_pointers
+                subject_keys.update(current_keys)
                 first_pair = False
             else:
+                subject_keys.intersection_update(current_keys)
                 subjects.intersection_update(subjects_pointers)
 
 
@@ -269,7 +278,7 @@ class AssociationService(ServiceProcess):
     def op_get_objects(self, subject_predicate_query, headers, msg):
         log.info('op_get_objects: ')
 
-        if subject_predicate_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
+        if subject_predicate_query.MessageType != SUBJECT_PREDICATE_QUERY_TYPE:
             raise AssociationServiceError('Unexpected type received \n %s' % str(subject_predicate_query), subject_predicate_query.ResponseCodes.BAD_REQUEST)
 
 
@@ -280,6 +289,9 @@ class AssociationService(ServiceProcess):
         objects = set()
 
         first_pair = True
+
+        # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+        object_keys = set()
 
         for pair in subject_predicate_query.pairs:
 
@@ -302,13 +314,14 @@ class AssociationService(ServiceProcess):
             # subject_pointers is the resulting set of pointers to the current state of the association subject
             objects_pointers = set()
 
-            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
-            object_keys = set()
+            current_keys=set()
             for key, row in rows.items():
 
                 if not first_pair and row[OBJECT_KEY] not in object_keys:
                     # The result we are looking for is an intersection operation. If this key is not her escape!
                     continue
+
+                current_keys.add(row[OBJECT_KEY])
 
                 # Get the latest commits for the Subject_Key
                 object_query = store.Query()
@@ -330,7 +343,7 @@ class AssociationService(ServiceProcess):
                         # We do not need to determine ancestry - the branch name is the same!
 
                         # return the pointer to this commit - this is the latest version of the associated subject!
-                        totalkey = (row[SUBJECT_KEY] , row[OBJECT_BRANCH])
+                        totalkey = (row[OBJECT_KEY] , row[OBJECT_BRANCH])
 
                         # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
                         objects_pointers.add(totalkey)
@@ -341,11 +354,13 @@ class AssociationService(ServiceProcess):
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
                 objects = objects_pointers
+                object_keys.update(current_keys)
                 first_pair = False
             else:
+                object_keys.intersection_update(current_keys)
                 objects.intersection_update(objects_pointers)
 
-        log.info('Found %s objects!' % len(subjects))
+        log.info('Found %s objects!' % len(objects))
 
 
         list_of_objects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
@@ -386,7 +401,7 @@ class AssociationService(ServiceProcess):
         # Make a place to store the branches found for each association
         repo_branches={}
 
-        for key, row in rows:
+        for key, row in rows.items():
 
             branches = repo_branches.get(row[REPOSITORY_KEY],None)
             if branches is None:
@@ -398,13 +413,13 @@ class AssociationService(ServiceProcess):
             else:
                 branches.add(row[BRANCH_NAME])
 
+            if object_reference.IsFieldSet('branch') is True:
+                if  True and row[OBJECT_BRANCH] == object_reference.branch:
+                    pass
 
-            if row[OBJECT_BRANCH] == object_reference.branch:
-                pass
-
-            else:
-                # Get the objects commits and check in parents!
-                raise NotImplementedError('Branches in an association are not yet supported')
+                else:
+                    # Get the objects commits and check in parents!
+                    raise NotImplementedError('Branches in an association are not yet supported')
 
 
             link = list_of_associations.idrefs.add()
@@ -439,7 +454,7 @@ class AssociationService(ServiceProcess):
         # Make a place to store the branches found for each association
         repo_branches={}
 
-        for key, row in rows:
+        for key, row in rows.items():
 
             branches = repo_branches.get(row[REPOSITORY_KEY],None)
             if branches is None:
@@ -451,12 +466,14 @@ class AssociationService(ServiceProcess):
             else:
                 branches.add(row[BRANCH_NAME])
 
-            if row[SUBJECT_BRANCH] == subject_reference.branch:
-                pass
+            if subject_reference.IsFieldSet('branch') is True:
 
-            else:
-                # Get the objects commits and check in parents!
-                raise NotImplementedError('Branches in an association are not yet supported')
+                if row[SUBJECT_BRANCH] == subject_reference.branch:
+                    pass
+
+                else:
+                    # Get the objects commits and check in parents!
+                    raise NotImplementedError('Branches in an association are not yet supported')
 
 
             link = list_of_associations.idrefs.add()
@@ -468,6 +485,107 @@ class AssociationService(ServiceProcess):
             link.SetLink(idref)
 
         yield self.reply_ok(msg, list_of_associations)
+
+
+
+    @defer.inlineCallbacks
+    def op_get_association(self, association_query, headers, msg):
+        log.info('op_get_association: ')
+
+        rows = yield self._get_association(association_query)
+
+        if len(rows) == 1:
+
+            key, row = rows.popitem()
+            response = yield self.message_client.create_instance(IDREF_TYPE)
+            response.key = row[REPOSITORY_KEY]
+            response.branch = row[BRANCH_NAME]
+
+        elif len(rows)==0:
+
+            raise AssociationServiceError('No association found for the specified triple!', association_query.ResponseCodes.NOT_FOUND)
+
+        else:
+
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_association_exists(self, association_query, headers, msg):
+        log.info('op_association_exists: ')
+
+        rows = yield self._get_association(association_query)
+
+        response = yield self.message_client.create_instance(MessageContentTypeID=BOOL_MSG_TYPE)
+        if not rows:
+            response.result = False
+        elif len(rows)==1:
+            repsonse.result = True
+        else:
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+
+
+    def _get_association(self, association_query):
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        return self.index_store.query(q)
+
+
+    @defer.inlineCallbacks
+    def op_get_associations(self, association_query, headers, msg):
+        log.info('op_get_association: ')
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        if association_query.IsFieldSet('subject'):
+            q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        if association_query.IsFieldSet('predicate'):
+            q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        if association_query.IsFieldSet('object'):
+            q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        rows = yield self.index_store.query(q)
+
+        response = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        for key, row in rows.iteritems():
+            
+            link = response.idrefs.add()
+
+            idref= response.CreateObject(IDREF_TYPE)
+            idref.key = row[REPOSITORY_KEY]
+            idref.branch = row[BRANCH_NAME]
+
+            link.SetLink(idref)
+
+        yield self.reply_ok(msg, response)
 
 
 
@@ -515,7 +633,30 @@ class AssociationServiceClient(ServiceClient):
 
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def get_association(self, msg):
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('get_association', msg)
+
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations', msg)
+
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def association_exists(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('association_exists', msg)
+
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AssociationService)
