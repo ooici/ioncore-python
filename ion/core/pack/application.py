@@ -55,6 +55,20 @@ class AppLoader(object):
         if app_args and type(modkwargs) is dict and type(app_args) is dict:
             modkwargs.update(app_args)
 
+        # Look for command line arguments for this app
+        startup_app_args = ioninit.cont_args.get("apparg_" + appdef.name, None)
+        if startup_app_args:
+            if type(startup_app_args) is dict:
+                modkwargs.update(startup_app_args)
+            elif type(startup_app_args) is str and startup_app_args.startswith('{'):
+                try:
+                    # Evaluate args and expect they are dict as str
+                    evargs = eval(startup_app_args)
+                    if type(evargs) is dict:
+                        modkwargs.update(evargs)
+                except Exception, ex:
+                    log.warn('Invalid argument format: %s' % str(ex))
+
         appmod = namedAny(modname)
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
