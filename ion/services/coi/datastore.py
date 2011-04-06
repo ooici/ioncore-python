@@ -776,16 +776,6 @@ class DataStoreService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-#    @defer.inlineCallbacks
-#    def op_get_preloaded_datasets_dict(self, content, headers, msg):
-#        log.info("<<<---@@@ DataStoreService: Incoming call to op_get_preloaded_datasets_dict()")
-#        log.debug('DataStoreService.op_get_preloaded_datasets_dict(): returning the preloaded datasets dictionary')
-##        return self.preloaded_datasets_dict
-#        log.info("@@@--->>> DataStoreService: Sending preloaded datasets dictionary to sender")
-#        res = yield self.reply_ok(msg, self.preloaded_datasets_dict)
-##        defer.returnValue(res)
-
-
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
     type_map = TypeMap()
