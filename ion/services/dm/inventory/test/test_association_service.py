@@ -670,8 +670,8 @@ class AssociationServiceTest(IonTestCase):
         # make the request
         result = yield self.asc.get_association(request)
         self.assertEqual(result.MessageType, IDREF_TYPE)
-        self.assertEqual(result.key, assoc.repository_key)
-        self.assertEqual(result.branch, assoc.current_branch_key())
+        self.assertEqual(result.key, assoc.Repository.repository_key)
+        self.assertEqual(result.branch, assoc.Repository.current_branch_key())
 
     def test_get_association_none(self):
 
