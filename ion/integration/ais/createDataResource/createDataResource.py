@@ -22,6 +22,16 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.object import object_utils
 
+from ion.services.dm.distribution.pubsub_service import PubSubClient, \
+                                                        REQUEST_TYPE, \
+                                                        REGEX_TYPE, \
+                                                        XP_TYPE, \
+                                                        XS_TYPE, \
+                                                        PUBLISHER_TYPE, \
+                                                        SUBSCRIBER_TYPE, \
+                                                        QUEUE_TYPE, \
+                                                        TOPIC_TYPE, \
+                                                        BINDING_TYPE
 
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
@@ -112,9 +122,10 @@ class CreateDataResource(object):
 
     def __init__(self, ais):
         log.debug('CreateDataResource.__init__()')
-        self.mc = ais.mc
-        self.rc = ais.rc
-        self.dscc = DatasetControllerClient(proc=ais)
+        self.mc    = ais.mc
+        self.rc    = ais.rc
+        self.dscc  = DatasetControllerClient(proc=ais)
+        self.psc   = PubSubClient(proc=ais)
 
 
     @defer.inlineCallbacks
@@ -183,7 +194,7 @@ class CreateDataResource(object):
         association_resource  = None
 
         try:
-            # Check only the type recieved and linked object types. All fields are
+            # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != CREATE_DATA_RESOURCE_REQ_TYPE:
                 errtext = "CreateDataResource.createDataResource(): " + \
@@ -207,7 +218,16 @@ class CreateDataResource(object):
             # next line could also be self.rc.reference_instance(datasrc_resource).key
             my_dataset_id = dataset_resource.key
 
-            #FIXME, create topics!
+            # create topics
+            pubmsg = yield self.create_message(TOPIC_TYPE)
+            # HARD CODED as per Paul Hubbard, 3/17/11
+            pubmsg.exchange_space_id = 'swapmeet'
+            pubmsg.exchange_point_id = 'science_data'
+            pubmsg.topic_name = my_datasrc_id
+            
+            topic_id = yield self.psc.declare_topic(msg)
+
+            
 
             #FIXME, associate them!
             #association_id = somepartof self.rc.create_association(subject, predicate, object)
