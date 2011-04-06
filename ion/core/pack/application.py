@@ -25,9 +25,6 @@ from ion.core.exception import ConfigurationError, FatalError, StartupError
 from ion.core.ioninit import ion_config
 from ion.util.config import Config
 
-CONF = ioninit.config(__name__)
-CF_app_dir_path = CONF['app_dir_path']
-
 START_PERMANENT = "permanent"
 
 class AppLoader(object):
@@ -48,7 +45,7 @@ class AppLoader(object):
 
     @classmethod
     @defer.inlineCallbacks
-    def start_application(cls, container, appdef, app_manager=None):
+    def start_application(cls, container, appdef, app_manager=None, app_config=None):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
 
@@ -60,7 +57,7 @@ class AppLoader(object):
             raise ConfigurationError("App module malformed")
 
         # @todo The backward reference to the app_manager is not nice at all
-        
+
         # Load dependent apps
         #if appdef.applications and app_manager:
         #    if type(appdef.applications) in (list, tuple):
@@ -85,10 +82,18 @@ class AppLoader(object):
         # Overriding ion configuration with config entries
         if appdef.config:
             if type(appdef.config) is dict:
-                log.debug("Applying app %s configuration" % appdef.name)
+                log.debug("Applying app '%s' configuration" % appdef.name)
                 ion_config.update(appdef.config)
             else:
-                raise ConfigurationError("Application %s app config not a dict: %s" %(
+                raise ConfigurationError("Application '%s' app config not a dict: %s" %(
+                    appdef.name, type(appdef.config)))
+
+        if app_config:
+            if type(app_config) is dict:
+                log.debug("Overriding app '%s' configuration" % appdef.name)
+                ion_config.update(app_config)
+            else:
+                log.warn("Application '%s' app config not a dict: %s" %(
                     appdef.name, type(appdef.config)))
 
         log.debug("Application '%s' starting" % appdef.name)

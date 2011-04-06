@@ -169,9 +169,9 @@ class Container(BasicLifecycleObject):
     # App management, handled by AppManager
     def start_app(self, *args, **kwargs):
         return self.app_manager.start_app(*args, **kwargs)
-
-    def start_rel(self, rel_filename):
-        pass
+    # Release management, handled by AppManager
+    def start_rel(self, *args, **kwargs):
+        return self.app_manager.start_rel(*args, **kwargs)
 
     # Container Events
 

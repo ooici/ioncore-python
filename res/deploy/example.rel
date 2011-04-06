@@ -1,0 +1,13 @@
+# Example Python Capability Container release
+{
+    "type":"release",
+    "name":"ExampleRel",
+    "version": "0.1",
+    "description": "ION Example Container deployment release",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'mult':True},
+    ]
+}
