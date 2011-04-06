@@ -52,28 +52,28 @@ AIS_DATASET_METADATA_TYPE = object_utils.create_type_identifier(object_id=9021, 
 message AisDatasetMetadata {
    enum _MessageTypeIdentifier {
        _ID = 9021;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    optional string user_ooi_id      = 1;
-   optional string data_resource_id = 2; 
-   optional string title            = 3; 
+   optional string data_resource_id = 2;
+   optional string title            = 3;
    optional string institution      = 4;
-   optional string source           = 5; 
-   optional string references       = 6; 
-   optional string conventions      = 7; 
-   optional string summary          = 8; 
-   optional string comment          = 9; 
-   optional string ion_time_coverage_start = 10; 
-   optional string ion_time_coverage_end   = 11; 
-   optional double ion_geospatial_lat_min  = 12; 
-   optional double ion_geospatial_lat_max  = 13; 
-   optional double ion_geospatial_lon_min  = 14; 
-   optional double ion_geospatial_lon_max  = 15; 
-   optional double ion_geospatial_vertical_min      = 16; 
-   optional double ion_geospatial_vertical_max      = 17; 
+   optional string source           = 5;
+   optional string references       = 6;
+   optional string conventions      = 7;
+   optional string summary          = 8;
+   optional string comment          = 9;
+   optional string ion_time_coverage_start = 10;
+   optional string ion_time_coverage_end   = 11;
+   optional double ion_geospatial_lat_min  = 12;
+   optional double ion_geospatial_lat_max  = 13;
+   optional double ion_geospatial_lon_min  = 14;
+   optional double ion_geospatial_lon_max  = 15;
+   optional double ion_geospatial_vertical_min      = 16;
+   optional double ion_geospatial_vertical_max      = 17;
    optional string ion_geospatial_vertical_positive = 18;
-   
+
 }
 """
 
@@ -82,9 +82,9 @@ AIS_DATASOURCE_METADATA_TYPE = object_utils.create_type_identifier(object_id=902
 message AisDatasourceMetadata {
    enum _MessageTypeIdentifier {
        _ID = 9022;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
-   
+
    optional net.ooici.services.sa.SourceType source_type = 1;
    repeated string property   = 2;
    repeated string station_id = 3;
@@ -114,14 +114,14 @@ AIS_DATA_VARIABLE_TYPE = object_utils.create_type_identifier(object_id=9023, ver
 message AisDataVariableType {
    enum _MessageTypeIdentifier {
        _ID = 9023;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
-   optional string units         = 1; 
-   optional string standard_name = 2; 
+   optional string units         = 1;
+   optional string standard_name = 2;
    optional string long_name     = 3;
    repeated string other_attributes = 4;
-  
+
 }
 """
 
@@ -179,7 +179,7 @@ message GetDataResourceDetailRspMsg {
        _ID = 9034;
        _VERSION = 1;
    }
-   optional string data_resource_id = 1; 
+   optional string data_resource_id = 1;
    optional net.ooici.integration.ais.aisDataVariable.AisDataVariableType variable = 2;
    optional net.ooici.integration.ais.aisDataResourceMetadata.AisDatasourceMetadata source = 3;
 }
@@ -386,6 +386,35 @@ message DataResourceCreateUpdateResponse {
     enum _MessageTypeIdentifier {
         _ID = 9216;
         _VERSION = 1;
+    }
+
+    optional bool success = 1;
+}
+"""
+
+
+SUBSCRIBE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9203, version=1)
+"""
+message SubscriptionCreateReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9203;
+      _VERSION = 1;
+    }
+
+    // The message parameters object
+    optional string dispatcher_id  = 1;
+    optional string script_path    = 2;
+    optional string resource_id    = 3;
+
+}
+"""
+
+SUBSCRIBE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9204, version=1)
+"""
+message SubscriptionCreateRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9204;
+      _VERSION = 1;
     }
 
     optional bool success = 1;

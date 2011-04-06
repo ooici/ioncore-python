@@ -170,8 +170,9 @@ class CreateDataResource(object):
         @GPB{Input,9211,1}
         @GPB{Returns,9212,1}
         @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
-        log.info('CreateDataResource.createDataResource()\n')
         """
+        log.info('CreateDataResource.createDataResource()\n')
+
         my_datasrc_id      = None
         my_dataset_id      = None
         my_association_id  = None
