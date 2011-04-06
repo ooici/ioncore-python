@@ -35,7 +35,8 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
-                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
+                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
+                                                       GET_RESOURCES_OF_TYPE_REQUEST_TYPE
 
 
 # Create CDM Type Objects
@@ -595,6 +596,26 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('getResourceTypes returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResourceTypes returned:\n'+str(reply.message_parameters_reference[0]))
+
+    @defer.inlineCallbacks
+    def test_getResourcesOfType(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # create the getResourcesOfType request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourcesOfType request')
+        msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
+        #msg.message_parameters_reference.resource_type = "identities"
+        #msg.message_parameters_reference.resource_type = "topics"
+        msg.message_parameters_reference.resource_type = "datasets"
+        #msg.message_parameters_reference.resource_type = "datasources"
+        reply = yield self.aisc.getResourcesOfType(msg)
+        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):

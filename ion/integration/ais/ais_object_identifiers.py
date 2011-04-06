@@ -266,15 +266,65 @@ message RegisterIonUserResponse {
 """
 
 # ManageResources GPBs from ion-object-definitions/net/ooici/integration/ais/manageResources/manage_resources.proto
-RESOURCE_TYPES_LIST_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9301, version=1)
+GET_RESOURCE_TYPES_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9120, version=1)
 """
-message ResourceTypesListResponse {
+message GetResourceTypesResponse {
    enum _MessageTypeIdentifier {
-       _ID = 9301;
+       _ID = 9120;
        _VERSION = 1;
    }
 
-   repeated net.ooici.core.link.CASRef resourceTypesList = 1;
+   repeated net.ooici.core.link.CASRef resource_types_list = 1;
+}
+"""
+
+GET_RESOURCES_OF_TYPE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9121, version=1)
+"""
+message GetResourcesOfTypeRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9121;
+       _VERSION = 1;
+   }
+
+   optional string resource_type = 1;
+}
+"""
+
+NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9122, version=1)
+"""
+message NameValuePair {
+   enum _MessageTypeIdentifier {
+       _ID = 9122;
+       _VERSION = 1;
+   }
+
+   optional string name = 1;
+   optional string value = 2;
+}
+"""
+
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=9123, version=1)
+"""
+message Resource {
+   enum _MessageTypeIdentifier {
+       _ID = 9123;
+       _VERSION = 1;
+   }
+
+   repeated net.ooici.integration.ais.manageResources.NameValuePair resource_attribute = 1;
+}
+"""
+
+GET_RESOURCES_OF_TYPE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9124, version=1)
+"""
+message GetResourcesOfTypeResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9124;
+       _VERSION = 1;
+   }
+
+   repeated string column_names = 1;
+   repeated net.ooici.integration.ais.manageResources.Resource resources = 2;
 }
 """
 

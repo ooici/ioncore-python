@@ -157,6 +157,14 @@ class AppIntegrationService(ServiceProcess):
         response = yield worker.getResourceTypes(content);
         yield self.reply_ok(msg, response)
 
+    @defer.inlineCallbacks
+    def op_getResourcesOfType(self, content, headers, msg):
+        log.debug('op_getResourcesOfType: \n'+str(content))
+        worker = ManageResources(self)
+        log.debug('op_getResourcesOfType: calling worker')
+        response = yield worker.getResourcesOfType(content);
+        yield self.reply_ok(msg, response)
+
 
 class AppIntegrationServiceClient(ServiceClient):
     """
@@ -271,7 +279,15 @@ class AppIntegrationServiceClient(ServiceClient):
         yield self._check_init()
         log.debug("AIS_client.getResourceTypes: sending following message to getResourceTypes:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('getResourceTypes', message)
-        log.debug('AIS_client.getResourceTypes: Association Service reply:\n' + str(content))
+        log.debug('AIS_client.getResourceTypes: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+ 
+    @defer.inlineCallbacks
+    def getResourcesOfType(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('getResourcesOfType', message)
+        log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
