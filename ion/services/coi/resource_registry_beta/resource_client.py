@@ -62,7 +62,6 @@ class ResourceClient(ApplicationError):
 
 
 
-
     def __init__(self, proc=None, datastore_service='datastore'):
         """
         Initializes a process client
@@ -452,6 +451,9 @@ class ResourceInstance(object):
     """
     __metaclass__ = ResourceInstanceType
 
+    predicate_map = ion_preload_config.PredicateMap()
+
+
     # Life Cycle States
     NEW = 'New'
     ACTIVE = 'Active'
@@ -478,6 +480,9 @@ class ResourceInstance(object):
         object.__setattr__(self, '_repository', None)
 
         self._repository = resource_repository
+
+        self.ResourceAssociationsAsObject.update_predicate_map(predicate_map)
+        self.ResourceAssociationsAsSubject.update_predicate_map(predicate_map)
 
         # association list
         object.__setattr__(self, '_associations', {})

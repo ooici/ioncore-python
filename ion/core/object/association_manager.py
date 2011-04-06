@@ -54,14 +54,13 @@ class AssociationManager(object):
 
     def __str__(self):
 
-        ret = 'Association Manager Object! Current predicates:\n'
-        for k in self.predicate_sorted_associations.iterkeys():
+        ret = 'Association Manager Object! Current predicates and number of associations:\n'
+        for k, v in self.predicate_sorted_associations.iteritems():
             pred_name = k
             if k in self.predicate_map:
                 pred_name = self.predicate_map.get(k)
 
-            ret += str(pred_name) + '\n'
-
+            ret += 'Predicate Name: %s, Number of Associations: %s \n' % (str(pred_name), str(len(v)))
         ret += 'Association Manager complete.'
         return ret
 
@@ -78,6 +77,8 @@ class AssociationManager(object):
                 self.predicate_sorted_associations[k]=associations
 
             associations.update(v)
+
+        self.predicate_map.update(other.predicate_map)
 
     def add(self, association):
 
