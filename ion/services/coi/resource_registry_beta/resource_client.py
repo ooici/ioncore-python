@@ -267,8 +267,8 @@ class ResourceClient(ApplicationError):
 
             # Check to make sure they are valid resource instances
             for instance in instances:
-                if not isinstance(instance, ResourceInstance):
-                    raise ResourceClientError('Invalid object in list of instances argument to put_resource_transaction. Must be a Resource Instance, received: "%s"' % str(instance))
+                if not hasattr(instance, 'Repository'):
+                    raise ResourceClientError('Invalid object in list of instances argument to put_resource_transaction. Must be an Instance, received: "%s"' % str(instance))
         else:
             raise ResourceClientError('Invalid argument to put_resource_transaction: instances must be a resource instance or a list of them')
 
