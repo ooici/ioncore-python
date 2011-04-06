@@ -52,7 +52,11 @@ class PST(IonTestCase):
                 'module':'ion.services.coi.exchange.exchange_management',
                 'class':'ExchangeManagementService',
             },
-
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
+            },
             ]
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
@@ -210,6 +214,16 @@ class PST(IonTestCase):
         msg.regex = '.+'
 
         topic_list = yield self.psc.query_topics(msg)
+
+        self.failUnless(len(topic_list.id_list) >= 1)
+
+    @defer.inlineCallbacks
+    def test_new_topic_query(self):
+        yield self._declare_topic()
+        msg = yield self.create_message(REGEX_TYPE)
+        msg.regex = '.+'
+        topic_list = yield self.psc.new_query_topics(msg)
+        log.debug(topic_list.id_list[0])
 
         self.failUnless(len(topic_list.id_list) >= 1)
 
