@@ -22,18 +22,6 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.object import object_utils
 
-from ion.services.dm.distribution.pubsub_service import PubSubClient, \
-                                                        REQUEST_TYPE, \
-                                                        REGEX_TYPE, \
-                                                        XP_TYPE, \
-                                                        XS_TYPE, \
-                                                        PUBLISHER_TYPE, \
-                                                        SUBSCRIBER_TYPE, \
-                                                        QUEUE_TYPE, \
-                                                        TOPIC_TYPE, \
-                                                        BINDING_TYPE
-
-
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
@@ -41,7 +29,6 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
                                                        CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE
-
 
 
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
@@ -219,11 +206,16 @@ class CreateDataResource(object):
             my_dataset_id = dataset_resource.key
 
             # create topics
-            pubmsg = yield self.create_message(TOPIC_TYPE)
-            # HARD CODED as per Paul Hubbard, 3/17/11
-            pubmsg.exchange_space_id = 'swapmeet'
-            pubmsg.exchange_point_id = 'science_data'
-            pubmsg.topic_name = my_datasrc_id
+            # call EOI: create_dataset_topics ( tim laroque or dave )
+
+            # call the scheduler service client
+            #
+            # interval_seconds=uint64, start_time, end_time, origin=string, payload
+            # response is UUID + origin
+            # 
+            # payload is the UpdateEvent, which contains the dataset id
+            # target is the DS update topic
+
             
             topic_id = yield self.psc.declare_topic(msg)
 
