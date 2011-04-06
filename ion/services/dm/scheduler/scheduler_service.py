@@ -156,7 +156,7 @@ class SchedulerService(ServiceProcess):
 
 
         #FIXME, generate origin if desired_origin was not provided
-        if not content.HasField('desired_origin'):
+        if not content.IsFieldSet('desired_origin'):
             log.debug('FIXME, generate an origin because one was not provided')
             content.desired_origin = 'SOMEONE PLEASE FIXME' + str(uuid4())
 
@@ -213,9 +213,10 @@ class SchedulerService(ServiceProcess):
         log.debug(tlist)
 
         resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
-
-
-        self.reply_ok(msg,  {'value': tlist})
+        for t in tlist:
+            resp.task_ids.add(t)
+        
+        self.reply_ok(msg, resp)
 
     ##################################################
     # Internal methods
@@ -232,9 +233,9 @@ class SchedulerService(ServiceProcess):
             log.info('Task ID missing in store, assuming removal and aborting')
             return
 
-        payload = tdef['payload']
-        target_id = tdef['target']
-        interval = tdef['interval']
+        payload    = tdef.payload
+        target_id  = tdef.desired_origin
+        interval   = tdef.interval_seconds
 
         log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
         yield self.send(target_id, 'scheduler', payload)

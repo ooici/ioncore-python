@@ -9,6 +9,8 @@
 
 from twisted.internet import defer
 
+from ion.core.process.process import Process
+from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 from ion.services.dm.scheduler.test.receiver import STClient
@@ -44,6 +46,8 @@ class SchedulerTest(IonTestCase):
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
 
+        self.proc = Process()
+
         # Look up the address of the test receiver by name
         sptid = yield self._get_procid('scheduled_task')
         self.dest = str(sptid)
@@ -52,6 +56,8 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     def test_service_init(self):
@@ -60,44 +66,20 @@ class SchedulerTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def _add(self, origin, interval, payload):
-        mc = MessageClient(proc=self.sup)
-
-        msg_a = yield self.mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = self.dest
-        msg_a.interval_seconds  = 3
-        msg_a.payload           = 'pingtest bar'
-
-        return yield sc.add_task(msg_a)
-    
-    @defer.inlineCallbacks
-    def _rm(self, task_id):
-        mc = MessageClient(proc=self.sup)
-
-        msg_r = yield self.mc.create_instance(RMTASK_REQ_TYPE)
-        msg_r.task_id = task_id
-
-        return yield sc.rm_task(msg_r)
-    
-    @defer.inlineCallbacks
-    def _query(self, regex):
-        mc = MessageClient(proc=self.sup)
-
-        msg_q = yield self.mc.create_instance(QUERYTASK_REQ_TYPE)
-        msg_q.task_regex = regex
-
-        return yield self.query_task(msg_q)
-
-    @defer.inlineCallbacks
     def test_complete_usecase(self):
         """
         Add a task, get a message, remove same.
         """
         # Create clients
-        mc = MessageClient(proc=self.sup)
         sc = SchedulerServiceClient(proc=self.sup)
+        mc = self.proc.message_client
 
-        resp_msg = self._add(self.dest, 3, 'pingtest_bar')
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = self.dest
+        msg_a.interval_seconds  = 3
+        msg_a.payload           = 'pingtest bar'
+
+        resp_msg = yield sc.add_task(msg_a)
 
         log.debug(resp_msg.task_id)
         self.failIf(resp_msg.task_id is None)
@@ -108,7 +90,12 @@ class SchedulerTest(IonTestCase):
         mc = yield self.client.get_count()
         self.failUnless(int(mc['value']) >= 1)
 
-        rc = self._rm(resp_msg.task_id)
+        
+        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+        msg_r.task_id = resp_msg.task_id
+
+        rc = yield sc.rm_task(msg_r)
+
         self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)
 
@@ -118,9 +105,19 @@ class SchedulerTest(IonTestCase):
         mc = MessageClient(proc=self.sup)
         sc = SchedulerServiceClient(proc=self.sup)
 
-        resp_msg = self._add(self.dest, 10, 'pingtest_foo')
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = self.dest
+        msg_a.interval_seconds  = 10
+        msg_a.payload           = 'pingtest_foo'
 
-        rc = self._rm(resp_msg.task_id)
+        resp_msg = yield sc.add_task(msg_a)
+
+        
+        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+        msg_r.task_id = resp_msg.task_id
+
+        rc = yield sc.rm_task(msg_r)
+
         self.failUnlessEqual(rc.value, 'OK')
         log.debug(rc)
 
@@ -130,10 +127,18 @@ class SchedulerTest(IonTestCase):
         mc = MessageClient(proc=self.sup)
         sc = SchedulerServiceClient(proc=self.sup)
 
-        self._add(self.dest, 1, 'baz')
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = self.dest
+        msg_a.interval_seconds  = 1
+        msg_a.payload           = 'baz'
 
-        msg_q = yield slef.mc.create_instance(QUERYTASK_REQ_TYPE)
+        yield sc.add_task(msg_a)
+
+
+
+        msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
         msg_q.task_regex = '.+'
+
         rl = yield sc.query_tasks(msg_q)
 
         #FIXME... also, why is this equal to 2 and not 1?
@@ -146,11 +151,26 @@ class SchedulerTest(IonTestCase):
         mc = MessageClient(proc=self.sup)
         sc = SchedulerServiceClient(proc=self.sup)
 
-        resp_msg = self._add(self.dest, 1, 'pingtest')
 
-        yield sc.rm_task(resp_msg.task_id)
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = self.dest
+        msg_a.interval_seconds  = 1
+        msg_a.payload           = 'pingtest'
+
+        resp_msg = yield sc.add_task(msg_a)
+
         
-        rl = yield sc.query_tasks(task_id)
+        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+        msg_r.task_id = resp_msg.task_id
+
+        rc = yield sc.rm_task(msg_r)
+        
+
+        msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
+        msg_q.task_regex = msg_r.task_id
+
+        rl = yield sc.query_task(msg_q)
+
         
         log.debug(rl)
         self.failUnlessEqual(len(rl['value']), 0)
