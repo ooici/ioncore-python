@@ -76,7 +76,7 @@ class SchedulerTest(IonTestCase):
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = self.dest
-        msg_a.interval_seconds  = 3
+        msg_a.interval_seconds  = 1
         msg_a.payload           = 'pingtest bar'
 
         resp_msg = yield sc.add_task(msg_a)
@@ -86,9 +86,9 @@ class SchedulerTest(IonTestCase):
         #fixme: also fail if we don't get GPB #2602 back
 
         # Wait for a message to go through the system
-        yield asleep(5)
-        mc = yield self.client.get_count()
-        self.failUnless(int(mc['value']) >= 1)
+        yield asleep(2)
+        cc = yield self.client.get_count()
+        self.failUnless(int(cc['value']) >= 1)
 
         
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
@@ -141,9 +141,7 @@ class SchedulerTest(IonTestCase):
 
         rl = yield sc.query_tasks(msg_q)
 
-        #FIXME... also, why is this equal to 2 and not 1?
-        self.failUnless(len(rl['value']) == 2)
-        self.failUnlessSubstring(str(task_id), str(rl['value']))
+        self.failUnless(len(rl.task_ids) == 1)
 
     @defer.inlineCallbacks
     def test_rm(self):
@@ -169,9 +167,9 @@ class SchedulerTest(IonTestCase):
         msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
         msg_q.task_regex = msg_r.task_id
 
-        rl = yield sc.query_task(msg_q)
+        rl = yield sc.query_tasks(msg_q)
 
         
         log.debug(rl)
-        self.failUnlessEqual(len(rl['value']), 0)
+        self.failUnlessEqual(len(rl.task_ids), 0)
         yield asleep(0.5)

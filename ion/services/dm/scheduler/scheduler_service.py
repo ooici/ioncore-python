@@ -118,7 +118,8 @@ class SchedulerService(ServiceProcess):
 
     def slc_init(self):
         # @note Might want to start another AS instance with a different target name
-        self.store = AttributeStoreClient(targetname='attributestore')
+        #self.store = AttributeStoreClient(targetname='attributestore')
+        self.scheduled_events = {}
         self.mc = MessageClient(proc=self)
 
     def slc_stop(self):
@@ -162,14 +163,12 @@ class SchedulerService(ServiceProcess):
 
         #create the response: task_id and actual origin
         resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
-        resp.task_id = task_id
-        resp.origin = content.desired_origin
+        resp.task_id  = task_id
+        resp.origin   = content.desired_origin
 
-        # Just drop the entire message payload in
-        rc = yield self.store.put(task_id, msg)
-        if re.search('rror', rc):
-            yield self.reply_err(msg, 'Error "%s" adding task to registry!' % rc)
-            return
+
+        self.scheduled_events[task_id] = content
+
 
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
@@ -194,7 +193,7 @@ class SchedulerService(ServiceProcess):
             return
 
         log.debug('Removing task_id %s from store...' % task_id)
-        yield self.store.remove(task_id)
+        del self.scheduled_events[task_id]
 
         resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
         resp.value = 'OK'
@@ -207,15 +206,14 @@ class SchedulerService(ServiceProcess):
         """
         Query tasks registered, returns a maybe-empty list
         """
+        resp = yield self.mc.create_instance(QUERYTASK_RSP_TYPE)
+
         log.debug('Looking for matching tasks')
-        tlist = yield self.store.query(content.task_regex)
+        for task_id, _ in self.scheduled_events.iteritems():
+            if not re.search(content.task_regex, task_id) is None:
+                log.debug("found " + task_id)
+                resp.task_ids.append(task_id)
 
-        log.debug(tlist)
-
-        resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
-        for t in tlist:
-            resp.task_ids.add(t)
-        
         self.reply_ok(msg, resp)
 
     ##################################################
@@ -228,20 +226,19 @@ class SchedulerService(ServiceProcess):
         and should abort the run.
         """
         log.debug('Worker activated for task %s' % task_id)
-        tdef = yield self.store.get(task_id)
-        if tdef is None:
+
+        try:
+            tdef = self.scheduled_events[task_id]
+        except KeyError, ke:
             log.info('Task ID missing in store, assuming removal and aborting')
             return
 
-        payload    = tdef.payload
-        target_id  = tdef.desired_origin
-        interval   = tdef.interval_seconds
-
-        log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
-        yield self.send(target_id, 'scheduler', payload)
+        log.debug('Time to send "%s" to "%s", id "%s"' % \
+                      (tdef.payload, tdef.desired_origin, task_id))
+        yield self.send(tdef.desired_origin, 'scheduler', tdef.payload)
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        reactor.callLater(interval, self._send_and_reschedule, task_id)
+        reactor.callLater(tdef.interval_seconds, self._send_and_reschedule, task_id)
 
         """
         Update last-invoked timestamp in registry
@@ -252,7 +249,7 @@ class SchedulerService(ServiceProcess):
 #        tdef['last_run'] = time.time()
 #        self.store.put(task_id, tdef)
         """
-        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
+        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef.interval_seconds))
 
 class SchedulerServiceClient(ServiceClient):
     """
@@ -274,8 +271,7 @@ class SchedulerServiceClient(ServiceClient):
         @retval Task ID and origin
         """
         yield self._check_init()
-
-        ret = yield self.rpc_send('add_task', msg)
+        (ret, heads, message) = yield self.rpc_send('add_task', msg)
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
@@ -290,9 +286,7 @@ class SchedulerServiceClient(ServiceClient):
         """
         #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
-
-
-        ret = yield self.rpc_send('rm_task', msg)
+        (ret, heads, message) = yield self.rpc_send('rm_task', msg)
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
@@ -305,7 +299,7 @@ class SchedulerServiceClient(ServiceClient):
         @retval GPB containing a list, possibly zero-length.
         """
         yield self._check_init()
-        ret = yield self.rpc_send('query_tasks', msg)
+        (ret, heads, message) = yield self.rpc_send('query_tasks', msg)
         defer.returnValue(ret)
 
 # Spawn of the process using the module name
