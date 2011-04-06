@@ -6,8 +6,8 @@
     "description": "ION Example Container deployment release",
     "ioncore" : "0.1",
     "apps":[
-        ('ccagent', '0.1', {'hello':'one'}),
-        ('example', '0.1', {'hello':'one'}),
-        ('example', '0.1', {'hello':'one'}),
+        {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'mult':True},
     ]
 }

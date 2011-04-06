@@ -90,7 +90,13 @@ class AppManager(BasicLifecycleObject):
             raise ConfigurationError("Release config apps entry malformed: %s" % reldef.apps)
 
         for app_def in reldef.apps:
-            (app_name, app_ver, app_config) = app_def
+            if not type(app_def) is dict:
+                raise ConfigurationError("Release app config entry malformed: %s" % app_def)
+
+            app_name = app_def.get('name', None)
+            app_ver = app_def.get('version', None)
+            app_config = app_def.get('config', None)
+            mult = app_def.get('mult', False)
 
             if app_config and not type(app_config) is dict:
                 raise ConfigurationError("Release app config entry malformed: %s" % app_def)
@@ -98,15 +104,15 @@ class AppManager(BasicLifecycleObject):
             yield self.start_app(None,
                                  app_name=app_name,
                                  app_version=app_ver,
-                                 app_config=app_config)
+                                 app_config=app_config,
+                                 start_mult=mult)
 
-    def start_app(self, app_filename, app_name=None, app_version=None, app_config=None):
+    def start_app(self, app_filename, app_name=None, app_version=None, app_config=None, start_mult=False):
         """
         @brief Start a Capability Container application from an .app file.
         @see OTP design principles, applications
         @retval Deferred
         """
-
         # Generate path to app file from app name
         if app_name is not None and app_filename is None:
             app_filename = "%s/%s.app" % (CF_app_dir_path, app_name)
@@ -119,7 +125,7 @@ class AppManager(BasicLifecycleObject):
                     app_filename))
 
         appdef = AppLoader.load_app_definition(app_filename)
-        if (self.is_app_started(appdef.name)):
+        if not start_mult and (self.is_app_started(appdef.name)):
             log.warn("Application '%s' already started" % appdef.name)
             return
 
