@@ -15,7 +15,10 @@
                 border-bottom: 1px solid black;
                 padding: 10px;
                 height: 30px;
-            }   
+            }
+            .right {
+                float: right;
+            }
             div.recv {
                 float: left;
                 width: 48%;
@@ -50,17 +53,30 @@
     </head>
     <body>
         <div id='header'>
-            <input type="button" id="stopupdates" value="Stop" />
-            <input type="button" id="regsub" value="Create Resource Lifecycle Event Subscriber" />
-            <input type="button" id="getdata" value="Get Data" />
+            <input type="button" id="toggleupdates" value="Stop" />
+            <span class="right">
+                <select id="subtype">
+                    <option value="1001">Resource Lifecycle</option>
+                    <option value="1051">Container Lifecycle</option>
+                    <option value="1052">Process Lifecycle</option>
+                    <option value="1101">Datasource Update</option>
+                    <option value="1111">Dataset Modification</option>
+                    <option value="1201">Subscription New/Mod</option>
+                    <option value="2001">Schedule Event</option>
+                    <option value="3002">Error Log</option>
+                    <option value="3001">Critical Log</option>
+                </select>
+                <label for="origin">Origin:</label>
+                <input id="origin" value="*" />
+                <input type="button" id="regsub" value="Subscribe" />
+            </span>
         </div>
         <ul id="log"></ul>
     </body>
     <script type="text/javascript">
         var intervalID;
+        var gllasttime = '0';
         $(document).ready(function() { 
-
-            var timeoutid = null;
 
             function dowork(lasttime, callback)
             {
@@ -68,12 +84,14 @@
                 console.log("bout to request " + req);
 
                 $.getJSON(req, function(data) {
+                    gllasttime = data.lasttime;
                     intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
                     callback(data);
                 });
             }
 
-            dowork('0', function(data) {
+            function handledata(data)
+            {
                 console.log(data);
 
                 // find existing ul with name
@@ -89,9 +107,11 @@
                         el = $('<div/>', { 'id':curdata.subscription_id, 
                                            'class':'recv' });
                         dec = $('<span>' + curdata.subscription_id + '</span>').addClass('decorate');
+                        dec2 = $('<span>' + curdata.subscription_desc + '</span>').addClass('decorate');
                         ul = $('<ul/>');
 
                         dec.appendTo(el);
+                        dec2.appendTo(el);
                         ul.appendTo(el);
                         el.appendTo('body');
                     }
@@ -100,7 +120,7 @@
                     {
                         li = $('<li/>');
                         li.appendTo(ul);
-                        console.log(curdata.events[j]);
+                        //console.log(curdata.events[j]);
                         for (var k = 0; k < curdata.events[j].length; k++)
                         {
                             var cchild = curdata.events[j][k];
@@ -118,21 +138,34 @@
                         }
                     }
                 }
-            });
+            }
 
-            $('input#stopupdates').click(function() { 
-                window.clearTimeout(intervalID);
+            dowork(gllasttime, handledata);
+
+            $('input#toggleupdates').click(function() {
+                if ($(this).attr('value') == "Stop")
+                {
+                    window.clearTimeout(intervalID);
+                    $(this).attr('value', 'Start');
+                }
+                else
+                {
+                    dowork(gllasttime, handledata);
+                    $(this).attr('value', 'Stop');
+                }
+                    
             });
 
             $('input#regsub').click(function() {
-                $.getJSON('/ctl/sub/1001', function(data) {
-                    console.log(data);
-                });
-            });
+                event_id = $('#subtype').val();
+                origin = $('#origin').val();
 
-            $('input#getdata').click(function() {
-                dowork('0', function(data) {
-                    console.log(data)
+                poststr = event_id
+                if (origin != "*")
+                    poststr = poststr + '/' + origin
+
+                $.getJSON('/ctl/sub/' + poststr, function(data) {
+                    console.log(data);
                 });
             });
 
