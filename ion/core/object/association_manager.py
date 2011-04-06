@@ -199,6 +199,10 @@ class AssociationInstance(object):
             previous_predicate_repository.associations_as_predicate.add(self)
 
 
+    @property
+    def AssociationIdentity(self):
+        return self._repository.repository_key
+
 
     @property
     def Repository(self):

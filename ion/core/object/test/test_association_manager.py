@@ -74,6 +74,9 @@ class AssociationInstanceTest(unittest.TestCase):
         predicate_repo = self.wb.get_repository(self.association.PredicateReference.key)
         self.assertEqual(predicate_repo, self.predicate )
 
+        association_repo = self.wb.get_repository(self.association.AssociationIdentity)
+        self.assertNotEqual(association_repo, None)
+
 
 
     def test_in_managers(self):
