@@ -140,7 +140,7 @@ class PST(IonTestCase):
         self.failUnless(len(xs_id.id_list) > 0)
         log.debug('exchange declared')
         msg = yield self.create_message(REGEX_TYPE)
-        msg.regex = self.xs_name
+        msg.regex = '.+'
 
         log.debug('querying now')
         idlist = yield self.psc.query_exchange_spaces(msg)

@@ -27,13 +27,17 @@ from ion.services.coi.exchange.exchange_management import ExchangeManagementClie
 
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, TOPIC_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
+    TOPIC_RESOURCE_TYPE_ID, EXCHANGE_SPACE_RES_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID, \
+    PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID
 
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 # References to protobuf message/object definitions
+XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
 PUBLISHER_TYPE = object_utils.create_type_identifier(object_id=2310, version=1)
 SUBSCRIBER_TYPE = object_utils.create_type_identifier(object_id=2311, version=1)
@@ -48,8 +52,6 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 # Query and response types
 REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
-XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
-XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 
 # Resource GPB objects
 XS_RES_TYPE = object_utils.create_type_identifier(object_id=2315, version=1)
@@ -152,36 +154,34 @@ class PubSubService(ServiceProcess):
         return self.rclient.reference_instance(object)
 
     @defer.inlineCallbacks
-    def _do_topic_registry_query(self, request, msg):
+    def _do_registry_query(self, request, msg, resource_typedef):
         """
-        @brief Query resource registry for specified stuff.
-        Blah blah blah.
-        @note For now, hardwired for topics
-        @note This is Stuebe magic. You (and I) are not expected to understand it.
-        @See https://github.com/ooici/ioncore-python/blob/develop/ion/services/coi/datastore_bootstrap/ion_preload_config.py#L59
+        @brief Query registry, apply regex to result, send results back
+        @param request GPB with regex field
+        @param msg Message provides context for reply_ok
+        @param resource_typedef Stuebe magic field to denote what we're listing
+        @retval None, sends reply off via reply_ok or reply_error
         """
-        log.debug('_DTRQ starting')
-
+        log.debug('registry query stirs the surface of the lake')
         query = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
         pair = query.pairs.add()
 
         log.debug('creating object')
         pred_ref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
         pred_ref.key = TYPE_OF_ID
-
         pair.predicate = pred_ref
 
         log.debug('creating idref')
         type_ref = query.CreateObject(IDREF_TYPE)
-        type_ref.key = TOPIC_RESOURCE_TYPE_ID
+        type_ref.key = resource_typedef
 
         pair.object = type_ref
 
         log.debug('sending off the query')
         result = yield self.asc.get_subjects(query)
 
-        # @todo Filtering here and not in the registry performs more slowly
-        log.debug('regex filtering')
+        # @todo Filtering here and not in the registry performs more slowly. Move to registry.
+        log.debug('regex filtering %d registry entries' % len(result.idrefs))
         idlist = []
         p = re.compile(request.regex)
         for cur_ref in result.idrefs:
@@ -189,41 +189,11 @@ class PubSubService(ServiceProcess):
                 idlist.append(cur_ref.key)
 
         response = yield self.mc.create_instance(IDLIST_TYPE)
-        response.MessageResponseCode = response.ResponseCodes.OK
 
         for cur_key in idlist:
             self._key_to_idref(cur_key, response)
-                                
-        log.debug('dtrq done')
-        yield self.reply_ok(msg, response)
 
-
-    @defer.inlineCallbacks
-    def _do_query(self, request, res_list, msg):
-        """
-        @brief Query internal dictionaries, create reply message, send same. Helper for the
-        various queries.
-        @param request Object containing a regex attribute
-        @param res_list Dictionary whose values we match against the regex
-        @param msg Ion message, with reply_ok method to invoke
-        @retval None
-        """
-        # This is probably better written as a list comprehension. Or something.
-        idlist = []
-        p = re.compile(request.regex)
-        for cur_key, cur_entry in res_list.iteritems():
-            if p.match(cur_entry):
-                idlist.append(cur_key)
-
-        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(idlist)))
-        response = yield self.mc.create_instance(IDLIST_TYPE)
-        response.MessageResponseCode = response.ResponseCodes.OK
-
-        # For each string in the dictionary, inflate into a casref/idref and add to message
-        for key in idlist:
-            self._key_to_idref(key, response)
-
-        log.debug('Query complete')
+        log.debug('dtrq done, %d results' % len(idlist))
         yield self.reply_ok(msg, response)
 
     def _reverse_find(self, data, search_value):
@@ -334,7 +304,7 @@ class PubSubService(ServiceProcess):
         self._check_msg_type(request, REGEX_TYPE)
 
         log.debug('Looking for XS entries...')
-        yield self._do_query(request, self.xs_list, msg)
+        yield self._do_registry_query(request, msg, EXCHANGE_SPACE_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_exchange_point(self, request, headers, msg):
@@ -431,7 +401,7 @@ class PubSubService(ServiceProcess):
                                request.ResponseCodes.BAD_REQUEST)
 
         # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.xp_list, msg)
+        yield self._do_registry_query(request, msg, EXCHANGE_POINT_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_topic(self, request, headers, msg):
@@ -522,7 +492,8 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message, regex missing',
                                request.ResponseCodes.BAD_REQUEST)
 
-        yield self._do_topic_registry_query(request, msg)
+
+        yield self._do_registry_query(request, msg, TOPIC_RESOURCE_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_publisher(self, request, headers, msg):
@@ -614,7 +585,7 @@ class PubSubService(ServiceProcess):
                                request.ResponseCodes.BAD_REQUEST)
 
         # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.pub_list, msg)
+        yield self._do_registry_query(request, msg, PUBLISHER_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_subscribe(self, request, headers, msg):
@@ -687,7 +658,7 @@ class PubSubService(ServiceProcess):
                                request.ResponseCodes.BAD_REQUEST)
 
         # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.sub_list, msg)
+        yield self._do_registry_query(request, msg, SUBSCRIBER_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_queue(self, request, headers, msg):
