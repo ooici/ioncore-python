@@ -139,7 +139,7 @@ class PubSubService(ServiceProcess):
         my_ref.key = key_string
         idx = len(object.id_list)
         object.id_list.add()
-        log.debug('Adding to index %d' % idx)
+        log.debug('Adding %s to index %d' % (key_string, idx))
         object.id_list[idx] = my_ref
 
     def _obj_to_ref(self, object):
@@ -157,6 +157,7 @@ class PubSubService(ServiceProcess):
         @brief Query resource registry for specified stuff.
         Blah blah blah.
         @note For now, hardwired for topics
+        @note This is Stuebe magic. You (and I) are not expected to understand it.
         @See https://github.com/ooici/ioncore-python/blob/develop/ion/services/coi/datastore_bootstrap/ion_preload_config.py#L59
         """
         log.debug('_DTRQ starting')
@@ -179,6 +180,7 @@ class PubSubService(ServiceProcess):
         log.debug('sending off the query')
         result = yield self.asc.get_subjects(query)
 
+        # @todo Filtering here and not in the registry performs more slowly
         log.debug('regex filtering')
         idlist = []
         p = re.compile(request.regex)
@@ -509,21 +511,6 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_query_topics(self, request, headers, msg):
-        """
-        @see PubSubClient.query_topics
-        """
-
-        log.debug('topic query starting')
-        # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
-        self._check_msg_type(request, REGEX_TYPE)
-        if not request.IsFieldSet('regex'):
-            raise PSSException('Bad message, regex missing',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        yield self._do_query(request, self.topic_list, msg)
-
-    @defer.inlineCallbacks
-    def op_new_query_topics(self, request, headers, msg):
         """
         @see PubSubClient.query_topics
         """
@@ -951,20 +938,6 @@ class PubSubClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('query_topics', params)
         defer.returnValue(content)
 
-    @defer.inlineCallbacks
-    def new_query_topics(self, params):
-        """
-        @brief List topics that match a regular expression
-        @param params GPB, 2306/1, with 'regex' filled in
-        @retval GPB, 2312/1, maybe zero-length if no matches.
-        @retval error return also possible
-        @GPB{Input,2306,1}
-        @GPB{Returns,2312,1}
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('new_query_topics', params)
-        defer.returnValue(content)
     @defer.inlineCallbacks
     def declare_publisher(self, params):
         """
