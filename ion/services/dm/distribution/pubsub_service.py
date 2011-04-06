@@ -85,7 +85,9 @@ class PubSubService(ServiceProcess):
     """
     declare = ServiceProcess.service_declare(name='pubsub',
                                           version='0.1.2',
-                                          dependencies=[])
+                                          dependencies=['DataStoreService',
+                                                        'ExchangeManagementService',
+                                                        'ResourceRegistryService'])
 
     def slc_init(self):
         self.ems = ExchangeManagementClient(proc=self)
@@ -191,7 +193,8 @@ class PubSubService(ServiceProcess):
         # Already declared?
         try:
             key = self._reverse_find(self.xs_list, request.exchange_space_name)
-            log.info('Exchange space "%s" already created, returning' % request.exchange_space_name)
+            log.info('Exchange space "%s" already created, returning %s' %
+                     (request.exchange_space_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)
@@ -285,8 +288,8 @@ class PubSubService(ServiceProcess):
         # Already declared?
         try:
             key = self._reverse_find(self.xp_list, request.exchange_point_name)
-            log.info('Exchange point "%s" already created, returning' %
-                     request.exchange_point_name)
+            log.info('Exchange point "%s" already created, returning %s' %
+                     (request.exchange_point_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)
@@ -381,7 +384,7 @@ class PubSubService(ServiceProcess):
         # Already declared?
         try:
             key = self._reverse_find(self.topic_list, request.topic_name)
-            log.info('Topic "%s" already created, returning' % request.topic_name)
+            log.info('Topic "%s" already created, returning %s' % (request.topic_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)
@@ -473,7 +476,7 @@ class PubSubService(ServiceProcess):
         # Already declared?
         try:
             key = self._reverse_find(self.pub_list, request.publisher_name)
-            log.info('Publisher "%s" already created, returning' % request.publisher_name)
+            log.info('Publisher "%s" already created, returning %s' % (request.publisher_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)

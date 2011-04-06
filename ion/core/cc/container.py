@@ -11,6 +11,7 @@ A container utilizes the messaging abstractions for AMQP.
 """
 
 import os
+import string
 import sys
 
 from twisted.internet import defer
@@ -43,7 +44,10 @@ class Container(BasicLifecycleObject):
     implements(IContainer)
 
     # Static variables
+    # Generate unique container id (and process id prefix). Avoid . chars.
     id = '%s.%d' % (os.uname()[1], os.getpid())
+    id = string.replace(id, ".", "_")
+
     args = None  # Startup arguments
     _started = False
 
@@ -174,10 +178,10 @@ class Container(BasicLifecycleObject):
     def fatalError(self, ex=None):
         """
         Container event that componenets/processes can raise when something
-        goes really wrong. 
+        goes really wrong.
         The result of the fatalError can cause the whole container to
         shutdown by calling reactor.stop
-        reactor.stop will call stopService on CapabilityContainer Service 
+        reactor.stop will call stopService on CapabilityContainer Service
         which, in turn, will terminate this container lifecycleobject,
         which then terminates its lifecycle objects.
         """
@@ -186,7 +190,7 @@ class Container(BasicLifecycleObject):
         f = failure.Failure()
         log.warning(str(f.getTraceback()))
         f.printDetailedTraceback()
-        log.info("The container suffered a fatal error event and is crashing.") 
+        log.info("The container suffered a fatal error event and is crashing.")
         log.info("The last traceback, in full detail, was written to stdout.")
         if not self._fatal_error_encountered:
             self._fatal_error_encountered = True

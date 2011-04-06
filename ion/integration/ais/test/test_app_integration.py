@@ -61,6 +61,11 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
+
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
         services = [
             {'name':'app_integration','module':'ion.integration.ais.app_integration_service','class':'AppIntegrationService'},
             {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
@@ -69,6 +74,7 @@ class AppIntegrationTest(IonTestCase):
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
                           COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
             {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
+            {'name':'dataset_controller', 'module':'ion.services.dm.inventory.dataset_controller', 'class':'DatasetControllerClient'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
@@ -102,10 +108,10 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude  = 32.87521
-        reqMsg.message_parameters_reference.maxLatitude  = 32.97521
-        reqMsg.message_parameters_reference.minLongitude = -117.274609
-        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
+        reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
+        reqMsg.message_parameters_reference.minLongitude = -74.13
+        reqMsg.message_parameters_reference.maxLongitude = -73.50
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
@@ -114,60 +120,60 @@ class AppIntegrationTest(IonTestCase):
 
         
         log.debug('Calling findDataResources to get list of resources.')
-        outcome1 = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
         i = 0
-        while i < len(outcome1.message_parameters_reference[0].dataResourceSummary):
+        while i < len(rspMsg.message_parameters_reference[0].dataResourceSummary):
             log.debug('DHE: findDataResources returned:\n' + \
                   'user_ooi_id: ' + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].user_ooi_id) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].user_ooi_id) + \
                   '\n' + \
                   str('resource_id: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].data_resource_id) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].data_resource_id) + \
                   str('\n') + \
                   str('title: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].title) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].title) + \
                   str('\n') + \
                   str('institution: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].institution) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].institution) + \
                   str('\n') + \
                   str('source: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].source) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].source) + \
                   str('\n') + \
                   str('references: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].references) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].references) + \
                   str('\n') + \
                   str('ion_time_coverage_start: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_start) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_start) + \
                   str('\n') + \
                   str('ion_time_coverage_end: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_end) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_time_coverage_end) + \
                   str('\n') + \
                   str('summary: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].summary) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].summary) + \
                   str('\n') + \
                   str('comment: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].comment) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].comment) + \
                   str('\n') + \
                   str('ion_geospatial_lat_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_min) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_min) + \
                   str('\n') + \
                   str('ion_geospatial_lat_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_max) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lat_max) + \
                   str('\n') + \
                   str('ion_geospatial_lon_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_min) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_min) + \
                   str('\n') + \
                   str('ion_geospatial_lon_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_max) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_lon_max) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_min: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_min) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_min) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_max: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_max) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_max) + \
                   str('\n') + \
                   str('ion_geospatial_vertical_positive: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_positive) + \
+                  str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_positive) + \
                   str('\n'))
             i = i + 1
 
@@ -180,6 +186,18 @@ class AppIntegrationTest(IonTestCase):
         # Create a message client
         #
         mc = MessageClient(proc=self.test_sup)
+
+        #
+        # Send a request without a resourceID to test that the appropriate error
+        # is returned.
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
+
+        log.debug('Calling getDataResourceDetail without resource ID.')
+        rspMsg = yield self.aisc.getDataResourceDetail(reqMsg)
+        if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('rspMsg to GPB w/missing resource ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
         
         #
         # In order to test getDataResourceDetail, we need a dataset resource
@@ -191,37 +209,38 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude = 32.87521
-        reqMsg.message_parameters_reference.maxLatitude = 32.97521
-        reqMsg.message_parameters_reference.minLongitude = -117.274609
-        reqMsg.message_parameters_reference.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minLatitude = 40.2216682434
+        reqMsg.message_parameters_reference.maxLatitude = 40.2216682434
+        reqMsg.message_parameters_reference.minLongitude = -74.13
+        reqMsg.message_parameters_reference.maxLongitude = -73.50
         
         log.debug('Calling findDataResources.')
-        outcome1 = yield self.aisc.findDataResources(reqMsg)
-        
-        dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
-        
-        #
-        # Now create a request message to get the metadata details about the
-        # source (i.e., where the dataset came from) of a particular dataset
-        # resource ID.
-        #
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
-        if dsID is not None:
-            reqMsg.message_parameters_reference.data_resource_id = dsID
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
 
-        log.debug('Calling getDataResourceDetail.')
-        outcome1 = yield self.aisc.getDataResourceDetail(reqMsg)
-        log.debug('getDataResourceDetail returned:\n' + \
-                  str('resource_id: ') + \
-                  str(outcome1.message_parameters_reference[0].data_resource_id) + \
-                  str('\n'))
+        if len(rspMsg.message_parameters_reference) > 0:
+            if len(rspMsg.message_parameters_reference[0].dataResourceSummary) > 0:
+                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
+        
+                #
+                # Now create a request message to get the metadata details about the
+                # source (i.e., where the dataset came from) of a particular dataset
+                # resource ID.
+                #
+                reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+                reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
+                reqMsg.message_parameters_reference.data_resource_id = dsID
 
-        log.debug('Variables:\n')
-        for var in outcome1.message_parameters_reference[0].variable:
-            for attrib in var.other_attributes:
-                log.debug('  ' + str(attrib) + str('\n'))
+                log.debug('Calling getDataResourceDetail.')
+                rspMsg = yield self.aisc.getDataResourceDetail(reqMsg)
+                log.debug('getDataResourceDetail returned:\n' + \
+                    str('resource_id: ') + \
+                    str(rspMsg.message_parameters_reference[0].data_resource_id) + \
+                    str('\n'))
+
+                log.debug('Minimum Metadata Variables:\n')
+                for var in rspMsg.message_parameters_reference[0].variable:
+                    for attrib in var.other_attributes:
+                        log.debug('  ' + str(attrib) + str('\n'))
         
     @defer.inlineCallbacks
     def test_createDownloadURL(self):
@@ -236,8 +255,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
 
         log.debug('Calling createDownloadURL.')
-        outcome1 = yield self.aisc.createDownloadURL(reqMsg)
-        downloadURL = outcome1.message_parameters_reference[0].download_url
+        rspMsg = yield self.aisc.createDownloadURL(reqMsg)
+        downloadURL = rspMsg.message_parameters_reference[0].download_url
         log.debug('DHE: createDownloadURL returned:\n' + downloadURL)
 
     @defer.inlineCallbacks
@@ -620,6 +639,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
         raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
+
+    @defer.inlineCallbacks
+    def test_createDataResource_failInputs(self):
+        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
 
     @defer.inlineCallbacks
     def test_createDataResource_failSource(self):

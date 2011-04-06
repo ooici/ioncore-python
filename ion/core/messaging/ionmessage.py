@@ -11,6 +11,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ionconst as ic
 from ion.core import ioninit
 from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
@@ -37,7 +38,7 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
         msg['encoding'] = headers.get('encoding','json')
         # See ion.data.dataobject Serializers for choices
-        msg['accept-encoding'] = headers.get('accept-encoding','')
+        #msg['accept-encoding'] = headers.get('accept-encoding','')
         # Language of the format specification
         msg['language'] = headers.get('language','ion1')
         # Identifier of a registered format specification (i.e. message schema)
@@ -53,7 +54,7 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         # Conversation message sequence number
         msg['conv-seq'] = headers.get('conv-seq',1)
         # Conversation type id
-        msg['protocol'] = headers.get('protocol','')
+        msg[ic.IONMSG_HDR_PROTOCOL] = headers.get('protocol','')
         # Status code
         msg['status'] = headers.get('status','OK')
         # Local timestamp in ms
@@ -62,8 +63,10 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         #msg['in-reply-to'] = ''
         #msg['reply-by'] = ''
         msg.update(headers)
-        # Operation of the message, aka performative, verb, method
-        msg['op'] = message.get('operation')
+        # Performative of the message
+        msg[ic.IONMSG_HDR_PERFORMATIVE] = headers.get('performative','')
+        # Operation = Action request of the message
+        msg[ic.IONMSG_HDR_ACTION] = message.get('operation')
         # The actual content
         msg['content'] = message.get('content')
 

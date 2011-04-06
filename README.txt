@@ -165,24 +165,55 @@ To compile all code to see if there are Python compile errors anywhere:
 ::  ant compile
 
 
+Local Configuration
+===================
+
+To override default configuration and logging config files (and in order to
+prevent changes to the global default), please make local changes in:
+    res/config/ionlocal.config   (eg. to set a local message broker)
+    res/logging/loglevelslocal.cfg   (eg. to increase/reduce log verbosity)
+
+
 ---------------------------------------------------------------------------
 Change log:
 ===========
 
-2011-1-28:
+2011-04-02:
+- App files support an entry "config" of type dict with ion.config override
+  values
+- Apps support loading of dependent apps from res/apps by using the
+  "applications" entry of type list.
+
+2011-04-01:
+- Introduced Conversations framework. Standard conversation types: rpc (request,
+  inform-result/failure), request (request, agree/refuse, inform-result/failure),
+  generic (any message is processed). Also conversation-less one-off messages.
+- Refactored Process base class to use conversations. Made rpc_send retrofit
+  RPC conversation; reply_err now sends a conversation failure (either rpc or
+  request); other reply methods also supported.
+- Conversations log messages; they are garbage collected in final state.
+- Process now supports graceful terminate from active state; Receiver can
+  gracefully handle deactivating the consumer followed by wait for all
+  processing completion.
+- Bug fixes to process terminate and life cycle handling.
+- Bug fixes to StateObject error handling and reporting (the moment of the state
+  change current->next was not exactly clear in the handler code; now it is
+  either before or after)
+- FSM now handles catch events and post state change action methods
+
+2011-01-28:
 - Switched to binary sha1 keys in all objects.
 - Added @ITV decorator to skip itv tests when running 'trial ion'
 
-2011-1-26:
+2011-01-26:
 - Moved scripts in bin/ dir to scripts/ dir.
 
-2011-1-24:
+2011-01-24:
 - Removed IRODS as backend storage configureation option
 
-2011-1-21:
+2011-01-21:
 - ION is now using google protocol buffer objects in the resource object model
 - Bumped version number to 0.4.0 consistent with the setup.py file.
-
 
 2010-10-28:
 - Set RPC default timeout to 15 secs (see ion.config).
@@ -342,5 +373,50 @@ Change log:
 - Provided an easier to use BaseServiceClient, which uses a default service
   name lookup. Accepts BaseProcess instance as argument to use for sending/
   receiving service calls.
+
+TODO:
+
+- TBD: Timeout as defined state transition of conversation
+- TBD: Conversation garbage collection and final/error state detection - tombstone
+- TBD: Conversation FSM cloning (instead of always new creation)
+- TBD: Interaction observer and generic receiver (for all operations on broker)
+- TBD: magnet.topic routing key naming (proc.main.#, proc.back.#, service.# etc)
+- TBD: proc.back.send-contid.sendpid.main.reccontid.recpid naming and bindings
+
+Apps:
+- Declare which apps to load in a test case
+- Easier to use app-supervisor
+- Generic app with configured file
+- Logs in apps
+- App dependencies
+- Distributed apps
+Conversations:
+- send inside FSM
+- timeout handing inside FSM
+- timeout transition
+- request as process default
+- distinguish failure and result
+- non-blocking rpc
+- refactor common pieces of rpc and request out
+- guard FSM vs observer FSM vs interceptor
+- State repo for conversations
+- Tombstones and timeouts
+- FSM keeps list of recent messages (for logging)
+- FSM caching, cloning
+Interactions/messaging:
+- Generic receiver, no dispatch
+- Process observer keeps list of recent messages
+- Routing key for processes
+- Public to private relay (or guard/interceptor) for processes as service
+- Conversation observer
+Misc:
+- Better FSM semantics: pre, post actions,
+- Correct handling of error conditions, timeouts, tombstones
+Testing:
+- optional process shutdown
+- msg observer usable / queriable in test
+Exchange Spaces:
+- separate process/service from data from events
+- use VHOST instead of sysname
 
 .

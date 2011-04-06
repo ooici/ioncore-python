@@ -37,8 +37,8 @@ def construct_policy_lists(policydb):
             elif role == 'OWNER':
                 role_set = set(['OWNER', 'ADMIN'])
             elif role == 'AUTHENTICATED':
-                role_set = set(['AUTHENTICATED', 'OWNER', 'ADMIN']) 
-            else:           
+                role_set = set(['AUTHENTICATED', 'OWNER', 'ADMIN'])
+            else:
                 role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN'])
 
             service_dict = thedict.setdefault(service, {})
@@ -95,8 +95,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
     def is_authorized(self, msg, invocation):
         """
-        Policy enforcement method which implements the functionality
-        conceptualized as the policy decision point (PDP).  This method
+        @brief Policy enforcement method which implements the functionality
+            conceptualized as the policy decision point (PDP).
+        This method
         will take the specified user id, convert it into a role.  A search
         will then be performed on the global policy_dictionary to determine if
         the user has the appropriate authority to access the specified
@@ -115,6 +116,10 @@ class PolicyInterceptor(EnvelopeInterceptor):
         @return: invocation object indicating status of authority check
         """
 
+        # Ignore messages that are not of performative 'request'
+        if msg.get('performative', None) != 'request':
+            return invocation
+
         # Reject improperly defined messages
         if not 'user-id' in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
@@ -128,14 +133,14 @@ class PolicyInterceptor(EnvelopeInterceptor):
             log.info("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
             invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
-        if not 'op'in msg:
+        if not 'op' in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
             invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
-        
+
         user_id = msg['user-id']
         expirystr = msg['expiry']
-        
+
         if not type(expirystr) is str:
             log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
@@ -147,7 +152,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
             log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
-            
+
         rcvr = msg['receiver']
         service = rcvr.rsplit('.',1)[-1]
 
@@ -184,7 +189,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         expiry_time = int(expiry)
         if (expiry_time > 0):
             current_time = time.time()
-        
+
             if current_time > expiry_time:
                 log.info('Policy Interceptor: Current time [%s] exceeds expiry [%s]. Returning Not Authorized.' % (str(current_time), expiry))
                 invocation.drop(note='Authentication expired', code=Invocation.CODE_UNAUTHORIZED)

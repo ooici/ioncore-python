@@ -18,7 +18,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
- 
+
 import ion.services.coi.exchange.resource_wrapper as res_wrapper
 from ion.services.coi.exchange.resource_wrapper import ClientHelper
 
@@ -51,16 +51,15 @@ class ExchangeManagementTest(IonTestCase):
                 'spawnargs':{'datastore_service':'datastore'}
             },
         ]
-        self.process = yield self._spawn_processes(services)
+        sup = yield self._spawn_processes(services)
         self.emc = ExchangeManagementClient(proc = self.test_sup)
         self.helper = ClientHelper(self.test_sup)
-        
-        
+
+
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._shutdown_processes(self.process)
+        yield self._shutdown_processes()
         yield self._stop_container()
-
 
 
     def test_trivial(self):
@@ -71,7 +70,7 @@ class ExchangeManagementTest(IonTestCase):
     @defer.inlineCallbacks
     def test_trivial_create_resources(self):
         """
-        A lower level test to make sure all of our resource definitions are 
+        A lower level test to make sure all of our resource definitions are
         actually usable.  Later on, this code will only be used within the
         boilerplate code.
         """
@@ -98,12 +97,12 @@ class ExchangeManagementTest(IonTestCase):
                 msg.configuration.name = "name"
             if hasattr(msg.configuration,'description'):
                 msg.configuration.description = "description"
-                                
+
             id = yield self.emc._create_object(msg)
-            
-            
+
+
             #assert bp.isHash(id)
-            
+
 
 
 
@@ -120,13 +119,13 @@ class ExchangeManagementTest(IonTestCase):
                 msg.configuration.name = "name"
             if hasattr(msg.configuration,'description'):
                 msg.configuration.description = "description"
-            
+
             id = yield self.emc._create_object(msg)
-            
+
             obj1 = msg.MessageObject
             key = id.resource_reference.key
             obj2 = yield self.emc._get_object(key)
-            
+
             type1 = obj1.GPBMessage.configuration.type
             type2 = obj2.MessageType
             self.assertEqual(type1.object_id, type2.object_id)
@@ -137,13 +136,13 @@ class ExchangeManagementTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_exchange_space(self):
         """
-        A test that ensures we can define an exchangespace.  Tests 
+        A test that ensures we can define an exchangespace.  Tests
         for:
-            1) successful creation 
+            1) successful creation
             2) failure on no name
             3) failure on duplicate name
         """
-        
+
         # Case 1:  Expect success
         id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
 
@@ -153,7 +152,7 @@ class ExchangeManagementTest(IonTestCase):
             self.fail("EMS accepted invalid exchangespace.name")
         except:
             pass
-        
+
         # Case 3:  Fail because of duplicate name
         try:
             id = yield self.emc.create_exchangespace("DuplicateName", "This is a test!")
@@ -161,22 +160,22 @@ class ExchangeManagementTest(IonTestCase):
             self.fail("EMS accepted invalid exchangespace.name")
         except Exception, err:
             pass
-       
 
-        
+
+
     @defer.inlineCallbacks
     def test_create_exchange_name(self):
         """
-        A test that ensures we can define an exchangename.  Tests 
+        A test that ensures we can define an exchangename.  Tests
         for:
-            1) successful creation 
+            1) successful creation
             2) failure on duplicate name
             3) failure on no name
             4) failure on no exchangespace
         """
 
         id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
- 
+
 
         # Case 1:  Expect success
         id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
@@ -197,7 +196,7 @@ class ExchangeManagementTest(IonTestCase):
         except Exception, err:
             # print err
             pass
-        
+
         # Case 4:  Fail because of missing exchange space
         try:
             id = yield self.emc.create_exchangename("TestExchangeName", "Object 3", "TestExchangeSpace_XYZZY")
@@ -206,15 +205,15 @@ class ExchangeManagementTest(IonTestCase):
         except Exception, err:
             # print err
             pass
-        
-        
-        
+
+
+
     @defer.inlineCallbacks
     def test_create_queue(self):
         """
-        A test that ensures we can define an exchangename.  Tests 
+        A test that ensures we can define an exchangename.  Tests
         for:
-            1) successful creation 
+            1) successful creation
         """
 
         # We need an exchangespace and an exchangename
@@ -223,9 +222,9 @@ class ExchangeManagementTest(IonTestCase):
 
         # Case 1:  Expect success
         id = yield self.emc.create_queue(
-                            name="TestQueue", 
-                            description="This is a test!", 
-                            exchangespace="TestExchangeSpace", 
+                            name="TestQueue",
+                            description="This is a test!",
+                            exchangespace="TestExchangeSpace",
                             exchangename="TestExchangeName",
                             # topic="alt.humar.best-of-usenet"
                     )
@@ -235,9 +234,9 @@ class ExchangeManagementTest(IonTestCase):
     @defer.inlineCallbacks
     def xtest_create_binding(self):
         """
-        A test that ensures we can define a binding.  Tests 
+        A test that ensures we can define a binding.  Tests
         for:
-            1) successful creation 
+            1) successful creation
         """
 
         # We need an exchangespace and an exchangename
@@ -246,9 +245,9 @@ class ExchangeManagementTest(IonTestCase):
 
         # Case 1:  Expect success
         id = yield self.emc.create_binding(
-                            name="TestBinding", 
-                            description="This is a test!", 
-                            exchangespace="TestExchangeSpace", 
+                            name="TestBinding",
+                            description="This is a test!",
+                            exchangespace="TestExchangeSpace",
                             exchangename="TestExchangeName",
                             queuename="TestQueue",
                             topic="alt.humar.best-of-usenet"
@@ -257,9 +256,9 @@ class ExchangeManagementTest(IonTestCase):
     @defer.inlineCallbacks
     def xtest_create_queue(self):
         """
-        A test that ensures we can define an exchangename.  Tests 
+        A test that ensures we can define an exchangename.  Tests
         for:
-            1) successful creation 
+            1) successful creation
             2) failure on duplicate name
             3) failure on no name
             4) failure on no exchangespace
@@ -269,9 +268,9 @@ class ExchangeManagementTest(IonTestCase):
         id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
         id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
         id = yield self.emc.create_queue(
-                            name="TestQueue", 
-                            description="This is a test!", 
-                            exchangespace="TestExchangeSpace", 
+                            name="TestQueue",
+                            description="This is a test!",
+                            exchangespace="TestExchangeSpace",
                             exchangename="TestExchangeName",
                             # topic="alt.humar.best-of-usenet"
 

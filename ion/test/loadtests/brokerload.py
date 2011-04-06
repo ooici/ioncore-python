@@ -177,7 +177,7 @@ class BrokerTest(LoadTest):
                              no_ack=no_ack, routing_key=route)
 
                         self.consumers.append(con)
-                        con.register_callback(self._recv_callback)
+                        #con.register_callback(self._recv_callback)
 
                         #yield self.consumer.qos()
 
@@ -187,7 +187,7 @@ class BrokerTest(LoadTest):
 
     @defer.inlineCallbacks
     def _run_consumers(self):
-        yield defer.DeferredList([con.iterconsume() for con in self.consumers])
+        yield defer.DeferredList([con.consume(self._recv_callback) for con in self.consumers])
 
         while True:
             if self.is_shutdown():

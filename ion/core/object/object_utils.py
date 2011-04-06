@@ -14,6 +14,7 @@ import hashlib
 import struct
 import os
 from google.protobuf import message
+from google.protobuf.internal import containers
 
 # Globals
 gpb_id_to_class = {}
@@ -28,6 +29,15 @@ def __eq__gpbtype(self, other):
     if self is None or other is None: return False
     return self.object_id == other.object_id and self.version == other.version
 setattr(type_pb2.GPBType, '__eq__', __eq__gpbtype)
+
+def __hash_by_id(self):
+    return id(self)
+    #return hash(repr(self))
+    
+setattr(containers.BaseContainer, '__hash__', __hash_by_id)
+setattr(message.Message, '__hash__', __hash_by_id)
+#setattr(containers.RepeatedCompositeFieldContainer, '__hash__', __hash_by_id)
+#setattr(containers.RepeatedScalarFieldContainer, '__hash__', __hash_by_id)
 
 def sha1hex(val):
     return hashlib.sha1(val).hexdigest().upper()
