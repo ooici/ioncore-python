@@ -759,8 +759,6 @@ class Process(BasicLifecycleObject, ResponseCodes):
         try:
             res1 = yield self.conv_manager.msg_send(message)
 
-            print "@@@@@@@@@@@", res1
-
             # PROBLEM: FSM does not raise any exception.
 
             # FSM processed successfully
