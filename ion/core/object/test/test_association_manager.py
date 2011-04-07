@@ -77,6 +77,26 @@ class AssociationInstanceTest(unittest.TestCase):
         association_repo = self.wb.get_repository(self.association.AssociationIdentity)
         self.assertNotEqual(association_repo, None)
 
+    def test_iter(self):
+
+        for item in self.obj.associations_as_object:
+
+            self.assertEqual(item, self.association)
+
+
+    def test_iteritems(self):
+
+        for predicate, association in self.obj.associations_as_object.iteritems():
+
+            self.assertEqual(predicate, self.predicate.repository_key)
+            self.assertEqual(association.pop(), self.association)
+
+
+    def test_len(self):
+
+        self.assertEqual(len(self.obj.associations_as_object),1)
+        self.assertEqual(len(self.obj.associations_as_subject), 0)
+
 
 
     def test_in_managers(self):

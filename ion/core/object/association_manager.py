@@ -137,6 +137,16 @@ class AssociationManager(object):
 
         return result
 
+    def __iter__(self):
+        return self.get_associations().__iter__()
+
+    def iteritems(self):
+        return self.predicate_sorted_associations.iteritems()
+
+
+    def __len__(self):
+        return len(self.get_associations())
+
 
 class AssociationInstanceError(ApplicationError):
     """
@@ -178,6 +188,9 @@ class AssociationInstance(object):
 
 
     def _add_association(self):
+        """
+        Add this association to any objects that the local process has for book keeping.
+        """
 
         previous_object = self._repository._workspace_root.object
         previous_object_repository = self._workbench.get_repository(previous_object.key)
@@ -201,38 +214,59 @@ class AssociationInstance(object):
 
     @property
     def AssociationIdentity(self):
+        """
+        @Brief Return the identity (guid) of this association
+        """
         return self._repository.repository_key
 
 
     @property
     def Repository(self):
+        """
+        @Brief Return the repository that contains this association
+        """
         return self._repository
 
 
     @property
     def Association(self):
+        """
+        @Brief Return the association object (gpb object)
+        """
         repo = self._repository
         return repo._workspace_root
 
 
     @property
     def SubjectReference(self):
+        """
+        @Brief Return the IDRef for the subject of this association
+        """
         repo = self._repository
         return repo._workspace_root.subject
 
     @property
     def ObjectReference(self):
+        """
+        @Brief Return the IDRef for the object of this association
+        """
         repo = self._repository
         return repo._workspace_root.object
 
 
     @property
     def PredicateReference(self):
+        """
+        @Brief Return the IDRef for the predicate of this association
+        """
         repo = self._repository
         return repo._workspace_root.predicate
 
 
     def SetObjectReference(self, new_object):
+        """
+        @Brief Set the object of this association to point at a new Resource, or object repository.
+        """
 
         if not hasattr(new_object, 'Repository'):
             raise AssociationInstanceError('Invalid argument to SetObjectReference. The new object must have or be a repository! (ResourceInstance, AssociationInstance or Repository)')
@@ -270,7 +304,7 @@ class AssociationInstance(object):
 
     def set_null(self):
         """
-        @Brief Set an associations subject and object to null. The Association must now be pushed explicitly using the resource client!
+        @Brief Set this associations to null. The Association must now be pushed explicitly using the resource client!
         """
 
         previous_object = self._repository._workspace_root.object

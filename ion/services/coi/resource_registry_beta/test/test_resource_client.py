@@ -107,7 +107,46 @@ class ResourceClientTest(IonTestCase):
         my_resource = yield my_rc.get_instance(res_id)
             
         self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
-        
+
+    @defer.inlineCallbacks
+    def test_resource_transaction(self):
+
+        n = 6
+        resource_list = []
+
+        name_index = {}
+        for i in range(n):
+
+            name = 'Test AddressLink Resource: '
+            resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName=name, ResourceDescription='A test resource')
+            res_id = resource.ResourceIdentity
+
+            resource.ResourceName = name + str(i)
+
+            resource_list.append(resource)
+            name_index[res_id] = resource.ResourceName
+
+        yield self.rc.put_resource_transaction(resource_list)
+
+        # Spawn a completely separate resource client and see if we can retrieve the resource...
+        services = [
+            {'name':'my_process','module':'ion.core.process.process','class':'Process'}]
+
+        sup = yield self._spawn_processes(services)
+
+        child_ps1 = yield self.sup.get_child_id('my_process')
+        log.debug('Process ID:' + str(child_ps1))
+        proc_ps1 = self._get_procinstance(child_ps1)
+
+        my_rc = ResourceClient(proc=proc_ps1)
+
+        for id, name in name_index.iteritems():
+
+            my_resource = yield my_rc.get_instance(id)
+
+            self.assertEqual(my_resource.ResourceName, name)
+
+
         
     @defer.inlineCallbacks
     def test_read_your_writes(self):
