@@ -317,6 +317,20 @@ class ProcessTest(IonTestCase):
         #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
         #yield lcop.register_life_cycle_object(lco5)
 
+        # test a process which registers lcos during init/activate
+        lcap = life_cycle_process.LCOProcessAddingObjects()
+        self.failUnlessEquals(len(lcap._registered_life_cycle_objects), 0)
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_INIT)
+
+        yield lcap.initialize()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_READY)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_READY)
+
+        yield lcap.activate()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_activate._get_state(), state_object.BasicStates.S_ACTIVE)
+
 class EchoProcess(Process):
 
     @defer.inlineCallbacks
