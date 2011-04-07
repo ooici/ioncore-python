@@ -201,7 +201,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
         # which it will do after this on_initialize method completes
         yield self._advance_life_cycle_objects(BasicStates.S_READY)
 
-        # take a snapshot of all registered lcos
+        # get length of all registered lcos
+        pre_init_lco_len = len(self._registered_life_cycle_objects)
 
         # Callback to subclasses
         try:
@@ -210,6 +211,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
         except Exception, ex:
             log.exception('----- Process %s INIT ERROR -----' % (self.id))
             raise ex
+
+        if len(self._registered_life_cycle_objects) > pre_init_lco_len:
+            log.debug("NEW LCOS ADDED DURING INIT")
+            yield self._advance_life_cycle_objects(BasicStates.S_READY)
 
     def plc_init(self):
         """
@@ -247,12 +252,20 @@ class Process(BasicLifecycleObject, ResponseCodes):
         # which it will do after this on_activate method completes
         yield self._advance_life_cycle_objects(BasicStates.S_ACTIVE)
 
+        # get length of all registered lcos
+        pre_active_lco_len = len(self._registered_life_cycle_objects)
+
         # Callback to subclasses
         try:
             yield defer.maybeDeferred(self.plc_activate)
         except Exception, ex:
             log.exception('----- Process %s ACTIVATE ERROR -----' % (self.id))
             raise ex
+
+        if len(self._registered_life_cycle_objects) > pre_active_lco_len:
+            log.debug("NEW LCOS ADDED DURING ACTIVE")
+            yield self._advance_life_cycle_objects(BasicStates.S_ACTIVE)
+
 
     def plc_activate(self):
         """
