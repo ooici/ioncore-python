@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/association_service.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief A service to provide indexing and search capability of objects in the datastore
 """
 
@@ -17,7 +18,10 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.data import cassandra
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY 
+from ion.core.data.storage_configuration_utility import  BRANCH_NAME, SUBJECT_KEY,  SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE 
+from ion.core.data.storage_configuration_utility import  RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH
+
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_LIFE_CYCLE_STATE_ID, TYPE_OF_ID
 
@@ -216,7 +220,7 @@ class AssociationService(ServiceProcess):
 
 
             if life_cycle_pair:
-                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
 
             # Get all the results that meet the type / state query
@@ -247,7 +251,7 @@ class AssociationService(ServiceProcess):
                 q.add_predicate_gt(BRANCH_NAME,'')
 
                 if life_cycle_pair:
-                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
                 if type_of_pair:
                     q.add_predicate_eq(RESOURCE_OBJECT_TYPE, type_of_pair.object.key)
@@ -547,7 +551,7 @@ class AssociationService(ServiceProcess):
         if not rows:
             response.result = False
         elif len(rows)==1:
-            repsonse.result = True
+            response.result = True
         else:
             raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
 

@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/test/test_datastore.py
 @author David Stuebe
+@author Matt Rodriguez
 """
 
 import ion.util.ionlog
@@ -402,8 +403,8 @@ class CassandraBackedDataStoreTest(DataStoreTest):
          'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
                       BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
                       PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                      "username":'Need Uname',
-                      "password":'Need Password',
+                      'username':'ooiuser',
+                      'password':'oceans11',
                        }
                 })
 
@@ -411,9 +412,9 @@ class CassandraBackedDataStoreTest(DataStoreTest):
 
 
     @itv(CONF)
+    @defer.inlineCallbacks
     def setUp(self):
-
-        DataStoreTest.setUp(self)
+        yield DataStoreTest.setUp(self)
 
 
 
