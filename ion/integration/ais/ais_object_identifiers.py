@@ -290,11 +290,48 @@ message GetResourcesOfTypeRequest {
 }
 """
 
-NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9122, version=1)
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=9122, version=1)
+"""
+message Resource {
+   enum _MessageTypeIdentifier {
+       _ID = 9122;
+       _VERSION = 1;
+   }
+
+   repeated string attribute = 1;
+}
+"""
+
+GET_RESOURCES_OF_TYPE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9123, version=1)
+"""
+message GetResourcesOfTypeResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9123;
+       _VERSION = 1;
+   }
+
+   repeated string column_names = 1;
+   repeated net.ooici.integration.ais.manageResources.Resource resources = 2;
+}
+"""
+
+GET_RESOURCE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9124, version=1)
+"""
+message GetResourceRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9124;
+       _VERSION = 1;
+   }
+
+   optional string ooi_id = 1;
+}
+"""
+
+NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
 """
 message NameValuePair {
    enum _MessageTypeIdentifier {
-       _ID = 9122;
+       _ID = 9125;
        _VERSION = 1;
    }
 
@@ -303,28 +340,16 @@ message NameValuePair {
 }
 """
 
-RESOURCE_TYPE = object_utils.create_type_identifier(object_id=9123, version=1)
+GET_RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9126, version=1)
 """
-message Resource {
+
+message GetResourceResponse {
    enum _MessageTypeIdentifier {
-       _ID = 9123;
+       _ID = 9126;
        _VERSION = 1;
    }
 
-   repeated net.ooici.integration.ais.manageResources.NameValuePair resource_attribute = 1;
-}
-"""
-
-GET_RESOURCES_OF_TYPE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9124, version=1)
-"""
-message GetResourcesOfTypeResponse {
-   enum _MessageTypeIdentifier {
-       _ID = 9124;
-       _VERSION = 1;
-   }
-
-   repeated string column_names = 1;
-   repeated net.ooici.integration.ais.manageResources.Resource resources = 2;
+   repeated net.ooici.integration.ais.manageResources.NameValuePair resource = 1;
 }
 """
 

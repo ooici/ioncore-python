@@ -644,9 +644,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the getResourcesOfType request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourcesOfType request')
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
-        #msg.message_parameters_reference.resource_type = "identities"
+        msg.message_parameters_reference.resource_type = "identities"
         #msg.message_parameters_reference.resource_type = "topics"
-        msg.message_parameters_reference.resource_type = "datasets"
+        #msg.message_parameters_reference.resource_type = "datasets"
         #msg.message_parameters_reference.resource_type = "datasources"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))

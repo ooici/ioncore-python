@@ -49,19 +49,19 @@ class ManageResources(object):
    def __init__(self, ais):
       log.debug('ManageResources.__init__()')
       TopicValues = TOPIC_RESOURCE_TYPE_ID, \
-                    self.__LoadTopicAttributes, \
+                    self.__LoadTopicColumnData, \
                     self.__PrintTopicAttributes, \
                     self.__LoadTopicColumnHeadrers
       DatasetValues = DATASET_RESOURCE_TYPE_ID, \
-                      self.__LoadDatasetAttributes, \
+                      self.__LoadDatasetColumnData, \
                       self.__PrintDatasetAttributes, \
                       self.__LoadDatasetColumnHeadrers
       IdentityValues = IDENTITY_RESOURCE_TYPE_ID, \
-                       self.__LoadIdentityAttributes, \
+                       self.__LoadIdentityColumnData, \
                        self.__PrintIdentityAttributes, \
                        self.__LoadIdentityColumnHeadrers
       DatasourceValues = DATASOURCE_RESOURCE_TYPE_ID, \
-                         self.__LoadDatasourceAttributes, \
+                         self.__LoadDatasourceColumnData, \
                          self.__PrintDatasourceAttributes, \
                          self.__LoadDatasourceColumnHeadrers
       self.ResourceTypes = {'topics' : TopicValues,
@@ -69,6 +69,8 @@ class ManageResources(object):
                             'identities' : IdentityValues,
                             'datasources' : DatasourceValues
                            }
+      self.SourceTypes = ['SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
+      self.RequestTypes = ['NONE', 'XBT', 'CTD', 'DAP', 'FTP']
       self.mc = ais.mc
       self.asc = AssociationServiceClient()
       self.rc = ResourceClient()
@@ -146,42 +148,32 @@ class ManageResources(object):
       Result = yield self.__findResourcesOfType(ResourceType)
       log.debug('Found ' + str(len(Result.idrefs)) + ' resources.')
 
-      # build AIS response with list of resources
+      # build AIS response 
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourcesOfType response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCES_OF_TYPE_RESPONSE_TYPE)
-      HeaderFunc(Response.message_parameters_reference[0])
       Response.result = Response.ResponseCodes.OK
+     
+      # load the column headers for this resource type into response
+      HeaderFunc(Response.message_parameters_reference[0])
 
-      # load the attributes for each resource found
+      # load the attributes for each resource that was found into response
       i = 0
       while i < len(Result.idrefs):
          ResID = Result.idrefs[i].key
          log.debug('Working on ResID: ' + ResID)        
          Resource = yield self.rc.get_instance(ResID)
+         
+         # debug print for dumping the attributes of the resource
          PrintFunc(Resource)
+         
+         # load the attributes of the resource into response
          Response.message_parameters_reference[0].resources.add()
-         LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource)
+         LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
          i = i + 1
 
       log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
       defer.returnValue(Response)
-
-
-   def __LoadTopicColumnHeadrers(self, To):
-      To.column_names.append('title')
-
-
-   def __LoadDatasetColumnHeadrers(self, To):
-      To.column_names.append('title')
-
-
-   def __LoadIdentityColumnHeadrers(self, To):
-      To.column_names.append('subject')
-
-
-   def __LoadDatasourceColumnHeadrers(self, To):
-      To.column_names.append('base url')
 
 
    def __PrintTopicAttributes(self, ds):
@@ -189,7 +181,6 @@ class ManageResources(object):
     
 
    def __PrintDatasetAttributes(self, ds):
-      print ds.ListSetFields()
       log.debug("Dataset = \n"+str(ds))
       for atrib in ds.root_group.attributes:
          log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
@@ -201,18 +192,93 @@ class ManageResources(object):
 
    def __PrintDatasourceAttributes(self, ds):
       log.debug("Datasource = \n"+str(ds))
-      log.debug('source_type: ' + str(ds.source_type))
+      log.debug('source_type: ' + self.SourceTypes[ds.source_type])
       for property in ds.property:
           log.debug('Property: ' + property)
       for sid in ds.station_id:
           log.debug('Station ID: ' + sid)
-      log.debug('request_type: ' + str(ds.request_type))
+      log.debug('request_type: ' + self.RequestTypes[ds.request_type])
       log.debug('base_url: ' + ds.base_url)
       log.debug('max_ingest_millis: ' + str(ds.max_ingest_millis))
 
 
-   def __LoadTopicAttributes(self, To, From):
+   def __LoadTopicColumnHeadrers(self, To):
+      To.column_names.append('OoiId')
+      To.column_names.append('TODO')
+
+
+   def __LoadDatasetColumnHeadrers(self, To):
+      To.column_names.append('OoiId')
+      To.column_names.append('Title')
+
+
+   def __LoadIdentityColumnHeadrers(self, To):
+      To.column_names.append('OoiId')
+      To.column_names.append('Subject')
+
+
+   def __LoadDatasourceColumnHeadrers(self, To):
+      To.column_names.append('OoiId')
+      To.column_names.append('Station ID')
+
+
+   def __LoadTopicColumnData(self, To, From, Id):
       try:
+         To.attribute.append(Id)
+         To.attribute.append(From.root_group.FindAttributeByName('TODO').GetValue())
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadDatasetColumnData(self, To, From, Id):
+      try:
+         To.attribute.append(Id)
+         To.attribute.append(From.root_group.FindAttributeByName('title').GetValue())
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadIdentityColumnData(self, To, From, Id):
+      try:
+         To.attribute.append(Id)
+         To.attribute.append(From.subject)
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadDatasourceColumnData(self, To, From, Id):
+      #log.debug("To is:\n"+To.MessageType)
+      try:
+         To.attribute.append(Id)
+         To.attribute.append(From.station_id[0])
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadTopicAttributes(self, To, From, Id):
+      try:
+         To.resource_attribute.add()
+         To.resource_attribute[0].name = 'title'
+         To.resource_attribute[0].value = From.root_group.FindAttributeByName('TODO').GetValue()
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadDatasetAttributes(self, To, From, Id):
+      try:
+         To.resource_attribute.add()
+         To.resource_attribute[0].name = 'ooi_id'
+         To.resource_attribute[0].value = Id
          To.resource_attribute.add()
          To.resource_attribute[0].name = 'title'
          To.resource_attribute[0].value = From.root_group.FindAttributeByName('title').GetValue()
@@ -222,35 +288,44 @@ class ManageResources(object):
          log.exception(estr)
 
 
-   def __LoadDatasetAttributes(self, To, From):
-      #log.debug("To is:\n"+To.MessageType)
+   def __LoadIdentityAttributes(self, To, From, Id):
       try:
          To.resource_attribute.add()
-         To.resource_attribute[0].name = 'title'
-         To.resource_attribute[0].value = From.root_group.FindAttributeByName('title').GetValue()
+         To.resource_attribute[0].name = 'ooi_id'
+         To.resource_attribute[0].value = Id
+         To.resource_attribute.add()
+         To.resource_attribute[1].name = 'subject'
+         To.resource_attribute[1].value = From.subject
+         To.resource_attribute.add()
+         To.resource_attribute[2].name = 'dispatcher_queue'
+         To.resource_attribute[2].value = From.dispatcher_queue
+         To.resource_attribute.add()
+         To.resource_attribute[3].name = 'email'
+         To.resource_attribute[3].value = From.email
+         To.resource_attribute.add()
+         To.resource_attribute[4].name = 'life_cycle_state'
+         To.resource_attribute[4].value = From.life_cycle_state
       
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
 
 
-   def __LoadIdentityAttributes(self, To, From):
-      try:
-         To.resource_attribute.add()
-         To.resource_attribute[0].name = 'subject'
-         To.resource_attribute[0].value = From.subject
-      
-      except:
-         estr = 'Object ERROR!'
-         log.exception(estr)
-
-
-   def __LoadDatasourceAttributes(self, To, From):
+   def __LoadDatasourceAttributes(self, To, From, Id):
       #log.debug("To is:\n"+To.MessageType)
       try:
          To.resource_attribute.add()
-         To.resource_attribute[0].name = 'base_url'
-         To.resource_attribute[0].value = From.base_url
+         To.resource_attribute[0].name = 'OoiId'
+         To.resource_attribute[0].value = Id
+         To.resource_attribute.add()
+         To.resource_attribute[1].name = 'source_type'
+         To.resource_attribute[1].value = self.SourceTypes[From.source_type]
+         To.resource_attribute.add()
+         To.resource_attribute[2].name = 'station_id'
+         To.resource_attribute[2].value = From.station_id[0]
+         To.resource_attribute.add()
+         To.resource_attribute[3].name = 'base_url'
+         To.resource_attribute[3].value = From.base_url
       
       except:
          estr = 'Object ERROR!'
