@@ -59,7 +59,9 @@ class DataStoreTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
 
 
         self.sup = yield self._spawn_processes(self.services)
@@ -116,9 +118,9 @@ class DataStoreTest(IonTestCase):
     def tearDown(self):
         log.info('Tearing Down Test Container')
 
-        #store.Store.kvs.clear()
-        #store.IndexStore.indices.clear()
-        #store.IndexStore.kvs.clear()
+        store.Store.kvs.clear()
+        store.IndexStore.indices.clear()
+        store.IndexStore.kvs.clear()
 
         yield self._shutdown_processes()
         yield self._stop_container()
