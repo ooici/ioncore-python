@@ -168,7 +168,6 @@ class ResourceClient(ApplicationError):
         version and version state.
         @retval the specified ResourceInstance
 
-        @TODO pull the associations that go with this resource
         """
         yield self._check_init()
 
@@ -191,7 +190,7 @@ class ResourceClient(ApplicationError):
             # @TODO Some reasonable test to make sure it is valid?
 
         else:
-            raise ResourceClientError('''Illegal argument type in retrieve_resource_instance:
+            raise ResourceClientError('''Illegal argument type in get_instance:
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))
 
             # Pull the repository
@@ -224,7 +223,7 @@ class ResourceClient(ApplicationError):
     @defer.inlineCallbacks
     def put_instance(self, instance, comment=None):
         """
-        @breif Write the current state of the resource to the data store
+        @Brief Write the current state of the resource and any associations to the data store
         @param instance is a ResourceInstance object to be written
         @param comment is a comment to add about the current state of the resource
 
@@ -249,7 +248,7 @@ class ResourceClient(ApplicationError):
     @defer.inlineCallbacks
     def put_resource_transaction(self, instances=None, comment=None):
         """
-        @breif Write the current state of the resource to the data store
+        @Brief Write the current state of a list of resources to the data store
         @param instance is a ResourceInstance object. All associations and all associated objects will be pushed.
         @param comment is a comment to add about the current state of the resource
 
@@ -290,7 +289,10 @@ class ResourceClient(ApplicationError):
 
     @defer.inlineCallbacks
     def get_associated_resource_object(self, association):
-
+        """
+        @Brief Get the Resource Instance which is the object of the association
+        @param association is an association instance
+        """
         if not isinstance(association, association_manager.AssociationInstance):
             raise ResourceClientError('Invalid argument to get_associated_resource_object: argument must be an association instance')
 
@@ -305,7 +307,10 @@ class ResourceClient(ApplicationError):
 
     @defer.inlineCallbacks
     def get_associated_resource_subject(self, association):
-
+        """
+        @Brief Get the Resource Instance which is the object of the association
+        @param association is an association instance
+        """
         if not isinstance(association, association_manager.AssociationInstance):
             raise ResourceClientError('Invalid argument to get_associated_resource_subject: argument must be an association instance')
 

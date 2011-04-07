@@ -111,7 +111,82 @@ class AssociationClient(object):
         defer.returnValue(association)
 
     @defer.inlineCallbacks
-    def get_associations(self, subject=None, obj=None, predicate_or_predicates=None):
+    def get_instance(self, association_id):
+        """
+        @brief Get the latest version of the identified association from the data store
+        @param association_id can be either a string association identity or an IDRef
+        object which specifies the association identity as well as optional parameters
+        version and version state.
+        @retval the specified AssociationInstance
+
+        """
+        yield self._check_init()
+
+        reference = None
+        branch = 'master'
+        commit = None
+
+        # Get the type of the argument and act accordingly
+        if hasattr(association_id, 'ObjectType') and association_id.ObjectType == IDREF_TYPE:
+            # If it is a resource reference, unpack it.
+            if association_id.branch:
+                branch = association_id.branch
+
+            reference = association_id.key
+            commit = association_id.commit
+
+        elif isinstance(association_id, (str, unicode)):
+            # if it is a string, us it as an identity
+            reference = association_id
+            # @TODO Some reasonable test to make sure it is valid?
+
+        else:
+            raise AssociationClientError('''Illegal argument type in get_instance:
+                                      \n type: %s \nvalue: %s''' % (type(association_id), str(association_id)))
+
+            # Pull the repository
+        try:
+            result = yield self.workbench.pull(self.datastore_service, reference)
+        except workbench.WorkBenchError, ex:
+            log.warn(ex)
+            raise AssociationClientError('Could not pull the requested association from the datastore. Workbench exception: \n %s' % ex)
+
+        # Get the repository
+        repo = self.workbench.get_repository(reference)
+        try:
+            yield repo.checkout(branch)
+        except repository.RepositoryError, ex:
+            log.warn('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
+            raise ResourceClientError('Could not checkout branch during get_instance.')
+
+        # Create a association instance to return
+        # @TODO - Check and see if there is already one - what to do?
+        association = AssociationInstance(repo)
+
+        defer.returnValue(association)
+
+    @defer.inlineCallbacks
+    def association_exists(self, subject_id, predicate_id, object_id):
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+        request.object = request.CreateObject(IDREF_TYPE)
+        request.object.key = subject_id
+
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = predicate_id
+
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = object_id
+
+
+        result = yield self.asc.association_exists(request)
+
+        defer.returnValue(result.result)
+
+
+    @defer.inlineCallbacks
+    def find_associations(self, subject=None, obj=None, predicate_or_predicates=None):
         """
         @Brief Get association to a resource instances as either subject or object. Specify a predicate or predicates to limit the results
         """

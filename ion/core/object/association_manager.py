@@ -137,6 +137,16 @@ class AssociationManager(object):
 
         return result
 
+    def __iter__(self):
+        return self.get_associations().__iter__()
+
+    def iteritems(self):
+        return self.predicate_sorted_associations.iteritems()
+
+
+    def __len__(self):
+        return len(self.get_associations())
+
 
 class AssociationInstanceError(ApplicationError):
     """
