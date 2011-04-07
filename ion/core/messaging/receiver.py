@@ -285,7 +285,6 @@ class Receiver(BasicLifecycleObject):
             else:
                 # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
                 yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
-                defer.returnValue(msg)
         except Exception, ex:
             log.exception("Send error")
         else:
@@ -293,6 +292,7 @@ class Receiver(BasicLifecycleObject):
                 log.info("===Message SENT! >>>> %s -> %s: %s:%s:%s===" % (msg.get('sender',None),
                                 msg.get('receiver',None), msg.get('protocol',None),
                                 msg.get('performative',None), msg.get('op',None)))
+                defer.returnValue(msg)
                 #log.debug("msg"+str(msg))
 
     def __str__(self):

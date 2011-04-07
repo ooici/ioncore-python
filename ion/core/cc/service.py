@@ -142,7 +142,7 @@ class CapabilityContainer(service.Service):
         The file may be an .app, a .rel, or a python code script.
         """
 
-        # Try two script locations, one for IDEs and another for shell. 
+        # Try two script locations, one for IDEs and another for shell.
         for script in self.config['scripts']:
             script = os.path.abspath(script)
             if not os.path.isfile(script):
@@ -151,9 +151,9 @@ class CapabilityContainer(service.Service):
                 log.error('Bad startup script path: %s' % script)
             else:
                 if script.endswith('.app'):
-                    yield self.container.start_app(script)
+                    yield self.container.start_app(app_filename=script)
                 elif script.endswith('.rel'):
-                    yield self.container.start_rel(script)
+                    yield self.container.start_rel(rel_filename=script)
                 else:
                     log.info("Executing script %s ..." % script)
                     execfile(script, {})

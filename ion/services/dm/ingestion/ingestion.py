@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry/resource_registry.py
+@file ion/services/dm/ingestion/ingestion.py
 @author Michael Meisinger
 @author David Stuebe
 @author Dave Foster <dfoster@asascience.com>
@@ -39,6 +39,7 @@ from ion.core.exception import ApplicationError
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
 from ion.services.dm.distribution.publisher_subscriber import Publisher
+from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
 
 
 from ion.core import ioninit
@@ -54,19 +55,19 @@ PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=20
 CREATE_DATASET_TOPICS_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
 INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
 
-class EOIIngestionError(ApplicationError):
+class IngestionError(ApplicationError):
     """
-    An error occured during the begin_ingest op of EOIIngestionService.
+    An error occured during the begin_ingest op of IngestionService.
     """
     pass
 
-class EOIIngestionService(ServiceProcess):
+class IngestionService(ServiceProcess):
     """
     Place holder to move data between EOI and the datastore
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='eoi_ingest', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='ingestion', version='0.1.0', dependencies=[])
 
     #TypeClassType = gpb_wrapper.get_type_from_obj(type_pb2.ObjectType())
 
@@ -86,7 +87,9 @@ class EOIIngestionService(ServiceProcess):
 
         self.mc = MessageClient(proc=self)
 
-        log.info('EOIIngestionService.__init__()')
+        self._pscclient = PubSubClient(proc=self)
+
+        log.info('IngestionService.__init__()')
 
     @defer.inlineCallbacks
     def op_ingest(self, content, headers, msg):
@@ -130,6 +133,29 @@ class EOIIngestionService(ServiceProcess):
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
         """
+
+        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
+        msg = yield self.mc.create_instance(XS_TYPE)
+
+        msg.exchange_space_name = 'swapmeet'
+
+        rc = yield self._pscclient.declare_exchange_space(msg)
+        #self._xs_id = rc.id_list[0]
+
+        msg = yield self.mc.create_instance(XP_TYPE)
+        msg.exchange_point_name = 'science_data'
+        msg.exchange_space_id = self._xs_id
+
+        rc = yield self._pscclient.declare_exchange_point(msg)
+        #self._xp_id = rc.id_list[0]
+
+        msg = yield self.mc.create_instance(TOPIC_TYPE)
+        msg.topic_name = content.dataset_id
+        msg.exchange_space_id = self._xs_id
+        msg.exchange_point_id = self._xp_id
+
+        rc = yield self._pscclient.declare_topic(msg)
+
         yield self.reply_ok(msg)
 
     class IngestSubscriber(Subscriber):
@@ -144,7 +170,7 @@ class EOIIngestionService(ServiceProcess):
     def _ingest_data_topic_valid(self, ingest_data_topic):
         """
         Determines if the ingestion data topic is a valid topic for ingestion.
-        The topic should have been registered via op_create_dataset_topics prior to 
+        The topic should have been registered via op_create_dataset_topics prior to
         ingestion.
         @TODO: this
         """
@@ -216,7 +242,7 @@ class EOIIngestionService(ServiceProcess):
             yield self.reply_ok(msg, content={})
         else:
             log.debug("Ingest failed, error back to original request")
-            raise EOIIngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
+            raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
 
     @defer.inlineCallbacks
     def _notify_ingest(self, content):
@@ -224,7 +250,7 @@ class EOIIngestionService(ServiceProcess):
         Generate a notification/event that an ingest succeeded.
         @TODO: this is temporary, to be replaced
         """
-        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest", process=self)
+        pub = Publisher(xp_name="event.topic", routing_key="_not.ingestion.ingest", process=self)
         yield pub.initialize()
         yield pub.activate()
         yield pub.publish(True)
@@ -250,14 +276,14 @@ class EOIIngestionService(ServiceProcess):
         # trigger the op_perform_ingest to complete!
         self._defer_ingest.callback(True)
 
-class EOIIngestionClient(ServiceClient):
+class IngestionClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
     """
     def __init__(self, proc=None, **kwargs):
         # Step 1: Delegate initialization to parent "ServiceClient"
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "eoi_ingest"
+            kwargs['targetname'] = "ingestion"
         ServiceClient.__init__(self, proc, **kwargs)
         
         # Step 2: Perform Initialization
@@ -315,7 +341,7 @@ class EOIIngestionClient(ServiceClient):
         a custom timeout for the ingest service (since it may take much longer than the
         default timeout to complete an ingest)
         """
-        log.debug('-[]- Entered EOIIngestionClient.perform_ingest()')
+        log.debug('-[]- Entered IngestionClient.perform_ingest()')
         # Ensure a Process instance exists to send messages FROM...
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
@@ -327,16 +353,24 @@ class EOIIngestionClient(ServiceClient):
         begin_msg.ingest_service_timeout    = ingest_service_timeout
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Sending 'perform_ingest' RPC message to eoi_ingest service")
+        log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
         content = ""
         (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
         
 
         defer.returnValue(content)
-        
+
+    @defer.inlineCallbacks
+    def create_dataset_topics(self, msg):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('create_dataset_topics', msg)
+        defer.returnValue(content)
         
     @defer.inlineCallbacks
     def demo(self, ds_ingest_topic):
+        """
+        This is a temporary method used for testing.
+        """
         yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
 
         yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
@@ -345,7 +379,7 @@ class EOIIngestionClient(ServiceClient):
         yield self.proc.send(ds_ingest_topic, operation='recv_done', content='demo_done')
 
 # Spawn of the process using the module name
-factory = ProcessFactory(EOIIngestionService)
+factory = ProcessFactory(IngestionService)
 
 
 
@@ -361,9 +395,9 @@ bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
 #----------------------------#
 # Begin_Ingest Testing
 #----------------------------#
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
-client = EOIIngestionClient()
-spawn('eoi_ingest')
+from ion.services.dm.ingestion.ingestion import IngestionClient
+client = IngestionClient()
+spawn('ingestion')
 
 client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
 

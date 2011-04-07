@@ -35,6 +35,15 @@ class IllegalStateError(IonError):
 class ConversationError(IonError):
     pass
 
+class ConversationTimeoutError(ConversationError):
+    pass
+
+class ConversationUnexpectedError(ConversationError):
+    pass
+
+class ConversationFailureError(ConversationError):
+    pass
+
 class ApplicationError(IonError):
     """
     @Brief An Exception class for use in service business logic which will not result in the service

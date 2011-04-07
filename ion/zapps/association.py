@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 """
-@file ion/zapps/resources.py
+@file ion/zapps/association.py
 @author David Stuebe
 @author Tim LaRocque
 @author Matt Rodriguez
-@brief A resource registry application that uses a datastore service with a Cassandra backend.
+@brief An association application that uses a datastore service with a Cassandra backend.
 """
 
 import ion.util.ionlog
@@ -55,21 +55,21 @@ def start(container, starttype, app_definition, *args, **kwargs):
                         }
 
 
-    resource_proc = [
+    association_proc = [
         {'name':'ds1',
          'module':'ion.services.coi.datastore',
          'class':'DataStoreService',
          'spawnargs':ds_spawn_args
             },
-        {'name':'resource_registry1',
-         'module':'ion.services.coi.resource_registry_beta.resource_registry',
-         'class':'ResourceRegistryService',
-         'spawnargs':{'datastore_service':'datastore'}}
+        {'name':'association_service',
+             'module':'ion.services.dm.inventory.association_service',
+             'class':'AssociationService'
+        }
         ]
 
     appsup_desc = ProcessDesc(name='app-supervisor-' + app_definition.name,
                               module=app_supervisor.__name__,
-                              spawnargs={'spawn-procs':resource_proc})
+                              spawnargs={'spawn-procs':association_proc})
     supid = yield appsup_desc.spawn()
 
     res = (supid.full, [appsup_desc])

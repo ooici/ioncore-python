@@ -21,6 +21,8 @@ from twisted.internet import threads, reactor, defer
 from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 
+from ion.core.object import association_manager
+
 from ion.util import procutils as pu
 
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
@@ -234,26 +236,12 @@ class Repository(object):
         the persistent setting is changed to false
         """
 
-        '''
-        Old method - where it was possible to load a repository from a serialized mutable head
-        if head:
-            self._dotgit = self._load_element(head)
-            # Set it to modified and give it a new ID as soon as we get it!
-            self._dotgit.Modified = True
-            self._dotgit.MyId = self.new_id()
-            if repository_key:
-                raise RepositoryError('Can not pass both a serialized head and a repository key')
-        else:
-           
-            mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
-            self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
 
-            if repository_key:
-                self._dotgit.repositorykey = repository_key
-            else:
-                self._dotgit.repositorykey = pu.create_guid()
-        '''
+        ### Structures for managing associations to a repository:
 
+        self.associations_as_subject = association_manager.AssociationManager()
+        self.associations_as_predicate = association_manager.AssociationManager()
+        self.associations_as_object = association_manager.AssociationManager()
 
         # New method to setup the mutable head of the repository
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
@@ -262,7 +250,7 @@ class Repository(object):
         if repository_key:
             self._dotgit.repositorykey = repository_key
         else:
-            self._dotgit.repositorykey = pu.create_guid().upper()
+            self._dotgit.repositorykey = pu.create_guid()
 
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -276,7 +264,15 @@ class Repository(object):
         output += str(self._workspace_root) + '\n'
         output += '============ End Resource ============\n'
         return output
-    
+
+    @property
+    def Repository(self):
+        """
+        Convience method to which is available for any object client or the repository of the object itself
+        """
+        return self
+
+
     @property
     def repository_key(self):
         return self._dotgit.repositorykey

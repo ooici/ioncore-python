@@ -87,7 +87,8 @@ def create_guid():
     """
     @retval Return global unique id string
     """
-    return str(uuid.uuid4())
+    # I find the guids more readable if they are UPPERCASE
+    return str(uuid.uuid4()).upper()
 
 def get_process_id(some_id):
     """

@@ -10,10 +10,17 @@ NOTIFY_EXCHANGE_SPACE = 'notify_exchange'
 NOTIFY_EXCHANGE_TYPE = 'topic'
 
 from ion.core.messaging.receiver import Receiver
-from twisted.internet import defer
+from twisted.internet import defer, reactor
+from twisted.web import server, resource
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
+
+import string
+try:
+    import json
+except:
+    import simplejson as json
 
 notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
 log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)
@@ -99,6 +106,7 @@ class LoggingReceiver(Receiver):
     Listens for log messages on the notification exchange and prints them.
     Sample of how to look at messages on the notification exchange.
     """
+
     def __init__(self, *args, **kwargs):
         kwargs = kwargs.copy()
         kwargs['handler'] = self.printlog
@@ -147,9 +155,8 @@ class LoggingReceiver(Receiver):
                                              arguments={})
 
     def printlog(self, payload, msg):
-        self._msgs.append(msg)
+        self._msgs.append(payload)
         logmsg = payload['content'].additional_data
         print logmsg.levelname, ": (", logmsg.module, "):",logmsg.message
         msg.ack()
-
 

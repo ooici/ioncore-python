@@ -20,7 +20,7 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 
 # Imports: Builtin
@@ -364,7 +364,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
         log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
         if self.__ingest_client is None:
-            self.__ingest_client = EOIIngestionClient()
+            self.__ingest_client = IngestionClient()
         
         reply_to        = self.receiver.name
         ingest_timeout  = context.max_ingest_millis
@@ -667,14 +667,14 @@ factory = ProcessFactory(JavaAgentWrapper)
 # Application Startup
 #----------------------------#
 # @todo: change res/apps/eoiagent to start the dependencies in resource.app and call its bootstrap
-#        to create the demo dataset and datasource.  Also include eoi_ingest dependency
+#        to create the demo dataset and datasource.  Also include ingestion dependency
 #        For now..  bootstrap the resource app and spawn the ingest manually 
 :: bash ::
 bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest,register=demodata res/apps/resource.app
 
 :: py ::
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
-spawn('eoi_ingest')
+from ion.services.dm.ingestion.ingestion import IngestionClient
+spawn('ingestion')
 
 
 
@@ -699,10 +699,10 @@ client.request_update(sample_profile_dataset, sample_profile_datasource)
 #----------------------------#
 # All together now!
 #----------------------------#
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
 spawn('java_agent_wrapper')
-spawn('eoi_ingest')
+spawn('ingestion')
 client = jawc()
 
 client.request_update(sample_profile_dataset, sample_profile_datasource)

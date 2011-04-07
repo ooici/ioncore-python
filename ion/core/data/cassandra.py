@@ -231,7 +231,7 @@ class CassandraIndexedStore(CassandraStore):
             raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
                 
-        isstr = lambda x: isinstance(x, str)
+        isstr = lambda x: isinstance(x, (str,unicode))
         alltrue = lambda x,y: x and y
         all_strings = reduce(alltrue, map(isstr, index_attributes.values()), True)
         if not all_strings:

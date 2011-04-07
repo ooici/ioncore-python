@@ -52,7 +52,11 @@ class PST(IonTestCase):
                 'module':'ion.services.coi.exchange.exchange_management',
                 'class':'ExchangeManagementService',
             },
-
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
+            },
             ]
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
