@@ -179,6 +179,7 @@ Change log:
 ===========
 
 2011-04-05:
+- Call _so_transition in StateObject action function to transition state.
 - Release (rel) files in res/deploy now supported as start argument. Release
   files can provide app specific config and start args.
 - Apps can accept kwargs in app file and via the apparg_<appname> container
