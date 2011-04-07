@@ -569,6 +569,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 # @see ion.interact.rpc, ion.interact.request
                 res = yield self.conv_manager.msg_received(message)
 
+                # Problem: what if FSM produces an error (it does not currently)
+                # Problem: log message here after reply/failure have been sent
                 self.conv_manager.log_conv_message(conv, message, msgtype='RECV')
 
                 self.conv_manager.check_conversation_state(conv)
@@ -594,6 +596,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 yield self.reply_err(msg, exception = ex)
 
         except Exception, ex:
+            # *** PROBLEM. Here the conversation is in ERROR state
             log.exception("*****Container error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
@@ -790,6 +793,9 @@ class Process(BasicLifecycleObject, ResponseCodes):
         res = None
         try:
             res1 = yield self.conv_manager.msg_send(message)
+
+            # PROBLEM: FSM does not raise any exception.
+
             # FSM processed successfully
             if send_receiver is None:
                 # The default case is to send out via the backend receiver

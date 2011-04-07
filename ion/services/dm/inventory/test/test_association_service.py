@@ -23,7 +23,6 @@ from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, 
 
 from ion.services.coi.resource_registry_beta import resource_client
 
-from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
@@ -57,10 +56,6 @@ class AssociationServiceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
-
 
         self.sup = yield self._spawn_processes(self.services)
 
@@ -76,10 +71,6 @@ class AssociationServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
        log.info('Tearing Down Test Container')
-
-       store.Store.kvs.clear()
-       store.IndexStore.kvs.clear()
-       store.IndexStore.indices.clear()
 
        yield self._shutdown_processes()
        yield self._stop_container()

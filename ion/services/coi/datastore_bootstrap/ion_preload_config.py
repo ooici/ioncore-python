@@ -3,7 +3,16 @@
 """
 @file ion/res/config.py
 @author David Stuebe
-@TODO
+
+@Brief This module contains defined constants and configuration dictionaries which are used in the data store and other
+services to provide and access core data schema objects and resources. These can be extended for testing purposes.
+
+To add a new entry in an existing list please use ion.util.procutils.create_guid() to generate a new ID_CFG for each
+new entry. Then follow the pattern to create a resource which will be filled in by the CONTENT_CFG dictionary.
+
+If you have a more complex, nested resource, you must create a function to generate that resource. Follow the example
+in the ION_DATASETS section...
+
 """
 
 import ion.util.ionlog
@@ -32,6 +41,7 @@ ION_PREDICATES_CFG = 'ion_predicates'
 ION_RESOURCE_TYPES_CFG = 'ion_resource_types'
 ION_DATASETS_CFG = 'ion_datasets'
 ION_IDENTITIES_CFG = 'ion_identities'
+ION_AIS_RESOURCES_CFG = 'ion_ais_resources'
 
 
 ### Defined Resource Types
@@ -46,7 +56,7 @@ default_resource_type_name = 'default_resource_type'
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
 ION_RESOURCE_TYPES={
-resource_type_type_name:{ID_CFG:'173a3188-e290-42be-8776-8717077dd207',
+resource_type_type_name:{ID_CFG:'173A3188-E290-42BE-8776-8717077DD207',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:resource_type_type_name,
                      DESCRIPTION_CFG:'The resource type is meta description of a class of resource',
@@ -82,7 +92,7 @@ identity_res_type_name:{ID_CFG:'9C457C32-5982-4044-A3ED-6DBDB5E3EB5C',
                                     'object_version':1,
                                     'meta_description':'protomessage?'}
                         },
-datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
+datasource_res_type_name:{ID_CFG:'B8B7BB73-F578-4604-B3B3-088D28F9A7DC',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:datasource_res_type_name,
                        DESCRIPTION_CFG:'A data source resource contains information about an source of data - metadata about the input to a dataset',
@@ -91,7 +101,7 @@ datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
                                     'meta_description':'protomessage?'}
                         },
 
-default_resource_type_name:{ID_CFG:'422ade3c-d820-437f-8bd3-7d8793591eb0',
+default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
                      DESCRIPTION_CFG:'A type to catch unregistered types!',
@@ -165,7 +175,7 @@ root_name = 'ROOT'
 
 identity_type = create_type_identifier(object_id=1401, version=1)
 ION_IDENTITIES = {
-anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
+anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                           TYPE_CFG:identity_type,
                           NAME_CFG:anonymous_name,
                           DESCRIPTION_CFG:'The anonymous user is the identity used by any unregistered user.',
@@ -177,7 +187,7 @@ anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
                                        'life_cycle_state':''}
                         },
 
-root_name:{ID_CFG:'e15cadea-4605-4afd-af80-8fc3bc54d2a3',
+root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           TYPE_CFG:identity_type,
                           NAME_CFG:root_name,
                           DESCRIPTION_CFG:'The root user is the super administrator.',
@@ -277,8 +287,31 @@ SAMPLE_STATION_DATA_SOURCE_ID = ION_DATASETS[station_data_source_name][ID_CFG]
 
 
 
+#### Define AIS Resources that should be preloaded for testing purposes:
 
+# Define types that will be created:
+TOPIC_TYPE = create_type_identifier(object_id=2317, version=1)
+### Note - Topics contain IDRef pointers to other resources.
+### We need to create a Topic generator function if these IDRefs are required for AIS testing.
 
+# Define resource names that will be crated:
+example_topic1_name = 'example_topic1'
+
+# Define the configuration dictionary for the resources
+ION_AIS_RESOURCES={
+example_topic1_name:{ID_CFG:'341FF107-5E42-4C8E-A30B-4A65A5675E63',
+                      TYPE_CFG:TOPIC_TYPE,
+                      NAME_CFG:profile_dataset_name,
+                      DESCRIPTION_CFG:'An example of a topic resource',
+                      CONTENT_CFG:{'exchange_space_name':'swap meet',
+                                       'exchange_point_name':'science_data',
+                                       'topic_name':'important science data'}
+                      },
+
+    }
+
+# Extract Resource ID_CFGs for use in services and tests
+EXAMPLE_TOPIC1_ID = ION_AIS_RESOURCES[example_topic1_name][ID_CFG]
 
 
 
@@ -326,8 +359,7 @@ class PredicateMap(dict):
         predicate_map = {}
         for predicate_name, description in ION_PREDICATES.items():
             preidcate_cfg = description.get(CONTENT_CFG)
-            obj_type_id = preidcate_cfg.get('object_identifier')
-            predicate_map[obj_type_id] = description.get(ID_CFG)
+            predicate_map[description.get(ID_CFG)] =  preidcate_cfg
 
         self.update(predicate_map)
 

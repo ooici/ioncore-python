@@ -76,6 +76,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_get_subjects(self, predicate_object_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_subjects
+        """
         log.info('op_get_subjects: ')
 
         if predicate_object_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
@@ -276,6 +279,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_get_objects(self, subject_predicate_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_objects
+        """
         log.info('op_get_objects: ')
 
         if subject_predicate_query.MessageType != SUBJECT_PREDICATE_QUERY_TYPE:
@@ -381,6 +387,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_object_associations(self, object_reference, headers, msg):
+        """
+        @see AssociationServiceClient.object_associations
+        """
         log.info('op_get_objects: ')
 
         if object_reference.MessageType != IDREF_TYPE:
@@ -436,6 +445,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_subject_associations(self, subject_reference, headers, msg):
+        """
+        @see AssociationServiceClient.subject_associations
+        """
         log.info('op_get_objects: ')
 
         if subject_reference.MessageType != IDREF_TYPE:
@@ -515,6 +527,10 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_association_exists(self, association_query, headers, msg):
+        """
+        @see AssociationServiceClient.association_exists
+        """
+
         log.info('op_association_exists: ')
 
         rows = yield self._get_association(association_query)
@@ -553,6 +569,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_get_associations(self, association_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_associations
+        """
         log.info('op_get_association: ')
 
         if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
@@ -602,6 +621,15 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_subjects(self, msg):
+        """
+        @brief Find the subjects which have associations including the given predicate object pairs.
+        Example Pairs: TypeOf - Dataset, LifeCycleState - Active, Owner - John Doe
+            Would return all active dataset resources owned by John Doe
+        @param params msg, GPB 15/1, a Predicate Object query message
+        @retval Query Results GPB 22/1
+        @GPB{Input,15,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('get_subjects', msg)
@@ -610,6 +638,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_objects(self, msg):
+        """
+        @brief Find the objects which have associations including the given subject predicate pairs.
+        @param params msg, GPB 16/1, a Subject Predicate query message
+        @retval Query Results GPB 22/1
+        @GPB{Input,16,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_objects', msg)
@@ -619,6 +654,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_subject_associations(self, msg):
+        """
+        @brief Get all the associations of a given subject
+        @param params msg, GPB 4/1, an IDRef for the subject in question
+        @retval Query Results GPB 22/1
+        @GPB{Input,4,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('subject_associations', msg)
@@ -627,6 +669,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_object_associations(self, msg):
+        """
+        @brief Get all the associations of a given object
+        @param params msg, GPB 4/1, an IDRef for the object in question
+        @retval Query Results GPB 22/1
+        @GPB{Input,14,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('object_associations', msg)
@@ -635,6 +684,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_association(self, msg):
+        """
+        @brief Get the identity of the association between these objects
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval IdRef of an association GPB 4/1
+        @GPB{Input,27,1}
+        @GPB{Returns,4,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_association', msg)
@@ -643,6 +699,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_associations(self, msg):
+        """
+        @brief Get the associations between any of subject, predicate and object. Becareful - you can ask very big questions with this method!
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval Query Results GPB 22/1
+        @GPB{Input,27,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_associations', msg)
@@ -652,6 +715,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def association_exists(self, msg):
+        """
+        @brief Get the identity of the association between these objects
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval Boolen Result Message GPB 22/1
+        @GPB{Input,27,1}
+        @GPB{Returns,30,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('association_exists', msg)
