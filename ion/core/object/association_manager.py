@@ -274,6 +274,8 @@ class AssociationInstance(object):
     def SetObjectReference(self, new_object):
         """
         @Brief Set the object of this association to point at a new Resource, or object repository.
+        ** Use with caution - in R1 the prefered convention is to set an association to null and create a new one rather
+        than modify and existing one. **
         """
 
         if not hasattr(new_object, 'Repository'):
@@ -310,7 +312,7 @@ class AssociationInstance(object):
                 log.debug('Association not found in previous objects association manager')
 
 
-    def set_null(self):
+    def SetNull(self):
         """
         @Brief Set this associations to null. The Association must now be pushed explicitly using the resource client!
         """

@@ -13,8 +13,7 @@ from twisted.trial import unittest
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from net.ooici.core.type import type_pb2
-from net.ooici.play import addressbook_pb2
+
 from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
 from ion.core.object import object_utils

@@ -133,7 +133,7 @@ class AssociationInstanceTest(unittest.TestCase):
     def test_set_null(self):
 
 
-        self.association.set_null()
+        self.association.SetNull()
 
         self.assertNotIn(self.association, self.predicate.associations_as_predicate.get_associations())
 

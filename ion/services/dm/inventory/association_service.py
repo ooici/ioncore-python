@@ -539,7 +539,7 @@ class AssociationService(ServiceProcess):
         if not rows:
             response.result = False
         elif len(rows)==1:
-            repsonse.result = True
+            response.result = True
         else:
             raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
 
