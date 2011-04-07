@@ -210,6 +210,20 @@ class FSM(object):
 
         return res
 
+    def _transition(self):
+        """
+        Transitions the current state to the next state, as currently processed
+        in an action function. Can be called by the action function to switch a
+        pre-action handler into a post-action handler.
+        @return True if transitioned, False otherwise
+        """
+        if self.next_state is not None:
+            self.current_state = self.next_state
+            self.next_state = None
+            return True
+        else:
+            return False
+
     def process_list(self, input_symbols):
         """
         This takes a list and sends each element to process().

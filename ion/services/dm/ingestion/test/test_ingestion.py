@@ -15,11 +15,11 @@ from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
 
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.test.iontest import IonTestCase
 
 
-class EOIIngestionTest(IonTestCase):
+class IngestionTest(IonTestCase):
     """
     Testing service classes of resource registry
     """
@@ -31,10 +31,10 @@ class EOIIngestionTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'EOIIngestionService'}]
+            {'name':'ingestion1','module':'ion.services.dm.ingestion.ingestion','class':'IngestionService'}]
         sup = yield self._spawn_processes(services)
 
-        self.eoi_ic = EOIIngestionClient(proc=sup)
+        self._ic = IngestionClient(proc=sup)
         self.sup = sup
 
     @defer.inlineCallbacks
@@ -52,9 +52,9 @@ class EOIIngestionTest(IonTestCase):
         
         #print 'Running Ingest:'
         
-        dataset_id = yield self.eoi_ic.ingest()
+        dataset_id = yield self._ic.ingest()
                 
-        dataset = yield self.eoi_ic.retrieve(dataset_id)
+        dataset = yield self._ic.retrieve(dataset_id)
         
         #print 'Got dataset'
         #print dataset
