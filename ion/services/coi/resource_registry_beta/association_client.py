@@ -167,6 +167,10 @@ class AssociationClient(object):
 
     @defer.inlineCallbacks
     def association_exists(self, subject_id, predicate_id, object_id):
+        """
+        @Brief Test for the existence of an association between these three resource or object identities
+        @TODO change to take either string or IDref 
+        """
 
         request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
 
