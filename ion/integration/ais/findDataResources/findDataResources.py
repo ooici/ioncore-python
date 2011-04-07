@@ -11,6 +11,8 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from decimal import Decimal
+
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
@@ -45,7 +47,8 @@ class FindDataResources(object):
         self.dsID = dsID
 
     @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType):
+    #def __findResourcesOfType(self, resourceType):
+    def findResourcesOfType(self, resourceType):
 
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
@@ -58,7 +61,6 @@ class FindDataResources(object):
         pair.predicate = pref
 
         # Set the Object search term
-
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
         
@@ -73,7 +75,6 @@ class FindDataResources(object):
 
         pair.predicate = pref
 
-
         # Set the Object search term
         state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
         state_ref.lcs = state_ref.LifeCycleState.ACTIVE
@@ -84,6 +85,43 @@ class FindDataResources(object):
         defer.returnValue(result)
 
         
+    @defer.inlineCallbacks
+    def findResourcesOfTypeAndOwner(self, resourceType, owner):
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+        
+        pair.object = type_ref
+
+        # Add a life cycle state request
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+        pair.object = state_ref
+
+        result = yield self.asc.get_subjects(request)
+        
+        defer.returnValue(result)
+
     @defer.inlineCallbacks
     def findDataResources(self, msg):
         """
@@ -99,6 +137,13 @@ class FindDataResources(object):
         #
         userID = msg.message_parameters_reference.user_ooi_id
 
+        self.filterByArea     = True
+        self.filterByVertical = True
+        self.filterByTime     = True
+        self.bIsInAreaBounds      = True
+        self.bIsInVerticalBounds  = True
+        self.bIsInTimeBounds      = True
+
         bounds = {}
         self.__loadBounds(bounds, msg)
         self.__printBounds(bounds)
@@ -112,12 +157,12 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
         # Get the list of dataset resource IDs
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSetResults.idrefs)) + 'datasets.')
+        dSetResults = yield self.findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
         # Get the list of datasource resource IDs
-        dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + 'datasources.')
+        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
 
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
@@ -130,27 +175,41 @@ class FindDataResources(object):
         #     - add the metadata to the response GPB
         #
         i = 0
+        j = 0
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
             dSourceResID = dSourceResults.idrefs[i].key
-            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID:' + dSourceResID)
+            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID: ' + dSourceResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
             dSource = yield self.rc.get_instance(dSourceResID)
+
+            minMetaData = {}
+            self.__loadMinMetaData(dSet, minMetaData)
 
             #
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.__isInBounds(dSetResID, bounds):
-                log.debug("isInBounds is TRUE")
+            if self.filterByArea:
+                self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
+
+            if self.filterByVertical:
+                self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
+                                    
+            if self.filterByTime:
+                self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+                
                 self.__printRootAttributes(dSet)
                 self.__printRootVariables(dSet)
                 self.__printSourceMetadata(dSource)
     
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
         
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+                j = j + 1
             else:
                 log.debug("isInBounds is FALSE")
 
@@ -160,6 +219,122 @@ class FindDataResources(object):
 
         defer.returnValue(rspMsg)
 
+    @defer.inlineCallbacks
+    def findDataResourcesByUser(self, msg):
+        """
+        Worker class method called by app_integration_service to implement
+        findDataResourcesByUser.  Finds all dataset resources regardless of state
+        and returns their IDs along with a load of metadata.
+        """
+
+        log.debug('findDataResourcesByUser Worker Class Method')
+
+        userID = msg.message_parameters_reference.user_ooi_id
+
+        self.filterByArea     = True
+        self.filterByVertical = True
+        self.filterByTime     = True
+        
+        bounds = {}
+        self.__loadBounds(bounds, msg)
+        self.__printBounds(bounds)
+        
+        #
+        # Create the response message to which we will attach the list of
+        # resource IDs
+        #
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
+
+        # Get the list of dataset resource IDs
+        dSetResults = yield self.findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
+        log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
+
+        # Get the list of datasource resource IDs
+        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
+
+        #
+        # Now iterate through the list if dataset resource IDs and for each ID:
+        #   - get the dataset instance
+        #   - get the associated datasource instance
+        #   - check that spatial and temporal criteria are met:
+        #   - if not:
+        #     - continue
+        #   - if so:
+        #     - add the metadata to the response GPB
+        #
+        i = 0
+        j = 0
+        while i < len(dSetResults.idrefs):
+            dSetResID = dSetResults.idrefs[i].key
+            dSourceResID = dSourceResults.idrefs[i].key
+            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID: ' + dSourceResID)
+            
+            dSet = yield self.rc.get_instance(dSetResID)
+            dSource = yield self.rc.get_instance(dSourceResID)
+
+            minMetaData = {}
+            self.__loadMinMetaData(dSet, minMetaData)
+
+            #
+            # If the dataset's data is within the given criteria, include it
+            # in the list
+            #
+            if self.filterByArea and self.__isInAreaBounds(minMetaData, bounds):
+                log.debug("isInAreaBounds is TRUE")
+                self.__printRootAttributes(dSet)
+                self.__printRootVariables(dSet)
+                self.__printSourceMetadata(dSource)
+    
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+        
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+                j = j + 1
+            else:
+                log.debug("isInBounds is FALSE")
+
+            
+            i = i + 1
+
+
+        defer.returnValue(rspMsg)
+
+    def __loadMinMetaData(self, dSet, minMetaData):
+        for attrib in dSet.root_group.attributes:
+            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            if attrib.name == 'title':
+                minMetaData['title'] = attrib.GetValue()
+            elif attrib.name == 'institution':                
+                minMetaData['institution'] = attrib.GetValue()
+            elif attrib.name == 'source':                
+                minMetaData['source'] = attrib.GetValue()
+            elif attrib.name == 'references':                
+                minMetaData['references'] = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_start':                
+                minMetaData['ion_time_coverage_start'] = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_end':                
+                minMetaData['ion_time_coverage_end'] = attrib.GetValue()
+            elif attrib.name == 'summary':                
+                minMetaData['summary'] = attrib.GetValue()
+            elif attrib.name == 'comment':                
+                minMetaData['comment'] = attrib.GetValue()
+            elif attrib.name == 'ion_geospatial_lat_min':                
+                minMetaData['ion_geospatial_lat_min'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_lat_max':                
+                minMetaData['ion_geospatial_lat_max'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_lon_min':                
+                minMetaData['ion_geospatial_lon_min'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_lon_max':                
+                minMetaData['ion_geospatial_lon_max'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_vertical_min':                
+                minMetaData['ion_geospatial_vertical_min'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_vertical_max':                
+                minMetaData['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
+            elif attrib.name == 'ion_geospatial_vertical_positive':                
+                minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
+
     def __loadBounds(self, bounds, msg):
         """
         Load up the bounds dictionary object with the given spatial and temporal
@@ -167,27 +342,115 @@ class FindDataResources(object):
         """
         log.debug('__loadBounds')
         
-        bounds['minLat'] = msg.message_parameters_reference.minLatitude
-        bounds['maxLat'] = msg.message_parameters_reference.maxLatitude
-        bounds['minLon'] = msg.message_parameters_reference.minLongitude
-        bounds['maxLon'] = msg.message_parameters_reference.maxLongitude
-        bounds['minVert'] = msg.message_parameters_reference.minVertical
-        bounds['maxVert'] = msg.message_parameters_reference.maxVertical
-        bounds['posVert'] = msg.message_parameters_reference.posVertical
-        bounds['minTime'] = msg.message_parameters_reference.minTime
-        bounds['maxTime'] = msg.message_parameters_reference.maxTime
+        if msg.message_parameters_reference.IsFieldSet('minLatitude'):
+            bounds['minLat'] = Decimal(str(msg.message_parameters_reference.minLatitude))
+        else:
+            self.filterByArea = False
 
-        
-    def __isInBounds(self, bounds, dSet):
+        if msg.message_parameters_reference.IsFieldSet('maxLatitude'):
+            bounds['maxLat'] = Decimal(str(msg.message_parameters_reference.maxLatitude))
+        else:
+            self.filterByArea = False
+
+        if msg.message_parameters_reference.IsFieldSet('minLongitude'):
+            bounds['minLon'] = Decimal(str(msg.message_parameters_reference.minLongitude))
+        else:
+            self.filterByArea = False
+
+        if msg.message_parameters_reference.IsFieldSet('maxLatitude'):
+            bounds['maxLon'] = Decimal(str(msg.message_parameters_reference.maxLongitude))
+        else:
+            self.filterByArea = False
+
+        if msg.message_parameters_reference.IsFieldSet('minVertical'):
+            bounds['minVert'] = Decimal(str(msg.message_parameters_reference.minVertical))
+        else:
+            self.filterByVertical = False
+
+        if msg.message_parameters_reference.IsFieldSet('maxVertical'):
+            bounds['maxVert'] = Decimal(str(msg.message_parameters_reference.maxVertical))
+        else:
+            self.filterByVertical = False
+
+        if msg.message_parameters_reference.IsFieldSet('posVertical'):
+            bounds['posVert'] = msg.message_parameters_reference.posVertical
+        else:
+            self.filterByVertical = False
+
+        if msg.message_parameters_reference.IsFieldSet('minTime'):
+            bounds['minTime'] = msg.message_parameters_reference.minTime
+        else:
+            self.filterByTime = False
+
+        if msg.message_parameters_reference.IsFieldSet('maxTime'):
+            bounds['maxTime'] = msg.message_parameters_reference.maxTime
+        else:
+            self.filterByTime = False
+
+    def __isInAreaBounds(self, minMetaData, bounds):
         """
-        Determine if dataset resource is in bounds.
+        Determine if dataset resource is in area bounds.
         Input:
           - bounds
           - dSet
         """
-        log.debug('__isInBounds')
-        result = True
-        return result
+        log.debug('__isInAreaBounds()')
+
+        if minMetaData['ion_geospatial_lat_min'] > bounds['minLat']:
+            log.debug(' %f is outside bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
+            return False
+            
+        if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
+            return False
+            
+        if minMetaData['ion_geospatial_lon_min'] > bounds['minLon']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
+            return False
+            
+        if minMetaData['ion_geospatial_lon_max'] > bounds['maxLon']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
+            return False
+        
+        return True
+        
+    def __isInVerticalBounds(self, minMetaData, bounds):
+        """
+        Determine if dataset resource is in vertical bounds.
+        Input:
+          - bounds
+          - dSet
+        """
+        log.debug('__isInVerticalBounds()')
+
+        if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
+            return False
+            
+        if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
+            return False
+        
+        return True
+        
+    def __isInTimeBounds(self, minMetaData, bounds):
+        """
+        Determine if dataset resource is in time bounds.
+        Input:
+          - bounds
+          - dSet
+        """
+        log.debug('__isInTimeBounds()')
+
+        if minMetaData['ion_time_coverage_start'] > bounds['minTime']:
+            log.debug(' %s is outside bounds %s' % (minMetaData['ion_time_coverage_start'], bounds['minTime']))
+            return False
+            
+        if minMetaData['ion_time_coverage_end'] > bounds['maxTime']:
+            log.debug('%s is outside bounds %s' % (minMetaData['ion_time_coverage_end'], bounds['maxTime']))
+            return False
+            
+        return True
         
     def __printBounds(self, bounds):
         boundNames = list(bounds)
@@ -218,30 +481,41 @@ class FindDataResources(object):
         log.debug('base_url: ' + dSource.base_url)
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
-    def __loadRootAttributes(self, rootAttributes, ds, userID, resID):
-        try:
-            rootAttributes.user_ooi_id = userID
-            rootAttributes.data_resource_id = resID
-            rootAttributes.title = ds.root_group.FindAttributeByName('title').GetValue()
-            rootAttributes.institution = ds.root_group.FindAttributeByName('institution').GetValue()
-            rootAttributes.source = ds.root_group.FindAttributeByName('source').GetValue()
-            rootAttributes.references = ds.root_group.FindAttributeByName('references').GetValue()
-            rootAttributes.ion_time_coverage_start = ds.root_group.FindAttributeByName('ion_time_coverage_start').GetValue()
-            rootAttributes.ion_time_coverage_end = ds.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-            rootAttributes.summary = ds.root_group.FindAttributeByName('summary').GetValue()
-            rootAttributes.comment = ds.root_group.FindAttributeByName('comment').GetValue()
-            rootAttributes.ion_geospatial_lat_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())
-            rootAttributes.ion_geospatial_lat_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue())
-            rootAttributes.ion_geospatial_lon_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_min').GetValue())
-            rootAttributes.ion_geospatial_lon_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_max').GetValue())
-            rootAttributes.ion_geospatial_vertical_min = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_min').GetValue())
-            rootAttributes.ion_geospatial_vertical_max = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_max').GetValue())
-            rootAttributes.ion_geospatial_vertical_positive = ds.root_group.FindAttributeByName('ion_geospatial_vertical_positive').GetValue()
-        
-        except:
-            estr = 'Object ERROR!'
-            log.exception(estr)
-
+    def __loadRootAttributes(self, rootAttributes, minMetaData, userID, resID):
+        rootAttributes.user_ooi_id = userID
+        rootAttributes.data_resource_id = resID
+        for attrib in minMetaData:
+            log.debug('Root Attribute: %s = %s'  % (attrib, minMetaData[attrib]))
+            if  attrib == 'title':
+                rootAttributes.title = minMetaData[attrib]
+            elif attrib == 'institution':                
+                rootAttributes.institution = minMetaData[attrib]
+            elif attrib == 'source':                
+                rootAttributes.source = minMetaData[attrib]
+            elif attrib == 'references':                
+                rootAttributes.references = minMetaData[attrib]
+            elif attrib == 'ion_time_coverage_start':                
+                rootAttributes.ion_time_coverage_start = minMetaData[attrib]
+            elif attrib == 'ion_time_coverage_end':                
+                rootAttributes.ion_time_coverage_end = minMetaData[attrib]
+            elif attrib == 'summary':                
+                rootAttributes.summary = minMetaData[attrib]
+            elif attrib == 'comment':                
+                rootAttributes.comment = minMetaData[attrib]
+            elif attrib == 'ion_geospatial_lat_min':                
+                rootAttributes.ion_geospatial_lat_min = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_lat_max':                
+                rootAttributes.ion_geospatial_lat_max = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_lon_min':                
+                rootAttributes.ion_geospatial_lon_min = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_lon_max':                
+                rootAttributes.ion_geospatial_lon_max = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_vertical_min':                
+                rootAttributes.ion_geospatial_vertical_min = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_vertical_max':                
+                rootAttributes.ion_geospatial_vertical_max = float(minMetaData[attrib])
+            elif attrib == 'ion_geospatial_vertical_positive':                
+                rootAttributes.ion_geospatial_vertical_positive = minMetaData[attrib]
 
     """
     def __loadRootVariable(self, rootVariable, ds, var):

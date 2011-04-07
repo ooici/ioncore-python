@@ -85,8 +85,6 @@ def pack_structure(content):
     Pack all children of the content stucture into a message.
     Return the content as a serialized container object.
     """
-    log.debug('pack_structure: Packing wrapper:\n'+str(content))
-
 
     repo = getattr(content, 'Repository', None)
     if repo is None:

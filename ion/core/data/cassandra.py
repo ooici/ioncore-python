@@ -170,9 +170,10 @@ class CassandraIndexedStore(CassandraStore):
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
-        """
-        log.info("CassandraIndexedStore.__init__")       
-        CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
+        """   
+        CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)  
+        self._query_attribute_names = None
+            
         
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
@@ -187,11 +188,12 @@ class CassandraIndexedStore(CassandraStore):
             index_cols = {}
         else:
             index_cols = dict(**index_attributes)
+
             
-        log.info("key: %s value: %s index_attributes %s" % (key,value,index_cols))
-        yield self._check_index(index_attributes)
+        log.info(" index_attributes %s" % (index_cols))
+        yield self._check_index(index_cols)
         index_cols.update({"value":value, "has_key":"1"})
-        log.info("Adding value to the row")
+        
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
     @defer.inlineCallbacks
@@ -207,25 +209,34 @@ class CassandraIndexedStore(CassandraStore):
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         defer.succeed(None)
 
+    
     @defer.inlineCallbacks
     def _check_index(self, index_attributes):
         """
         Ensure that the index_attribute keys are columns that are indexed in the column family.
+        Ensure that the column values are of type str.
         
-        This method raises an exception if the index_attribute dictionary has keys that 
-        are not the names of the columns indexed.
+        This method raises an IndexStoreError exception if the index_attribute dictionary has keys that 
+        are not the names of the columns indexed. 
         """
-        query_attributes = yield self.get_query_attributes()
-        query_attribute_names = set(query_attributes)
-        index_attribute_names = set(index_attributes.keys())
-        log.info(index_attribute_names)
-        log.info(query_attribute_names)
+        #Get the set of indexes the first time this is called.
+        if self._query_attribute_names is None:
+            query_attributes =  yield self.get_query_attributes()
+            self._query_attribute_names = set(query_attributes)
         
-        if not index_attribute_names.issubset(query_attribute_names):
-            bad_attrs = index_attribute_names.difference(query_attribute_names)
+        index_attribute_names = set(index_attributes.keys())
+        
+        if not index_attribute_names.issubset(self._query_attribute_names):
+            bad_attrs = index_attribute_names.difference(self._query_attribute_names)
             raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
-        defer.returnValue(None)
+                
+        isstr = lambda x: isinstance(x, str)
+        alltrue = lambda x,y: x and y
+        all_strings = reduce(alltrue, map(isstr, index_attributes.values()), True)
+        if not all_strings:
+            raise IndexStoreError("Values for the indexed columns must be of type str.")
+        
 
     @defer.inlineCallbacks    
     def query(self, query_predicates, row_count=100):
@@ -252,9 +263,10 @@ class CassandraIndexedStore(CassandraStore):
             args = {'column_name':query_tuple[0], 'op':new_pred, 'value': query_tuple[1]}
             return IndexExpression(**args)
         selection_predicates = map(fix_preds, predicates)
-        log.info("selection_predicate %s " % (selection_predicates,))
-
+        log.info("Calling get_indexed_slices selection_predicate %s " % (selection_predicates,))
+        
         rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates, count=row_count)
+        log.info("Got rows back")
         result ={}
         for row in rows:
             row_vals = {}

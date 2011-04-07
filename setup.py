@@ -32,12 +32,12 @@ setup( name = 'ioncore',
        package_data = {
            'twisted.plugins' : [
                'twisted/plugins/cc.py'
-                               ]
+                               ],
+           'ion':['core/messaging/*.xml']
                       },
        test_suite = 'ion',
        install_requires = [
            'Twisted==10.2.0', 
-           'carrot==0.10.15-txamqp', 
            'txamqp==0.3',
            'simplejson==2.1.2', 
            'msgpack-python==015final',

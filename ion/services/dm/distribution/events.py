@@ -14,6 +14,8 @@ from ion.services.dm.distribution.publisher_subscriber import Publisher, Subscri
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+import time
+
 EVENTS_EXCHANGE_POINT="events.topic"
 
 EVENT_MESSAGE_TYPE                          = object_utils.create_type_identifier(object_id=2322, version=1)
@@ -141,6 +143,10 @@ class EventPublisher(Publisher):
         @returns The event message.
         """
         assert self.msg_type
+
+        if not kwargs.has_key('datetime'):
+            log.debug("Automatically setting 'datetime' field")
+            kwargs['datetime'] = time.time()
 
         # copy kwargs into local list
         msgargs = kwargs.copy()

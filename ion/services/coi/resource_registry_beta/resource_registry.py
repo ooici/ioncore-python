@@ -52,20 +52,20 @@ class ResourceRegistryService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        
+
         #assert isinstance(backend, store.IStore)
         #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
-        
+
         self.push = self.workbench.push
         self.pull = self.workbench.pull
         self.fetch_blobs = self.workbench.fetch_blobs
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
-        
+
         self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='No Data Store service name provided!'))
-        
+
         log.info('ResourceRegistryService.__init__()')
-        
+
     @defer.inlineCallbacks
     def op_register_resource_instance(self, request, headers, msg):
         """
@@ -83,8 +83,8 @@ class ResourceRegistryService(ServiceProcess):
 
 
         response = yield self._register_resource_instance(request, headers)
-       
-        
+
+
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -118,14 +118,14 @@ class ResourceRegistryService(ServiceProcess):
 
         # Create the response object...
         response = yield self.message_client.create_instance(MessageContentTypeID=None)
-        
+
         # Create a new repository to hold this resource
         resource_repository = self.workbench.create_repository(RESOURCE_TYPE)
         resource = resource_repository.root_object
 
         # Set the identity of the resource
         resource.identity = resource_repository.repository_key
-            
+
         # Create the new resource object
         try:
             res_obj = resource_repository.create_object(resource_description.object_type)
@@ -133,7 +133,7 @@ class ResourceRegistryService(ServiceProcess):
             raise ResourceRegistryError(ex, response.ResponseCodes.NOT_FOUND)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
-            
+
         # Name and Description is set by the resource client
         resource.name = resource_description.name
         resource.description = resource_description.description
@@ -144,10 +144,10 @@ class ResourceRegistryService(ServiceProcess):
         # Set the resource type
         resource.resource_type = resource_description.resource_type
 
-        
+
         # State is set to new by default
         resource.lcs = resource.LifeCycleState.NEW
-        
+
         resource_repository.commit('Created a new resource!')
 
         # Add the association to the user
@@ -155,13 +155,13 @@ class ResourceRegistryService(ServiceProcess):
         ownership_association = self.workbench.create_association(resource_repository, self.owned_by, user)
 
 
-        # push the new resource to the data store        
+        # push the new resource to the data store
         yield self.push(self.datastore_service, [resource_repository, ownership_association])
         # If the push fails hand back the workbench error
-        
+
         response.MessageResponseCode = response.ResponseCodes.OK
         response.MessageResponseBody = resource.identity
-            
+
         defer.returnValue(response)
 
 
@@ -196,9 +196,9 @@ class ResourceRegistryService(ServiceProcess):
         Service operation: Find the registered instances that matches the service class
         """
         raise NotImplementedError, "Interface Method Not Implemented"
-    
-    
-    
+
+
+
 class ResourceRegistryClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
@@ -217,13 +217,13 @@ class ResourceRegistryClient(ServiceClient):
         @param RESOURCE_TYPE
         """
         yield self._check_init()
-        
+
         content, headers, msg = yield self.rpc_send('register_resource_instance', RESOURCE_TYPE)
-        
+
         log.info('Resource Registry Service reply with new resource ID: '+str(content))
         defer.returnValue(content)
 
-        
+
 
     #@defer.inlineCallbacks
     def lookup_resource_instance(self):
@@ -261,4 +261,3 @@ class ResourceRegistryClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(ResourceRegistryService)
-

@@ -33,7 +33,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'module':'ion.services.coi.datastore',
          'class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
+                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
         {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
         {'name':'resource_registry1',
          'module':'ion.services.coi.resource_registry_beta.resource_registry',
