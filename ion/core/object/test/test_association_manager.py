@@ -31,7 +31,7 @@ from ion.test.iontest import IonTestCase
 
 
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
-
+PREDICATE_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 
 class AssociationInstanceTest(unittest.TestCase):
@@ -48,8 +48,8 @@ class AssociationInstanceTest(unittest.TestCase):
 
         self.subject = subject
 
-        predicate = self.wb.create_repository(ADDRESSLINK_TYPE)
-        predicate.root_object.title = 'predicate'
+        predicate = self.wb.create_repository(PREDICATE_TYPE)
+        predicate.root_object.word = 'predicate'
         predicate.commit('a predicate')
 
         self.predicate = predicate
@@ -143,4 +143,6 @@ class AssociationInstanceTest(unittest.TestCase):
 
 
 
+    def test_str(self):
 
+        log.info(str(self.obj.associations_as_object))

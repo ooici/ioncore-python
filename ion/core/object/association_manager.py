@@ -53,6 +53,9 @@ class AssociationManager(object):
 
 
     def __str__(self):
+        """
+        @Brief Handy helper method to print out the content of an association manager.
+        """
 
         ret = 'Association Manager Object! Current predicates and number of associations:\n'
         for k, v in self.predicate_sorted_associations.iteritems():
@@ -87,6 +90,14 @@ class AssociationManager(object):
 
         predicate = association.PredicateReference.key
 
+
+        # Make a not of the human readable predicate in this key!
+        predicate_repo = association._workbench.get_repository(predicate)
+        if predicate_repo is not None and predicate_repo.status == predicate_repo.UPTODATE:
+            value = predicate_repo.root_object.word
+            self.predicate_map[predicate_repo.repository_key] = value
+
+
         associations = self.predicate_sorted_associations.get(predicate, None)
 
         if associations is None:
@@ -119,13 +130,10 @@ class AssociationManager(object):
     def get_associations_by_predicate(self, predicate):
         """
         Return the set of associations for a particular predicate
+        @param predicate is the ID of the predicate in question
         """
-        if predicate in self.predicate_map:
-            predicate_id = self.predicate_map.get(predicate)
-        else:
-            predicate_id = predicate
 
-        return self.predicate_sorted_associations.get(predicate_id,set())
+        return self.predicate_sorted_associations.get(predicate,set())
 
     def get_associations(self):
         """
