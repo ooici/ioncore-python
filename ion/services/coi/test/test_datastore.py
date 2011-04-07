@@ -12,6 +12,8 @@ from twisted.internet import defer
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+from ion.util.itv_decorator import itv
+
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
@@ -24,10 +26,8 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES
 
-
-from ion.core.data import store
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -39,13 +39,10 @@ class DataStoreTest(IonTestCase):
     """
     Testing Datastore service.
     """
-    # Hold references to preserve state between runs!
-    store_class = store.Store
-    index_store_class = store.IndexStore
 
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True}}
                 },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
@@ -58,10 +55,6 @@ class DataStoreTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
 
 
         self.sup = yield self._spawn_processes(self.services)
@@ -117,10 +110,6 @@ class DataStoreTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
-
-        store.Store.kvs.clear()
-        store.IndexStore.indices.clear()
-        store.IndexStore.kvs.clear()
 
         yield self._shutdown_processes()
         yield self._stop_container()
@@ -364,6 +353,7 @@ class DataStoreTest(IonTestCase):
         defaults.update(ION_RESOURCE_TYPES)
         defaults.update(ION_DATASETS)
         defaults.update(ION_IDENTITIES)
+        defaults.update(ION_AIS_RESOURCES)
 
         for key, value in defaults.items():
 
@@ -402,48 +392,29 @@ class DataStoreTest(IonTestCase):
 
 
 
-
-"""
-
-class StoreServiceBackedDataStoreTest(DataStoreTest):
-
-
-    services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
-            {'name':'store_service','module':'ion.core.data.store_service','class':'StoreService'},
-
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient',
-                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient',
-                          PRELOAD_CFG:{ION_DATASETS_CFG:True}}
-                },
-            {'name':'workbench_test1',
-             'module':'ion.core.object.test.test_workbench',
-             'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
-        ]
-"""
-
-'''
 class CassandraBackedDataStoreTest(DataStoreTest):
 
 
-    services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
 
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
-                },
-            {'name':'workbench_test1',
-             'module':'ion.core.object.test.test_workbench',
-             'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
-        ]
+    services=[]
+    services.append(
+        {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+         'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                      BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
+                      PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
+                      "username":'Need Uname',
+                      "password":'Need Password',
+                       }
+                })
 
-'''
+    services.append(DataStoreTest.services[1])
+
+
+    @itv(CONF)
+    def setUp(self):
+
+        DataStoreTest.setUp(self)
+
 
 
 '''

@@ -250,7 +250,7 @@ class Repository(object):
         if repository_key:
             self._dotgit.repositorykey = repository_key
         else:
-            self._dotgit.repositorykey = pu.create_guid().upper()
+            self._dotgit.repositorykey = pu.create_guid()
 
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
