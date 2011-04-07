@@ -15,7 +15,6 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient, \
 
 from uuid import uuid4
 from ion.test.iontest import IonTestCase
-from twisted.trial import unittest
 from ion.core import ioninit
 from ion.core.object import object_utils
 from ion.core.exception import ReceivedApplicationError
@@ -120,18 +119,6 @@ class PST(IonTestCase):
 
         yield self.psc.undeclare_exchange_space(msg)
 
-    #noinspection PyUnreachableCode
-    @defer.inlineCallbacks
-    def test_bad_xs_creation(self):
-        raise unittest.SkipTest("EMS doesn't do paramater validation yet")
-        # Make sure it fails if you skip the argument
-
-        msg = yield self.create_message(XS_TYPE)
-
-        xs_id = yield self.psc.declare_exchange_space(msg)
-
-        self.failIf(len(xs_id.id_list) > 0)
-
     @defer.inlineCallbacks
     def test_xs_query(self):
 
@@ -193,6 +180,17 @@ class PST(IonTestCase):
     def test_declare_topic(self):
         xs, xp, topic_id = yield self._declare_topic()
         self.failUnless(len(topic_id.id_list) > 0)
+
+
+    @defer.inlineCallbacks
+    def test_multi_declare_topic(self):
+        yield self._declare_topic()
+        yield self._declare_topic()
+        yield self._declare_topic()
+        yield self._declare_topic()
+        xs, xp, topic_id = yield self._declare_topic()
+        self.failUnless(len(topic_id.id_list) > 0)
+
 
     @defer.inlineCallbacks
     def test_undeclare_topic(self):
@@ -292,16 +290,6 @@ class PST(IonTestCase):
         msg.regex = '.+'
         idlist = yield self.psc.query_subscribers(msg)
         self.failUnless(len(idlist.id_list) > 0)
-
-    @defer.inlineCallbacks
-    def test_query_no_regex(self):
-        msg = yield self.create_message(REGEX_TYPE)
-        try:
-            yield self.psc.query_subscribers(msg)
-        except ReceivedApplicationError:
-            return
-
-        self.fail('Did not get the exception I expected on bad message')
 
     @defer.inlineCallbacks
     def _declare_q(self):

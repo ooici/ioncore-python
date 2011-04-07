@@ -55,6 +55,7 @@ exchange_space_rtn = 'exchange_space_resource_type'
 exchange_point_rtn = 'exchange_point_resource_type'
 publisher_rtn = 'publisher_resource_type'
 subscriber_rtn = 'subscriber_type'
+queue_rtn = 'queue_type'
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
@@ -143,6 +144,15 @@ datasource_res_type_name:{ID_CFG:'B8B7BB73-F578-4604-B3B3-088D28F9A7DC',
                                     'meta_description':'protomessage?'}
                         },
 
+queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
+             TYPE_CFG: resource_type_type,
+             NAME_CFG:queue_rtn,
+             DESCRIPTION_CFG:'A resource for queues inside the PSC',
+             CONTENT_CFG:{'object_identifier':2321,
+                          'object_version':1,
+                          'meta_description':'protomessage?'}
+            },
+
 default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
@@ -160,14 +170,13 @@ EXCHANGE_SPACE_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
 EXCHANGE_POINT_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
 PUBLISHER_RES_TYPE_ID = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
 SUBSCRIBER_RES_TYPE_ID = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
+QUEUE_RES_TYPE_ID = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
 RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
-
 DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
-
 
 ##### Define Predicates #####:
 
