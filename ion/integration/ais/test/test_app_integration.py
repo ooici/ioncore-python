@@ -108,14 +108,14 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
+        #reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.minLongitude = -74.13
         reqMsg.message_parameters_reference.maxLongitude = -73.50
-        reqMsg.message_parameters_reference.minVertical  = 20
+        #reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
+        #reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
 
         
