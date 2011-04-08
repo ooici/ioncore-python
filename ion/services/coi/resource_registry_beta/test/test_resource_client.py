@@ -13,8 +13,7 @@ from twisted.trial import unittest
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from net.ooici.core.type import type_pb2
-from net.ooici.play import addressbook_pb2
+
 from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
 from ion.core.object import object_utils
@@ -29,10 +28,6 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, ANONYMOUS_USER_ID
 
 
-
-from ion.core.data import store
-
-
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
@@ -43,19 +38,9 @@ class ResourceClientTest(IonTestCase):
     """
     Testing service classes of resource registry
     """
-
-    # Hold references to preserve state between runs!
-    store_class = store.Store
-    index_store_class = store.IndexStore
         
     @defer.inlineCallbacks
     def setUp(self):
-
-
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
-
 
         yield self._start_container()
         #self.sup = yield self._start_core_services()
@@ -72,7 +57,7 @@ class ResourceClientTest(IonTestCase):
         
     @defer.inlineCallbacks
     def tearDown(self):
-        # You must explicitly clear the registry in case cassandra is used as a back end!
+        yield self._shutdown_processes()
         yield self._stop_container()
         
     @defer.inlineCallbacks

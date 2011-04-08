@@ -51,7 +51,11 @@ identity_res_type_name = 'identity_resource_type'
 datasource_res_type_name = 'datasource_resource_type'
 resource_type_type_name = 'resource_type_type'
 default_resource_type_name = 'default_resource_type'
-
+exchange_space_rtn = 'exchange_space_resource_type'
+exchange_point_rtn = 'exchange_point_resource_type'
+publisher_rtn = 'publisher_resource_type'
+subscriber_rtn = 'subscriber_type'
+queue_rtn = 'queue_type'
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
@@ -74,6 +78,45 @@ topic_res_type_name:{ID_CFG:'3BD84B48-073E-4833-A62B-0DE4EC106A34',
                                   'object_version':1,
                                   'meta_description':'protomessage?'}
                      },
+
+exchange_space_rtn:{ID_CFG:'5bf51324-0bd8-43a6-9551-4dbaf6ccd1a2',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_space_rtn,
+                    DESCRIPTION_CFG:'An exchange space resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2315,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+
+exchange_point_rtn:{ID_CFG:'c092163e-995b-40ef-9ff2-d49c1dccf8c5',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_point_rtn,
+                    DESCRIPTION_CFG:'An exchange point resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2316,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+publisher_rtn:{ID_CFG:'d4c17990-a7d0-47a7-911a-138ee7bfb112',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:publisher_rtn,
+                    DESCRIPTION_CFG:'A publisher resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2318,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+
+subscriber_rtn:{ID_CFG:'bdf80fd1-8088-4860-87e5-b04676320edc',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_space_rtn,
+                    DESCRIPTION_CFG:'A subscriber resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2319,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
 
 dataset_res_type_name:{ID_CFG:'487594C6-3D10-4DAA-A8FF-83E1E0EFB964',
                        TYPE_CFG:resource_type_type,
@@ -101,6 +144,15 @@ datasource_res_type_name:{ID_CFG:'B8B7BB73-F578-4604-B3B3-088D28F9A7DC',
                                     'meta_description':'protomessage?'}
                         },
 
+queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
+             TYPE_CFG: resource_type_type,
+             NAME_CFG:queue_rtn,
+             DESCRIPTION_CFG:'A resource for queues inside the PSC',
+             CONTENT_CFG:{'object_identifier':2321,
+                          'object_version':1,
+                          'meta_description':'protomessage?'}
+            },
+
 default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
@@ -114,13 +166,17 @@ default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
 
 # Extract Resource ID_CFGs for use in services and tests
 TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
+EXCHANGE_SPACE_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
+EXCHANGE_POINT_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
+PUBLISHER_RES_TYPE_ID = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
+SUBSCRIBER_RES_TYPE_ID = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
+QUEUE_RES_TYPE_ID = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
 RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
 DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
-
 
 ##### Define Predicates #####:
 

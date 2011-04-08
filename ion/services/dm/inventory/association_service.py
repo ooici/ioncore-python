@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/association_service.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief A service to provide indexing and search capability of objects in the datastore
 """
 
@@ -16,7 +17,11 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data import cassandra
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY 
+from ion.core.data.storage_configuration_utility import  BRANCH_NAME, SUBJECT_KEY,  SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE 
+from ion.core.data.storage_configuration_utility import  RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH
+
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_LIFE_CYCLE_STATE_ID, TYPE_OF_ID
 
@@ -64,13 +69,20 @@ class AssociationService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
 
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
-
         index_store_class = pu.get_class(index_store_class_name)
         assert store.IIndexStore.implementedBy(index_store_class), \
-            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'
-
-
-        self.index_store = yield defer.maybeDeferred(index_store_class, self, **{'indices':COMMIT_INDEXED_COLUMNS})
+            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'       
+                # Service life cycle state. Initialize service here. Can use yields.
+        self._username = self.spawn_args.get("username", CONF.getValue("username", None))
+        self._password = self.spawn_args.get("password", CONF.getValue("password",None))
+        
+        if issubclass(index_store_class, cassandra.CassandraIndexedStore):
+            log.info("Instantiating Cassandra Index Store")
+            self.index_store = yield defer.maybeDeferred(index_store_class,  **{"username": self._username, "password": self._password})
+            self.index_store.initialize()
+            yield self.register_life_cycle_object(self.index_store)
+        else:
+            self.index_store = yield defer.maybeDeferred(index_store_class,  **{'indices':COMMIT_INDEXED_COLUMNS})
 
         log.info('SLC_INIT Association Service')
 
@@ -208,7 +220,7 @@ class AssociationService(ServiceProcess):
 
 
             if life_cycle_pair:
-                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
 
             # Get all the results that meet the type / state query
@@ -239,7 +251,7 @@ class AssociationService(ServiceProcess):
                 q.add_predicate_gt(BRANCH_NAME,'')
 
                 if life_cycle_pair:
-                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
                 if type_of_pair:
                     q.add_predicate_eq(RESOURCE_OBJECT_TYPE, type_of_pair.object.key)
@@ -539,7 +551,7 @@ class AssociationService(ServiceProcess):
         if not rows:
             response.result = False
         elif len(rows)==1:
-            repsonse.result = True
+            response.result = True
         else:
             raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
 

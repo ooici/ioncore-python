@@ -27,13 +27,17 @@ from ion.services.coi.exchange.exchange_management import ExchangeManagementClie
 
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, TOPIC_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
+    TOPIC_RESOURCE_TYPE_ID, EXCHANGE_SPACE_RES_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID, \
+    PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, QUEUE_RES_TYPE_ID
 
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 # References to protobuf message/object definitions
+XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
 PUBLISHER_TYPE = object_utils.create_type_identifier(object_id=2310, version=1)
 SUBSCRIBER_TYPE = object_utils.create_type_identifier(object_id=2311, version=1)
@@ -48,8 +52,6 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 # Query and response types
 REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
-XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
-XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 
 # Resource GPB objects
 XS_RES_TYPE = object_utils.create_type_identifier(object_id=2315, version=1)
@@ -95,26 +97,17 @@ class PubSubService(ServiceProcess):
                                           version='0.1.2',
                                           dependencies=['DataStoreService',
                                                         'ExchangeManagementService',
-                                                        'ResourceRegistryService'])
+                                                        'ResourceRegistryService',
+                                                        'AssociationService'])
 
     def __init__(self, *args, **kwargs):
         super(PubSubService, self).__init__(*args, **kwargs)
-        self.asc = None
 
     def slc_init(self):
         self.ems = ExchangeManagementClient(proc=self)
         self.rclient = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
-
-        # @bug Dictionaries to cover for lack of find/query in registry
-        self.xs_list = dict()
-        self.xp_list = dict()
-        self.topic_list = dict()
-        self.pub_list = dict()
-        self.sub_list = dict()
-        self.q_list = dict()
-        self.binding_list = dict()
 
     def _check_msg_type(self, request, expected_type):
         """
@@ -127,6 +120,18 @@ class PubSubService(ServiceProcess):
             log.error('Bad message type, throwing exception')
             raise PSSException('Bad message type!',
                                request.ResponseCodes.BAD_REQUEST)
+
+    @defer.inlineCallbacks
+    def _key_to_field(self, key_string, field_name):
+        """
+        """
+        idref = yield self.mc.create_instance(IDREF_TYPE)
+        idref.key = key_string
+
+        resource = yield self.rclient.get_instance(idref)
+
+        defer.returnValue(getattr(resource, field_name))
+
 
     def _key_to_idref(self, key_string, object):
         """
@@ -152,95 +157,82 @@ class PubSubService(ServiceProcess):
         return self.rclient.reference_instance(object)
 
     @defer.inlineCallbacks
-    def _do_topic_registry_query(self, request, msg):
+    def _do_registry_query(self, regex, resource_typedef):
         """
-        @brief Query resource registry for specified stuff.
-        Blah blah blah.
-        @note For now, hardwired for topics
-        @note This is Stuebe magic. You (and I) are not expected to understand it.
-        @See https://github.com/ooici/ioncore-python/blob/develop/ion/services/coi/datastore_bootstrap/ion_preload_config.py#L59
+        @brief Query registry, apply regex to result
+        @param regex regex to search
+        @param msg Message provides context for reply_ok
+        @param resource_typedef Stuebe magic field to denote what we're listing
+        @retval Array of key strings
         """
-        log.debug('_DTRQ starting')
-
+        log.debug('registry query stirs the surface of the lake')
         query = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
         pair = query.pairs.add()
 
         log.debug('creating object')
         pred_ref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
         pred_ref.key = TYPE_OF_ID
-
         pair.predicate = pred_ref
 
         log.debug('creating idref')
         type_ref = query.CreateObject(IDREF_TYPE)
-        type_ref.key = TOPIC_RESOURCE_TYPE_ID
+        type_ref.key = resource_typedef
 
         pair.object = type_ref
 
         log.debug('sending off the query')
         result = yield self.asc.get_subjects(query)
 
-        # @todo Filtering here and not in the registry performs more slowly
-        log.debug('regex filtering')
+        # @todo Filtering here and not in the registry performs more slowly. Move to registry.
+        log.debug('regex filtering %d registry entries' % len(result.idrefs))
         idlist = []
-        p = re.compile(request.regex)
+        p = re.compile(regex)
         for cur_ref in result.idrefs:
-            if p.match(cur_ref.key):
+            if p.search(cur_ref.key):
                 idlist.append(cur_ref.key)
 
-        response = yield self.mc.create_instance(IDLIST_TYPE)
-        response.MessageResponseCode = response.ResponseCodes.OK
-
-        for key in idlist:
-            self._key_to_idref(cur_ref.key, response)
-                                
-        log.debug('dtrq done')
-        yield self.reply_ok(msg, response)
-
+        log.debug('Registry query and filter done, %d results from %d records' %
+                  (len(idlist), len(result.idrefs)))
+        defer.returnValue(idlist)
 
     @defer.inlineCallbacks
-    def _do_query(self, request, res_list, msg):
+    def _do_registry_query_and_reply(self, regex, msg, resource_typedef):
         """
-        @brief Query internal dictionaries, create reply message, send same. Helper for the
-        various queries.
-        @param request Object containing a regex attribute
-        @param res_list Dictionary whose values we match against the regex
-        @param msg Ion message, with reply_ok method to invoke
-        @retval None
+        @retval None, sends reply off via reply_ok or reply_error
+        @gpb{Results,2312,1}
         """
-        # This is probably better written as a list comprehension. Or something.
-        idlist = []
-        p = re.compile(request.regex)
-        for cur_key, cur_entry in res_list.iteritems():
-            if p.match(cur_entry):
-                idlist.append(cur_key)
 
-        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(idlist)))
+        idlist = yield self._do_registry_query(regex, resource_typedef)
+
+        # Create response message
         response = yield self.mc.create_instance(IDLIST_TYPE)
-        response.MessageResponseCode = response.ResponseCodes.OK
 
-        # For each string in the dictionary, inflate into a casref/idref and add to message
-        for key in idlist:
-            self._key_to_idref(key, response)
+        log.debug('Converting keys to idrefs')
+        for cur_key in idlist:
+            self._key_to_idref(cur_key, response)
 
-        log.debug('Query complete')
+        log.debug('drqr done')
         yield self.reply_ok(msg, response)
 
-    def _reverse_find(self, data, search_value):
+    @defer.inlineCallbacks
+    def _rev_find(self, search_value, resource_type, field_name):
         """
-        @brief Look for a given value in a provided dictionary, return key that corresponds.
-        @note Probably a better way to solve this.
+        Prototyping an implementation of reverse find that uses the registry and
+        associations.
         @note To emulate the python dictionary, it raises KeyError if not found.
         """
-        rc = None
-        if not search_value in data.values():
-            raise KeyError('%s not in data', search_value)
+        log.debug('Reverse searching for "%s" in "%s"' % (search_value, field_name))
 
-        for key, value in data.iteritems():
-            if value == search_value:
-                rc = key
+        log.debug('Querying association service for list of references')
+        idref_list = yield self._do_registry_query('.+', resource_type)
 
-        return rc
+        # Now we have a list of topic IDREFS. Gotta pull and search same individually.
+        for cur_ref in idref_list:
+            cur_resource = yield self.rclient.get_instance(cur_ref)
+            if search_value == getattr(cur_resource, field_name):
+                defer.returnValue(cur_resource.ResourceIdentity)
+
+        raise KeyError('%s not in registry', search_value)
 
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
@@ -252,7 +244,8 @@ class PubSubService(ServiceProcess):
 
         # Already declared?
         try:
-            key = self._reverse_find(self.xs_list, request.exchange_space_name)
+            key = yield self._rev_find(request.exchange_space_name, EXCHANGE_SPACE_RES_TYPE_ID,
+                                      'exchange_space_name')
             log.info('Exchange space "%s" already created, returning %s' %
                      (request.exchange_space_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
@@ -293,10 +286,6 @@ class PubSubService(ServiceProcess):
         response.id_list[0] = xs_resource_id
         response.MessageResponseCode = response.ResponseCodes.OK
 
-        # save to list
-        log.debug('Saving to internal list...')
-        self.xs_list[xs_resource_id.key] = request.exchange_space_name
-
         log.debug('Responding...')
         yield self.reply_ok(msg, response)
         log.debug('DXS completed OK')
@@ -309,19 +298,9 @@ class PubSubService(ServiceProcess):
         log.debug('UDXS starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
-        log.debug('Looking for XS entry...')
-        try:
-            rc = self.xs_list[request.resource_reference.key]
-        except KeyError:
-            response = yield self.mc.create_instance(RESPONSE_TYPE)
-            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
-            yield self.reply_ok(msg, response)
-
-        log.debug('Found XS %s' % rc)
         # @todo Call EMS to remove the XS
         # @todo Remove resource record too
         log.warn('Here is where we ask EMS to remove the XS')
-        del(self.xs_list[request.resource_reference.key])
 
         yield self.reply_ok(msg)
 
@@ -332,9 +311,8 @@ class PubSubService(ServiceProcess):
         """
         log.debug('qxs starting')
         self._check_msg_type(request, REGEX_TYPE)
-
-        log.debug('Looking for XS entries...')
-        yield self._do_query(request, self.xs_list, msg)
+        yield self._do_registry_query_and_reply(request.regex, msg,
+                                                EXCHANGE_SPACE_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_exchange_point(self, request, headers, msg):
@@ -347,7 +325,8 @@ class PubSubService(ServiceProcess):
 
         # Already declared?
         try:
-            key = self._reverse_find(self.xp_list, request.exchange_point_name)
+            key = yield self._rev_find(request.exchange_point_name, EXCHANGE_POINT_RES_TYPE_ID,
+                                       'exchange_point_name')
             log.info('Exchange point "%s" already created, returning %s' %
                      (request.exchange_point_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
@@ -357,25 +336,23 @@ class PubSubService(ServiceProcess):
         except KeyError:
             log.debug('XP not found, will go ahead and create')
 
-        # Lookup the XS ID in the dictionary
-        try:
-            xs_name = self.xs_list[request.exchange_space_id.key]
-            log.debug('Found XS %s/%s' % (request.exchange_space_id.key, xs_name))
-        except KeyError:
-            raise PSSException('Unable to locate XS ID %s' % request.exchange_space_id.key,
-                               request.ResponseCodes.BAD_REQUEST)
+        xs_resource = yield self.rclient.get_instance(request.exchange_space_id)
 
         # Found XS ID, now call EMS
         description = str(time.time())
-        xpid = yield self.ems.create_exchangename(request.exchange_point_name, description, xs_name)
+        xpid = yield self.ems.create_exchangename(request.exchange_point_name,
+                                                  description,
+                                                  xs_resource.exchange_space_name)
 
-        log.debug('EMS completed, returned XP ID "%s"' % xpid.resource_reference.key)
+        log.debug('EMS completed, returned XP ID "%s"' %
+                  xpid.resource_reference.key)
 
-        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, 'Niemand')
+        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE,
+                                                         'Niemand')
 
         log.debug('creating xp resource and populating')
 
-        xp_resource.exchange_space_name = xs_name
+        xp_resource.exchange_space_name = xs_resource.exchange_space_name
         xp_resource.exchange_space_id = request.exchange_space_id
         xp_resource.exchange_point_id = xpid.resource_reference
         xp_resource.exchange_point_name = request.exchange_point_name
@@ -389,9 +366,6 @@ class PubSubService(ServiceProcess):
         reply.id_list.add()
         reply.id_list[0] = xp_resource_id
 
-        log.debug('Saving XPID to internal list')
-        self.xp_list[xp_resource_id.key] = request.exchange_point_name
-
         log.debug('DXP responding')
         yield self.reply_ok(msg, reply)
         log.debug('DXP completed OK')
@@ -404,15 +378,6 @@ class PubSubService(ServiceProcess):
         log.debug('UDXP starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
-        # Try to lookup the XP in the dictionary
-        log.debug('Looking for XP ID %s' % request.resource_reference.key)
-        try:
-            xp_name = self.xp_list[request.resource_reference.key]
-            log.debug('XP found, %s/%s' % (request.resource_reference.key, xp_name))
-        except KeyError:
-            raise PSSException('Unable to locate XP ID',
-                               request.ResponseCodes.BAD_REQUEST)
-
         # @todo Look up XS via XPID, call EMS to remove same...
         log.warn('This is where the Actual Work Goes...')
         yield self.reply_ok(msg)
@@ -422,16 +387,10 @@ class PubSubService(ServiceProcess):
         """
         @see PubSubClient.query_exchange_points
         """
-
         log.debug('Starting XP query')
         self._check_msg_type(request, REGEX_TYPE)
-
-        if not request.IsFieldSet('regex'):
-            raise PSSException('Bad message, regex missing',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.xp_list, msg)
+        yield self._do_registry_query_and_reply(request.regex,msg,
+                                                EXCHANGE_POINT_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_topic(self, request, headers, msg):
@@ -443,8 +402,10 @@ class PubSubService(ServiceProcess):
 
         # Already declared?
         try:
-            key = self._reverse_find(self.topic_list, request.topic_name)
-            log.info('Topic "%s" already created, returning %s' % (request.topic_name, key))
+            key = yield self._rev_find(request.topic_name,
+                                       TOPIC_RESOURCE_TYPE_ID, 'topic_name')
+            log.info('Topic "%s" already created, returning %s' %
+                     (request.topic_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)
@@ -452,18 +413,14 @@ class PubSubService(ServiceProcess):
         except KeyError:
             log.debug('Topic not found, will go ahead and create')
 
-        try:
-            xs_name = self.xs_list[request.exchange_space_id.key]
-            xp_name = self.xp_list[request.exchange_point_id.key]
-        except KeyError:
-            log.exception('Error looking up exchange space or point')
-            raise PSSException('Unable to look up exchange space or point',
-                               request.ResponseCodes.BAD_REQUEST)
+        xs_res = yield self.rclient.get_instance(request.exchange_space_id)
+        xp_res = yield self.rclient.get_instance(request.exchange_point_id)
 
         log.debug('Creating and populating the resource')
-        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE, 'Niemand')
-        topic_resource.exchange_space_name = xs_name
-        topic_resource.exchange_point_name = xp_name
+        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE,
+                                                            'Niemand')
+        topic_resource.exchange_space_name = xs_res.exchange_space_name
+        topic_resource.exchange_point_name = xp_res.exchange_point_name
         topic_resource.topic_name = request.topic_name
         topic_resource.exchange_space_id = request.exchange_space_id
         topic_resource.exchange_point_id = request.exchange_point_id
@@ -481,9 +438,6 @@ class PubSubService(ServiceProcess):
         reply.id_list.add()
         reply.id_list[0] = topic_ref
 
-        log.debug('Saving topic "%s"/"%s" to internal list...' % (topic_ref.key, request.topic_name))
-        self.topic_list[topic_ref.key] = request.topic_name
-
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
@@ -495,18 +449,7 @@ class PubSubService(ServiceProcess):
         log.debug('UDT starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
-        try:
-            log.debug('Looking for topic %s...' % request.resource_reference.key)
-            topic_name = self.topic_list[request.resource_reference.key]
-        except KeyError:
-            log.exception('Unable to locate topic!')
-            response = yield self.mc.create_instance(RESPONSE_TYPE)
-            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
-            yield self.reply_ok(msg, response)
-
-        log.debug('Topic %s found' % topic_name)
         # @todo Remove instance from resource registry
-        del(self.topic_list[request.resource_reference.key])
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
@@ -514,15 +457,10 @@ class PubSubService(ServiceProcess):
         """
         @see PubSubClient.query_topics
         """
-
-        log.debug('new topic query starting')
-        # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
+        log.debug('Topic query starting')
         self._check_msg_type(request, REGEX_TYPE)
-        if not request.IsFieldSet('regex'):
-            raise PSSException('Bad message, regex missing',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        yield self._do_topic_registry_query(request, msg)
+        yield self._do_registry_query_and_reply(request.regex,msg,
+                                                TOPIC_RESOURCE_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_publisher(self, request, headers, msg):
@@ -535,8 +473,11 @@ class PubSubService(ServiceProcess):
 
         # Already declared?
         try:
-            key = self._reverse_find(self.pub_list, request.publisher_name)
-            log.info('Publisher "%s" already created, returning %s' % (request.publisher_name, key))
+            key = yield self._rev_find(request.publisher_name,
+                                       PUBLISHER_RES_TYPE_ID,
+                                       'publisher_name')
+            log.info('Publisher "%s" already created, returning %s' \
+                    % (request.publisher_name, key))
             response = yield self.mc.create_instance(IDLIST_TYPE)
             self._key_to_idref(key, response)
             yield self.reply_ok(msg, response)
@@ -545,20 +486,21 @@ class PubSubService(ServiceProcess):
             log.debug('XS not found, will go ahead and create')
 
 
-        # Verify that IDs exist - not sure if this is the correct order or not...
-        try:
-            xs_name = self.xs_list[request.exchange_space_id.key]
-            xp_name = self.xp_list[request.exchange_point_id.key]
-            topic_name = self.topic_list[request.topic_id.key]
-        except KeyError:
-            log.exception('Error looking up publisher context!')
-            raise PSSException('Bad publisher request, cannot locate context',
-                               request.ResponseCodes.BAD_REQUEST)
+        # Verify that IDs exist
+        xs_res = yield self.rclient.get_instance(request.exchange_space_id)
+        xp_res = yield self.rclient.get_instance(request.exchange_point_id)
+        topic_res = yield self.rclient.get_instance(request.topic_id)
 
-        log.debug('Publisher context is %s/%s/%s' % (xs_name, xp_name, topic_name))
+        xs_name = xs_res.exchange_space_name
+        xp_name = xp_res.exchange_point_name
+        topic_name = topic_res.topic_name
+
+        log.debug('Publisher context is %s/%s/%s' % \
+                  (xs_name, xp_name, topic_name))
 
         log.debug('Creating and populating the publisher resource...')
-        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE, 'Niemand')
+        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE,
+                                                           'Niemand')
         publ_resource.exchange_space_id = request.exchange_space_id
         publ_resource.exchange_point_id = request.exchange_point_id
         publ_resource.topic_id = request.topic_id
@@ -576,9 +518,6 @@ class PubSubService(ServiceProcess):
         reply.id_list.add()
         reply.id_list[0] = pub_ref
 
-        log.debug('Saving publisher to internal list...')
-        self.pub_list[pub_ref.key] = request.publisher_name
-
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
@@ -588,55 +527,37 @@ class PubSubService(ServiceProcess):
         """
         log.debug('UDP starting')
         self._check_msg_type(request, REQUEST_TYPE)
-
-        # Try to lookup in the dictionary
-        log.debug('Looking for publ ID %s' % request.resource_reference.key)
-        try:
-            pub_name = self.pub_list[request.resource_reference.key]
-            log.debug('Publisher found, %s/%s' % (request.resource_reference.key, pub_name))
-        except KeyError:
-            raise PSSException('Unable to locate publisher ID %s' % request.resource_reference.key,
-                               request.ResponseCodes.BAD_REQUEST)
-
-        del(self.pub_list[request.resource_reference.key])
         # @todo Delete from registry
         log.warn('This is where the Actual Work Goes...')
-
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
     def op_query_publishers(self, request, headers, msg):
         log.debug('QP starting')
         self._check_msg_type(request, REGEX_TYPE)
-
-        if not request.IsFieldSet('regex'):
-            raise PSSException('Bad message, regex missing',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.pub_list, msg)
+        yield self._do_registry_query_and_reply(request.regex, msg,
+                                                PUBLISHER_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_subscribe(self, request, headers, msg):
         """
         @see PubSubClient.subscribe
         """
-
         log.debug('PSC subscribe starting')
         self._check_msg_type(request, SUBSCRIBER_TYPE)
 
-        try:
-            xs_name = self.xs_list[request.exchange_space_id.key]
-            xp_name = self.xp_list[request.exchange_point_id.key]
-            topic_name = self.topic_list[request.topic_id.key]
-        except KeyError:
-            log.exception('Error looking up subscription context!')
-            raise PSSException('Bad subscription request, cannot locate context',
-                               request.ResponseCodes.BAD_REQUEST)
+        xs_res = yield self.rclient.get_instance(request.exchange_space_id)
+        xp_res = yield self.rclient.get_instance(request.exchange_point_id)
+        topic_res = yield self.rclient.get_instance(request.topic_id)
+
+        xs_name = xs_res.exchange_space_name
+        xp_name = xp_res.exchange_point_name
+        topic_name = topic_res.topic_name
 
         # Save into registry
         log.debug('Saving subscription into registry')
-        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE, 'Niemand')
+        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE,
+                                                          'Niemand')
         sub_resource.exchange_space_id = request.exchange_space_id
         sub_resource.exchange_point_id = request.exchange_point_id
         sub_resource.topic_id = request.topic_id
@@ -650,8 +571,6 @@ class PubSubService(ServiceProcess):
         reply.id_list.add()
         reply.id_list[0] = sub_ref
 
-        log.debug('Saving %s/%s to internal list' % (sub_ref.key, request.subscriber_name))
-        self.sub_list[sub_ref.key] = request.subscriber_name
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
@@ -659,20 +578,8 @@ class PubSubService(ServiceProcess):
         """
         @see PubSubClient.unsubscribe
         """
-
         log.debug('Starting unsub')
         self._check_msg_type(request, REQUEST_TYPE)
-
-        try:
-            sub_name = self.sub_list[request.resource_reference.key]
-        except KeyError:
-            log.exception('Unable to locate subscription!')
-            raise PSSException('Could not locate subscription ID',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        log.debug('Deleting subscription for %s' % sub_name)
-        del(self.sub_list[request.resource_reference.key])
-
         # @todo Call EMS, delete from registry
         log.warn('Theres a wee bit of code left to do here....')
         yield self.reply_ok(msg)
@@ -681,13 +588,8 @@ class PubSubService(ServiceProcess):
     def op_query_subscribers(self, request, headers, msg):
         log.debug('QS starting')
         self._check_msg_type(request, REGEX_TYPE)
-
-        if not request.IsFieldSet('regex'):
-            raise PSSException('Bad message, regex missing',
-                               request.ResponseCodes.BAD_REQUEST)
-
-        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.sub_list, msg)
+        yield self._do_registry_query_and_reply(request.regex, msg,
+                                                SUBSCRIBER_RES_TYPE_ID)
 
     @defer.inlineCallbacks
     def op_declare_queue(self, request, headers, msg):
@@ -697,14 +599,13 @@ class PubSubService(ServiceProcess):
         log.debug('DQ starting')
         self._check_msg_type(request, QUEUE_TYPE)
 
-        try:
-            xs_name = self.xs_list[request.exchange_space_id.key]
-            xp_name = self.xp_list[request.exchange_point_id.key]
-            topic_name = self.topic_list[request.topic_id.key]
-        except KeyError:
-            log.exception('Error looking up queue context!')
-            raise PSSException('Bad queue request, cannot locate context',
-                               request.ResponseCodes.BAD_REQUEST)
+        xs_res = yield self.rclient.get_instance(request.exchange_space_id)
+        xp_res = yield self.rclient.get_instance(request.exchange_point_id)
+        topic_res = yield self.rclient.get_instance(request.topic_id)
+
+        xs_name = xs_res.exchange_space_name
+        xp_name = xp_res.exchange_point_name
+        topic_name = topic_res.topic_name
 
         log.debug('Queue context is %s/%s/%s' %
                   (xs_name, xp_name, topic_name))
@@ -712,10 +613,12 @@ class PubSubService(ServiceProcess):
         description = str(time.time())
 
         log.debug('Calling EMS to make the q')
-        yield self.ems.create_queue(request.queue_name, description, xs_name, xp_name)
+        yield self.ems.create_queue(request.queue_name,
+                                    description, xs_name, xp_name)
         
         log.debug('Creating registry object')
-        q_resource = yield self.rclient.create_instance(QUEUE_RES_TYPE, 'Niemand')
+        q_resource = yield self.rclient.create_instance(QUEUE_RES_TYPE,
+                                                        'Niemand')
 
         q_resource.exchange_space_id = request.exchange_space_id
         q_resource.exchange_point_id = request.exchange_point_id
@@ -727,15 +630,11 @@ class PubSubService(ServiceProcess):
         log.debug('Creating reference')
         q_ref = self._obj_to_ref(q_resource)
 
-        log.debug('Saving q into dictionary')
-        self.q_list[q_ref.key] = request.queue_name
-
         reply = yield self.mc.create_instance(IDLIST_TYPE)
         reply.id_list.add()
         reply.id_list[0] = q_ref
 
         yield self.reply_ok(msg, reply)
-
 
     @defer.inlineCallbacks
     def op_undeclare_queue(self, request, headers, msg):
@@ -746,19 +645,8 @@ class PubSubService(ServiceProcess):
         log.debug('Undeclare_q starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
-        # Try to lookup in the dictionary
-        log.debug('Looking for queue ID %s' % request.resource_reference.key)
-        try:
-            q_name = self.q_list[request.resource_reference.key]
-            log.debug('Q found, %s/%s' % (request.resource_reference.key, q_name))
-        except KeyError:
-            raise PSSException('Unable to locate queue ID %s' % request.resource_reference.key,
-                               request.ResponseCodes.BAD_REQUEST)
-
-        del(self.q_list[request.resource_reference.key])
         # @todo Delete from registry
         log.warn('This is where the Actual Work Goes...')
-
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
@@ -771,25 +659,32 @@ class PubSubService(ServiceProcess):
 
         log.debug('Looking up queue for binding....')
         try:
-            q_id = self._reverse_find(self.q_list, request.queue_name)
-            q_entry = yield self.rclient.get_instance(q_id)
-
-            xs_name = self.xs_list[q_entry.exchange_space_id.key]
-            xp_name = self.xp_list[q_entry.exchange_point_id.key]
-            topic_name = self.topic_list[q_entry.topic_id.key]
+            q_id = yield self._rev_find(request.queue_name,
+                                        QUEUE_RES_TYPE_ID, 'queue_name')
         except KeyError:
             log.exception('Unable to locate queue for binding!')
             raise PSSException('AB error in lookup',
                                request.ResponseCodes.BAD_REQUEST)
+
+        q_entry = yield self.rclient.get_instance(q_id)
+        xs_res = yield self.rclient.get_instance(q_entry.exchange_space_id)
+        xp_res = yield self.rclient.get_instance(q_entry.exchange_point_id)
+        topic_res = yield self.rclient.get_instance(q_entry.topic_id)
+
+        xs_name = xs_res.exchange_space_name
+        xp_name = xp_res.exchange_point_name
+        topic_name = topic_res.topic_name
 
         log.debug('Ready for EMS with %s/%s/%s and %s' % \
                   (xs_name, xp_name, topic_name, request.queue_name))
         
         description = str(time.time())
         rc = yield self.ems.create_binding('NoName', description,
-                                           xs_name, xp_name, request.queue_name, topic_name)
+                                           xs_name, xp_name,
+                                           request.queue_name, topic_name)
 
-        b_resource = yield self.rclient.create_instance(BINDING_RES_TYPE, 'Niemand')
+        b_resource = yield self.rclient.create_instance(BINDING_RES_TYPE,
+                                                        'Niemand')
         b_resource.queue_name = request.queue_name
         b_resource.binding = request.binding
         b_resource.queue_id = self._obj_to_ref(q_entry)

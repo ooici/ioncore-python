@@ -665,7 +665,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
                     attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
-                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
 
 
                 elif  root_type == TERMINOLOGY_TYPE:
@@ -832,7 +832,6 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Cassandra Index Store")
             self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE],  **{"username": self._username, "password": self._password})
-            self.c_store.initialize()
             yield self.register_life_cycle_object(self.c_store)
             
         else:
@@ -849,7 +848,6 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Store")
             self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE],  **{"username": self._username, "password": self._password})
-            self.b_store.initialize()
             yield self.register_life_cycle_object(self.b_store)
         else:
 
