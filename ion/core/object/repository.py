@@ -100,6 +100,7 @@ class IndexHash(dict):
         """ D.copy() -> a shallow copy of D """
         raise NotImplementedError('IndexHash does not support copy')
 
+
     @staticmethod # known case
     def fromkeys(S, v=None):
         """
@@ -333,14 +334,14 @@ class Repository(object):
 
         self._dotgit.Invalidate()
 
-        self._workspace = None
-        self.index_hash = None
-        self._commit_index = None
+        self._workspace.clear()
+        self.index_hash.clear()
+        self._commit_index.clear()
         self._current_branch = None
-        self.branchnicknames = None
+        self.branchnicknames.clear()
         self._merge_from = None
-        self._stash = None
-        self._upstream = None
+        self._stash.clear()
+        self._upstream.clear()
         self._process = None
 
 
@@ -1283,4 +1284,48 @@ class Repository(object):
         object_utils.set_type_from_obj(value, tp)
         #link.type = object_utils.get_type_from_obj(value)
             
-    
+
+class MergeContainer(object):
+
+    def __init__(self):
+
+
+        self._workspace = {}
+        """
+        A dictionary containing objects which are not yet indexed, linked by a
+        counter refrence in the current workspace
+        """
+
+        self._workspace_root = None
+        """
+        Pointer to the current root object in the workspace
+        """
+
+
+        self.index_hash = IndexHash()
+        """
+        All content elements are stored here - from incoming messages and
+        new commits - everything goes here. Now it can be decoded for a checkout
+        or sent in a message.
+        """
+
+
+    @property
+    def root_object(self):
+        return self._workspace_root
+
+
+    def clear(self):
+        """
+        Clear the repository in preparation for python garbage collection
+        """
+         # Do some clean up!
+        for item in self._workspace.itervalues():
+            item.Invalidate()
+
+        self._workspace.clear()
+        self.index_hash.clear()
+        self._workspace_root = None
+
+
+
