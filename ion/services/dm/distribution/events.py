@@ -25,6 +25,8 @@ RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE       = object_utils.create_type_identifie
 TRIGGER_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2324, version=1)
 RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifier(object_id=2325, version=1)
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
+NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=7008, version=1)
+DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=7009, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
@@ -32,6 +34,8 @@ CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
 DATASOURCE_UPDATE_EVENT_ID = 1101
 DATASET_MODIFICATION_EVENT_ID = 1111
+NEW_SUBSCRIPTION_EVENT_ID = 1201
+DEL_SUBSCRIPTION_EVENT_ID = 1202
 SCHEDULE_EVENT_ID = 2001
 LOGGING_ERROR_EVENT_ID = 3002
 LOGGING_CRITICAL_EVENT_ID = 3001
@@ -261,6 +265,24 @@ class DatasetModificationEventPublisher(ResourceModifiedEventPublisher):
     """
     event_id = DATASET_MODIFICATION_EVENT_ID
 
+class NewSubscriptionEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    msg_type = NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE
+    event_id = NEW_SUBSCRIPTION_EVENT_ID
+
+class DelSubscriptionEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    msg_type = DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE
+    event_id = DEL_SUBSCRIPTION_EVENT_ID
+
 class ScheduleEventPublisher(TriggerEventPublisher):
     """
     Event Notification Publisher for Scheduled events (ie from the Scheduler service).
@@ -388,6 +410,22 @@ class DatasetModificationEventSubscriber(ResourceModifiedEventSubscriber):
     The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
     """
     event_id = DATASET_MODIFICATION_EVENT_ID
+
+class NewSubscriptionEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    event_id = NEW_SUBSCRIPTION_EVENT_ID
+
+class DelSubscriptionEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    event_id = DEL_SUBSCRIPTION_EVENT_ID
 
 class ScheduleEventSubscriber(TriggerEventSubscriber):
     """
