@@ -90,13 +90,15 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, xp_name=None, credentials=None, process=None, publisher_type=None):
+    def __init__(self, routing_key=None, xp_name=None, credentials=None, process=None, publisher_type=None):
         """
         Initializer. Sets default properties for calling the build method.
 
         These default are overridden by specifying the same named keyword arguments to the 
         build method.
 
+        @param  routing_key     Name of the routing key to publish messages on. Typically not set as a factory-wide
+                                setting.
         @param  xp_name         Name of exchange point to use
         @param  credentials     Placeholder for auth* tokens
         @param  process         Owning process of the Publisher.
@@ -104,6 +106,7 @@ class PublisherFactory(object):
                                 Publisher derived class for any custom behavior. If left None, the standard
                                 Publisher class is used.
         """
+        self._routing_key       = routing_key
         self._xp_name           = xp_name
         self._credentials       = credentials
         self._process           = process
@@ -116,7 +119,7 @@ class PublisherFactory(object):
         self._publisher_id = None
 
     @defer.inlineCallbacks
-    def build(self, routing_key, xp_name=None, credentials=None, process=None, publisher_type=None, *args, **kwargs):
+    def build(self, routing_key=None, xp_name=None, credentials=None, process=None, publisher_type=None, *args, **kwargs):
         """
         Creates a publisher and calls register on it.
 
@@ -132,6 +135,7 @@ class PublisherFactory(object):
                                 Publisher derived class for any custom behavior. If left None, the standard
                                 Publisher class is used.
         """
+        routing_key     = routing_key or self._routing_key
         xp_name         = xp_name or self._xp_name
         credentials     = credentials or self._credentials
         process         = process or self._process
