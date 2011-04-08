@@ -36,7 +36,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
         print_pword = None
     else:
         print_pword = '****'
-    log.info('Starting DataStore Service Instance: username: %s, password: %s' % (uname, print_pword))
+    log.info('Starting Association Service Instance: username: %s, password: %s' % (uname, print_pword))
 
 
     spawnargs = {'username':uname,
