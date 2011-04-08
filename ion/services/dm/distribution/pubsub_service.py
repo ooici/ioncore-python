@@ -64,7 +64,6 @@ BINDING_RES_TYPE = object_utils.create_type_identifier(object_id=2320, version=1
 
 # Query and association types
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
-LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 class PSSException(ApplicationError):
     """
