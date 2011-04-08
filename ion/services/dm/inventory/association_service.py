@@ -70,6 +70,8 @@ class AssociationService(ServiceProcess):
 
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         index_store_class = pu.get_class(index_store_class_name)
+
+
         assert store.IIndexStore.implementedBy(index_store_class), \
             'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'       
                 # Service life cycle state. Initialize service here. Can use yields.

@@ -20,11 +20,7 @@ from ion.core.pack import app_supervisor
 #from ion.core.ioninit import ion_config
 from ion.core import ioninit
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
-#from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, \
-#                                                                    SAMPLE_TRAJ_DATASET_ID, SAMPLE_TRAJ_DATA_SOURCE_ID, \
-#                                                                    SAMPLE_STATION_DATASET_ID, SAMPLE_STATION_DATA_SOURCE_ID, \
-#                                                                    PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, CONTENT_ARGS_CFG, ID_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, ION_AIS_RESOURCES_CFG
 
 
 # --- CC Application interface
@@ -47,24 +43,23 @@ def start(container, starttype, app_definition, *args, **kwargs):
         print 'Import Dataset IDs from "ion.services.coi.datastore_bootstrap.ion_preload_config"'
         print '================================================================='
 
-        ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True,
-                                          'blobs': 'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
-                                          'commits': 'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
-                                          'username':'ooiuser',
-                                          'password':'oceans11'}
+        ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True,ION_AIS_RESOURCES_CFG:True}
                         }
 
 
     resource_proc = [
-        {'name':'ds1',
+        {'name':'datastore_service',
          'module':'ion.services.coi.datastore',
          'class':'DataStoreService',
          'spawnargs':ds_spawn_args
             },
-        {'name':'resource_registry1',
+        {'name':'resource_registry_service',
          'module':'ion.services.coi.resource_registry_beta.resource_registry',
          'class':'ResourceRegistryService',
-         'spawnargs':{'datastore_service':'datastore'}}
+         'spawnargs':{'datastore_service':'datastore'}},
+        {'name':'association_service',
+         'module':'ion.services.dm.inventory.association_service',
+         'class':'AssociationService'}
         ]
 
     appsup_desc = ProcessDesc(name='app-supervisor-' + app_definition.name,

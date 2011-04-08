@@ -817,10 +817,8 @@ class DataStoreService(ServiceProcess):
                         ION_DATASETS_CFG:False,
                         ION_AIS_RESOURCES_CFG:False}
 
-        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
-        
-#        self.preloaded_datasets_dict = {}
 
         log.info('DataStoreService.__init__()')
         
@@ -880,7 +878,6 @@ class DataStoreService(ServiceProcess):
         """
         This method is used to preload required content into the datastore
         """
-
 
         if self.preload[ION_PREDICATES_CFG]:
 

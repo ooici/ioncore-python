@@ -36,11 +36,17 @@ CONTENT_ARGS_CFG = 'content_args'
 PRELOAD_CFG = 'preload'
 
 
-# Set some constants based on the config file:
+# Set some constants used system wide!:
+
+# These name must also be changed in the datastore Zapp!
+
+### THESE ARE REQUIRED OBJECTS
 ION_PREDICATES_CFG = 'ion_predicates'
 ION_RESOURCE_TYPES_CFG = 'ion_resource_types'
-ION_DATASETS_CFG = 'ion_datasets'
 ION_IDENTITIES_CFG = 'ion_identities'
+
+### THESE ARE FOR TESTING AND DEVELOPMENT
+ION_DATASETS_CFG = 'ion_datasets'
 ION_AIS_RESOURCES_CFG = 'ion_ais_resources'
 
 
