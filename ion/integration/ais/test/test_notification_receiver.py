@@ -1,39 +1,32 @@
+__author__ = 'mauricemanning'
 #!/usr/bin/env python
 
 """
-@file ion/integration/test_notification_alert.py
+@file ion/integration/test_notification_receiver.py
 @test ion.integration.notification_alert_service
 @author Maurice Manning
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
 from twisted.internet import defer
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.test.iontest import IonTestCase
-from ion.core.messaging import messaging
-from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+from ion.core.process.process import Process
 
-from ion.core.object import object_utils
-from ion.core.data import store
+import ion.util.procutils as pu
+from ion.services.dm.distribution.events import ResourceLifecycleEventPublisher
+
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import SUBSCRIPTION_INFO_TYPE
 
-# Create CDM Type Objects
-SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
 
-
-class NotificationAlertTest(IonTestCase):
-    """
-    Testing Notification Alert Service.
-    """
+class NotificationReceiverTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -82,7 +75,7 @@ class NotificationAlertTest(IonTestCase):
                 'class':'NotificationAlertService'
             },
 
-            ]        
+            ]
 
         sup = yield self._spawn_processes(services)
         self.sup = sup
@@ -93,11 +86,14 @@ class NotificationAlertTest(IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
-
     @defer.inlineCallbacks
-    def test_addSubscription(self):
+    def test_publish_recieve(self):
+        """
+        """
 
-        log.info('NotificationAlertTest: test_addSubscription.\n')
+        log.info('NotificationReceiverTest: test_publish_recieve begin')
+        proc = Process()
+        yield proc.spawn()
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
@@ -109,37 +105,23 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
         reqMsg.message_parameters_reference.routing_key = 'arf_test';
 
-        log.info("test_addSubscription: call the service")
+        log.info("NotificationReceiverTest: call the service")
         # try to register this user for the first time
         reply = yield self.nac.addSubscription(reqMsg)
-
         log.info('addSubscription returned:\n'+str(reply))
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            self.fail('NotificationReceiverTest: response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        log.info('addSubscription complete')
+        log.info('NotificationReceiverTest: test_publish_recieve publish notification')
+
+        pub = ResourceLifecycleEventPublisher(process=self.sup) # all publishers/subscribers need a process associated
+        yield pub.initialize()
+        yield pub.activate()
+
+        yield pub.create_and_publish_event(name="foo", state=ResourceLifecycleEventPublisher.State.NEW, origin="magnet_topic")
 
 
-    @defer.inlineCallbacks
-    def test_removeSubscription(self):
+        yield pu.asleep(3.0)
 
-        # Create a message client
-        mc = MessageClient(proc=self.test_sup)
-
-        # Use the message client to create a message object
-        log.debug('test_removeSubscription! instantiating FindResourcesMsg.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = "test";
-        reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
-        reqMsg.message_parameters_reference.routing_key = 'arf_test';
-
-        log.info('Calling removeSubscription!!...')
-        reply = yield self.nac.removeSubscription(reqMsg)
-        log.info('removeSubscription returned:\n'+str(reply))
-
-        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('rResponse is not an AIS_RESPONSE_MSG_TYPE GPB')
-
-        log.info('test_removeSubscription complete')
+        log.info('NotificationReceiverTest: test_publish_recieve completed')
