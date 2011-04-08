@@ -25,7 +25,7 @@ class CassandraBootStrap:
         """
         Get init args from the bootstrap
         """
-        storage_conf = storage_configuration_utility.STORAGE_CONF_DICTIONARY
+        storage_conf = storage_configuration_utility.get_storage_conf_dict()
         #storage_conf = Config("res/config/storage.cfg")
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
