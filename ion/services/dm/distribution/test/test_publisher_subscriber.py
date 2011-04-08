@@ -108,7 +108,7 @@ class TestPublisher(IonTestCase):
         yield proc.spawn()
 
         fact = PublisherFactory(xp_name='science_data', process=proc)
-        yield fact.build('fubar')
+        yield fact.build(routing_key='fubar')
 
     @defer.inlineCallbacks
     def test_publisher_factory_create(self):
@@ -121,11 +121,11 @@ class TestPublisher(IonTestCase):
         fact = PublisherFactory()
 
         # we didn't specify xp_name in factory creation nor here, so it will error
-        yield self.failUnlessFailure(fact.build('arf.test'), AssertionError)
-        yield self.failUnlessFailure(fact.build('arf.test', process=proc), AssertionError)
+        yield self.failUnlessFailure(fact.build(routing_key='arf.test'), AssertionError)
+        yield self.failUnlessFailure(fact.build(routing_key='arf.test', process=proc), AssertionError)
 
         # specify all
-        pub = yield fact.build("arf.test", xp_name="magnet.topic", process=proc)
+        pub = yield fact.build(routing_key="arf.test", xp_name="magnet.topic", process=proc)
 
         # we should get an active Publisher back here
         self.failUnlessIsInstance(pub, Publisher)
@@ -135,7 +135,7 @@ class TestPublisher(IonTestCase):
         # now lets make a factory where we can specify the xp_name as a default
         fact2 = PublisherFactory(xp_name="magnet.topic")
 
-        pub2 = yield fact2.build("arf.test", process=proc)
+        pub2 = yield fact2.build(routing_key="arf.test", process=proc)
 
         self.failUnlessIsInstance(pub2, Publisher)
         self.failUnless(pub2._process == proc)
@@ -143,7 +143,7 @@ class TestPublisher(IonTestCase):
         self.failUnless(pub2._recv.publisher_config.has_key("exchange") and pub2._recv.publisher_config['exchange'] == "magnet.topic")
 
         # use the same factory to override the default xp_name
-        pub3 = yield fact2.build("arf.test", xp_name="afakeexchange", process=proc)
+        pub3 = yield fact2.build(routing_key="arf.test", xp_name="afakeexchange", process=proc)
 
         self.failUnlessIsInstance(pub3, Publisher)
         self.failUnless(pub3._process == proc)
