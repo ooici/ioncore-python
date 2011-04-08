@@ -2,9 +2,9 @@
 """
 Created on Apr 5, 2011
 
-@file:   ion/integration/eoi/dispatcher/workflow_dispatcher_service.py
+@file:   ion/integration/eoi/dispatcher/dispatcher_service.py
 @author: Timothy LaRocque
-@brief:  Dispatching service for starting remote workflows (external scripts) for data assimilation/processing upon changes to availability of data
+@brief:  Dispatching service for starting external scripts for data assimilation/processing upon changes to availability/content of data
 """
 
 # Imports: logging
@@ -24,7 +24,8 @@ from ion.core.process.process import ProcessFactory, Process, ProcessClient
 # Imports: Messages and events
 from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory, PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, NewSubscriptionEventSubscriber, \
-                                                                       DelSubscriptionEventPublisher, DelSubscriptionEventSubscriber
+                                                DelSubscriptionEventPublisher, DelSubscriptionEventSubscriber, \
+                                                DatasetModificationEventSubscriber
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 
 DISPATCHER_WORKFLOW_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7003, version=1)
@@ -32,19 +33,22 @@ DISPATCHER_WORKFLOW_RESOURCE_TYPE = object_utils.create_type_identifier(object_i
 
 class DispatcherProcess(Process):
     """
-    Dispatching service for starting remote workflows (scripts)
+    Dispatching service for starting external scripts
     """
 
     
     def __init__(self, *args, **kwargs):
         """
         Initializes the DispatcherService class
-        Checks for the existance of the workflow_dispatcher.id file to procure a system ID for
+        Checks for the existance of the dispatcher.id file to procure a system ID for
         this service's Dispatcher Resource.  If one does not exist, it is created
         """
         # Step 1: Delegate initialization to parent
         log.debug('__init__(): Starting initialization...')
         Process.__init__(self, *args, **kwargs)
+        
+        self.dues_dict = {}
+        self.dues_factory = None
         
         # Step 2: Check for the workflow_dispatcher.id file, or create it
         f = None
@@ -72,7 +76,8 @@ class DispatcherProcess(Process):
         
         # Step 3: Store the new ID locally
         self.dispatcher_id = id
-        log.info('\n\n\n__init__(): Retrieved dispatcher_id "%s"\n\n\n' % id)
+        log.info('\n\n__init__(): Retrieved dispatcher_id "%s"' % id)
+        
         
     @defer.inlineCallbacks
     def plc_init(self):
@@ -86,19 +91,19 @@ class DispatcherProcess(Process):
         # Step 1: Obtain DispatcherResource using self.dispatcher_id
         # @attention: is the DispatcherResource needed for anything??
         
-        # Step 2: Generate Subscription Event Subscribers
-        self.new_ses = yield self._generate_subscription_subscriber(NewSubscriptionEventSubscriber)
-#        yield self._gen_del_sub_event_subscriber()
+        # Step 2: Create all necessary Update Event Notification Subscribers
+        # @todo: do this
         
-        # Step 3: Create all necessary Update Event Notification Subscribers
-#        yield self.
+        # Step 3: Generate Subscription Event Subscribers
+        self.new_ses = yield self._create_subscription_subscriber(NewSubscriptionEventSubscriber, lambda *args, **kw: self.create_dataset_update_subscriber(*args, **kw))
+        self.del_ses = yield self._create_subscription_subscriber(DelSubscriptionEventSubscriber, lambda *args, **kw: self.delete_dataset_update_subscriber(*args, **kw))
 
-        log.debug('plc_init(): ******** COMPLETE3 ********')
-    
+        log.debug('plc_init(): ******** COMPLETE ********')
+        
     
     @defer.inlineCallbacks
-    def _generate_subscription_subscriber(self, subscriber_type):
-        log.debug('_generate_subscription_subscriber(): Generating a Subscription Events Subscriber (SES)')
+    def _create_subscription_subscriber(self, subscriber_type, callback):
+        log.debug('_create_subscription_subscriber(): Creating a Subscription Events Subscriber (SES)')
         
         # Step 1: Generate the subscriber
         factory = SubscriberFactory(subscriber_type=subscriber_type, process=self)
@@ -107,23 +112,83 @@ class DispatcherProcess(Process):
         # Step 2: Monkey Patch a callback into the subscriber
         def cb(data):
             log.info('<<<---@@@ Subscriber recieved data callback')
-            log.info('Creating Update Event Subscriber for dataset_id "%s" and workflow "%s"' % DispatcherProcess.unpack_subscription_content(data))
+            subscription = DispatcherProcess.unpack_subscription_data(data)
+            log.info('Invoking subscription event callback using dataset_id "%s" and script "%s"' % subscription)
+            return callback(*subscription)
         subscriber.ondata = cb
         
-        log.debug('_generate_subscription_subscriber(): SES bound to topic "%s"' % subscriber.topic(self.dispatcher_id))
+        log.debug('_create_subscription_subscriber(): SES bound to topic "%s"' % subscriber.topic(self.dispatcher_id))
         defer.returnValue(subscriber)
         
     
     @staticmethod
-    def unpack_subscription_content(data):
+    def unpack_subscription_data(data):
+        """
+        Unpacks the subscription change event from message content in the given
+        dictionary and retrieves the dataset_id and workflow_path fields.
+        This subscription data is returned in a tuple.
+        """
+        # Dig through the message wrappers...
         content = data and data.get('content', None)
         chg_evt = content and content.additional_data
         dwf_res = chg_evt and chg_evt.dispatcher_workflow
         
-        dataset_id    = dwf_res and str(dwf_res.dataset_id)
-        workflow_path = dwf_res and str(dwf_res.workflow_path)
-        return (dataset_id, workflow_path)
+        # Keep digging...
+        dataset_id  = dwf_res and str(dwf_res.dataset_id)
+        script_path = dwf_res and str(dwf_res.workflow_path)
+        return (dataset_id, script_path)
     
+    
+    @defer.inlineCallbacks
+    def create_dataset_update_subscriber(self, dataset_id, script_path):
+        """
+        A dataset update subscriber listens for update event notifications which are triggered when
+        a dataset has changed.  When this occurs, the subscriber kicks-off the given script via the
+        subprocess module
+        """
+        yield
+        log.info('create_dataset_update_subscriber(): Creating Dataset Update Event Subscriber (DUES)')
+        key = (dataset_id, script_path)
+        
+        # Step 1: If the dictionary has this key dispose of it first
+        subscriber = self.dues_dict.has_key(key) and self.dues_dict.pop(key)
+        if subscriber:
+            # @todo: delete this subscriber
+            log.warn('create_dataset_update_subscriber(): Removing old subscriber for key: %s' % str(key))
+            pass
+        
+        # Step 2: Create the new subscriber
+        log.debug('create_dataset_update_subscriber(): Creating new Dataset Update Events Subscriber via SubscriberFactory')
+        if self.dues_factory is None:
+            self.dues_factory = SubscriberFactory(subscriber_type=DatasetModificationEventSubscriber, process=self)
+        subscriber = yield self.dues_factory.build(origin=dataset_id)
+        
+        # Step 3: Monkey patch a callback into subscriber
+        log.debug('create_dataset_update_subscriber(): Monkey patching callback to subscriber')
+        subscriber.ondata = lambda data: self.run_script(data)
+        
+        # Step 4: Add this subscriber to the dictionary of dataset update event subscribers
+        self.dues_dict[key] = subscriber
+        log.debug('create_dataset_update_subscriber(): Create subscriber complete!')
+        
+    
+    def delete_dataset_update_subscriber(self, dataset_id, script_path):
+        """
+        Removes the dataset update event subscriber from the DUES dict which is keyed off the
+        same dataset_id and script_path
+        """
+        log.info('delete_dataset_update_subscriber(): NOT YET IMPLEMENTED')
+        
+    
+    def run_script(self, script_path):
+        """
+        """
+        log.info('run_script(): Running script "%s"' % script_path)
+        
+        # Step 1: Make sure the script exists so we don't have a failure
+        
+        # Step 2: Use subprocess to run the script
+        
     
     @defer.inlineCallbacks
     def op_test(self, content, headers, msg):
@@ -217,7 +282,7 @@ class DispatcherProcessClient(ProcessClient):
         defer.returnValue(str(content))
     
     @defer.inlineCallbacks
-    def test_newsub(self, dispatcher_id, dataset_id='abcd-1234', workflow='/dispatcher/workflow/script'):
+    def test_newsub(self, dispatcher_id, dataset_id='abcd-1234', script='/dispatcher/script/script'):
         yield self._check_init()
 
         # Step 1: Create the publisher
@@ -225,20 +290,19 @@ class DispatcherProcessClient(ProcessClient):
         publisher = yield factory.build(routing_key=self.target, origin=dispatcher_id)
         log.debug('test_newsub(): Created publisher; bound to topic "%s" for publishing' % publisher.topic(dispatcher_id))
         
-        # Step 2: Create the dispatcher workflow resource
+        # Step 2: Create the dispatcher script resource
         dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, ResourceName='DWR1', ResourceDescription='Dispatcher Workflow Resource')
         dwr.dataset_id = dataset_id
-        dwr.workflow_path = workflow
+        dwr.workflow_path = script
         log.debug('test_newsub(): Created the DispatcherWorkflowResource')
         
-        # Step 3: Send the dispatcher workflow resource
+        # Step 3: Send the dispatcher script resource
         log.info('test_newsub(): @@@--->>> Publishing New Subscription event on topic "%s"' % publisher.topic(dispatcher_id))
-#        yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
         yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
         log.debug('test_newsub(): Publish test complete!')
 
     @defer.inlineCallbacks
-    def test_delsub(self, dispatcher_id, dataset_id='abcd-1234', workflow='/dispatcher/workflow/script'):
+    def test_delsub(self, dispatcher_id, dataset_id='abcd-1234', script='/dispatcher/script/script'):
         yield self._check_init()
 
         # Step 1: Create the publisher
@@ -246,13 +310,13 @@ class DispatcherProcessClient(ProcessClient):
         publisher = yield factory.build(routing_key=self.target, origin=dispatcher_id)
         log.debug('test_delsub(): Created publisher; bound to topic "%s" for publishing' % publisher.topic(dispatcher_id))
         
-        # Step 2: Create the dispatcher workflow resource
+        # Step 2: Create the dispatcher script resource
         dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, ResourceName='DWR1', ResourceDescription='Dispatcher Workflow Resource')
         dwr.dataset_id = dataset_id
-        dwr.workflow_path = workflow
+        dwr.workflow_path = script
         log.debug('test_delsub(): Created the DispatcherWorkflowResource')
         
-        # Step 3: Send the dispatcher workflow resource
+        # Step 3: Send the dispatcher script resource
         log.info('test_newsub(): @@@--->>> Publishing Del Subscription event on topic "%s"' % publisher.topic(dispatcher_id))
 #        yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
         yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
@@ -266,15 +330,15 @@ class DispatcherProcessClient(ProcessClient):
 #        return str(cls._next_id)
 #    
 #    @defer.inlineCallbacks
-#    def rpc_notify(self, datasetId, datasetName=None, workflow=DEFAULT_GET_SCRIPT):
+#    def rpc_notify(self, datasetId, datasetName=None, script=DEFAULT_GET_SCRIPT):
 #        '''
 #        Dispatches a change notification so that the dispatcher can launch the appropriate
-#        workflow using the given dataset_id, dataset_name, and workflow filepath.
+#        script using the given dataset_id, dataset_name, and script filepath.
 #        '''
 #        yield self._check_init()
 #        if (datasetName == None):
 #            datasetName = 'example_dataset_' + DispatcherServiceClient.next_id()
-#        (content, headers, msg) = yield self.rpc_send('notify', {"dataset_id":datasetId, "dataset_name": datasetName, "workflow":workflow})
+#        (content, headers, msg) = yield self.rpc_send('notify', {"dataset_id":datasetId, "dataset_name": datasetName, "script":script})
 #        log.info("<<<---@@@ Incoming RPC reply...")
 #        log.debug("\n\n\n...Content:\t" + str(content))
 #        log.debug("...Headers\t" + str(headers))
