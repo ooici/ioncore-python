@@ -1,0 +1,12 @@
+{
+    "type":"release",
+    "name":"EventsRel",
+    "version": "0.1",
+    "description": "Event Notification related services",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'datastore',            'version':'0.1', 'config':{}},
+        {'name':'association',          'version':'0.1', 'config':{}},
+        {'name':'resource_registry',    'version':'0.1', 'config':{}},
+    ]
+}
