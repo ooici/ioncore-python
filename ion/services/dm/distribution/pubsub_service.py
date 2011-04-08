@@ -25,6 +25,10 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, TOPIC_RESOURCE_TYPE_ID
+
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -55,6 +59,10 @@ PUBLISHER_RES_TYPE = object_utils.create_type_identifier(object_id=2318, version
 SUBSCRIBER_RES_TYPE = object_utils.create_type_identifier(object_id=2319, version=1)
 QUEUE_RES_TYPE = object_utils.create_type_identifier(object_id=2321, version=1)
 BINDING_RES_TYPE = object_utils.create_type_identifier(object_id=2320, version=1)
+
+# Query and association types
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 class PSSException(ApplicationError):
     """
@@ -89,10 +97,15 @@ class PubSubService(ServiceProcess):
                                                         'ExchangeManagementService',
                                                         'ResourceRegistryService'])
 
+    def __init__(self, *args, **kwargs):
+        super(PubSubService, self).__init__(*args, **kwargs)
+        self.asc = None
+
     def slc_init(self):
         self.ems = ExchangeManagementClient(proc=self)
         self.rclient = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
+        self.asc = AssociationServiceClient(proc=self)
 
         # @bug Dictionaries to cover for lack of find/query in registry
         self.xs_list = dict()
@@ -126,7 +139,7 @@ class PubSubService(ServiceProcess):
         my_ref.key = key_string
         idx = len(object.id_list)
         object.id_list.add()
-        log.debug('Adding to index %d' % idx)
+        log.debug('Adding %s to index %d' % (key_string, idx))
         object.id_list[idx] = my_ref
 
     def _obj_to_ref(self, object):
@@ -139,13 +152,60 @@ class PubSubService(ServiceProcess):
         return self.rclient.reference_instance(object)
 
     @defer.inlineCallbacks
+    def _do_topic_registry_query(self, request, msg):
+        """
+        @brief Query resource registry for specified stuff.
+        Blah blah blah.
+        @note For now, hardwired for topics
+        @note This is Stuebe magic. You (and I) are not expected to understand it.
+        @See https://github.com/ooici/ioncore-python/blob/develop/ion/services/coi/datastore_bootstrap/ion_preload_config.py#L59
+        """
+        log.debug('_DTRQ starting')
+
+        query = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = query.pairs.add()
+
+        log.debug('creating object')
+        pred_ref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pred_ref.key = TYPE_OF_ID
+
+        pair.predicate = pred_ref
+
+        log.debug('creating idref')
+        type_ref = query.CreateObject(IDREF_TYPE)
+        type_ref.key = TOPIC_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
+
+        log.debug('sending off the query')
+        result = yield self.asc.get_subjects(query)
+
+        # @todo Filtering here and not in the registry performs more slowly
+        log.debug('regex filtering')
+        idlist = []
+        p = re.compile(request.regex)
+        for cur_ref in result.idrefs:
+            if p.match(cur_ref.key):
+                idlist.append(cur_ref.key)
+
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        response.MessageResponseCode = response.ResponseCodes.OK
+
+        for key in idlist:
+            self._key_to_idref(cur_ref.key, response)
+                                
+        log.debug('dtrq done')
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
     def _do_query(self, request, res_list, msg):
         """
         @brief Query internal dictionaries, create reply message, send same. Helper for the
         various queries.
         @param request Object containing a regex attribute
         @param res_list Dictionary whose values we match against the regex
-        @param msg Ion message, with .reply_ok method to invoke
+        @param msg Ion message, with reply_ok method to invoke
         @retval None
         """
         # This is probably better written as a list comprehension. Or something.
@@ -455,14 +515,14 @@ class PubSubService(ServiceProcess):
         @see PubSubClient.query_topics
         """
 
-        log.debug('topic query starting')
+        log.debug('new topic query starting')
         # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
         self._check_msg_type(request, REGEX_TYPE)
         if not request.IsFieldSet('regex'):
             raise PSSException('Bad message, regex missing',
                                request.ResponseCodes.BAD_REQUEST)
 
-        yield self._do_query(request, self.topic_list, msg)
+        yield self._do_topic_registry_query(request, msg)
 
     @defer.inlineCallbacks
     def op_declare_publisher(self, request, headers, msg):

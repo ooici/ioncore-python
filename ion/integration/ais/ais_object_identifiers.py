@@ -265,6 +265,94 @@ message RegisterIonUserResponse {
 }
 """
 
+# ManageResources GPBs from ion-object-definitions/net/ooici/integration/ais/manageResources/manage_resources.proto
+GET_RESOURCE_TYPES_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9120, version=1)
+"""
+message GetResourceTypesResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9120;
+       _VERSION = 1;
+   }
+
+   repeated net.ooici.core.link.CASRef resource_types_list = 1;
+}
+"""
+
+GET_RESOURCES_OF_TYPE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9121, version=1)
+"""
+message GetResourcesOfTypeRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9121;
+       _VERSION = 1;
+   }
+
+   optional string resource_type = 1;
+}
+"""
+
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=9122, version=1)
+"""
+message Resource {
+   enum _MessageTypeIdentifier {
+       _ID = 9122;
+       _VERSION = 1;
+   }
+
+   repeated string attribute = 1;
+}
+"""
+
+GET_RESOURCES_OF_TYPE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9123, version=1)
+"""
+message GetResourcesOfTypeResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9123;
+       _VERSION = 1;
+   }
+
+   repeated string column_names = 1;
+   repeated net.ooici.integration.ais.manageResources.Resource resources = 2;
+}
+"""
+
+GET_RESOURCE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9124, version=1)
+"""
+message GetResourceRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9124;
+       _VERSION = 1;
+   }
+
+   optional string ooi_id = 1;
+}
+"""
+
+NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
+"""
+message NameValuePair {
+   enum _MessageTypeIdentifier {
+       _ID = 9125;
+       _VERSION = 1;
+   }
+
+   optional string name = 1;
+   optional string value = 2;
+}
+"""
+
+GET_RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9126, version=1)
+"""
+
+message GetResourceResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9126;
+       _VERSION = 1;
+   }
+
+   repeated net.ooici.integration.ais.manageResources.NameValuePair resource = 1;
+}
+"""
+
 SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
 """
 message SubscriptionInfo {

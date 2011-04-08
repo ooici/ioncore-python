@@ -252,7 +252,7 @@ class Subscriber(BasicLifecycleObject):
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, *args, **kwargs):
 
         BasicLifecycleObject.__init__(self)
 
@@ -374,7 +374,7 @@ class SubscriberFactory(object):
         self._credentials       = credentials
 
     @defer.inlineCallbacks
-    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, process=None, credentials=None, *args, **kwargs):
+    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=None, process=None, credentials=None, *args, **kwargs):
         """
         Creates a subscriber.
 

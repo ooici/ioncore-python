@@ -57,7 +57,7 @@ def construct_admin_list(adminrolelist):
     thelist = []
     for role_entry in adminrolelist:
         subject = role_entry
-        role_dict = {'subject': subject, 'ooid': None}
+        role_dict = {'subject': subject, 'ooi_id': None}
         thelist.append(role_dict);
     return thelist
 
@@ -70,17 +70,49 @@ def subject_has_admin_role(subject):
             return True
     return False
 
-def user_has_admin_role(ooid):
+def user_has_admin_role(ooi_id):
     for role_entry in admin_role_list:
-        if role_entry['ooid'] == ooid:
+        if role_entry['ooi_id'] == ooi_id:
             return True
-        else:
-            return False
+    return False
 
-def map_ooid_to_subject(subject,ooid):
+def map_ooi_id_to_subject_admin_role(subject,ooi_id):
     for role_entry in admin_role_list:
         if role_entry['subject'] == subject:
-            role_entry['ooid'] = ooid
+            role_entry['ooi_id'] = ooi_id
+            return
+
+dispatcheruserdb_filename = ioninit.adjust_dir(CONF.getValue('dispatcheruserdb'))
+dispatcher_user_list = Config(dispatcheruserdb_filename).getObject()
+
+def subject_has_dispatcher_queue(subject):
+    for dispatcher_user_entry in dispatcher_user_list:
+        if dispatcher_user_entry['subject'] == subject:
+            return True
+    return False
+
+def user_has_dispatcher_queue(ooi_id):
+    for dispatcher_user_entry in dispatcher_user_list:
+        if dispatcher_user_entry['ooi_id'] == ooi_id:
+            return True
+    return False
+
+def get_dispatcher_queue_for_subject(subject):
+    for dispatcher_user_entry in dispatcher_user_list:
+        if dispatcher_user_entry['subject'] == subject:
+            return dispatcher_user_entry['dispatcher_queue']
+    return None
+
+def get_dispatcher_queue_for_user(ooi_id):
+    for dispatcher_user_entry in dispatcher_user_list:
+        if dispatcher_user_entry['ooi_id'] == ooi_id:
+            return dispatcher_user_entry['dispatcher_queue']
+    return None
+
+def map_ooi_id_to_subject_dispatcher_queue(subject,ooi_id):
+    for dispatcher_user_entry in dispatcher_user_list:
+        if dispatcher_user_entry['subject'] == subject:
+            dispatcher_user_entry['ooi_id'] = ooi_id
             return
 
 class PolicyInterceptor(EnvelopeInterceptor):

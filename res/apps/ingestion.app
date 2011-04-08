@@ -1,14 +1,14 @@
 {
     "type":"application",
-    "name":"EOIIngesterApp",
-    "description": "EOI Ingester App",
+    "name":"Ingestion",
+    "description": "Ingestion Service App",
     "version": "0.1",
-    "mod": ("ion.zapps.eoi_ingester", []),
+    "mod": ("ion.zapps.ingestion", []),
     "modules": [
-        "ion.zapps.eoi_ingester",
+        "ion.zapps.ingestion",
     ],
     "registered": [
-        "eoi_ingester"
+        "ingestion"
     ],
     "applications": [
         "ioncore",

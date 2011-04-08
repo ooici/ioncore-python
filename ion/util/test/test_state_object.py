@@ -213,6 +213,24 @@ class StateObjectTest(IonTestCase):
         self.assertEqual(so.kwargs, {})
 
 
+    def test_SO_transition(self):
+        so = TestSO()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+        so._so_process(BasicStates.E_INITIALIZE)
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        res1 = so._so_process(BasicStates.E_ACTIVATE)
+        self._assertCounts(so, 1, 1, 0, 0, 0)
+        self.assertEqual(res1, BasicStates.S_READY)
+
+        so = TestSO()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+        so._so_process(BasicStates.E_INITIALIZE)
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        res2 = so._so_process(BasicStates.E_ACTIVATE,transition=True)
+        self._assertCounts(so, 1, 1, 0, 0, 0)
+        self.assertEqual(res2, BasicStates.S_ACTIVE)
+
+
     def _assertCounts(self, so, init, act, deact, term, error, errerr=0):
         self.assertEqual(so.cnt_init, init)
         self.assertEqual(so.cnt_act, act)
@@ -243,10 +261,14 @@ class TestSO(BasicLifecycleObject):
         self.args = args
         self.kwargs = kwargs
         log.debug("on_activate called")
+        if kwargs.get('transition', False):
+            self._so_transition()
+            return self._get_state()
         if kwargs.get('errblow', False):
             raise RuntimeError("errblow")
         if kwargs.get('blow', False):
             raise RuntimeError("blow")
+        return self._get_state()
 
     def on_deactivate(self, *args, **kwargs):
         self.cnt_deact += 1
