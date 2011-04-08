@@ -665,7 +665,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
                     attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
-                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
 
 
                 elif  root_type == TERMINOLOGY_TYPE:
