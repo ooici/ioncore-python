@@ -166,6 +166,15 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
+    @defer.inlineCallbacks
+    def op_getResource(self, content, headers, msg):
+        log.debug('op_getResource: \n'+str(content))
+        worker = ManageResources(self)
+        log.debug('op_getResource: calling worker')
+        response = yield worker.getResource(content);
+        yield self.reply_ok(msg, response)
+
+
 class AppIntegrationServiceClient(ServiceClient):
     """
     This is a service client for AppIntegrationServices.
@@ -288,6 +297,14 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('getResourcesOfType', message)
         log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+ 
+    @defer.inlineCallbacks
+    def getResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.getResource: sending following message to getResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('getResource', message)
+        log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
