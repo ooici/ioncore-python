@@ -27,11 +27,17 @@ class CassandraBootStrap:
         """
         storage_conf = storage_configuration_utility.get_storage_conf_dict()
         #storage_conf = Config("res/config/storage.cfg")
+        log.info('Configuring Cassandra Connection:', str(storage_conf))
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
         self._keyspace = storage_conf["persistent archive"]["name"]
-        authorization_dictionary = {"username":username, "password":password}  
-        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+
+        if username is None or password is None:
+            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace)
+        else:
+            authorization_dictionary = {"username":username, "password":password}
+            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)
         log.info("Created Cassandra Client")
