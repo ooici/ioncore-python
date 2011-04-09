@@ -21,22 +21,22 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 class CassandraBootStrap:
-    def __init__(self, username, password):
+    def __init__(self, username, password, sysname=None):
         """
         Get init args from the bootstrap
         """
-        storage_conf = storage_configuration_utility.get_storage_conf_dict()
+        storage_conf = storage_configuration_utility.get_storage_conf_dict(sysname)
         #storage_conf = Config("res/config/storage.cfg")
         log.info('Configuring Cassandra Connection:', str(storage_conf))
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
         self._keyspace = storage_conf["persistent archive"]["name"]
 
-        if username is None or password is None:
-            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace)
-        else:
-            authorization_dictionary = {"username":username, "password":password}
-            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+        #if username is None or password is None:
+        #    self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace)
+        #else:
+        authorization_dictionary = {"username":username, "password":password}
+        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
 
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)
@@ -44,8 +44,8 @@ class CassandraBootStrap:
 
 class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):
     
-    def __init__(self, username, password):
-        CassandraBootStrap.__init__(self, username, password)
+    def __init__(self, username, password, sysname=None ):
+        CassandraBootStrap.__init__(self, username, password, sysname)
         #We must set self._query_attribute_names, because we don't call 
         #CassandraIndexedStore.__init__
         self._query_attribute_names = None
@@ -54,6 +54,6 @@ class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):
 
 class CassandraStoreBootstrap(CassandraBootStrap, CassandraStore):
 
-    def __init__(self, username, password):
-        CassandraBootStrap.__init__(self, username, password)
+    def __init__(self, username, password, syname=None):
+        CassandraBootStrap.__init__(self, username, password, sysname)
         self._cache_name = BLOB_CACHE

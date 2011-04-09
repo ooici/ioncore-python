@@ -36,6 +36,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
 
+from ion.test.iontest import IonTestCase
 
 from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
 
@@ -520,7 +521,7 @@ class BootstrapIndexedStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
+        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11", "sysname")
         store.initialize()
         store.activate()
         return defer.succeed(store)
