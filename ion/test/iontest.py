@@ -121,13 +121,6 @@ class IonTestCase(unittest.TestCase):
         defer.returnValue(msg_instance)
 
     @defer.inlineCallbacks
-    def _start_core_services(self):
-        sup = yield bootstrap.spawn_processes(bootstrap.ion_core_services,
-                                              self.test_sup)
-        log.info("============Core ION services started============")
-        defer.returnValue(sup)
-
-    @defer.inlineCallbacks
     def _stop_container(self):
         """
         Taking down the container's connection to the broker an preparing for

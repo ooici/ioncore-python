@@ -27,7 +27,6 @@ class IngestionTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        #self.sup = yield self._start_core_services()
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
@@ -44,20 +43,17 @@ class IngestionTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_resource_reg(self):
-        
+
         child_ds1 = yield self.sup.get_child_id('ds1')
         log.debug('Process ID:' + str(child_ds1))
         proc_ds1 = self._get_procinstance(child_ds1)
-        
-        
+
+
         #print 'Running Ingest:'
-        
+
         dataset_id = yield self._ic.ingest()
-                
+
         dataset = yield self._ic.retrieve(dataset_id)
-        
+
         #print 'Got dataset'
         #print dataset
-        
-        
-        

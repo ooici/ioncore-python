@@ -28,29 +28,20 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
-# Static definition of message queues
-ion_messaging = {}
-
-# Static definition of service names
-cc_agent = Config(CONF.getValue('ccagent_cfg')).getObject()
-ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
-
 @defer.inlineCallbacks
 def start():
     """
     Starts ION system with static config of core messaging names and services.
     """
     log.info("ION SYSTEM bootstrapping now...")
-    startsvcs = []
-    startsvcs.extend(ion_core_services)
-    sup = yield bootstrap(ion_messaging, startsvcs)
+    sup = yield bootstrap({}, [])
 
 @defer.inlineCallbacks
 def bootstrap(messaging=None, services=None):
     """
-    Initializes local container and starts services and messaging from given
-    setup args.
-    @param messaging  dict of messaging name configuration dicts
+    @brief Initializes local container and starts services and messaging from
+        given setup args.
+    @param messaging  dict of messaging name configuration dicts (obsolete)
     @param services list of services (as svc description dict) to start up
     @retval Deferred -> supervisor Process instance
     """
@@ -58,8 +49,9 @@ def bootstrap(messaging=None, services=None):
     yield init_ioncore()
     sup = None
     if messaging:
-        assert type(messaging) is dict
-        yield declare_messaging(messaging)
+        raise NotImplementedError("bootstrap: messaging configuration not supported")
+        #assert type(messaging) is dict
+        #yield declare_messaging(messaging)
     if services:
         assert type(services) is list
         sup = yield spawn_processes(services)
@@ -71,18 +63,16 @@ def init_ioncore():
     Performs global initializations on the local container on startup.
     @retval Deferred
     """
+    # Extract command line args and set with Container instance
     _set_container_args(Container.args)
-    #interceptorsys = CONF.getValue('interceptor_system',None)
-    #if interceptorsys:
-    #    log.info("Setting capability container interceptor system")
-    #    cls = pu.get_class(interceptorsys)
-    #    Container.interceptor_system = cls()
+
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
 
-    #Load All Resource Descriptions for future decoding
+    # OBSOLETE-REMOVE Load All Resource Descriptions for future decoding
     description_utility.load_descriptions()
 
+    # @todo Service registry call for local service/version registration
     #yield bs_register_services()
     return defer.succeed(None)
 
@@ -115,6 +105,7 @@ def _set_container_args(contargs=None):
         ioninit.sys_name = ioninit.container_instance.id
 
 def declare_messaging(messagingCfg, cgroup=None):
+    #raise NotImplementedError("bootstrap.declare_messaging() not supported any longer")
     return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
 
 def spawn_processes(procs, sup=None):

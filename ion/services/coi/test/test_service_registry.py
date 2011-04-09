@@ -23,7 +23,6 @@ class ServiceRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        #self.sup = yield self._start_core_services()
         services = [
             {'name':'serviceregistry1','module':'ion.services.coi.service_registry','class':'ServiceRegistryService'}]
         sup = yield self._spawn_processes(services)
@@ -75,7 +74,6 @@ class ServiceRegistryCoreServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        self.sup = yield self._start_core_services()
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -83,6 +81,6 @@ class ServiceRegistryCoreServiceTest(IonTestCase):
 
     #@defer.inlineCallbacks
     def test_service_reg(self):
-        raise unittest.SkipTest('Not implimented yet!')
+        raise unittest.SkipTest('Not implemented yet!')
         # Not sure what the point is here?
         # Lets get it integrated with base process!
