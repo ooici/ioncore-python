@@ -3,8 +3,8 @@
 """
 @file ion/core/bootstrap.py
 @author Michael Meisinger
-@brief main module for bootstrapping the system and support functions. Functions
-        in here are actually called from ioncore application module and test cases.
+@brief Main module for bootstrapping the system and support functions. Functions
+        in here are called from ioncore application module and from test cases.
 """
 
 from twisted.internet import defer
@@ -22,19 +22,10 @@ from ion.data.datastore import registry
 from ion.data.store import Store
 from ion.resources import description_utility
 from ion.services.coi import service_registry
-
 from ion.util.config import Config
 import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
-
-@defer.inlineCallbacks
-def start():
-    """
-    Starts ION system with static config of core messaging names and services.
-    """
-    log.info("ION SYSTEM bootstrapping now...")
-    sup = yield bootstrap({}, [])
 
 @defer.inlineCallbacks
 def bootstrap(messaging=None, services=None):
