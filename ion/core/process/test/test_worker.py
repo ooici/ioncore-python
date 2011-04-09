@@ -42,17 +42,19 @@ class WorkerTest(IonTestCase):
         wcId = yield self._spawn_process(wc)
 
         wq_name = ioninit.sys_name + ".worker1"
-        for i in range(1,11):
-            yield wc.submit_work(wq_name, i, 0.5)
+        # Submit 4 work packets
+        for i in range(1,5):
+            yield wc.submit_work(wq_name, i, 0.3)
 
-        yield pu.asleep(7)
+        # 2 workers dividing 4 requests 0.3 sec each makes 0.6 sec plus overhead
+        yield pu.asleep(1.5)
         log.info("Work results: %s" % (wc.workresult))
         log.info("Worker results: %s" % (wc.worker))
 
         sum = 0
         for w,v in wc.worker.items():
             sum += v
-        self.assertEqual(sum, 10)
+        self.assertEqual(sum, 4)
 
     @defer.inlineCallbacks
     def test_fanout(self):
@@ -67,17 +69,19 @@ class WorkerTest(IonTestCase):
         wcId = yield self._spawn_process(wc)
 
         wq_name = ioninit.sys_name + ".fanout1"
-        for i in range(1,6):
-            yield wc.submit_work(wq_name, i, 0.5)
+        # Submit 2 work packets
+        for i in range(1,3):
+            yield wc.submit_work(wq_name, i, 0.3)
 
-        yield pu.asleep(5)
+        # 2 workers processing 2 requests 0.3 sec each makes 0.6 sec plus overhead
+        yield pu.asleep(1.5)
         log.info("Work results: "+str(wc.workresult))
         log.info("Worker results: "+str(wc.worker))
 
         sum = 0
         for w,v in wc.worker.items():
             sum += v
-        self.assertEqual(sum, 10)
+        self.assertEqual(sum, 4)
 
 class WorkerClient(Process):
     """
