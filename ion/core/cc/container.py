@@ -157,8 +157,6 @@ class Container(BasicLifecycleObject):
         return self.proc_manager.terminate_process(*args, **kwargs)
 
     # Exchange management, handled by ExchangeManager
-    def declare_messaging(self, *args, **kwargs):
-        return self.exchange_manager.declare_messaging(*args, **kwargs)
     def configure_messaging(self, *args, **kwargs):
         return self.exchange_manager.configure_messaging(*args, **kwargs)
     def new_consumer(self, *args, **kwargs):

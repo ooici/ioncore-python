@@ -104,10 +104,6 @@ def _set_container_args(contargs=None):
     else:
         ioninit.sys_name = ioninit.container_instance.id
 
-def declare_messaging(messagingCfg, cgroup=None):
-    #raise NotImplementedError("bootstrap.declare_messaging() not supported any longer")
-    return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
-
 def spawn_processes(procs, sup=None):
     return ioninit.container_instance.spawn_processes(procs, sup)
 

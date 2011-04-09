@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @brief test case for ION integration and system test cases (and some unit tests)
 """
+import os
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -12,21 +13,17 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import bootstrap, ioninit
+from ion.core import bootstrap
 from ion.core import ioninit
 from ion.core.cc import service
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
-from ion.core.process.process import IProcess, Process
+from ion.core.process.process import IProcess, Process, request
 from ion.data.store import Store
-import ion.util.procutils as pu
-import os
-
 from ion.resources import description_utility
-
-from ion.core.process.process import request
+import ion.util.procutils as pu
 
 # The following modules must be imported here, because they load config
 # files. If done while in test, it does not work!
@@ -183,9 +180,6 @@ class IonTestCase(unittest.TestCase):
             return proc.shutdown()
         else:
             return self.test_sup.shutdown_child_procs()
-
-    def _declare_messaging(self, messaging):
-        return bootstrap.declare_messaging(messaging)
 
     def _spawn_processes(self, procs, sup=None):
         sup = sup if sup else self.test_sup
