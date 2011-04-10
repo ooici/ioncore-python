@@ -89,31 +89,3 @@ class ResourceRegistryTest(IonTestCase):
         # Test a simple, non-recursive resource description
         rd = yield self.rrc.describe_resource(dataobject.Resource)
         self.assertEqual(rd.name, 'Resource')
-
-
-
-
-
-class ResourceRegistryCoreServiceTest(IonTestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-        self.sup = self.test_sup
-        #log.info('self.sup.proc_state'+str(self.sup.proc_state))
-
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        # You must explicitly clear the registry in case cassandra is used as a back end!
-        yield self.rrc.clear_registry
-        yield self._stop_container()
-
-    @defer.inlineCallbacks
-    def test_reg_startup(self):
-        self.rrc = ResourceRegistryClient(proc=self.sup)
-
-        # Show that the registry work when started as a core service
-        res_to_describe = coi_resource_descriptions.IdentityResource
-        res_description = yield self.rrc.register_resource_definition(res_to_describe)
-
-        #print res_description
