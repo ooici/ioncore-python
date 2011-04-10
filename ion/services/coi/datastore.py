@@ -41,9 +41,9 @@ from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANC
 from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG
 
@@ -817,10 +817,8 @@ class DataStoreService(ServiceProcess):
                         ION_DATASETS_CFG:False,
                         ION_AIS_RESOURCES_CFG:False}
 
-        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
-        
-#        self.preloaded_datasets_dict = {}
 
         log.info('DataStoreService.__init__()')
         
@@ -880,7 +878,6 @@ class DataStoreService(ServiceProcess):
         """
         This method is used to preload required content into the datastore
         """
-
 
         if self.preload[ION_PREDICATES_CFG]:
 
@@ -946,6 +943,16 @@ class DataStoreService(ServiceProcess):
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading DataSet:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    # Do not fail if returning none - may or may not load data from disk
+                    if resource_instance is not None:
+                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+            for key, value in ION_DATA_SOURCES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading DataSource:' + str(value.get(NAME_CFG)))
 
                     resource_instance = self._create_resource(value)
                     # Do not fail if returning none - may or may not load data from disk
@@ -1060,12 +1067,12 @@ class DataStoreService(ServiceProcess):
 
         elif isinstance(content, FunctionType):
             #execute the function on the resource_instance!
-            kwargs = {}
+            kwargs = {'has_a_id':HAS_A_ID}
             if description.has_key(CONTENT_ARGS_CFG):
-                kwargs = description[CONTENT_ARGS_CFG]
+                kwargs.update(description[CONTENT_ARGS_CFG])
+
             if not content(resource_instance, self, **kwargs):
                 set_content_ok = False
-            
         
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')

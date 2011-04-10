@@ -83,7 +83,23 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     # Create the coresponding datasource object #
     #-------------------------------------------#
     # Datasource: NDBC SOS Glider data
-    
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating associaiton')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
     datasource.source_type = datasource.SourceType.SOS
     datasource.property.append('salinity')
     datasource.station_id.append('48900')
@@ -106,7 +122,26 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     # Create the coresponding datasource object #
     #-------------------------------------------#
     # Datasource: USGS waterservices
-    
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating associaiton')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
     datasource.source_type = datasource.SourceType.USGS
     datasource.property.append('00010')
     datasource.property.append('00060')
@@ -392,7 +427,19 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     #-------------------------------------------#
     # Create the coresponding datasource object #
     #-------------------------------------------#
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating associaiton')
     
+     # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
     datasource.source_type = datasource.SourceType.SOS
     datasource.property.append('sea_water_temperature')
     datasource.station_id.append('41012')
@@ -406,7 +453,7 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
     datasource.max_ingest_millis = 6000
-    
+
     return True
 
 

@@ -62,7 +62,7 @@ class ResourceRegistryService(ServiceProcess):
         self.fetch_blobs = self.workbench.fetch_blobs
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
-        self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='No Data Store service name provided!'))
+        self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='datastore'))
 
         log.info('ResourceRegistryService.__init__()')
 
