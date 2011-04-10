@@ -65,7 +65,10 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
         # This is where dependent apps can be included
-        mopt['scripts'] = [CONF['start_app']] or start_app
+        if start_app:
+            mopt['scripts'] = start_app
+        elif CONF['start_app']:
+            mopt['scripts'] = [CONF['start_app']]
 
         # Little trick to have no consecutive failures if previous setUp() failed
         # @note This is not fail fast and does not always work. TEMPORARY.
