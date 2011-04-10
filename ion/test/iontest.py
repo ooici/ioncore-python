@@ -49,7 +49,7 @@ class IonTestCase(unittest.TestCase):
     twisted_container_service = None #hack
 
     @defer.inlineCallbacks
-    def _start_container(self, sysname=None, start_app=None):
+    def _start_container(self, sysname=None, start_apps=None):
         """
         Starting and initialzing the container with a connection to a broker.
         """
@@ -65,8 +65,11 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
         # This is where dependent apps can be included
-        if start_app:
-            mopt['scripts'] = start_app
+        if start_apps and type(start_apps) in (tuple, list):
+            apps = []
+            for app in start_apps:
+                apps.append("../res/apps/%s.app" % app)
+            mopt['scripts'] = apps
         elif CONF['start_app']:
             mopt['scripts'] = [CONF['start_app']]
 
