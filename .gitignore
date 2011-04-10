@@ -30,3 +30,5 @@ buildout.cfg
 .gitignore
 .idea
 ioncore-python
+msc.*
+

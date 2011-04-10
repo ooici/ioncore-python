@@ -346,7 +346,7 @@ class FanoutReceiver(Receiver):
         assert self.xname, "Receiver must have a name"
 
         name_config = messaging.fanout(self.xname)
-        name_config.update({'name_type':'fanout'})
+
 
         yield self._init_receiver(name_config, store_config=True)
 
