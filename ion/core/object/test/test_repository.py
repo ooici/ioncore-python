@@ -23,10 +23,10 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 from ion.core.object import repository
 
-invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
 
 
 class DummyClass(object):
@@ -261,12 +261,12 @@ class RepositoryTest(unittest.TestCase):
         
         
         # Pass in a type id object (the new way!)
-        repo2, person = self.wb.init_repository(person_type)
+        repo2, person = self.wb.init_repository(PERSON_TYPE)
         self.assertIsInstance(repo2, repository.Repository)
         self.assertIsInstance(person, gpb_wrapper.Wrapper)
         
         # Pass in an invalid type id object (the new way!)
-        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type)
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, INVALID_TYPE)
         
         # Pass in None - get a repo with no root object yet...
         repo3, nothing = self.wb.init_repository()
@@ -280,7 +280,7 @@ class RepositoryTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_invalidate(self):
         
-        repo, person = self.wb.init_repository(person_type)
+        repo, person = self.wb.init_repository(PERSON_TYPE)
         
         repo.commit('junk commit')
         
@@ -293,14 +293,14 @@ class RepositoryTest(unittest.TestCase):
         """
         Test the basic state of a new wrapper object when it is created
         """
-        repo, simple = self.wb.init_repository(addressbook_type)   
+        repo, simple = self.wb.init_repository(ADDRESSBOOK_TYPE)   
         
         self.assertEqual(len(simple.ParentLinks),0)
         self.assertEqual(len(simple.ChildLinks),0)
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
-        simple2= repo.create_object(addresslink_type)
+        simple2= repo.create_object(ADDRESSLINK_TYPE)
         
         self.assertEqual(len(simple2.ParentLinks),0)
         self.assertEqual(len(simple2.ChildLinks),0)
@@ -310,11 +310,11 @@ class RepositoryTest(unittest.TestCase):
         
     def test_inparents(self):
             
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
         
         ab.person.add()
             
-        ab2 = repo.create_object(addresslink_type)
+        ab2 = repo.create_object(ADDRESSLINK_TYPE)
             
         # Person is a null pointer - put an addresslink in it cause we can...
         ab.person[0] = ab2
@@ -328,7 +328,7 @@ class RepositoryTest(unittest.TestCase):
         
     @defer.inlineCallbacks
     def test_branch_checkout(self):
-        repo, ab = self.wb.init_repository(addressbook_type)   
+        repo, ab = self.wb.init_repository(ADDRESSBOOK_TYPE)   
         p = ab.person.add()
         p.name = 'David'
         p.id = 1
@@ -351,13 +351,13 @@ class RepositoryTest(unittest.TestCase):
         
         
     def test_branch_no_commit(self):
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
         self.assertEqual(len(repo.branches),1)
             
         self.assertRaises(repository.RepositoryError, repo.branch, 'Arthur')
         
     def test_branch(self):
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
         repo.commit()
         self.assertEqual(len(repo.branches),1)
         
@@ -381,13 +381,13 @@ class RepositoryTest(unittest.TestCase):
         
         
     def test_create_commit_ref(self):
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
         cref = repo._create_commit_ref(comment="Cogent Comment")
         assert(cref.comment == "Cogent Comment")
             
     @defer.inlineCallbacks
     def test_checkout_commit_id(self):
-        repo, ab = self.wb.init_repository(addressbook_type)
+        repo, ab = self.wb.init_repository(ADDRESSBOOK_TYPE)
         
         commit_ref1 = repo.commit()
 
@@ -414,7 +414,7 @@ class RepositoryTest(unittest.TestCase):
 
     def test_error_on_set_linked_object(self):
 
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
 
         self.assertRaises(repository.RepositoryError, setattr, ab , 'owner', 'anything but a gpbwrapper')
 
@@ -425,7 +425,7 @@ class RepositoryTest(unittest.TestCase):
     def test_log(self):
         wb1 = workbench.WorkBench('No Process Test')
         
-        repo1, ab = self.wb.init_repository(addressbook_type)
+        repo1, ab = self.wb.init_repository(ADDRESSBOOK_TYPE)
         
         commit_ref1 = repo1.commit(comment='a')
         commit_ref2 = repo1.commit(comment='b')
@@ -436,9 +436,9 @@ class RepositoryTest(unittest.TestCase):
         
     @defer.inlineCallbacks  
     def test_dag_structure(self):
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
                         
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -452,7 +452,7 @@ class RepositoryTest(unittest.TestCase):
         ab.person[0] = p
         
         ab.person.add()
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
@@ -486,10 +486,10 @@ class RepositoryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_lost_objects(self):
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
             
         # Create a resource object    
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -511,10 +511,10 @@ class RepositoryTest(unittest.TestCase):
 
     def test_transfer_repository_objects(self):
         
-        repo1, ab1 = self.wb.init_repository(addresslink_type)
+        repo1, ab1 = self.wb.init_repository(ADDRESSLINK_TYPE)
             
         # Create a resource object    
-        p1 = repo1.create_object(person_type)
+        p1 = repo1.create_object(PERSON_TYPE)
         p1.name='David'
         p1.id = 5
         p1.email = 'd@s.com'
@@ -538,7 +538,7 @@ class RepositoryTest(unittest.TestCase):
 
 
         # Create a second repository and copy p1 from repo1 to repo2
-        repo2, ab2 = self.wb.init_repository(addresslink_type)
+        repo2, ab2 = self.wb.init_repository(ADDRESSLINK_TYPE)
             
         ab2.person.add()
         
@@ -570,10 +570,10 @@ class RepositoryTest(unittest.TestCase):
     @defer.inlineCallbacks 
     def test_merge(self):
         
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
             
         # Create a resource object    
-        p1 = repo.create_object(person_type)
+        p1 = repo.create_object(PERSON_TYPE)
         p1.name='David'
         p1.id = 5
         p1.email = 'd@s.com'
@@ -591,7 +591,7 @@ class RepositoryTest(unittest.TestCase):
         repo.branch('Merge')
         
         # Create a resource object    
-        p2 = repo.create_object(person_type)
+        p2 = repo.create_object(PERSON_TYPE)
         p2.name='John'
         p2.id = 3
         p2.email = 'J@G.com'
@@ -606,17 +606,20 @@ class RepositoryTest(unittest.TestCase):
         del ab, p1, p2, ph2, ph1
         
         ab = yield repo.checkout(branchname='master')
+
+        #yield repo.merge(branchname='Merge')
+        repo.merge(branchname='Merge')
+
+
+        self.assertEqual(ab.title, repo.merge_objects(0).title)
+
+        self.assertEqual(ab.person[0].name, repo.merge_objects(0).person[0].name)
         
-        yield repo.merge(branchname='Merge')
-        
-        self.assertEqual(ab.title, repo.merge_objects[0].title)
-        self.assertEqual(ab.person[0].name, repo.merge_objects[0].person[0].name)
-        
-        self.assertNotIdentical(ab.person[0], repo.merge_objects[0].person[0])
+        self.assertNotIdentical(ab.person[0], repo.merge_objects(0).person[0])
         
         # Can not modify merger objects   
-        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects[0], 'title', 'David')
-        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects[0].person[0], 'name', 'Matthew')
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects(0), 'title', 'David')
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects(0).person[0], 'name', 'Matthew')
         
         # Can modify workspace objects
         ab.person[0].name = 'Matthew'
@@ -624,7 +627,7 @@ class RepositoryTest(unittest.TestCase):
         
         # Can move object from merge to workspace
         ab.person.add()
-        ab.person[1] = repo.merge_objects[0].person[1]
+        ab.person[1] = repo.merge_objects(0).person[1]
         
         self.assertEqual(ab.person[1].name, 'John')
         
@@ -643,7 +646,7 @@ class RepositoryTest(unittest.TestCase):
 
         def closure(workbench):
 
-            repo = self.wb.create_repository(addresslink_type)
+            repo = self.wb.create_repository(ADDRESSLINK_TYPE)
             # Create a weakref proxy to the repository
             repo_ref = weakref.proxy(repo)
 
@@ -688,10 +691,10 @@ class RepositoryTest(unittest.TestCase):
         @TODO add a test to make sure that 
         """
         def closure(workbench):
-            repo = workbench.create_repository(addresslink_type)
+            repo = workbench.create_repository(ADDRESSLINK_TYPE)
 
             # Create a resource object
-            p1 = repo.create_object(person_type)
+            p1 = repo.create_object(PERSON_TYPE)
             p1.name='David'
             p1.id = 5
             p1.email = 'd@s.com'
@@ -737,3 +740,59 @@ class RepositoryTest(unittest.TestCase):
 
         for item in repo_refs:
             self.assertEqual(item(),None)
+            
+            
+class MergeContainerTest(unittest.TestCase):
+    
+    def setUp(self):
+        
+        wb = workbench.WorkBench('No Process Test')
+        self.wb = wb
+
+        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
+
+        ab = repo.root_object
+
+        p = repo.create_object(PERSON_TYPE)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '123 456 7890'
+
+        ab.owner = p
+
+        ab.person.add()
+        ab.person[0] = p
+
+        ab.person.add()
+        p = repo.create_object(PERSON_TYPE)
+        p.name='John'
+        p.id = 78
+        p.email = 'J@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '111 222 3333'
+
+        ab.person[1] = p
+
+        self.ab = ab
+        self.repo = repo
+
+        repo.commit('Commit to serialize elements')
+    
+
+    def test_load_element(self):
+
+        commit = self.repo._current_branch.commitrefs[0]
+
+        mc = repository.MergeContainer(commit, self.repo.index_hash.cache)
+
+        print mc.root_object
+
+    
+    
+    
+    
+    
