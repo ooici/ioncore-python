@@ -72,7 +72,7 @@ class MessageSpace(BasicLifecycleObject):
     """
 
     def __init__(self, exchange_manager, hostname='localhost', port=5672,
-            virtual_host='/', heartbeat=0):
+            virtual_host='/', username='guest', password='guest', heartbeat=0):
         """
         @param exchange_manager So we can link our states. If I'm in a bad
         state, then I need to notify ExchangeManager.
@@ -83,6 +83,8 @@ class MessageSpace(BasicLifecycleObject):
         self.hostname = hostname
         self.port = port
         self.virtual_host = virtual_host
+        self.username = username
+        self.password = password # Code review...review me!
         self.heartbeat = heartbeat
 
         # Immediately transition to READY state
@@ -104,7 +106,9 @@ class MessageSpace(BasicLifecycleObject):
         clientCreator = amqp.ConnectionCreator(reactor,
                                     vhost=self.virtual_host,
                                     delegate=amqpEvents,
-                                    heartbeat=self.heartbeat)
+                                    heartbeat=self.heartbeat,
+                                    username=self.username,
+                                    password=self.password)
         d = clientCreator.connectTCP(self.hostname, self.port)
         def connected(client):
             log.info('connected')
