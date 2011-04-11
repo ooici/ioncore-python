@@ -820,6 +820,8 @@ class DataStoreService(ServiceProcess):
         self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
 
+
+
         log.info('DataStoreService.__init__()')
         
 
@@ -874,12 +876,8 @@ class DataStoreService(ServiceProcess):
     def slc_activate(self):
 
 
-        print 'BLOB STORE STATE', self.b_store._get_state()
-        print 'Commit STORE STATE', self.c_store._get_state()
 
-        print 'EHEHEHEHEHEHEHE111111'
         yield self.initialize_datastore()
-        print 'EHEHEHEHEHEHEHE2222222'
 
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
@@ -892,7 +890,6 @@ class DataStoreService(ServiceProcess):
         This method is used to preload required content into the datastore
         """
 
-        print 'dmndndndndndn'
         if self.preload[ION_PREDICATES_CFG]:
 
             log.info('Preloading Predicates')
@@ -907,7 +904,6 @@ class DataStoreService(ServiceProcess):
                     #@TODO make associations to predicates!
 
 
-        print 'dmndndndndndn'
 
         # Load the Root User!
         if self.preload[ION_IDENTITIES_CFG]:
@@ -990,11 +986,7 @@ class DataStoreService(ServiceProcess):
 
 
 
-        print 'NNEEMEMEN<ENE<ENMENSJBSDMSB1111'
         yield self.workbench.flush_initialization_to_backend()
-        print 'NNEEMEMEN<ENE<ENMENSJBSDMSB2222'
-
-
 
     def _create_predicate(self,description):
 

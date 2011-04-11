@@ -21,6 +21,10 @@ STORAGE_PROVIDER = 'storage provider'
 PERSISTENT_ARCHIVE = 'persistent archive'
 CACHE_CONFIGURATION = 'cache configuration'
 
+DEFAULT_KEYSPACE_NAME ='DEFAULT NAME - DO NOT USE'
+
+ION_KEYSPACE = 'ion keyspace'
+
 ### BLOB CACHE SETUP
 BLOB_CACHE = 'blobs'
 BLOB_INDEXED_COLUMNS=[]
@@ -52,11 +56,57 @@ KEYWORD = 'keyword'
 COMMIT_INDEXED_COLUMNS=[REPOSITORY_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT, PREDICATE_KEY,
                      PREDICATE_BRANCH, PREDICATE_COMMIT, OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT, KEYWORD, RESOURCE_LIFE_CYCLE_STATE, RESOURCE_OBJECT_TYPE]
 
+
 # Common Columns:
 VALUE = 'value'
 
-###
+### Build up datastructures
 
+base_col_def = {'name':None,
+           'validation_class':'BytesType',
+           'index_type':None,
+           'index_name':None}
+
+
+base_cf_def ={
+    'keyspace' : DEFAULT_KEYSPACE_NAME,
+    'name' : None,
+    'column_type' : 'Standard',
+    'comparator_type' : 'BytesType',
+    'subcomparator_type' : None,
+    'comment' : None,
+    'column_metadata' : None,
+    'default_validation_class':'BytesType',
+}
+
+base_ks_def = {
+    'name':DEFAULT_KEYSPACE_NAME,
+    'strategy_class':'org.apache.cassandra.locator.SimpleStrategy',
+    #'strategy_options':'',
+    'replication_factor':1,
+    'cf_defs':None,
+}
+
+
+commit_cols = []
+for col_name in COMMIT_INDEXED_COLUMNS:
+    col_def = base_col_def.copy()
+    col_def['name']=col_name
+    commit_cols.append(col_def)
+
+
+commit_cf = base_cf_def.copy()
+commit_cf['name']=COMMIT_CACHE
+commit_cf['column_metadata'] = commit_cols
+
+blob_cf = base_cf_def.copy()
+blob_cf['name']=BLOB_CACHE
+
+
+ion_ks = base_ks_def.copy()
+ion_ks['cf_defs'] = [blob_cf, commit_cf]
+
+###
 # CREATE A SINGLE EXPORTABLE DATA STRUCTURE
 
 STORAGE_CONF_DICTIONARY = {
@@ -66,19 +116,8 @@ STORAGE_PROVIDER:{'host':'localhost', # ec2-184-72-14-57.us-west-1.compute.amazo
                     'port':9160
                     },
 ### Storage Keyspace is provided by the sysname!!!
-PERSISTENT_ARCHIVE:{'name':'DEFAULT NAME - DO NOT USE',
-                    'attrs': {
-                      'replication_factor':2,
-                      'placement_strategy':'NetworkTopologyStrategy',
-                      },
-                    },
-### Column Families
-CACHE_CONFIGURATION: {BLOB_CACHE:{
-    					'indexed columns':BLOB_INDEXED_COLUMNS},
+PERSISTENT_ARCHIVE:{ION_KEYSPACE:ion_ks},
 
-     					COMMIT_CACHE:{
-        					'indexed columns':COMMIT_INDEXED_COLUMNS}
-        				},
 }
 
 def get_storage_conf_dict(sysname=None):
@@ -87,6 +126,9 @@ def get_storage_conf_dict(sysname=None):
 
     # update configuration from ion.config file
 
+
+    if 'name' in CONF.getValue(PERSISTENT_ARCHIVE, {}):
+        raise KeyError('The keyspace name can not be set from the CONF file.')
 
     confdict[STORAGE_PROVIDER].update(CONF.getValue(STORAGE_PROVIDER, {}))
     confdict[PERSISTENT_ARCHIVE].update(CONF.getValue(PERSISTENT_ARCHIVE, {}))
@@ -98,7 +140,12 @@ def get_storage_conf_dict(sysname=None):
     sysname = sysname or ioninit.sys_name
     assert sysname, "storage_configuration_utility.py: no ioninit.sysname or sysname provided on command line"
 
-    confdict[PERSISTENT_ARCHIVE]['name'] = sysname
+    confdict[PERSISTENT_ARCHIVE][ION_KEYSPACE] = sysname
+
+
+    
+    v['keyspace'] = sysname
+
 
     return confdict
 
