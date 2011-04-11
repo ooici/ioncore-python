@@ -13,6 +13,8 @@ from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from ion.util.tcp_connections import TCPConnection
 
+from ion.util import procutils as pu
+
 from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 from ion.core.data import storage_configuration_utility
@@ -32,11 +34,11 @@ class CassandraBootStrap:
         port = storage_conf["storage provider"]["port"]
         self._keyspace = storage_conf["persistent archive"]["name"]
 
-        #if username is None or password is None:
-        #    self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace)
-        #else:
-        authorization_dictionary = {"username":username, "password":password}
-        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+        if username is None or password is None:
+            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace)
+        else:
+            authorization_dictionary = {"username":username, "password":password}
+            self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
 
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)
@@ -54,6 +56,6 @@ class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):
 
 class CassandraStoreBootstrap(CassandraBootStrap, CassandraStore):
 
-    def __init__(self, username, password, syname=None):
+    def __init__(self, username, password, sysname=None):
         CassandraBootStrap.__init__(self, username, password, sysname)
         self._cache_name = BLOB_CACHE

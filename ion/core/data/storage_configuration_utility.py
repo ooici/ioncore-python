@@ -66,7 +66,7 @@ STORAGE_PROVIDER:{'host':'localhost', # ec2-184-72-14-57.us-west-1.compute.amazo
                     'port':9160
                     },
 ### Storage Keyspace is provided by the sysname!!!
-PERSISTENT_ARCHIVE:{'name':'sysname',
+PERSISTENT_ARCHIVE:{'name':'DEFAULT NAME - DO NOT USE',
                     'attrs': {
                       'replication_factor':2,
                       'placement_strategy':'NetworkTopologyStrategy',
@@ -85,15 +85,21 @@ def get_storage_conf_dict(sysname=None):
     # shallow copy conf dict
     confdict = STORAGE_CONF_DICTIONARY.copy()
 
-    # update configuration from conf file
-    conffile_storage_conf = CONF.getValue('STORAGE_CONF_DICTIONARY', {})
-    confdict[STORAGE_PROVIDER].update(conffile_storage_conf.get(STORAGE_PROVIDER, {}))
-    confdict[PERSISTENT_ARCHIVE].update(conffile_storage_conf.get(PERSISTENT_ARCHIVE, {}))
-    confdict[CACHE_CONFIGURATION].update(conffile_storage_conf.get(CACHE_CONFIGURATION, {}))
+    # update configuration from ion.config file
+
+    confdict[STORAGE_PROVIDER].update(CONF.getValue(STORAGE_PROVIDER, {}))
+    confdict[PERSISTENT_ARCHIVE].update(CONF.getValue(PERSISTENT_ARCHIVE, {}))
+
+    # Do not allow override of the Cache Configuration defined here!
+    #confdict[CACHE_CONFIGURATION].update(CONF.getValue(CACHE_CONFIGURATION, {}))
 
     # update the sysname
+    print 'EJHEJH'
     sysname = sysname or ioninit.sys_name
     assert sysname, "storage_configuration_utility.py: no ioninit.sysname or sysname provided on command line"
+
+
+    print 'EJHEJH2222'
 
     confdict[PERSISTENT_ARCHIVE]['name'] = sysname
 
