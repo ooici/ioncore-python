@@ -45,7 +45,6 @@ class AssociationClientTest(IonTestCase):
     def setUp(self):
 
         yield self._start_container()
-        #self.sup = yield self._start_core_services()
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}},
@@ -157,5 +156,3 @@ class AssociationClientTest(IonTestCase):
 
             self.assertEqual(association.SubjectReference.key, ds_resource.ResourceIdentity)
             self.assertEqual(association.ObjectReference.key, anon_resource.ResourceIdentity)
-
-        

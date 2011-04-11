@@ -81,26 +81,6 @@ class ExchangeManager(BasicLifecycleObject):
     # API
 
     @defer.inlineCallbacks
-    def declare_messaging(self, messagingCfg, cgroup=None):
-        """
-        Configures messaging resources.
-        @todo this needs to be called from exchange management service
-        """
-        # for each messaging resource call Magnet to define a resource
-        for name, msgResource in messagingCfg.iteritems():
-            scope = msgResource.get('args',{}).get('scope','global')
-            msgName = name
-            if scope == 'local':
-                msgName = self.container.id + "." + msgName
-            elif scope == 'system':
-                # @todo in the root bootstrap this is ok, but HACK
-                msgName = self.container.id + "." + msgName
-
-            # declare queues, bindings as needed
-            log.info("Messaging name config: name="+msgName+', '+str(msgResource))
-            yield self.configure_messaging(msgName, msgResource)
-
-    @defer.inlineCallbacks
     def configure_messaging(self, name, config):
         """
         """
@@ -145,4 +125,3 @@ class ExchangeManager(BasicLifecycleObject):
         exchange manager of things like connectionLost
         """
         self.container.exchangeConnectionLost(reason)
-

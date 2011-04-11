@@ -16,7 +16,7 @@ class ExchangeTypes:
                  type='topic', 
                  passive=False, 
                  durable=False,
-                 auto_delete=False, 
+                 auto_delete=True, 
                  internal=False, 
                  nowait=False        
         )

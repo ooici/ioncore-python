@@ -178,6 +178,13 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
+2011-04-09:
+- Removed support for bootstrap.declare_messaging and
+  IonTestCase._declare_messaging.
+- Removed all scripts in res/scripts. Use app and rel files instead.
+- Added interaction (message) observer app. Start with
+  bin/twistd -n cc res/apps/observer.app
+
 2011-04-05:
 - Call _so_transition in StateObject action function to transition state.
 - Release (rel) files in res/deploy now supported as start argument. Release
