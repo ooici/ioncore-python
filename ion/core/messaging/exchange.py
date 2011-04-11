@@ -43,6 +43,8 @@ class ExchangeManager(BasicLifecycleObject):
         hostname = self.config['broker_host']
         port = self.config['broker_port']
         virtual_host = self.config['broker_vhost']
+        username = self.config['broker_username']
+        password = self.config['broker_password']
         heartbeat = int(self.config['broker_heartbeat'])
 
         # Is a BrokerConnection instance (no action at this point)
@@ -50,6 +52,8 @@ class ExchangeManager(BasicLifecycleObject):
                                 hostname=hostname,
                                 port=port,
                                 virtual_host=virtual_host,
+                                username=username,
+                                password=password,
                                 heartbeat=heartbeat)
 
         return defer.succeed(None)
