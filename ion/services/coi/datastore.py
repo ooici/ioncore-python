@@ -986,7 +986,9 @@ class DataStoreService(ServiceProcess):
 
 
 
+        print 'NNEEMEMEN<ENE<ENMENSJBSDMSB1111'
         yield self.workbench.flush_initialization_to_backend()
+        print 'NNEEMEMEN<ENE<ENMENSJBSDMSB2222'
 
 
 
