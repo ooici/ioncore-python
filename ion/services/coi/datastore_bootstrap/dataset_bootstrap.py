@@ -95,7 +95,7 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
 
     # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
@@ -136,7 +136,7 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
 
     # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
@@ -435,7 +435,7 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
     
      # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
