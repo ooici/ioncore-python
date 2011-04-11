@@ -45,7 +45,11 @@ class ExchangeManager(BasicLifecycleObject):
         virtual_host = self.config['broker_vhost']
         username = self.config['broker_username']
         password = self.config['broker_password']
+        credfile = self.config['broker_credfile']
         heartbeat = int(self.config['broker_heartbeat'])
+
+        if credfile:
+            username, password = open(credfile).read().split()
 
         # Is a BrokerConnection instance (no action at this point)
         self.message_space = MessageSpace(self,
