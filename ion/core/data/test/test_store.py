@@ -525,7 +525,12 @@ class BootstrapIndexedStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11", "sysname")
+
+        uname = CONF.getValue('cassandra_username', None)
+        pword = CONF.getValue('cassandra_password', None)
+        keyspace = CONF.getValue('keyspace','sysname')
+
+        store = CassandraIndexedStoreBootstrap(uname,pword,keyspace)
         store.initialize()
         store.activate()
         return defer.succeed(store)
