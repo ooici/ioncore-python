@@ -34,6 +34,8 @@ from ion.core.data.store import Query
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+
 from ion.util.itv_decorator import itv
 
 from ion.test.iontest import IonTestCase
@@ -165,15 +167,17 @@ class StoreServiceTest(IStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-
-
-
-
 class BootstrapStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        store = CassandraStoreBootstrap("ooiuser", "oceans11")
+
+
+        uname = CONF.getValue('cassandra_username', None)
+        pword = CONF.getValue('cassandra_password', None)
+        keyspace = CONF.getValue('keyspace','sysname')
+
+        store = CassandraStoreBootstrap(uname,pword,keyspace)
         store.initialize()
         store.activate()
         return defer.succeed(store)

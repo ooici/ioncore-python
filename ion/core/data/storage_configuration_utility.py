@@ -87,6 +87,7 @@ def get_storage_conf_dict(sysname=None):
 
     # update configuration from ion.config file
 
+
     confdict[STORAGE_PROVIDER].update(CONF.getValue(STORAGE_PROVIDER, {}))
     confdict[PERSISTENT_ARCHIVE].update(CONF.getValue(PERSISTENT_ARCHIVE, {}))
 
@@ -94,12 +95,8 @@ def get_storage_conf_dict(sysname=None):
     #confdict[CACHE_CONFIGURATION].update(CONF.getValue(CACHE_CONFIGURATION, {}))
 
     # update the sysname
-    print 'EJHEJH'
     sysname = sysname or ioninit.sys_name
     assert sysname, "storage_configuration_utility.py: no ioninit.sysname or sysname provided on command line"
-
-
-    print 'EJHEJH2222'
 
     confdict[PERSISTENT_ARCHIVE]['name'] = sysname
 

@@ -15,7 +15,11 @@ def create_keyspace(pa_dict):
     name = pa_dict["name"]
     f = lambda x: "".join((x[0],"=",str(x[1])))
     attrs = " and ".join(map(f, pa_dict.get("attrs",{}).items()))
-    command = " ".join(("create keyspace", name, "with", attrs, ";"))
+    if attrs:
+        command = " ".join(("create keyspace", name, "with", attrs, ";"))
+    else:
+        command = " ".join(("create keyspace", name,";"))
+
     return "\n".join([command, " ".join(("use",name,";"))])
 
 def create_column_families(cache_dict):
@@ -36,7 +40,7 @@ def create_column_families(cache_dict):
         if len(cols) > 0:
            attrs = attrs + " and column_metadata=" + str(cols)
 
-        command = " ".join(("create column family", cf, attrs, ";"))
+        command = " ".join(("create column family", cf, attrs, ";\n"))
         output.append(command)
 
     return "\n".join(output)

@@ -23,13 +23,16 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 class CassandraBootStrap:
-    def __init__(self, username, password, sysname=None):
+    def __init__(self, username, password, keyspace=None):
         """
         Get init args from the bootstrap
         """
-        storage_conf = storage_configuration_utility.get_storage_conf_dict(sysname)
+
+        log.info('CassandraBootStrap Args: Uname - %s, Password - %s, Keyspace - %s' % (username,password,keyspace))
+
+        storage_conf = storage_configuration_utility.get_storage_conf_dict(keyspace)
         #storage_conf = Config("res/config/storage.cfg")
-        log.info('Configuring Cassandra Connection:', str(storage_conf))
+        log.debug('Configuring Cassandra Connection: %s' % str(storage_conf))
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
         self._keyspace = storage_conf["persistent archive"]["name"]
@@ -39,6 +42,9 @@ class CassandraBootStrap:
         else:
             authorization_dictionary = {"username":username, "password":password}
             self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+
+
+        log.info('CassandraBootStrap: Host - %s, Port - %s' % (host, port))
 
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)

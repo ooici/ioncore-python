@@ -867,15 +867,17 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
-
-
         
 
 
     @defer.inlineCallbacks
     def slc_activate(self):
 
-        print 'EHEHEHEHEHEHEHE'
+
+        print 'BLOB STORE STATE', self.b_store._get_state()
+        print 'Commit STORE STATE', self.c_store._get_state()
+
+        print 'EHEHEHEHEHEHEHE111111'
         yield self.initialize_datastore()
         print 'EHEHEHEHEHEHEHE2222222'
 
@@ -890,6 +892,7 @@ class DataStoreService(ServiceProcess):
         This method is used to preload required content into the datastore
         """
 
+        print 'dmndndndndndn'
         if self.preload[ION_PREDICATES_CFG]:
 
             log.info('Preloading Predicates')
@@ -904,6 +907,7 @@ class DataStoreService(ServiceProcess):
                     #@TODO make associations to predicates!
 
 
+        print 'dmndndndndndn'
 
         # Load the Root User!
         if self.preload[ION_IDENTITIES_CFG]:
