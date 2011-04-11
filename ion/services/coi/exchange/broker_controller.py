@@ -163,7 +163,6 @@ class BrokerController:
                 queue=name, 
                 durable=False, 
                 exclusive=True,
-                mandatory=True,
                 auto_delete=True
         )    
         returnValue(q)
