@@ -3,10 +3,11 @@
     "name":"PubSub",
     "description": "PubSubController Service",
     "version": "0.1",
-    "mod": ("ion.zapps.pubsub", []),
-    "modules": [
-        "ion.zapps.pubsub",
-    ],
+    "mod":  ("ion.core.pack.processapp", [
+        'pubsub',
+        'ion.services.dm.distribution.pubsub_service',
+        'PubSubService'], {}
+    ),
     "registered": [
         "pubsub"
     ],
