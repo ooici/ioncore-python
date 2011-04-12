@@ -8,8 +8,6 @@
 
 from ion.core import ioninit
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 # get configuration
 CONF = ioninit.config(__name__)
@@ -19,11 +17,8 @@ CONF = ioninit.config(__name__)
 ### PRESERVATION SERVICE TERMS
 STORAGE_PROVIDER = 'storage provider'
 PERSISTENT_ARCHIVE = 'persistent archive'
-CACHE_CONFIGURATION = 'cache configuration'
 
 DEFAULT_KEYSPACE_NAME ='DEFAULT NAME - DO NOT USE'
-
-ION_KEYSPACE = 'ion keyspace'
 
 ### BLOB CACHE SETUP
 BLOB_CACHE = 'blobs'
@@ -102,57 +97,79 @@ commit_cf['column_metadata'] = commit_cols
 blob_cf = base_cf_def.copy()
 blob_cf['name']=BLOB_CACHE
 
-
+### Storage Keyspace Name is provided by the sysname!!!
 ion_ks = base_ks_def.copy()
 ion_ks['cf_defs'] = [blob_cf, commit_cf]
 
 ###
 # CREATE A SINGLE EXPORTABLE DATA STRUCTURE
 
-STORAGE_CONF_DICTIONARY = {
-
 ### This is the cassandra cluster details - do not put credentials in a config file!
-STORAGE_PROVIDER:{'host':'localhost', # ec2-184-72-14-57.us-west-1.compute.amazonaws.com',
-                    'port':9160
-                    },
-### Storage Keyspace is provided by the sysname!!!
-PERSISTENT_ARCHIVE:{ION_KEYSPACE:ion_ks},
+storage_provider = {'host':'localhost', # ec2-184-72-14-57.us-west-1.compute.amazonaws.com',
+                    'port':9160,
+                    }
 
-}
-
-def get_storage_conf_dict(sysname=None):
-    # shallow copy conf dict
-    confdict = STORAGE_CONF_DICTIONARY.copy()
-
-    # update configuration from ion.config file
+class StorageConfigurationError(Exception):
+    '''
+    An exception thrown due to invalid configuration of the cassandra storage
+    '''
 
 
-    if 'name' in CONF.getValue(PERSISTENT_ARCHIVE, {}):
-        raise KeyError('The keyspace name can not be set from the CONF file.')
+def get_datastore_configuration(sysname=None):
+    """
+    Create a copy of all the components and over ride settings based on the configuration entry for this module
 
-    confdict[STORAGE_PROVIDER].update(CONF.getValue(STORAGE_PROVIDER, {}))
-    confdict[PERSISTENT_ARCHIVE].update(CONF.getValue(PERSISTENT_ARCHIVE, {}))
+    'ion.core.data.storage_configuration_utility':{
+    'storage provider':{'host':'ec2-184-72-14-57.us-west-1.compute.amazonaws.com','port':9160},
+    'persistent archive':{'strategy_class':'org.apache.cassandra.locator.SimpleStrategy',
+                            'replication_factor':1,}
+    },
 
-    # Do not allow override of the Cache Configuration defined here!
-    #confdict[CACHE_CONFIGURATION].update(CONF.getValue(CACHE_CONFIGURATION, {}))
+
+    """
+    my_blob_cf = blob_cf.copy()
+    my_commit_cf = commit_cf.copy()
+
+    my_ks = ion_ks.copy()
+
+    confdict = {
+        STORAGE_PROVIDER:storage_provider.copy(),
+        PERSISTENT_ARCHIVE:my_ks,
+        }
+
+
+
+
+    conf_provider = CONF.getValue(STORAGE_PROVIDER, {})
+    for k, v in conf_provider.iteritems():
+        if k not in storage_provider:
+            raise StorageConfigurationError('Invalid storage provider configuration: key - "%s", value - "%s"' % (k,v))
+        else:
+            confdict[STORAGE_PROVIDER][k]=v
+
+    # Set the values in the Key Space
+    conf_pa = CONF.getValue(PERSISTENT_ARCHIVE, {})
+    if 'name' in conf_pa:
+        raise StorageConfigurationError('Invalid Configuration for Persistent Archive: the name of the keyspace can not be specified in the CONF file. The sysname is always used.')
+
+    for k, v in conf_pa.iteritems():
+        if k not in base_ks_def:
+            raise StorageConfigurationError('Invalid keyspace configuration: key - "%s", value - "%s"' % (k,v))
+        else:
+            my_ks[k]=v
+
+    # The blob cache and the commit cache are not configurable in this object!
+    my_ks['cf_defs'] = [my_blob_cf, my_commit_cf]
 
     # update the sysname
     sysname = sysname or ioninit.sys_name
-    assert sysname, "storage_configuration_utility.py: no ioninit.sysname or sysname provided on command line"
+    if sysname is None:
+        raise StorageConfigurationError("storage_configuration_utility.py: no ioninit.sysname or sysname provided to get_datastore_configuration")
 
-    confdict[PERSISTENT_ARCHIVE][ION_KEYSPACE] = sysname
-
-
-    
-    v['keyspace'] = sysname
-
+    # Set the keyspace name to the sysname!
+    my_ks['name'] = sysname
+    my_blob_cf['keyspace'] = sysname
+    my_commit_cf['keyspace'] = sysname
 
     return confdict
 
-### LOG SOME DEBUG
-# @TODO Adde some more debug here!
-log.info('BLOB CACHE NAME: %s' % BLOB_CACHE)
-log.info('BLOB INDEXED COLUMNS: %s' % BLOB_INDEXED_COLUMNS)
-
-log.info('COMMIT CACHE NAME: %s' % COMMIT_CACHE)
-log.info('COMMIT INDEXED COLUMNS: %s' % COMMIT_INDEXED_COLUMNS)
