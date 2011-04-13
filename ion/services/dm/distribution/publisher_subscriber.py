@@ -26,7 +26,15 @@ class Publisher(BasicLifecycleObject):
     """
 
     def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, *args, **kwargs):
+        """
+        Initializer for a Publisher.
 
+        @param  xp_name     Exchange Point name.
+        @param  routing_key The routing key this publisher will use. May be None or overridden when calling
+                            publish.
+        @param  credentials Credentials to use.
+        @param  process     The owning process of this Publisher. Must be specified.
+        """
         BasicLifecycleObject.__init__(self)
 
         assert xp_name and routing_key and process
@@ -256,17 +264,37 @@ class Subscriber(BasicLifecycleObject):
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, durable=False, auto_delete=True, *args, **kwargs):
+        """
+        Initializer for Subscribers.
 
+        @param  xp_name     Exchange Point name.
+        @param  binding_key The binding key (AMQP) to attach this Subscriber to. Can be left blank if attaching to
+                            an existing queue.
+        @param  queue_name  Queue name to attach to. If the queue exists, attaches to it. If not, it is created. If
+                            left blank, an anonymous queue is created.
+        @param  credentials Credentials for the Subscriber.
+        @param  process     Owning process of this Subscriber. Must be specified.
+        @param  durable     If the queue is durable (AMQP), which means the broker will recreate the queue if it
+                            restarts. This should not be specified with an anonymous queue name.
+        @param  auto_delete If the queue has the auto_delete setting (AMQP), which means that on last consumer detatch
+                            from that queue, the queue is deleted.
+        """
         BasicLifecycleObject.__init__(self)
 
         assert xp_name and process
+
+        # sanity check: worth a warning but not an assert
+        if (durable or not auto_delete) and queue_name is None:
+            log.warn("Subscriber() - specified no queue name with durable %s or auto_delete %s" % (str(durable), str(auto_delete)))
 
         self._xp_name       = xp_name
         self._binding_key   = binding_key
         self._queue_name    = queue_name
         self._credentials   = credentials
         self._process       = process
+        self._durable       = durable
+        self._auto_delete   = auto_delete
         self._subscriber_id = None
         self._resource_id = None
 
@@ -275,7 +303,8 @@ class Subscriber(BasicLifecycleObject):
         # set up comms details
         consumer_config = { 'exchange' : self._xp_name,
                             'exchange_type' : 'topic',  # TODO
-                            'durable': False,
+                            'durable': durable,
+                            'auto_delete': auto_delete,
                             'mandatory': True,
                             'immediate': False,
                             'warn_if_exists': False,
