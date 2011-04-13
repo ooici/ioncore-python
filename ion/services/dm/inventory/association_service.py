@@ -69,9 +69,6 @@ class AssociationService(ServiceProcess):
 
         ServiceProcess.__init__(self, *args, **kwargs)
 
-
-        print CONF
-        
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         self.index_store_class = pu.get_class(index_store_class_name)
 

@@ -793,9 +793,6 @@ class DataStoreService(ServiceProcess):
         
         self._backend_classes={}
 
-
-        print 'NDNS<MNDSMBDBE', CONF
-
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
         self._password = self.spawn_args.get("password", CONF.getValue("password",None))
 
