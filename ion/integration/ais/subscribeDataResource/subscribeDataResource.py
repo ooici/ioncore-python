@@ -224,7 +224,7 @@ class SubscribeDataResource(object):
         association = None
         for a in found:
             #ian is not convinced... but this should work
-            exists = yield self.ac.association_exists(a.SubjectReference.key, TYPE_OF_ID, DATASET_RESOURCE_TYPE_ID):
+            exists = yield self.ac.association_exists(a.SubjectReference.key, TYPE_OF_ID, DATASET_RESOURCE_TYPE_ID)
             if exists:
                 #FIXME: if not association is None then we have data inconsistency!
                 association = a
