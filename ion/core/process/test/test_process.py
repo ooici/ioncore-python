@@ -404,7 +404,7 @@ class ProcessTest(IonTestCase):
         self.failUnlessEquals(ep3._get_state(), state_object.BasicStates.S_ERROR)
         self.failUnlessEquals(ep3lco1._get_state(), state_object.BasicStates.S_TERMINATED)
         self.failUnlessEquals(ep3lco2._get_state(), state_object.BasicStates.S_ERROR)       # did not terminate
-        self.failUnlessEquals(ep3lco3._get_state(), state_object.BasicStates.S_READY)       # never got a chance to terminate
+        self.failUnlessEquals(ep3lco3._get_state(), state_object.BasicStates.S_TERMINATED)  # terminated fine as its in parallel
 
 class DeadOnActivateProcess(Process):
     """
