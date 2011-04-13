@@ -3,14 +3,19 @@
 """
 @file ion/services/dm/inventory/test/test_association_service.py
 @author David Stuebe
+@author Matt Rodriguez
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+from ion.util.itv_decorator import itv
+
 
 from ion.test.iontest import IonTestCase
 
@@ -19,14 +24,17 @@ from ion.core.object import object_utils
 from ion.core.process.process import Process
 from ion.core.exception import ReceivedApplicationError
 
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
 from ion.services.coi.resource_registry_beta import resource_client
 
-from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, ION_AIS_RESOURCES_CFG
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
@@ -41,25 +49,22 @@ class AssociationServiceTest(IonTestCase):
     Testing association service.
     """
     services = [
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}
-                },
+            {'name':'ds1',
+             'module':'ion.services.coi.datastore',
+             'class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+            },
 
             {'name':'association_service',
              'module':'ion.services.dm.inventory.association_service',
              'class':'AssociationService'
-              },
+              }
         ]
 
 
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
 
 
         self.sup = yield self._spawn_processes(self.services)
@@ -77,13 +82,11 @@ class AssociationServiceTest(IonTestCase):
     def tearDown(self):
        log.info('Tearing Down Test Container')
 
-       store.Store.kvs.clear()
-       store.IndexStore.kvs.clear()
-       store.IndexStore.indices.clear()
-
        yield self._shutdown_processes()
        yield self._stop_container()
 
+    def test_instantiate(self):
+        pass
 
     @defer.inlineCallbacks
     def test_association_by_type(self):
@@ -690,7 +693,7 @@ class AssociationServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_association_true(self):
+    def test_association_false(self):
 
 
         request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
@@ -707,7 +710,8 @@ class AssociationServiceTest(IonTestCase):
         # make the request
         result = yield self.asc.association_exists(request)
         self.assertEqual(result.result, False)
-
+    
+    @defer.inlineCallbacks
     def test_association_true(self):
 
         request = yield self.proc.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
@@ -724,4 +728,49 @@ class AssociationServiceTest(IonTestCase):
         # make the request
         result = yield self.asc.association_exists(request)
         self.assertEqual(result.result, True)
+    
+        
+class CassandraBackedAssociationServiceTest(AssociationServiceTest):
+    
+    services = [
+            {'name':'ds1',
+             'module':'ion.services.coi.datastore',
+             'class':'DataStoreService',
+             'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                      BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
+                      PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
+                      'username':'ooiuser',
+                      'password':'oceans11',
+                       }
+            },
+            {'name':'association_service',
+             'module':'ion.services.dm.inventory.association_service',
+             'class':'AssociationService',
+             'spawnargs':{'index_store_class': 'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                          'username':'ooiuser',
+                          'password':'oceans11',
+                         }
+                }
+    ]
 
+    
+
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def setUp(self):
+        self._skip_test_msg = "Skipping this test because it assumes the backend data is not persisted."
+        yield AssociationServiceTest.setUp(self)
+
+    
+    def test_get_association_one(self):
+        raise unittest.SkipTest(self._skip_test_msg)
+    
+    def test_association_by_type_and_lcs(self):
+        raise unittest.SkipTest(self._skip_test_msg)
+    
+    def test_association_subject_predicate_updated_object(self):
+        raise unittest.SkipTest(self._skip_test_msg)
+
+    def test_association_false(self):
+        raise unittest.SkipTest(self._skip_test_msg)
+    

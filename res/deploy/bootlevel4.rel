@@ -1,0 +1,12 @@
+ {
+    "type":"release",
+    "name":"bootlevel4",
+    "version": "0.1",
+    "description": "Bootlevel 4 release file",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'datastore',            'version':'0.1', 'config':{}},
+        {'name':'association',          'version':'0.1', 'config':{}},
+        {'name':'resource_registry',    'version':'0.1', 'config':{}},
+    ]
+}

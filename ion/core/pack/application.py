@@ -51,7 +51,7 @@ class AppLoader(object):
 
         modname = appdef.mod[0]
         modargs = appdef.mod[1] if len(appdef.mod) >= 2 else []
-        modkwargs = appdef.mod[2] if len(appdef.mod) >= 3 else {}
+        modkwargs = appdef.mod[2] if (len(appdef.mod) >= 3 and appdef.mod[2] is not None) else {}
         if app_args and type(modkwargs) is dict and type(app_args) is dict:
             modkwargs.update(app_args)
 
@@ -172,6 +172,8 @@ class AppDefinition(object):
             self.config = {}
         if not hasattr(self, "args"):
             self.args = {}
+        if not hasattr(self, "processapp"):
+            self.processapp = []
 
 class IAppModule(Interface):
     """

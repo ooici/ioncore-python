@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/test/test_datastore.py
 @author David Stuebe
+@author Matt Rodriguez
 """
 
 import ion.util.ionlog
@@ -12,22 +13,28 @@ from twisted.internet import defer
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+from ion.util.itv_decorator import itv
+
+from ion.util import procutils as pu
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
 from ion.core.object import workbench
 
+from ion.core.data import cassandra_bootstrap
+from ion.core.data import storage_configuration_utility
+
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
-from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE, PERSISTENT_ARCHIVE
+
+from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES
 
-
-from ion.core.data import store
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -39,13 +46,10 @@ class DataStoreTest(IonTestCase):
     """
     Testing Datastore service.
     """
-    # Hold references to preserve state between runs!
-    store_class = store.Store
-    index_store_class = store.IndexStore
 
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True}}
                 },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
@@ -59,7 +63,11 @@ class DataStoreTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
+        yield self.setup_services()
 
+    @defer.inlineCallbacks
+    def setup_services(self):
+        yield self._start_container()
 
 
         self.sup = yield self._spawn_processes(self.services)
@@ -115,10 +123,6 @@ class DataStoreTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
-
-        #store.Store.kvs.clear()
-        #store.IndexStore.indices.clear()
-        #store.IndexStore.kvs.clear()
 
         yield self._shutdown_processes()
         yield self._stop_container()
@@ -362,6 +366,7 @@ class DataStoreTest(IonTestCase):
         defaults.update(ION_RESOURCE_TYPES)
         defaults.update(ION_DATASETS)
         defaults.update(ION_IDENTITIES)
+        defaults.update(ION_AIS_RESOURCES)
 
         for key, value in defaults.items():
 
@@ -400,48 +405,75 @@ class DataStoreTest(IonTestCase):
 
 
 
-
-"""
-
-class StoreServiceBackedDataStoreTest(DataStoreTest):
-
-
-    services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
-            {'name':'store_service','module':'ion.core.data.store_service','class':'StoreService'},
-
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient',
-                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient',
-                          PRELOAD_CFG:{ION_DATASETS_CFG:True}}
-                },
-            {'name':'workbench_test1',
-             'module':'ion.core.object.test.test_workbench',
-             'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
-        ]
-"""
-
-'''
 class CassandraBackedDataStoreTest(DataStoreTest):
 
 
-    services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+    username = CONF.getValue('cassandra_username', None)
+    password = CONF.getValue('cassandra_password', None)
 
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
-                },
-            {'name':'workbench_test1',
-             'module':'ion.core.object.test.test_workbench',
-             'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
-        ]
 
-'''
+    services=[]
+    services.append(
+        {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+         'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                      BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
+                      PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
+                      'username':username,
+                      'password':password,
+                       }
+                })
+
+    services.append(DataStoreTest.services[1])
+
+
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def setUp(self):
+
+        yield self._start_container()
+
+        storage_conf = storage_configuration_utility.get_cassandra_configuration()
+
+        self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
+
+        # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
+        test_harness = cassandra_bootstrap.CassandraTestHarnessClient(self.username, self.password, storage_conf, connect_to_keyspace=False)
+
+        yield test_harness.initialize()
+        yield test_harness.activate()
+
+        self.test_harness = test_harness
+
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info(ire)
+
+        # Configure the keyspace for this test
+        spargs = {'cassandra_username':self.username, 'cassandra_password':self.password, 'keyspace':None, 'error_if_existing':True}
+        cip = cassandra_bootstrap.CassandraInitializationProcess(spawnargs=spargs)
+
+        yield cip.spawn()
+
+
+        yield DataStoreTest.setup_services(self)
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info(ire)
+
+        yield pu.asleep(2)
+
+        yield self.test_harness.terminate()
+
+        DataStoreTest.tearDown(self)
+
 
 
 '''

@@ -31,7 +31,7 @@ from ion.test.iontest import IonTestCase
 
 
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
-
+PREDICATE_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 
 class AssociationInstanceTest(unittest.TestCase):
@@ -48,8 +48,8 @@ class AssociationInstanceTest(unittest.TestCase):
 
         self.subject = subject
 
-        predicate = self.wb.create_repository(ADDRESSLINK_TYPE)
-        predicate.root_object.title = 'predicate'
+        predicate = self.wb.create_repository(PREDICATE_TYPE)
+        predicate.root_object.word = 'predicate'
         predicate.commit('a predicate')
 
         self.predicate = predicate
@@ -73,6 +73,29 @@ class AssociationInstanceTest(unittest.TestCase):
 
         predicate_repo = self.wb.get_repository(self.association.PredicateReference.key)
         self.assertEqual(predicate_repo, self.predicate )
+
+        association_repo = self.wb.get_repository(self.association.AssociationIdentity)
+        self.assertNotEqual(association_repo, None)
+
+    def test_iter(self):
+
+        for item in self.obj.associations_as_object:
+
+            self.assertEqual(item, self.association)
+
+
+    def test_iteritems(self):
+
+        for predicate, association in self.obj.associations_as_object.iteritems():
+
+            self.assertEqual(predicate, self.predicate.repository_key)
+            self.assertEqual(association.pop(), self.association)
+
+
+    def test_len(self):
+
+        self.assertEqual(len(self.obj.associations_as_object),1)
+        self.assertEqual(len(self.obj.associations_as_subject), 0)
 
 
 
@@ -110,7 +133,7 @@ class AssociationInstanceTest(unittest.TestCase):
     def test_set_null(self):
 
 
-        self.association.set_null()
+        self.association.SetNull()
 
         self.assertNotIn(self.association, self.predicate.associations_as_predicate.get_associations())
 
@@ -120,4 +143,6 @@ class AssociationInstanceTest(unittest.TestCase):
 
 
 
+    def test_str(self):
 
+        log.info(str(self.obj.associations_as_object))

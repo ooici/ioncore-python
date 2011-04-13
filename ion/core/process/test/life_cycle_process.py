@@ -63,5 +63,17 @@ class LCOProcess(Process):
         
         #self.register_life_cycle_object(lco)
 
+class LCOProcessAddingObjects(Process):
+    def plc_init(self):
+        self._obj_init = LifeCycleObject()
+
+        self.register_life_cycle_object(self._obj_init)
+
+    def plc_activate(self):
+        self._obj_activate = LifeCycleObject()
+
+        self.register_life_cycle_object(self._obj_activate)
+        
+        
 # Spawn of the process using the module name
 factory = ProcessFactory(LCOProcess)

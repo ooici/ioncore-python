@@ -14,7 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.exception import ConfigurationError, StartupError
-from ion.core.pack.application import AppLoader
+from ion.core.pack.application import AppLoader, AppDefinition
 from ion.core.pack.release import ReleaseLoader
 from ion.util.state_object import BasicLifecycleObject
 
@@ -97,37 +97,47 @@ class AppManager(BasicLifecycleObject):
             app_ver = app_def.get('version', None)
             app_config = app_def.get('config', None)
             app_args = app_def.get('args', None)
+            process_app = app_def.get('processapp', None)
             mult = app_def.get('mult', False)
 
             if app_config and not type(app_config) is dict:
                 raise ConfigurationError("Release app config entry malformed: %s" % app_def)
+
+            if process_app and not type(process_app) in (list, tuple):
+                raise ConfigurationError("Release app processapp entry malformed: %s" % app_def)
 
             yield self.start_app(None,
                                  app_name=app_name,
                                  app_version=app_ver,
                                  app_config=app_config,
                                  app_args=app_args,
-                                 start_mult=mult)
+                                 start_mult=mult,
+                                 process_app=process_app)
 
     def start_app(self, app_filename, app_name=None, app_version=None,
-                  app_config=None, app_args=None, start_mult=False):
+                  app_config=None, app_args=None, start_mult=False, process_app=None):
         """
         @brief Start a Capability Container application from an .app file.
         @see OTP design principles, applications
         @retval Deferred
         """
-        # Generate path to app file from app name
-        if app_name is not None and app_filename is None:
-            app_filename = "%s/%s.app" % (CF_app_dir_path, app_name)
-            log.debug("Locating app '%s' in file: '%s'" % (app_name, app_filename))
+        if process_app is not None:
+            appdef = self.create_processapp_def(process_app, app_name, app_version,
+                                                app_config, app_args)
         else:
-            log.info("Starting app: '%s'" % app_filename)
+            # Generate path to app file from app name
+            if app_name is not None and app_filename is None:
+                app_filename = "%s/%s.app" % (CF_app_dir_path, app_name)
+                log.debug("Locating app '%s' in file: '%s'" % (app_name, app_filename))
+            else:
+                log.info("Starting app: '%s'" % app_filename)
 
-        if app_filename is None or not os.path.isfile(app_filename):
-            raise StartupError("App file '%s' not found" % (
-                    app_filename))
+            if app_filename is None or not os.path.isfile(app_filename):
+                raise StartupError("App file '%s' not found" % (
+                        app_filename))
 
-        appdef = AppLoader.load_app_definition(app_filename)
+            appdef = AppLoader.load_app_definition(app_filename)
+
         if not start_mult and (self.is_app_started(appdef.name)):
             log.warn("Application '%s' already started" % appdef.name)
             return
@@ -138,3 +148,23 @@ class AppManager(BasicLifecycleObject):
         d = AppLoader.start_application(self.container, appdef, app_manager=self,
                                         app_config=app_config, app_args=app_args)
         return d
+
+    def create_processapp_def(self, process_app,
+                                    app_name=None, app_version=None,
+                                    app_config=None, app_args=None):
+        """
+        @bried boilerplate for creating apps in release files without an app file.
+        """
+        app_dict = {
+            "type":"application",
+            "name":app_name,
+            "description": "Automatic process app for %s" % (app_name),
+            "version": app_version,
+            "mod": ("ion.core.pack.processapp", process_app, app_args),
+        }
+        if app_config:
+            app_dict.update(app_config)
+
+        newapp = AppDefinition(**app_dict)
+
+        return newapp

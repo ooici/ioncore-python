@@ -46,7 +46,7 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
     E_TIMEOUT = "timeout"
 
     A_UNEXPECTED = "unexpected"
-    
+
     def create_fsm(self, target, memory=None):
         fsm = ConversationTypeFSMFactory.create_fsm(self, target, memory)
 
@@ -196,8 +196,23 @@ class RequestParticipant(ConversationRole):
         # Note: We are NOW in a different conversation state: AGREED/REFUSED
 
         # Invoke operation/action
-        res = yield process._dispatch_message_op(headers, msg, conv)
-        defer.returnValue(res)
+        try:
+            res = yield process._dispatch_message_op(headers, msg, conv)
+            defer.returnValue(res)
+        except ApplicationError, ex:
+            # In case of an application error - do not terminate the process!
+            log.exception("*****Application error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            # @note We can only send a reply_err to an RPC
+            if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
+                yield process.reply_err(msg, exception = ex)
+        except Exception, ex:
+            # *** PROBLEM. Here the conversation is in ERROR state
+            log.exception("*****Container error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            # @note We can only send a reply_err to an RPC
+            if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
+                yield process.reply_err(msg, exception = ex)
 
     def refuse(self, message, *args, **kwargs):
         log.debug("IN: Request.refuse")

@@ -161,6 +161,14 @@ class StateObject(Actionable):
             res = func(*args, **kwargs)
         return res
 
+    def _so_transition(self):
+        """
+        @brief To be called from a pre-action event handler to explicitly
+            transition the FSM's state and turn the handler into a post-action.
+        """
+        assert self.__fsm, "FSM not set"
+        return self.__fsm._transition()
+
     def _get_state(self):
         assert self.__fsm, "FSM not set"
         return self.__fsm.current_state

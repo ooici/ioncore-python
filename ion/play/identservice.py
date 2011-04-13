@@ -25,8 +25,6 @@ def main():
     log.debug('Starting')
     description_utility.load_descriptions()
     bootstrap._set_container_args("{'sys-name':'mysys'}")
-    messaging = {'identity':{'name_type':'worker', 'args':{'scope':'system'}}}
-    yield bootstrap.declare_messaging(messaging)
     services = [
             {
                 'name':'identity',

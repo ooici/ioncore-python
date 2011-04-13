@@ -30,10 +30,11 @@ from ion.test.iontest import IonTestCase
 
 
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
-invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
+INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
+PREDICATE_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 
 class WorkBenchTest(unittest.TestCase):
@@ -42,11 +43,11 @@ class WorkBenchTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
 
-        repo = self.wb.create_repository(addresslink_type)
+        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
 
         ab = repo.root_object
 
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -60,7 +61,7 @@ class WorkBenchTest(unittest.TestCase):
         ab.person[0] = p
 
         ab.person.add()
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
@@ -73,9 +74,9 @@ class WorkBenchTest(unittest.TestCase):
         self.ab = ab
         self.repo = repo
 
-    def test_invalid_type(self):
+    def test_INVALID_TYPE(self):
 
-        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type )
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, INVALID_TYPE )
 
     def test_simple_commit(self):
 
@@ -106,7 +107,7 @@ class WorkBenchTest(unittest.TestCase):
 
 
         # Try it with a root object this time
-        repo = self.wb.create_repository(addressbook_type)
+        repo = self.wb.create_repository(ADDRESSBOOK_TYPE)
         rootobj = repo.root_object
 
         rkey = repo.repository_key
@@ -114,7 +115,7 @@ class WorkBenchTest(unittest.TestCase):
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
 
         # Try it with a nickname for the repository
-        repo = self.wb.create_repository(root_type=addressbook_type, nickname='David')
+        repo = self.wb.create_repository(root_type=ADDRESSBOOK_TYPE, nickname='David')
         rootobj = repo.root_object
 
         self.assertEqual(repo, self.wb.get_repository('David'))
@@ -124,17 +125,16 @@ class WorkBenchTest(unittest.TestCase):
 
         # Copy the address book object from the setup method to three new objects and use them in an association
         self.ab.title = 'subject'
-        subject = self.wb.create_repository(addresslink_type)
+        subject = self.wb.create_repository(ADDRESSLINK_TYPE)
         subject.root_object = self.ab
         subject.commit('a subject')
 
-        self.ab.title = 'predicate'
-        predicate = self.wb.create_repository(addresslink_type)
-        predicate.root_object = self.ab
+        predicate = self.wb.create_repository(PREDICATE_TYPE)
+        predicate.root_object.word = 'predicate'
         predicate.commit('a predicate')
 
         self.ab.title = 'object'
-        obj = self.wb.create_repository(addresslink_type)
+        obj = self.wb.create_repository(ADDRESSLINK_TYPE)
         obj.root_object = self.ab
         obj.commit('a object')
 
@@ -241,11 +241,11 @@ class WorkBenchProcessTest(IonTestCase):
         workbench_process2 = self._get_procinstance(child_proc2)
 
 
-        repo = workbench_process1.workbench.create_repository(addresslink_type)
+        repo = workbench_process1.workbench.create_repository(ADDRESSLINK_TYPE)
 
         ab = repo.root_object
 
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'

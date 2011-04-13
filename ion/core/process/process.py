@@ -197,9 +197,12 @@ class Process(BasicLifecycleObject, ResponseCodes):
         yield self.backend_receiver.initialize()
         yield self.backend_receiver.activate()
 
-        # Move registerd life cycle objects through there life cycle
-        for lco in self._registered_life_cycle_objects:
-            yield defer.maybeDeferred(lco.initialize)
+        # advance the registered objects as if this process has already transitioned to the READY state,
+        # which it will do after this on_initialize method completes
+        yield self._advance_life_cycle_objects(BasicStates.S_READY)
+
+        # get length of all registered lcos
+        pre_init_lco_len = len(self._registered_life_cycle_objects)
 
         # Callback to subclasses
         try:
@@ -208,6 +211,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
         except Exception, ex:
             log.exception('----- Process %s INIT ERROR -----' % (self.id))
             raise ex
+
+        if len(self._registered_life_cycle_objects) > pre_init_lco_len:
+            log.debug("NEW LCOS ADDED DURING INIT")
+            yield self._advance_life_cycle_objects(BasicStates.S_READY)
 
     def plc_init(self):
         """
@@ -241,9 +248,12 @@ class Process(BasicLifecycleObject, ResponseCodes):
         # Create consumer for process receiver
         yield self.receiver.activate()
 
-        # Move registerd life cycle objects through there life cycle
-        for lco in self._registered_life_cycle_objects:
-            yield defer.maybeDeferred(lco.activate)
+        # advance the registered objects as if this process has already transitioned to the ACTIVE state,
+        # which it will do after this on_activate method completes
+        yield self._advance_life_cycle_objects(BasicStates.S_ACTIVE)
+
+        # get length of all registered lcos
+        pre_active_lco_len = len(self._registered_life_cycle_objects)
 
         # Callback to subclasses
         try:
@@ -251,6 +261,11 @@ class Process(BasicLifecycleObject, ResponseCodes):
         except Exception, ex:
             log.exception('----- Process %s ACTIVATE ERROR -----' % (self.id))
             raise ex
+
+        if len(self._registered_life_cycle_objects) > pre_active_lco_len:
+            log.debug("NEW LCOS ADDED DURING ACTIVE")
+            yield self._advance_life_cycle_objects(BasicStates.S_ACTIVE)
+
 
     def plc_activate(self):
         """
@@ -308,10 +323,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
         for port in self.listeners:
             yield port.stopListening()
 
-        # Move registerd life cycle objects through there life cycle
-        for lco in self._registered_life_cycle_objects:
-            yield defer.maybeDeferred(lco.terminate)
-
+        # advance the registered objects as if this process has already transitioned to the TERMINATED state,
+        # which it will do after this on_terminate method completes
+        yield self._advance_life_cycle_objects(BasicStates.S_TERMINATED)
+        
         # Terminate all child processes
         yield self.shutdown_child_procs()
 
@@ -402,21 +417,41 @@ class Process(BasicLifecycleObject, ResponseCodes):
         assert isinstance(lco, BasicLifecycleObject), \
         'Can not register an instance that does not inherit from BasicLifecycleObject'
 
-        if self._get_state() == BasicStates.S_INIT:
-            pass
-        elif self._get_state() == BasicStates.S_READY:
-            yield defer.maybeDeferred(lco.initialize)
-
-        elif self._get_state() == BasicStates.S_ACTIVE:
-            yield defer.maybeDeferred(lco.initialize)
-            yield defer.maybeDeferred(lco.activate)
-
-        elif self._get_state() == BasicStates.S_TERMINATED:
-            raise ProcessError, '''Can not register life cycle object in invalid state "TERMINATED"'''
-        elif self._get_state() == BasicStates.S_ERROR:
-            raise ProcessError, '''Can not register life cycle object in invalid state "ERROR"'''
-
         self._registered_life_cycle_objects.append(lco)
+        yield self._advance_life_cycle_objects()
+
+    @defer.inlineCallbacks
+    def _advance_life_cycle_objects(self, curstate=None):
+        """
+        Helper method to move all registered lifecycle objects in this process to the state
+        of either the process or the state passed into this method.
+
+        You can explicitly define the state you want to transition everything to.
+        This is used by on_initialize and friends to advance LCOs with a state
+        that is just about to occur.
+        """
+
+        curstate = curstate or self._get_state()
+
+        states      = [BasicStates.S_INIT,          BasicStates.S_READY,        BasicStates.S_ACTIVE,   BasicStates.S_TERMINATED]
+        transitions = [BasicStates.E_INITIALIZE,    BasicStates.E_ACTIVATE,     BasicStates.E_TERMINATE]
+
+        curidx = states.index(curstate)
+        log.debug("_advance_lco owning process is in state %s" % curstate)
+
+        for idx, lco in enumerate(self._registered_life_cycle_objects):
+            lcoidx = states.index(lco._get_state())
+            log.debug("_advance_lco cur lco #%d is in state %s" % (idx, lco._get_state()))
+
+            for i in range(lcoidx, curidx):
+                input = transitions[i]
+
+                log.debug("_advance_lco cur lco #%d about to put transition %s to %s" % (idx, input, str(lco)))
+                yield defer.maybeDeferred(lco._so_process, input)
+                log.debug("lco is now at %s" % lco._get_state())
+
+        defer.returnValue(None)
+
 
     ##########################################################################
     # --- Incoming message handling
@@ -534,6 +569,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 # @see ion.interact.rpc, ion.interact.request
                 res = yield self.conv_manager.msg_received(message)
 
+                # Problem: what if FSM produces an error (it does not currently)
+                # Problem: log message here after reply/failure have been sent
                 self.conv_manager.log_conv_message(conv, message, msgtype='RECV')
 
                 self.conv_manager.check_conversation_state(conv)
@@ -559,6 +596,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 yield self.reply_err(msg, exception = ex)
 
         except Exception, ex:
+            # *** PROBLEM. Here the conversation is in ERROR state
             log.exception("*****Container error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
@@ -755,6 +793,9 @@ class Process(BasicLifecycleObject, ResponseCodes):
         res = None
         try:
             res1 = yield self.conv_manager.msg_send(message)
+
+            # PROBLEM: FSM does not raise any exception.
+
             # FSM processed successfully
             if send_receiver is None:
                 # The default case is to send out via the backend receiver

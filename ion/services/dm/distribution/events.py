@@ -10,13 +10,15 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from twisted.internet import defer
 from ion.services.dm.distribution.publisher_subscriber import Publisher, Subscriber
+from ion.core import ioninit
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 import time
 
-EVENTS_EXCHANGE_POINT="events.topic"
+def get_events_exchange_point():
+    return "%s.events.topic" % ioninit.sys_name
 
 EVENT_MESSAGE_TYPE                          = object_utils.create_type_identifier(object_id=2322, version=1)
 RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE       = object_utils.create_type_identifier(object_id=2323, version=1)
@@ -96,7 +98,7 @@ class EventPublisher(Publisher):
         assert self.event_id and origin
         return "%s.%s" % (str(self.event_id), str(origin))
 
-    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, origin="unknown", *args, **kwargs):
+    def __init__(self, xp_name=None, routing_key=None, process=None, origin="unknown", *args, **kwargs):
         """
         Initializer override.
         Sets defaults for the EventPublisher.
@@ -107,10 +109,10 @@ class EventPublisher(Publisher):
         self._origin = origin
         self._mc = MessageClient(proc=process)
 
-        xp_name = xp_name or EVENTS_EXCHANGE_POINT
+        xp_name = xp_name or get_events_exchange_point()
         routing_key = routing_key or "unknown"
 
-        Publisher.__init__(self, xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
+        Publisher.__init__(self, xp_name=xp_name, routing_key=routing_key, process=process, *args, **kwargs)
 
     def _set_msg_fields(self, msg, msgargs):
         """
@@ -314,7 +316,7 @@ class EventSubscriber(Subscriber):
 
         return "%s.%s" % (str(event_id), str(origin))
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, event_id=None, origin=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, event_id=None, origin=None, *args, **kwargs):
         """
         Initializer.
 
@@ -324,10 +326,10 @@ class EventSubscriber(Subscriber):
         """
         self._event_id = event_id or self.event_id
 
-        xp_name = xp_name or EVENTS_EXCHANGE_POINT
+        xp_name = xp_name or get_events_exchange_point()
         binding_key = binding_key or self.topic(origin)
 
-        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials, process=process, *args, **kwargs)
+        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, *args, **kwargs)
 
     def on_activate(self, *args, **kwargs):
         log.debug("Listening to events on %s" % self._binding_key)

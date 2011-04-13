@@ -250,7 +250,7 @@ class Repository(object):
         if repository_key:
             self._dotgit.repositorykey = repository_key
         else:
-            self._dotgit.repositorykey = pu.create_guid().upper()
+            self._dotgit.repositorykey = pu.create_guid()
 
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -354,8 +354,12 @@ class Repository(object):
         id_ref.branch = self._current_branch.branchkey
         
         if current_state:
-            id_ref.commit = self._current_branch.commitrefs[0].MyId
-            
+            try:
+                id_ref.commit = self._current_branch.commitrefs[0].MyId
+            except IndexError, ie:
+                log.error(ie)
+                raise RepositoryError('Can not create repository reference: no commits on the current branch!')
+
         return id_ref
     
     

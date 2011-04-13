@@ -41,11 +41,11 @@ from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANC
 from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -665,7 +665,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
                     attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
-                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
 
 
                 elif  root_type == TERMINOLOGY_TYPE:
@@ -814,12 +814,13 @@ class DataStoreService(ServiceProcess):
         self.preload = {ION_PREDICATES_CFG:True,
                         ION_RESOURCE_TYPES_CFG:True,
                         ION_IDENTITIES_CFG:True,
-                        ION_DATASETS_CFG:False,}
+                        ION_DATASETS_CFG:False,
+                        ION_AIS_RESOURCES_CFG:False}
 
-        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
-        
-#        self.preloaded_datasets_dict = {}
+
+
 
         log.info('DataStoreService.__init__()')
         
@@ -831,10 +832,18 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Cassandra Index Store")
             self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE],  **{"username": self._username, "password": self._password})
-            self.c_store.initialize()
+
+            yield self.c_store.initialize()
+            yield self.c_store.activate()
+
             yield self.register_life_cycle_object(self.c_store)
             
         else:
+
+            log.info("Clearing The In Memeory Index Store")
+
+            self._backend_classes[COMMIT_CACHE].indices.clear()
+            self._backend_classes[COMMIT_CACHE].kvs.clear()
 
             log.info("Instantiating In Memeory Index Store")
             self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self,**{'indices':COMMIT_INDEXED_COLUMNS} )
@@ -843,9 +852,17 @@ class DataStoreService(ServiceProcess):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Store")
             self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE],  **{"username": self._username, "password": self._password})
-            self.b_store.initialize()
+
+            yield self.b_store.initialize()
+            yield self.b_store.activate()
+
             yield self.register_life_cycle_object(self.b_store)
         else:
+
+            log.info("Clearing The In Memeory Store")
+
+            self._backend_classes[BLOB_CACHE].kvs.clear()
+
             log.info("Instantiating In Memory Store")
             self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE], self)
 
@@ -853,14 +870,12 @@ class DataStoreService(ServiceProcess):
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
 
+        yield self.initialize_datastore()
 
-        
 
-
-    @defer.inlineCallbacks
     def slc_activate(self):
 
-        yield self.initialize_datastore()
+
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
@@ -871,7 +886,6 @@ class DataStoreService(ServiceProcess):
         """
         This method is used to preload required content into the datastore
         """
-
 
         if self.preload[ION_PREDICATES_CFG]:
 
@@ -899,7 +913,7 @@ class DataStoreService(ServiceProcess):
 
                 resource_instance = self._create_resource(root_description)
                 if resource_instance is None:
-                    raise DataStoreError('Failed to Identity Resource: %s' % str(root_description))
+                    raise DataStoreError('Failed to create Identity Resource: %s' % str(root_description))
                 self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
@@ -913,7 +927,7 @@ class DataStoreService(ServiceProcess):
 
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
-                        raise DataStoreError('Failed to Resource Type Resource: %s' % str(value))
+                        raise DataStoreError('Failed to create Resource Type Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
 
@@ -927,7 +941,7 @@ class DataStoreService(ServiceProcess):
 
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
-                        raise DataStoreError('Failed to Identity Resource: %s' % str(value))
+                        raise DataStoreError('Failed to create Identity Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
                     
         if self.preload[ION_DATASETS_CFG]:
@@ -939,8 +953,35 @@ class DataStoreService(ServiceProcess):
                     log.info('Preloading DataSet:' + str(value.get(NAME_CFG)))
 
                     resource_instance = self._create_resource(value)
+                    # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
                         self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+            for key, value in ION_DATA_SOURCES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading DataSource:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    # Do not fail if returning none - may or may not load data from disk
+                    if resource_instance is not None:
+                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+
+        if self.preload[ION_AIS_RESOURCES_CFG]:
+            log.info('Preloading AIS Resources')
+
+            for key, value in ION_AIS_RESOURCES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading AIS Resource:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to create AIS Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+
 
         yield self.workbench.flush_initialization_to_backend()
 
@@ -1034,12 +1075,12 @@ class DataStoreService(ServiceProcess):
 
         elif isinstance(content, FunctionType):
             #execute the function on the resource_instance!
-            kwargs = {}
+            kwargs = {'has_a_id':HAS_A_ID}
             if description.has_key(CONTENT_ARGS_CFG):
-                kwargs = description[CONTENT_ARGS_CFG]
+                kwargs.update(description[CONTENT_ARGS_CFG])
+
             if not content(resource_instance, self, **kwargs):
                 set_content_ok = False
-            
         
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
@@ -1063,6 +1104,8 @@ class DataStoreService(ServiceProcess):
         # Set the predicate
         id_ref = association_repo.create_object(IDREF_TYPE)
         owned_by_repo = self.workbench.get_repository(OWNED_BY_ID)
+        if owned_by_repo is None:
+            raise DataStoreError('Owned_By predicate not found during preload.')
         owned_by_repo.set_repository_reference(id_ref, current_state=True)
 
         association_repo.root_object.predicate = id_ref
@@ -1070,6 +1113,8 @@ class DataStoreService(ServiceProcess):
         # Set teh Object
         id_ref = association_repo.create_object(IDREF_TYPE)
         owner_repo = self.workbench.get_repository(user_id)
+        if owner_repo is None:
+            raise DataStoreError('Owner resource not found during preload.')
         owner_repo.set_repository_reference(id_ref, current_state=True)
 
         association_repo.root_object.object = id_ref

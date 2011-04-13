@@ -30,7 +30,6 @@ class ResourceRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        #self.sup = yield self._start_core_services()
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
@@ -48,21 +47,21 @@ class ResourceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_resource_reg(self):
-        
+
         child_ds1 = yield self.sup.get_child_id('ds1')
         log.debug('Process ID:' + str(child_ds1))
         proc_ds1 = self._get_procinstance(child_ds1)
-        
+
         child_rr1 = yield self.sup.get_child_id('resource_registry1')
         log.debug('Process ID:' + str(child_rr1))
         proc_rr2 = self._get_procinstance(child_rr1)
-        
+
         # Replicate what we should receive from the requesting service
         wb = proc_rr2.workbench
-        
+
         # Create a sendable resource object
         description_repository, resource_description = wb.init_repository(root_type=RESOURCE_DESCRIPTION_TYPE)
-        
+
         # Set the description
         resource_description.name = 'Johns resource'
         resource_description.description = 'Lots of metadata'
@@ -74,38 +73,37 @@ class ResourceRegistryTest(IonTestCase):
         res_type.key = 'Some junk'
         resource_description.resource_type = res_type
 
-        
+
         # Test the business logic of the register resource instance operation
         result = yield proc_rr2._register_resource_instance(resource_description, headers={})
-            
+
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Requested Resource Type Not Found!')
         else:
             res_id = str(result.MessageResponseBody)
-            
+
         # Check the result!
         new_repo = proc_ds1.workbench.get_repository(res_id)
-            
+
         resource = yield new_repo.checkout('master')
-            
+
         self.assertEqual(resource.identity, res_id)
-        
+
         self.assertEqual(resource.object_type, resource_description.object_type)
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
 
 #
 #class ResourceRegistryCoreServiceTest(IonTestCase):
 #    @defer.inlineCallbacks
 #    def setUp(self):
 #        yield self._start_container()
-#        self.sup = yield self._start_core_services()
 #        #log.info('self.sup.proc_state'+str(self.sup.proc_state))
-#        
+#
 #
 #    @defer.inlineCallbacks
 #    def tearDown(self):
@@ -116,10 +114,10 @@ class ResourceRegistryTest(IonTestCase):
 #    @defer.inlineCallbacks
 #    def test_reg_startup(self):
 #        self.rrc = ResourceRegistryClient(proc=self.sup)
-#        
+#
 #        # Show that the registry work when started as a core service
 #        res_to_describe = coi_resource_descriptions.IdentityResource
 #        res_description = yield self.rrc.register_resource_definition(res_to_describe)
-#        
+#
 #        #print res_description
-#        
+#

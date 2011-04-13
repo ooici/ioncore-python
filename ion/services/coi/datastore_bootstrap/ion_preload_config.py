@@ -3,7 +3,16 @@
 """
 @file ion/res/config.py
 @author David Stuebe
-@TODO
+
+@Brief This module contains defined constants and configuration dictionaries which are used in the data store and other
+services to provide and access core data schema objects and resources. These can be extended for testing purposes.
+
+To add a new entry in an existing list please use ion.util.procutils.create_guid() to generate a new ID_CFG for each
+new entry. Then follow the pattern to create a resource which will be filled in by the CONTENT_CFG dictionary.
+
+If you have a more complex, nested resource, you must create a function to generate that resource. Follow the example
+in the ION_DATASETS section...
+
 """
 
 import ion.util.ionlog
@@ -27,11 +36,18 @@ CONTENT_ARGS_CFG = 'content_args'
 PRELOAD_CFG = 'preload'
 
 
-# Set some constants based on the config file:
+# Set some constants used system wide!:
+
+# These name must also be changed in the datastore Zapp!
+
+### THESE ARE REQUIRED OBJECTS
 ION_PREDICATES_CFG = 'ion_predicates'
 ION_RESOURCE_TYPES_CFG = 'ion_resource_types'
-ION_DATASETS_CFG = 'ion_datasets'
 ION_IDENTITIES_CFG = 'ion_identities'
+
+### THESE ARE FOR TESTING AND DEVELOPMENT
+ION_DATASETS_CFG = 'ion_datasets'
+ION_AIS_RESOURCES_CFG = 'ion_ais_resources'
 
 
 ### Defined Resource Types
@@ -41,12 +57,16 @@ identity_res_type_name = 'identity_resource_type'
 datasource_res_type_name = 'datasource_resource_type'
 resource_type_type_name = 'resource_type_type'
 default_resource_type_name = 'default_resource_type'
-
+exchange_space_rtn = 'exchange_space_resource_type'
+exchange_point_rtn = 'exchange_point_resource_type'
+publisher_rtn = 'publisher_resource_type'
+subscriber_rtn = 'subscriber_type'
+queue_rtn = 'queue_type'
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
 ION_RESOURCE_TYPES={
-resource_type_type_name:{ID_CFG:'173a3188-e290-42be-8776-8717077dd207',
+resource_type_type_name:{ID_CFG:'173A3188-E290-42BE-8776-8717077DD207',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:resource_type_type_name,
                      DESCRIPTION_CFG:'The resource type is meta description of a class of resource',
@@ -65,6 +85,45 @@ topic_res_type_name:{ID_CFG:'3BD84B48-073E-4833-A62B-0DE4EC106A34',
                                   'meta_description':'protomessage?'}
                      },
 
+exchange_space_rtn:{ID_CFG:'5bf51324-0bd8-43a6-9551-4dbaf6ccd1a2',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_space_rtn,
+                    DESCRIPTION_CFG:'An exchange space resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2315,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+
+exchange_point_rtn:{ID_CFG:'c092163e-995b-40ef-9ff2-d49c1dccf8c5',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_point_rtn,
+                    DESCRIPTION_CFG:'An exchange point resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2316,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+publisher_rtn:{ID_CFG:'d4c17990-a7d0-47a7-911a-138ee7bfb112',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:publisher_rtn,
+                    DESCRIPTION_CFG:'A publisher resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2318,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+
+subscriber_rtn:{ID_CFG:'bdf80fd1-8088-4860-87e5-b04676320edc',
+                    TYPE_CFG:resource_type_type,
+                    NAME_CFG:exchange_space_rtn,
+                    DESCRIPTION_CFG:'A subscriber resource, pubsub controller',
+                    CONTENT_CFG: {
+                        'object_identifier':2319,
+                        'object_version':1,
+                        'meta_description':'protomessage?'
+                    }},
+
 dataset_res_type_name:{ID_CFG:'487594C6-3D10-4DAA-A8FF-83E1E0EFB964',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:dataset_res_type_name,
@@ -82,7 +141,7 @@ identity_res_type_name:{ID_CFG:'9C457C32-5982-4044-A3ED-6DBDB5E3EB5C',
                                     'object_version':1,
                                     'meta_description':'protomessage?'}
                         },
-datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
+datasource_res_type_name:{ID_CFG:'B8B7BB73-F578-4604-B3B3-088D28F9A7DC',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:datasource_res_type_name,
                        DESCRIPTION_CFG:'A data source resource contains information about an source of data - metadata about the input to a dataset',
@@ -91,7 +150,16 @@ datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
                                     'meta_description':'protomessage?'}
                         },
 
-default_resource_type_name:{ID_CFG:'422ade3c-d820-437f-8bd3-7d8793591eb0',
+queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
+             TYPE_CFG: resource_type_type,
+             NAME_CFG:queue_rtn,
+             DESCRIPTION_CFG:'A resource for queues inside the PSC',
+             CONTENT_CFG:{'object_identifier':2321,
+                          'object_version':1,
+                          'meta_description':'protomessage?'}
+            },
+
+default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
                      DESCRIPTION_CFG:'A type to catch unregistered types!',
@@ -104,13 +172,17 @@ default_resource_type_name:{ID_CFG:'422ade3c-d820-437f-8bd3-7d8793591eb0',
 
 # Extract Resource ID_CFGs for use in services and tests
 TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
+EXCHANGE_SPACE_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
+EXCHANGE_POINT_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
+PUBLISHER_RES_TYPE_ID = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
+SUBSCRIBER_RES_TYPE_ID = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
+QUEUE_RES_TYPE_ID = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
 RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
 DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
-
 
 ##### Define Predicates #####:
 
@@ -165,7 +237,7 @@ root_name = 'ROOT'
 
 identity_type = create_type_identifier(object_id=1401, version=1)
 ION_IDENTITIES = {
-anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
+anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                           TYPE_CFG:identity_type,
                           NAME_CFG:anonymous_name,
                           DESCRIPTION_CFG:'The anonymous user is the identity used by any unregistered user.',
@@ -177,7 +249,7 @@ anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
                                        'life_cycle_state':''}
                         },
 
-root_name:{ID_CFG:'e15cadea-4605-4afd-af80-8fc3bc54d2a3',
+root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           TYPE_CFG:identity_type,
                           NAME_CFG:root_name,
                           DESCRIPTION_CFG:'The root user is the super administrator.',
@@ -221,14 +293,7 @@ profile_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F1',
                       TYPE_CFG:DATASET_TYPE,
                       NAME_CFG:profile_dataset_name,
                       DESCRIPTION_CFG:'An example of a profile dataset',
-                      CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset
-                      },
-
-profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F2',
-                      TYPE_CFG:DATASOURCE_TYPE,
-                      NAME_CFG:profile_data_source_name,
-                      DESCRIPTION_CFG:'An example of a data source for the profile dataset',
-                      CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset,
                       },
 
 traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
@@ -238,13 +303,6 @@ traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':trj_dataset_loc},
                       },
-                      
-traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F5',
-                      TYPE_CFG:DATASOURCE_TYPE,
-                      NAME_CFG:traj_data_source_name,
-                      DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
-                      CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source
-                      },
 
 station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       TYPE_CFG:DATASET_TYPE,
@@ -253,32 +311,76 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                       },
-                      
+}
+
+ION_DATA_SOURCES ={
+
+profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F2',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:profile_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the profile dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]}
+                      },
+
+traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F5',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:traj_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]}
+                      },
+
 station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F6',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:station_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the station dataset',
-                      CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
                       },
 
-#grid_dataset_name:{ID_CFG:''},
 }
+
+
 
 
 # Extract Resource ID_CFGs for use in services and tests
 SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID_CFG]
-SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATASETS[profile_data_source_name][ID_CFG]
+SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATA_SOURCES[profile_data_source_name][ID_CFG]
 SAMPLE_TRAJ_DATASET_ID = ION_DATASETS[traj_dataset_name][ID_CFG]
-SAMPLE_TRAJ_DATA_SOURCE_ID = ION_DATASETS[traj_data_source_name][ID_CFG]
+SAMPLE_TRAJ_DATA_SOURCE_ID = ION_DATA_SOURCES[traj_data_source_name][ID_CFG]
 SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
-SAMPLE_STATION_DATA_SOURCE_ID = ION_DATASETS[station_data_source_name][ID_CFG]
+SAMPLE_STATION_DATA_SOURCE_ID = ION_DATA_SOURCES[station_data_source_name][ID_CFG]
 #SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
 
 
 
 
+#### Define AIS Resources that should be preloaded for testing purposes:
 
+# Define types that will be created:
+TOPIC_TYPE = create_type_identifier(object_id=2317, version=1)
+### Note - Topics contain IDRef pointers to other resources.
+### We need to create a Topic generator function if these IDRefs are required for AIS testing.
 
+# Define resource names that will be crated:
+example_topic1_name = 'example_topic1'
+
+# Define the configuration dictionary for the resources
+ION_AIS_RESOURCES={
+example_topic1_name:{ID_CFG:'341FF107-5E42-4C8E-A30B-4A65A5675E63',
+                      TYPE_CFG:TOPIC_TYPE,
+                      NAME_CFG:profile_dataset_name,
+                      DESCRIPTION_CFG:'An example of a topic resource',
+                      CONTENT_CFG:{'exchange_space_name':'swap meet',
+                                       'exchange_point_name':'science_data',
+                                       'topic_name':'important science data'}
+                      },
+
+    }
+
+# Extract Resource ID_CFGs for use in services and tests
+EXAMPLE_TOPIC1_ID = ION_AIS_RESOURCES[example_topic1_name][ID_CFG]
 
 
 
