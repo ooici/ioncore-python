@@ -103,8 +103,6 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
 
     def __init__(self, username, password, storage_conf, error_if_existing=True):
 
-
-
         CassandraMixin.__init__(self, username, password, storage_conf, connect_to_keyspace=False)
         self.error_if_existing = error_if_existing
 
@@ -235,7 +233,10 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
 
 
 def build_telephus_ks(storage_conf):
+    """
+    Be careful not to change the imported dictionary - copy everything!
 
+    """
     # Create a copy of the
     ks_dict = storage_conf.copy()
 
@@ -300,3 +301,13 @@ class CassandraInitializationProcess(process.Process):
             log.warn('Process not yet active: waiting for termination!')
             reactor.callLater(1, terminate_when_active)
 
+
+class CassandraTestHarnessClient(CassandraMixin, TCPConnection):
+
+    def on_deactivate(self, *args, **kwargs):
+        self._manager.shutdown()
+        log.info('on_deactivate: Lose Connection TCP')
+
+    def on_terminate(self, *args, **kwargs):
+        self._manager.shutdown()
+        log.info('on_terminate: Lose Connection TCP')

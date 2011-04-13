@@ -28,16 +28,6 @@ CONF = ioninit.config(__name__)
 
 from ion.util.itv_decorator import itv
 
-class CassandraTestHarness(cassandra_bootstrap.CassandraMixin, cassandra_bootstrap.TCPConnection):
-
-    def on_deactivate(self, *args, **kwargs):
-        self._manager.shutdown()
-        log.info('on_deactivate: Lose Connection TCP')
-
-    def on_terminate(self, *args, **kwargs):
-        self._manager.shutdown()
-        log.info('on_terminate: Lose Connection TCP')
-
 
 
 class CassandraInitTest(IonTestCase):
@@ -55,7 +45,7 @@ class CassandraInitTest(IonTestCase):
         storage_conf = storage_configuration_utility.get_cassandra_configuration(self.keyspace)
 
         # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
-        test_harness = CassandraTestHarness(self.uname, self.pword, storage_conf, connect_to_keyspace=False)
+        test_harness = cassandra_bootstrap.CassandraTestHarnessClient(self.uname, self.pword, storage_conf, connect_to_keyspace=False)
 
         yield test_harness.initialize()
         yield test_harness.activate()

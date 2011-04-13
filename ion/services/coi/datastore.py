@@ -873,8 +873,6 @@ class DataStoreService(ServiceProcess):
         yield self.initialize_datastore()
 
 
-
-    @defer.inlineCallbacks
     def slc_activate(self):
 
 
@@ -986,6 +984,8 @@ class DataStoreService(ServiceProcess):
 
 
         yield self.workbench.flush_initialization_to_backend()
+
+
 
     def _create_predicate(self,description):
 
