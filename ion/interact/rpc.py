@@ -190,6 +190,13 @@ class RpcParticipant(ConversationRole):
             # @note We can only send a reply_err to an RPC
             if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
                 yield process.reply_err(msg, exception = ex)
+        except Exception, ex:
+            # *** PROBLEM. Here the conversation is in ERROR state
+            log.exception("*****Container error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            # @note We can only send a reply_err to an RPC
+            if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
+                yield process.reply_err(msg, exception = ex)
 
     def failure(self, message, *args, **kwargs):
         """

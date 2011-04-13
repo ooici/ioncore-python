@@ -178,6 +178,13 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
+2011-04-05:
+- Call _so_transition in StateObject action function to transition state.
+- Release (rel) files in res/deploy now supported as start argument. Release
+  files can provide app specific config and start args.
+- Apps can accept kwargs in app file and via the apparg_<appname> container
+  command line arg.
+
 2011-04-02:
 - App files support an entry "config" of type dict with ion.config override
   values
@@ -403,6 +410,7 @@ Conversations:
 - Tombstones and timeouts
 - FSM keeps list of recent messages (for logging)
 - FSM caching, cloning
+- msg_send() FSM exceptions and abort of send. Return code of FSM handler
 Interactions/messaging:
 - Generic receiver, no dispatch
 - Process observer keeps list of recent messages
@@ -412,6 +420,7 @@ Interactions/messaging:
 Misc:
 - Better FSM semantics: pre, post actions,
 - Correct handling of error conditions, timeouts, tombstones
+- Exceptions in FSM. Automatism of error transition?
 Testing:
 - optional process shutdown
 - msg observer usable / queriable in test

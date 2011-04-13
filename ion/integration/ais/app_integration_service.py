@@ -27,6 +27,7 @@ from ion.integration.ais.findDataResources.findDataResources import FindDataReso
 from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetDataResourceDetail
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
+from ion.integration.ais.ManageResources.ManageResources import ManageResources
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -148,6 +149,31 @@ class AppIntegrationService(ServiceProcess):
     def getTestDatasetID(self):
         return self.dsID
                          
+    @defer.inlineCallbacks
+    def op_getResourceTypes(self, content, headers, msg):
+        log.debug('op_getResourceTypes: \n'+str(content))
+        worker = ManageResources(self)
+        log.debug('op_getResourceTypes: calling worker')
+        response = yield worker.getResourceTypes(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_getResourcesOfType(self, content, headers, msg):
+        log.debug('op_getResourcesOfType: \n'+str(content))
+        worker = ManageResources(self)
+        log.debug('op_getResourcesOfType: calling worker')
+        response = yield worker.getResourcesOfType(content);
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_getResource(self, content, headers, msg):
+        log.debug('op_getResource: \n'+str(content))
+        worker = ManageResources(self)
+        log.debug('op_getResource: calling worker')
+        response = yield worker.getResource(content);
+        yield self.reply_ok(msg, response)
+
 
 class AppIntegrationServiceClient(ServiceClient):
     """
@@ -257,6 +283,30 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug('AIS_client.updateUserDispatcherQueue: IR Service reply:\n' + str(content))
         defer.returnValue(content)
         
+    @defer.inlineCallbacks
+    def getResourceTypes(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.getResourceTypes: sending following message to getResourceTypes:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('getResourceTypes', message)
+        log.debug('AIS_client.getResourceTypes: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+ 
+    @defer.inlineCallbacks
+    def getResourcesOfType(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('getResourcesOfType', message)
+        log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+ 
+    @defer.inlineCallbacks
+    def getResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.getResource: sending following message to getResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('getResource', message)
+        log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+ 
     @defer.inlineCallbacks
     def CheckRequest(self, request):
         # Check for correct request protocol buffer type

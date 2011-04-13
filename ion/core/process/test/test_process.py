@@ -21,7 +21,7 @@ from ion.core import ioninit
 from ion.core.messaging import ion_reply_codes
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
-from ion.core.exception import ReceivedError
+from ion.core.exception import ReceivedError, ApplicationError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
@@ -205,6 +205,17 @@ class ProcessTest(IonTestCase):
             log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks
+    def test_apperror_in_op(self):
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
+        pid1 = yield self.test_sup.spawn_child(child1)
+
+        try:
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_apperror','content123')
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            log.info('Process 1 responded to error correctly')
+
+    @defer.inlineCallbacks
     def test_send_byte_string(self):
         """
         @brief Test that any arbitrary byte string can be sent through the
@@ -306,6 +317,20 @@ class ProcessTest(IonTestCase):
         #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
         #yield lcop.register_life_cycle_object(lco5)
 
+        # test a process which registers lcos during init/activate
+        lcap = life_cycle_process.LCOProcessAddingObjects()
+        self.failUnlessEquals(len(lcap._registered_life_cycle_objects), 0)
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_INIT)
+
+        yield lcap.initialize()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_READY)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_READY)
+
+        yield lcap.activate()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_activate._get_state(), state_object.BasicStates.S_ACTIVE)
+
 class EchoProcess(Process):
 
     @defer.inlineCallbacks
@@ -324,6 +349,14 @@ class EchoProcess(Process):
     def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
+
+        # This is never reached!
+        yield self.reply_ok(msg, content=content)
+
+    @defer.inlineCallbacks
+    def op_echo_apperror(self, content, headers, msg):
+        log.info("Message received: "+str(content))
+        raise ApplicationError("I'm supposed to fail")
 
         # This is never reached!
         yield self.reply_ok(msg, content=content)

@@ -1,0 +1,193 @@
+<html>
+    <head>
+        <title>Notification Monitor</title>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+        <style>
+            body {
+                font-family: helvetica, sans-serif;
+                font-size: 8pt;
+                background-color: #efefef;
+                margin: 0px;
+            }
+            #header {
+                background-color: white;
+                color: #333;
+                border-bottom: 1px solid black;
+                padding: 10px;
+                height: 30px;
+            }
+            .right {
+                float: right;
+            }
+            div.recv {
+                float: left;
+                width: 46%;
+                padding: 2%;
+            }
+
+            div.recv span {
+                margin: 0px 3px;
+            }
+
+            div.recv span.decorate {
+                background-color: blue;
+                color: white;
+            }
+            div.recv li span.label {
+                color: red;
+            }
+            div.recv li span.datetime {
+                color: black;
+                background-color: #ffff00;
+                padding: 3px;
+            }
+            div.recv li span.DEBUG {
+                color: white;
+                background-color: #a40000;
+            }
+            div.recv li span.INFO {
+                color: white;
+                background-color: #336699;
+            }
+        </style>
+    </head>
+    <body>
+        <div id='header'>
+            <input type="button" id="toggleupdates" value="Stop" />
+            <span class="right">
+                <select id="subtype">
+                    <option value="1001">Resource Lifecycle</option>
+                    <option value="1051">Container Lifecycle</option>
+                    <option value="1052">Process Lifecycle</option>
+                    <option value="1101">Datasource Update</option>
+                    <option value="1111">Dataset Modification</option>
+                    <option value="1201">Subscription New/Mod</option>
+                    <option value="2001">Schedule Event</option>
+                    <option value="3002">Error Log</option>
+                    <option value="3001">Critical Log</option>
+                </select>
+                <label for="origin">Origin:</label>
+                <input id="origin" value="*" />
+                <input type="button" id="regsub" value="Subscribe" />
+            </span>
+        </div>
+        <ul id="log"></ul>
+    </body>
+    <script type="text/javascript">
+        var intervalID;
+        var gllasttime = '0';
+        $(document).ready(function() { 
+
+            function dowork(lasttime, callback)
+            {
+                req = "/data/" + lasttime;
+                console.log("bout to request " + req);
+
+                $.getJSON(req, function(data) {
+                    gllasttime = data.lasttime;
+                    intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
+                    callback(data);
+                });
+            }
+
+            function handledata(data)
+            {
+                console.log(data);
+
+                // find existing ul with name
+
+                for (var i = 0; i < data.data.length; i++)
+                {
+                    var curdata = data.data[i]; 
+                    //console.log(curdata);
+                    //console.log("name: " + curdata.name + " msgs: " + curdata.logs.length);
+                    ul = $('div#' + curdata.subscription_id + ' > ul');
+                    if (ul.length == 0)
+                    {
+                        el = $('<div/>', { 'id':curdata.subscription_id, 
+                                           'class':'recv' });
+                        dec = $('<span>' + curdata.subscription_id + '</span>').addClass('decorate');
+                        dec2 = $('<span>' + curdata.subscription_desc + '</span>').addClass('decorate');
+
+                        unsubspan = $('<span class="unsubwrapper" />');
+                        unsub = $('<input type="button" class="unsub" value="Unsub"/>');
+
+                        ul = $('<ul/>');
+
+                        dec.appendTo(el);
+                        dec2.appendTo(el);
+                        unsub.appendTo(unsubspan);
+                        unsubspan.appendTo(el);
+
+                        ul.appendTo(el);
+                        el.appendTo('body');
+                    }
+
+                    for (var j = 0; j < curdata.events.length; j++)
+                    {
+                        li = $('<li/>');
+                        li.appendTo(ul);
+                        //console.log(curdata.events[j]);
+                        for (var k = 0; k < curdata.events[j].length; k++)
+                        {
+                            var cchild = curdata.events[j][k];
+
+                            cid = $('<span class=\'label\'>' + cchild.id + '</span>');
+                            cid.appendTo(li);
+
+                            cel = $('<span>' + cchild.content + '</span>');
+                            if (cchild.class)
+                                cel.addClass(cchild.class);
+                            if (cchild.id)
+                                cel.attr('id', cchild.id);
+
+                            cel.appendTo(li);
+                        }
+                    }
+                }
+            }
+
+            dowork(gllasttime, handledata);
+
+            $('input#toggleupdates').click(function() {
+                if ($(this).attr('value') == "Stop")
+                {
+                    window.clearTimeout(intervalID);
+                    $(this).attr('value', 'Start');
+                }
+                else
+                {
+                    dowork(gllasttime, handledata);
+                    $(this).attr('value', 'Stop');
+                }
+                    
+            });
+
+            $('input#regsub').click(function() {
+                event_id = $('#subtype').val();
+                origin = $('#origin').val();
+
+                poststr = event_id
+                if (origin != "*")
+                    poststr = poststr + '/' + origin
+
+                $.getJSON('/ctl/sub/' + poststr, function(data) {
+                    console.log(data);
+                });
+            });
+
+            // have to use the live method here as these buttons don't exist at this time,
+            // they are added dynamically.
+            $('input.unsub').live('click', function() {
+                subdiv = $(this).parent().parent()
+                subid = subdiv[0].id
+                
+                $.getJSON('/ctl/unsub/' + subid, function(data) {
+                    subdiv.remove();
+                });
+            });
+
+        });
+    </script>
+</html>
+

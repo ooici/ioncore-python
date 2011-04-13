@@ -156,7 +156,7 @@ class ResourceRegistryService(ServiceProcess):
 
 
         # push the new resource to the data store
-        yield self.push(self.datastore_service, [resource_repository, ownership_association])
+        yield self.push(self.datastore_service, resource_repository)
         # If the push fails hand back the workbench error
 
         response.MessageResponseCode = response.ResponseCodes.OK

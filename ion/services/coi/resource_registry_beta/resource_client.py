@@ -11,9 +11,7 @@ create, get, put and update resources.
 Add methods to access the state of updates which are merging...
 """
 
-from twisted.internet import defer, reactor
-from twisted.python import failure
-from zope.interface import implements, Interface
+from twisted.internet import defer
 
 import ion.util.ionlog
 
@@ -24,13 +22,18 @@ from ion.core import ioninit
 from ion.core.process import process
 from ion.core.object import workbench
 from ion.core.object import repository
+from ion.core.object import association_manager
+
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 from ion.services.coi.datastore_bootstrap import ion_preload_config
 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID
+
+from ion.core.exception import ApplicationError
+
 from google.protobuf import message
 from google.protobuf.internal import containers
-from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 
 
@@ -40,13 +43,13 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 CONF = ioninit.config(__name__)
 
-class ResourceClientError(Exception):
+class ResourceClientError(ApplicationError):
     """
     A class for resource client exceptions
     """
 
 
-class ResourceClient(object):
+class ResourceClient(ApplicationError):
     """
     @brief This is the base class for a resource client. It is a factory for resource
     instances. The resource instance provides the interface for working with resources.
@@ -56,7 +59,6 @@ class ResourceClient(object):
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
     type_map = ion_preload_config.TypeMap()
-
 
 
 
@@ -79,6 +81,8 @@ class ResourceClient(object):
 
         # The resource client is backed by a process workbench.
         self.workbench = self.proc.workbench
+
+        #self.asc = AssociationServiceClient(proc=proc)
 
         # What about the name of the index services to use?
 
@@ -164,7 +168,6 @@ class ResourceClient(object):
         version and version state.
         @retval the specified ResourceInstance
 
-        @TODO pull the associations that go with this resource
         """
         yield self._check_init()
 
@@ -187,7 +190,7 @@ class ResourceClient(object):
             # @TODO Some reasonable test to make sure it is valid?
 
         else:
-            raise ResourceClientError('''Illegal argument type in retrieve_resource_instance:
+            raise ResourceClientError('''Illegal argument type in get_instance:
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))
 
             # Pull the repository
@@ -202,7 +205,7 @@ class ResourceClient(object):
         try:
             yield repo.checkout(branch)
         except repository.RepositoryError, ex:
-            log.warn('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
+            log.debug('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
             raise ResourceClientError('Could not checkout branch during get_instance.')
 
         # Create a resource instance to return
@@ -212,12 +215,15 @@ class ResourceClient(object):
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
         # Is this a good use of the resource name? Is it safe?
 
+        # Get owner and ownership association:
+        #owner_associations = yield self.get_associations(subject=resource, predicate_or_predicates=OWNED_BY_ID)
+
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def put_instance(self, instance, comment=None):
         """
-        @breif Write the current state of the resource to the data store
+        @Brief Write the current state of the resource and any associations to the data store
         @param instance is a ResourceInstance object to be written
         @param comment is a comment to add about the current state of the resource
 
@@ -231,48 +237,92 @@ class ResourceClient(object):
         # Get the repository
         repository = instance.Repository
 
-        repository.commit(comment=comment)
+        if repository.status == repository.MODIFIED:
+            repository.commit(comment=comment)
 
         result = yield self.workbench.push(self.datastore_service, repository)
 
         if not result.MessageResponseCode == result.ResponseCodes.OK:
             raise ResourceClientError('Push to datastore failed during put_instance')
 
-
     @defer.inlineCallbacks
-    def find_instance(self, **kwargs):
+    def put_resource_transaction(self, instances=None, comment=None):
         """
-        Use the index to find resource instances that match a set of constraints
-        For R1 the constraints that may be used are very limited
+        @Brief Write the current state of a list of resources to the data store
+        @param instance is a ResourceInstance object. All associations and all associated objects will be pushed.
+        @param comment is a comment to add about the current state of the resource
+
+        @TODO push the associations that go with this resource
         """
         yield self._check_init()
 
-        raise NotImplementedError, "Interface Method Not Implemented"
+        if comment is None or comment == '':
+            comment = 'Resource client default commit message'
 
-    def create_association(self, subject, predicate, obj):
+        if instances is None:
+            raise ResourceClientError('Must pass at least one resource instance to put_resource_transaction')
+        elif hasattr(instances, '__iter__'):
+            instances = instances
+
+            # Check to make sure they are valid resource instances
+            for instance in instances:
+                if not hasattr(instance, 'Repository'):
+                    raise ResourceClientError('Invalid object in list of instances argument to put_resource_transaction. Must be an Instance, received: "%s"' % str(instance))
+        else:
+            raise ResourceClientError('Invalid argument to put_resource_transaction: instances must be a resource instance or a list of them')
+
+
+        transaction_repos = []
+
+        for instance in instances:
+
+            repo = instance.Repository
+            if repo.status != repo.UPTODATE:
+                repo.commit(comment=comment)
+
+            transaction_repos.append(repo)
+
+        result = yield self.workbench.push(self.datastore_service, transaction_repos)
+
+        if not result.MessageResponseCode == result.ResponseCodes.OK:
+            raise ResourceClientError('Push to datastore failed during put_instance')
+
+    @defer.inlineCallbacks
+    def get_associated_resource_object(self, association):
         """
-        This method is still experimental
+        @Brief Get the Resource Instance which is the object of the association
+        @param association is an association instance
         """
-        # @TODO  yield self._check_init() 
+        if not isinstance(association, association_manager.AssociationInstance):
+            raise ResourceClientError('Invalid argument to get_associated_resource_object: argument must be an association instance')
 
-        association = self.workbench.create_association(subject, predicate, obj)
+        obj_ref = association.ObjectReference
 
-        # @TODO Now what - what should we do with the association? Stash it in the workbench?
+        resource_instance = yield self.get_instance(obj_ref)
 
+        resource_instance.ResourceAssociationsAsObject.add(association)
+
+        defer.returnValue(resource_instance)
+
+
+    @defer.inlineCallbacks
+    def get_associated_resource_subject(self, association):
         """
-        # For now - put a reference to it in the resource instance
-        if isinstance(subject, ResourceInstance):
-            subject._associations.append(association)
-
-        if isinstance(predicate, ResourceInstance):
-            predicate._associations.append(association)
-
-        if isinstance(object, ResourceInstance):
-            object._associations.append(association)
-
-        # No return val - don't touch the associations in the process!
+        @Brief Get the Resource Instance which is the object of the association
+        @param association is an association instance
         """
-        return association
+        if not isinstance(association, association_manager.AssociationInstance):
+            raise ResourceClientError('Invalid argument to get_associated_resource_subject: argument must be an association instance')
+
+        subject_ref = association.SubjectReference
+
+        resource_instance = yield self.get_instance(subject_ref)
+
+        resource_instance.ResourceAssociationsAsSubject.add(association)
+
+        defer.returnValue(resource_instance)
+
+
 
 
     def reference_instance(self, instance, current_state=False):
@@ -285,11 +335,11 @@ class ResourceClient(object):
         @retval an Identity Reference object to the resource
         """
 
-        # @TODO  yield self._check_init() 
+        # @TODO  yield self._check_init()
         return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
 
 
-class ResourceInstanceError(Exception):
+class ResourceInstanceError(ApplicationError):
     """
     Exception class for Resource Instance Object
     """
@@ -406,6 +456,8 @@ class ResourceInstance(object):
     """
     __metaclass__ = ResourceInstanceType
 
+    predicate_map = ion_preload_config.PredicateMap()
+
     # Life Cycle States
     NEW = 'New'
     ACTIVE = 'Active'
@@ -433,13 +485,24 @@ class ResourceInstance(object):
 
         self._repository = resource_repository
 
+        self.ResourceAssociationsAsObject.update_predicate_map(self.predicate_map)
+        self.ResourceAssociationsAsSubject.update_predicate_map(self.predicate_map)
+
         # association list
-        object.__setattr__(self, '_associations', [])
+        object.__setattr__(self, '_associations', {})
 
 
     @property
     def Repository(self):
         return self._repository
+
+    @property
+    def ResourceAssociationsAsSubject(self):
+        return self._repository.associations_as_subject
+
+    @property
+    def ResourceAssociationsAsObject(self):
+        return self._repository.associations_as_object
 
     @property
     def Resource(self):

@@ -21,7 +21,7 @@ from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
-from ion.core.intercept.policy import subject_has_admin_role, map_ooid_to_subject
+from ion.core.intercept.policy import subject_has_admin_role, map_ooi_id_to_subject_admin_role, subject_has_dispatcher_queue, map_ooi_id_to_subject_dispatcher_queue
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
@@ -407,9 +407,13 @@ class IdentityRegistryService(ServiceProcess):
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
 
-        # Optionally map OOID to subject in admin role dictionary
+        # Optionally map OOI ID to subject in admin role dictionary
         if subject_has_admin_role(identity.subject):
-            map_ooid_to_subject(identity.subject, identity.ResourceIdentity)
+            map_ooi_id_to_subject_admin_role(identity.subject, identity.ResourceIdentity)
+
+        # Optionally map OOI ID to subject in dispatcher queue user dictionary
+        if subject_has_dispatcher_queue(identity.subject):
+            map_ooi_id_to_subject_dispatcher_queue(identity.subject, identity.ResourceIdentity)
 
         # Create the response object...
         Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
@@ -417,7 +421,6 @@ class IdentityRegistryService(ServiceProcess):
         Response.resource_reference.ooi_id = identity.ResourceIdentity
         Response.result = "OK"
         defer.returnValue(Response)
- 
 
     @defer.inlineCallbacks
     def op_get_user(self, request, headers, msg):
