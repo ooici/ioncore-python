@@ -7,7 +7,7 @@
 """
 
 from ion.core import ioninit
-
+from telephus.cassandra.ttypes import IndexType
 
 # get configuration
 CONF = ioninit.config(__name__)
@@ -87,6 +87,7 @@ commit_cols = []
 for col_name in COMMIT_INDEXED_COLUMNS:
     col_def = base_col_def.copy()
     col_def['name']=col_name
+    col_def['index_type']=IndexType.KEYS
     commit_cols.append(col_def)
 
 
@@ -96,6 +97,7 @@ commit_cf['column_metadata'] = commit_cols
 
 blob_cf = base_cf_def.copy()
 blob_cf['name']=BLOB_CACHE
+# No columns to declare for indexing
 
 ### Storage Keyspace Name is provided by the sysname!!!
 ion_ks = base_ks_def.copy()
@@ -115,7 +117,7 @@ class StorageConfigurationError(Exception):
     '''
 
 
-def get_datastore_configuration(sysname=None):
+def get_cassandra_configuration(sysname=None):
     """
     Create a copy of all the components and over ride settings based on the configuration entry for this module
 
@@ -125,21 +127,20 @@ def get_datastore_configuration(sysname=None):
                             'replication_factor':1,}
     },
 
-
     """
     my_blob_cf = blob_cf.copy()
     my_commit_cf = commit_cf.copy()
 
     my_ks = ion_ks.copy()
 
+    # Create the return value object
     confdict = {
         STORAGE_PROVIDER:storage_provider.copy(),
         PERSISTENT_ARCHIVE:my_ks,
         }
 
 
-
-
+    # set the storage provider information - host and port
     conf_provider = CONF.getValue(STORAGE_PROVIDER, {})
     for k, v in conf_provider.iteritems():
         if k not in storage_provider:
@@ -147,7 +148,7 @@ def get_datastore_configuration(sysname=None):
         else:
             confdict[STORAGE_PROVIDER][k]=v
 
-    # Set the values in the Key Space
+    # Set the values in the Key Space configuration
     conf_pa = CONF.getValue(PERSISTENT_ARCHIVE, {})
     if 'name' in conf_pa:
         raise StorageConfigurationError('Invalid Configuration for Persistent Archive: the name of the keyspace can not be specified in the CONF file. The sysname is always used.')
@@ -164,7 +165,7 @@ def get_datastore_configuration(sysname=None):
     # update the sysname
     sysname = sysname or ioninit.sys_name
     if sysname is None:
-        raise StorageConfigurationError("storage_configuration_utility.py: no ioninit.sysname or sysname provided to get_datastore_configuration")
+        raise StorageConfigurationError("storage_configuration_utility.py: no ioninit.sysname or sysname provided to get_cassandra_configuration")
 
     # Set the keyspace name to the sysname!
     my_ks['name'] = sysname

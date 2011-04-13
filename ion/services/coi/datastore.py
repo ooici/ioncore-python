@@ -869,15 +869,14 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
-        
+
+        yield self.initialize_datastore()
+
 
 
     @defer.inlineCallbacks
     def slc_activate(self):
 
-
-
-        yield self.initialize_datastore()
 
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull

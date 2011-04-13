@@ -8,10 +8,6 @@
 @author Matt Rodriguez
 @test Service test of IStore Implementation
 
-@TODO - Right now skiptest causes an error when used with a cassandra connection
- Once this is fixed we can skip individual tests. For now we must skip all or none
- by skipping the setUp or a method inside it!
-
 """
 
 import ion.util.ionlog
