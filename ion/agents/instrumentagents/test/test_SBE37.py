@@ -33,7 +33,7 @@ def dump_dict(d,d2=None):
             print key, ' ', val
 
 
-class TestSBE49(IonTestCase):
+class TestSBE37(IonTestCase):
     
     # Increase the timeout so we can handle longer instrument interactions.
     timeout = 60
