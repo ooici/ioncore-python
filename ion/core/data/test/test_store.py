@@ -8,10 +8,6 @@
 @author Matt Rodriguez
 @test Service test of IStore Implementation
 
-@TODO - Right now skiptest causes an error when used with a cassandra connection
- Once this is fixed we can skip individual tests. For now we must skip all or none
- by skipping the setUp or a method inside it!
-
 """
 
 import ion.util.ionlog
@@ -34,11 +30,13 @@ from ion.core.data.store import Query
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+
 from ion.util.itv_decorator import itv
 
 from ion.test.iontest import IonTestCase
 
-from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
+from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap, BLOB_CACHE, COMMIT_CACHE
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
 columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
@@ -165,15 +163,17 @@ class StoreServiceTest(IStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-
-
-
-
 class BootstrapStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        store = CassandraStoreBootstrap("ooiuser", "oceans11")
+
+
+        uname = CONF.getValue('cassandra_username', None)
+        pword = CONF.getValue('cassandra_password', None)
+        keyspace = CONF.getValue('keyspace','sysname')
+
+        store = CassandraStoreBootstrap(uname,pword,keyspace)
         store.initialize()
         store.activate()
         return defer.succeed(store)
@@ -202,13 +202,13 @@ class CassandraStoreTest(IStoreTest):
         cas_host = cassandra_cluster.hosts.add()
         #cas_host.host = 'amoeba.ucsd.edu'
         #cas_host.host = 'localhost'
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        cas_host.host = 'ec2-184-72-14-57.us-west-1.compute.amazonaws.com'
         cas_host.port = 9160
 
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'StoreTestKeyspace'
+        cassandra_keyspace.name = 'sysname'
         #cassandra_keyspace.name = 'Keyspace1'
 
         ### Create a Credentials resource - for cassandra a SimplePassword object
@@ -220,14 +220,13 @@ class CassandraStoreTest(IStoreTest):
         ### Create a Cache resource - for cassandra a ColumnFamily object
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
-        column_family.name = 'TestCF'
+        column_family.name = BLOB_CACHE
 
 
         store = cassandra.CassandraStore(cassandra_cluster, \
                                          cassandra_keyspace, \
                                          simple_password, \
                                          column_family)
-
 
         store.initialize()
         store.activate()
@@ -521,7 +520,12 @@ class BootstrapIndexedStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11", "sysname")
+
+        uname = CONF.getValue('cassandra_username', None)
+        pword = CONF.getValue('cassandra_password', None)
+        keyspace = CONF.getValue('keyspace','sysname')
+
+        store = CassandraIndexedStoreBootstrap(uname,pword,keyspace)
         store.initialize()
         store.activate()
         return defer.succeed(store)
@@ -559,13 +563,13 @@ class CassandraIndexedStoreTest(IndexStoreTest):
         cas_host = cassandra_cluster.hosts.add()
         #cas_host.host = 'amoeba.ucsd.edu'
         #cas_host.host = 'localhost'
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        cas_host.host = 'ec2-184-72-14-57.us-west-1.compute.amazonaws.com'
         cas_host.port = 9160
 
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'StoreTestKeyspace'
+        cassandra_keyspace.name = 'sysname'
         #cassandra_keyspace.name = 'Keyspace1'
 
         ### Create a Credentials resource - for cassandra a SimplePassword object
@@ -578,7 +582,7 @@ class CassandraIndexedStoreTest(IndexStoreTest):
 
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
-        column_family.name = 'TestCF'
+        column_family.name = COMMIT_CACHE
 
         self.cache = column_family
         self.cache_repository = cache_repository

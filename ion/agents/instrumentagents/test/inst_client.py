@@ -67,15 +67,17 @@ class StdioProxyFactory(protocol.ClientFactory):
 
 if __name__ == '__main__':
     import sys
-    
+
+
     if len(sys.argv) < 3 or len(sys.argv) > 4 or \
        (len(sys.argv) == 4 and not sys.argv[3].startswith('sim')):
         print "Usage: %s host port [sim_INSTRUMENT-NAME]" % __file__
         sys.exit(1)
-
+    
     if len(sys.argv) == 4:
         try:
-            exec ('from ion.agents.instrumentagents.simulators.{0} import Simulator'.format(sys.argv[3]))
+            #exec ('from ion.agents.instrumentagents.simulators.{0} import Simulator'.format(sys.argv[3]))
+            exec 'from ion.agents.instrumentagents.simulators.' + sys.argv[3] + ' import Simulator'
         except:
             print 'ERROR while trying to import Simulator from module {0}'.format(sys.argv[3])
             sys.exit(1)
@@ -95,4 +97,4 @@ if __name__ == '__main__':
         print 'Connected to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
          
     reactor.run( )
-
+    

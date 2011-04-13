@@ -22,8 +22,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
 
     # Get the username for cassandra from the command line. If not present get username from the kwargs for the app.
-    uname = ioninit.cont_args.get('username', kwargs.get('username', None))
-    pword = ioninit.cont_args.get('password', kwargs.get('password', None))
+    uname = ioninit.cont_args.get('cassandra_username', kwargs.get('cassandra_username', None))
+    pword = ioninit.cont_args.get('cassandra_password', kwargs.get('cassandra_password', None))
 
     do_init = ioninit.cont_args.get('do-init', kwargs.get('do-init', True))
 
@@ -41,8 +41,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     PRELOAD_CFG = 'preload'
 
-    spawnargs = {'username':uname,
-                  'password':pword,
+    spawnargs = {'cassandra_username':uname,
+                  'cassandra_password':pword,
                   }
 
     if isinstance(do_init, (str, unicode)):
@@ -65,8 +65,6 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
 
     spawnargs.update(init)
-
-    print spawnargs
 
     services =[{ 'name':'datastore',
                      'module':'ion.services.coi.datastore',

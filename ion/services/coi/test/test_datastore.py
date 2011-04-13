@@ -15,13 +15,19 @@ CONF = ioninit.config(__name__)
 
 from ion.util.itv_decorator import itv
 
+from ion.util import procutils as pu
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
 from ion.core.object import workbench
 
+from ion.core.data import cassandra_bootstrap
+from ion.core.data import storage_configuration_utility
+
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
-from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE, PERSISTENT_ARCHIVE
+
+from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
 # Pick three to test existence
@@ -55,6 +61,12 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        yield self._start_container()
+
+        yield self.setup_services()
+
+    @defer.inlineCallbacks
+    def setup_services(self):
         yield self._start_container()
 
 
@@ -396,6 +408,9 @@ class DataStoreTest(IonTestCase):
 class CassandraBackedDataStoreTest(DataStoreTest):
 
 
+    username = CONF.getValue('cassandra_username', None)
+    password = CONF.getValue('cassandra_password', None)
+
 
     services=[]
     services.append(
@@ -403,8 +418,8 @@ class CassandraBackedDataStoreTest(DataStoreTest):
          'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
                       BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
                       PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                      'username':'ooiuser',
-                      'password':'oceans11',
+                      'username':username,
+                      'password':password,
                        }
                 })
 
@@ -414,7 +429,50 @@ class CassandraBackedDataStoreTest(DataStoreTest):
     @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
-        yield DataStoreTest.setUp(self)
+
+        yield self._start_container()
+
+        storage_conf = storage_configuration_utility.get_cassandra_configuration()
+
+        self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
+
+        # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
+        test_harness = cassandra_bootstrap.CassandraTestHarnessClient(self.username, self.password, storage_conf, connect_to_keyspace=False)
+
+        yield test_harness.initialize()
+        yield test_harness.activate()
+
+        self.test_harness = test_harness
+
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info(ire)
+
+        # Configure the keyspace for this test
+        spargs = {'cassandra_username':self.username, 'cassandra_password':self.password, 'keyspace':None, 'error_if_existing':True}
+        cip = cassandra_bootstrap.CassandraInitializationProcess(spawnargs=spargs)
+
+        yield cip.spawn()
+
+
+        yield DataStoreTest.setup_services(self)
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info(ire)
+
+        yield pu.asleep(2)
+
+        yield self.test_harness.terminate()
+
+        DataStoreTest.tearDown(self)
 
 
 
