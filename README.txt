@@ -70,6 +70,7 @@ Example setup to work on ioncore-python:
 ----------------------------------------
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+cdvirtualenv
 mkdir some_dir_to_keep_it_all_in
 cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
@@ -83,6 +84,7 @@ Example setup to work on ioncore-python and ion-object-definitions:
 -------------------------------------------------------------------
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+cdvirtualenv
 mkdir some_dir_to_keep_it_all_in
 cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
