@@ -432,7 +432,6 @@ class CassandraBackedDataStoreTest(DataStoreTest):
 
         self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
 
-        print 'KEYSPACE', self.keyspace
         # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
         test_harness = cassandra_bootstrap.CassandraSchemaProvider(self.username, self.password, storage_conf, error_if_existing=False)
 
