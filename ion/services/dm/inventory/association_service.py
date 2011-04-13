@@ -69,6 +69,9 @@ class AssociationService(ServiceProcess):
 
         ServiceProcess.__init__(self, *args, **kwargs)
 
+
+        print CONF
+        
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         self.index_store_class = pu.get_class(index_store_class_name)
 
@@ -101,7 +104,7 @@ class AssociationService(ServiceProcess):
         else:
             self.index_store = self.index_store_class(self, indices=COMMIT_INDEXED_COLUMNS )
 
-        log.info('SLC_INIT Association Service')
+        log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
     def op_get_subjects(self, predicate_object_query, headers, msg):
