@@ -283,7 +283,7 @@ class RegisterUser(object):
       Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
       Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_has_dispatcher_queue = user_has_dispatcher_queue(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_has_dispatcher = user_has_dispatcher_queue(result.resource_reference.ooi_id)
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 
