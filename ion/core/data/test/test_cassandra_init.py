@@ -46,12 +46,18 @@ class CassandraInitTest(IonTestCase):
         storage_conf = storage_configuration_utility.get_cassandra_configuration(self.keyspace)
 
         # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
-        test_harness = cassandra_bootstrap.CassandraTestHarnessClient(self.uname, self.pword, storage_conf, connect_to_keyspace=False)
+        test_harness = cassandra_bootstrap.CassandraSchemaProvider(self.uname, self.pword, storage_conf, error_if_existing=False)
 
-        yield test_harness.initialize()
-        yield test_harness.activate()
+        test_harness.connect()
 
         self.test_harness = test_harness
+        
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info(ire)
+
+
 
     @itv(CONF)
     @defer.inlineCallbacks
@@ -62,13 +68,7 @@ class CassandraInitTest(IonTestCase):
         except InvalidRequestException, ire:
             log.info(ire)
 
-        # Waiting for process to terminate automatically
-        yield pu.asleep(2)
-
-        yield self.test_harness.terminate()
-
-        yield pu.asleep(2)
-
+        self.test_harness.disconnect()
 
         yield self._shutdown_processes()
         yield self._stop_container()
@@ -77,12 +77,6 @@ class CassandraInitTest(IonTestCase):
     @itv(CONF)
     @defer.inlineCallbacks
     def test_run_once(self):
-
-
-        try:
-            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
-        except InvalidRequestException, ire:
-            log.info(ire)
 
         spargs = {'cassandra_username':self.uname, 'cassandra_password':self.pword, 'keyspace':self.keyspace, 'error_if_existing':True}
 
@@ -95,17 +89,10 @@ class CassandraInitTest(IonTestCase):
 
         self.assertEqual(ks.name, self.keyspace)
 
-        
-        #yield cip.terminate_when_active()
-
 
     @itv(CONF)
     @defer.inlineCallbacks
     def test_fail_existing(self):
-        """
-        Known bug - will not pass even though the failure is expected!
-        """
-
 
         ks_dict = storage_configuration_utility.base_ks_def.copy()
         ks_dict['name'] = self.keyspace
@@ -123,11 +110,7 @@ class CassandraInitTest(IonTestCase):
         cip = cassandra_bootstrap.CassandraInitializationProcess(spawnargs=spargs)
 
 
-        #self.failUnlessFailure(cip.spawn(), cassandra_bootstrap.CassandraSchemaError)
-        #self.failUnlessFailure(cip.spawn(), process.ProcessError)
         self.failUnlessFailure(cip.spawn(), ion.core.data.cassandra_bootstrap.CassandraSchemaError)
-
-        #yield cip.terminate_when_active()
 
 
     @itv(CONF)
