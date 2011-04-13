@@ -67,8 +67,6 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setup_services(self):
-        yield self._start_container()
-
 
         self.sup = yield self._spawn_processes(self.services)
 
@@ -418,8 +416,6 @@ class CassandraBackedDataStoreTest(DataStoreTest):
          'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
                       BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
                       PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                      'username':username,
-                      'password':password,
                        }
                 })
 
@@ -437,10 +433,9 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
 
         # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
-        test_harness = cassandra_bootstrap.CassandraTestHarnessClient(self.username, self.password, storage_conf, connect_to_keyspace=False)
+        test_harness = cassandra_bootstrap.CassandraSchemaProvider(self.username, self.password, storage_conf, error_if_existing=False)
 
-        yield test_harness.initialize()
-        yield test_harness.activate()
+        test_harness.connect()
 
         self.test_harness = test_harness
 
@@ -448,13 +443,9 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         try:
             yield self.test_harness.client.system_drop_keyspace(self.keyspace)
         except InvalidRequestException, ire:
-            log.info(ire)
+            log.info('No Keyspace to remove in setup: ' + str(ire))
 
-        # Configure the keyspace for this test
-        spargs = {'cassandra_username':self.username, 'cassandra_password':self.password, 'keyspace':None, 'error_if_existing':True}
-        cip = cassandra_bootstrap.CassandraInitializationProcess(spawnargs=spargs)
-
-        yield cip.spawn()
+        yield test_harness.run_cassandra_config()
 
 
         yield DataStoreTest.setup_services(self)
@@ -466,13 +457,12 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         try:
             yield self.test_harness.client.system_drop_keyspace(self.keyspace)
         except InvalidRequestException, ire:
-            log.info(ire)
+            log.info('No Keyspace to remove in teardown: ' + str(ire))
 
-        yield pu.asleep(2)
 
-        yield self.test_harness.terminate()
+        self.test_harness.disconnect()
 
-        DataStoreTest.tearDown(self)
+        yield DataStoreTest.tearDown(self)
 
 
 

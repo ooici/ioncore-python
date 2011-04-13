@@ -421,8 +421,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("response does not indicate user wasn't already registered")
         if reply.message_parameters_reference[0].user_is_admin != True:
             self.fail("response does not indicate user is administrator")
-        if reply.message_parameters_reference[0].user_has_dispatcher_queue != True:
-            self.fail("response does not indicate user has a dispatcher queue")
+        if reply.message_parameters_reference[0].user_has_dispatcher != True:
+            self.fail("response does not indicate user has a dispatcher")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
             
@@ -438,8 +438,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("response does not indicate user was already registered")
         if reply.message_parameters_reference[0].user_is_admin != True:
             self.fail("response does not indicate user is administrator")
-        if reply.message_parameters_reference[0].user_has_dispatcher_queue != True:
-            self.fail("response does not indicate user has a dispatcher queue")
+        if reply.message_parameters_reference[0].user_has_dispatcher != True:
+            self.fail("response does not indicate user has a dispatcher")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
         log.info("test_registerUser: re-registration received GPB = "+str(reply.message_parameters_reference[0]))
