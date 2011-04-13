@@ -70,6 +70,7 @@ Example setup to work on ioncore-python:
 ----------------------------------------
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+cdvirtualenv
 mkdir some_dir_to_keep_it_all_in
 cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
@@ -83,6 +84,7 @@ Example setup to work on ioncore-python and ion-object-definitions:
 -------------------------------------------------------------------
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+cdvirtualenv
 mkdir some_dir_to_keep_it_all_in
 cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
@@ -177,6 +179,13 @@ prevent changes to the global default), please make local changes in:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2011-04-09:
+- Removed support for bootstrap.declare_messaging and
+  IonTestCase._declare_messaging.
+- Removed all scripts in res/scripts. Use app and rel files instead.
+- Added interaction (message) observer app. Start with
+  bin/twistd -n cc res/apps/observer.app
 
 2011-04-05:
 - Call _so_transition in StateObject action function to transition state.

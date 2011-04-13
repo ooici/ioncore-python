@@ -47,6 +47,7 @@ class TCPConnection(BasicLifecycleObject):
         log.info('on_terminate: disconnected TCP')
 
     def on_error(self, *args, **kwargs):
+        self._connector.disconnect()
         log.info('on_error')
 
 class TCPListen(BasicLifecycleObject):

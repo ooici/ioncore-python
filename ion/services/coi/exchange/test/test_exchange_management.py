@@ -164,7 +164,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_create_exchange_name(self):
+    def xtest_create_exchange_name(self):
         """
         A test that ensures we can define an exchangename.  Tests
         for:
@@ -209,7 +209,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_create_queue(self):
+    def xtest_create_queue(self):
         """
         A test that ensures we can define an exchangename.  Tests
         for:

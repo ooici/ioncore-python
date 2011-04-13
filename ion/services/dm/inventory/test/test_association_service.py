@@ -21,6 +21,10 @@ from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
 
+from ion.core.data import storage_configuration_utility
+from ion.core.data.cassandra_bootstrap import PERSISTENT_ARCHIVE, CassandraSchemaProvider
+from ion.core.data.cassandra_bootstrap import InvalidRequestException
+
 from ion.core.process.process import Process
 from ion.core.exception import ReceivedApplicationError
 
@@ -66,7 +70,10 @@ class AssociationServiceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
+        yield self.setup_services()
 
+    @defer.inlineCallbacks
+    def setup_services(self):
         self.sup = yield self._spawn_processes(self.services)
 
         self.proc = Process()
@@ -75,7 +82,6 @@ class AssociationServiceTest(IonTestCase):
 
         # run the tests in a completely separate process.
         self.asc = AssociationServiceClient(proc=self.proc)
-
 
 
     @defer.inlineCallbacks
@@ -731,7 +737,12 @@ class AssociationServiceTest(IonTestCase):
     
         
 class CassandraBackedAssociationServiceTest(AssociationServiceTest):
-    
+
+    username = CONF.getValue('cassandra_username', None)
+    password = CONF.getValue('cassandra_password', None)
+
+
+
     services = [
             {'name':'ds1',
              'module':'ion.services.coi.datastore',
@@ -739,16 +750,12 @@ class CassandraBackedAssociationServiceTest(AssociationServiceTest):
              'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
                       BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
                       PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                      'username':'ooiuser',
-                      'password':'oceans11',
                        }
             },
             {'name':'association_service',
              'module':'ion.services.dm.inventory.association_service',
              'class':'AssociationService',
              'spawnargs':{'index_store_class': 'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
-                          'username':'ooiuser',
-                          'password':'oceans11',
                          }
                 }
     ]
@@ -758,19 +765,43 @@ class CassandraBackedAssociationServiceTest(AssociationServiceTest):
     @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
-        self._skip_test_msg = "Skipping this test because it assumes the backend data is not persisted."
-        yield AssociationServiceTest.setUp(self)
+        yield self._start_container()
 
-    
-    def test_get_association_one(self):
-        raise unittest.SkipTest(self._skip_test_msg)
-    
-    def test_association_by_type_and_lcs(self):
-        raise unittest.SkipTest(self._skip_test_msg)
-    
-    def test_association_subject_predicate_updated_object(self):
-        raise unittest.SkipTest(self._skip_test_msg)
 
-    def test_association_false(self):
-        raise unittest.SkipTest(self._skip_test_msg)
-    
+        storage_conf = storage_configuration_utility.get_cassandra_configuration()
+
+        self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
+
+        # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
+        test_harness = CassandraSchemaProvider(self.username, self.password, storage_conf, error_if_existing=False)
+
+        test_harness.connect()
+
+        self.test_harness = test_harness
+
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info('No Keyspace to remove in setup: ' + str(ire))
+
+        yield test_harness.run_cassandra_config()
+
+
+
+
+        yield self.setup_services()
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+
+        try:
+            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
+        except InvalidRequestException, ire:
+            log.info('No Keyspace to remove in teardown: ' + str(ire))
+
+
+        self.test_harness.disconnect()
+
+        yield AssociationServiceTest.tearDown(self)

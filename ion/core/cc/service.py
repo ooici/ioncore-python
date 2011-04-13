@@ -36,6 +36,9 @@ class Options(usage.Options):
                 ["broker_port", "p", 5672, "Message space broker port"],
                 ["broker_vhost", "v", "/", "Message space..."],
                 ["broker_heartbeat", None, 0, "Heartbeat rate [seconds]"],
+                ["broker_username", None, "guest", "Username to log into virtual host as"],
+                ["broker_password", None, "guest", ""],
+                ["broker_credfile", None, None, "File containing broker username and password"],
                 ["boot_script", "b", None, "Boot script (python source)."],
                 ["args", "a", None, "Additional startup arguments such as sysname=me" ],
                     ]

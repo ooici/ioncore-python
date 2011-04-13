@@ -56,7 +56,14 @@ stringArray_type = object_utils.create_type_identifier(object_id=10015, version=
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
+#
+# ResourceID for testing create download URL response
+#
+TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
+
+
 class AppIntegrationTest(IonTestCase):
+   
     """
     Testing Application Integration Service.
     """
@@ -110,7 +117,7 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
+        #reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
         #reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.minLongitude = -74.13
@@ -124,6 +131,54 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+
+        i = 0
+        while i < len(rspMsg.message_parameters_reference[0].dataResourceSummary):
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('user_ooi_id'):
+                self.fail('response to findDataResources has no user_ooi_id field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('data_resource_id'):
+                self.fail('response to findDataResources has no resource_id field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('title'):
+                #self.fail('response to findDataResources has no title field')
+                log.error('response to findDataResources has no title field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('institution'):
+                #self.fail('response to findDataResources has no institution field')
+                log.error('response to findDataResources has no institution field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('source'):
+                #self.fail('response to findDataResources has no source field')
+                log.error('response to findDataResources has no source field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('references'):
+                #self.fail('response to findDataResources has no references field')
+                log.error('response to findDataResources has no references field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
+                self.fail('response to findDataResources has no ion_time_coverage_start field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
+                self.fail('response to findDataResources has no ion_time_coverage_end field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('summary'):
+                #self.fail('response to findDataResources has no summary field')
+                log.error('response to findDataResources has no summary field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('comment'):
+                #self.fail('response to findDataResources has no comment field')
+                log.error('response to findDataResources has no comment field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
+                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
+                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
+                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
+                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
+            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('download_url'):
+                self.fail('response to findDataResources has no download_url field')
+            i = i + 1                
+
+        """
         i = 0
         while i < len(rspMsg.message_parameters_reference[0].dataResourceSummary):
             log.debug('DHE: findDataResources returned:\n' + \
@@ -179,6 +234,7 @@ class AppIntegrationTest(IonTestCase):
                   str(rspMsg.message_parameters_reference[0].dataResourceSummary[i].ion_geospatial_vertical_positive) + \
                   str('\n'))
             i = i + 1
+            """
 
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):
@@ -271,14 +327,31 @@ class AppIntegrationTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
+        #
+        # Send a request without a resourceID to test that the appropriate error
+        # is returned.
+        #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(CREATE_DOWNLOAD_URL_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
+
+        log.debug('Calling createDownloadURL without resource ID.')
+        rspMsg = yield self.aisc.createDownloadURL(reqMsg)
+        if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('rspMsg to GPB w/missing resource ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(CREATE_DOWNLOAD_URL_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
+        reqMsg.message_parameters_reference.data_resource_id = TEST_RESOURCE_ID
 
         log.debug('Calling createDownloadURL.')
         rspMsg = yield self.aisc.createDownloadURL(reqMsg)
         downloadURL = rspMsg.message_parameters_reference[0].download_url
         log.debug('DHE: createDownloadURL returned:\n' + downloadURL)
+        if TEST_RESOURCE_ID not in downloadURL:
+            self.fail("createDownloadURL response does not contain resourceID")
+
 
     @defer.inlineCallbacks
     def test_registerUser(self):
@@ -348,6 +421,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("response does not indicate user wasn't already registered")
         if reply.message_parameters_reference[0].user_is_admin != True:
             self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_has_dispatcher != True:
+            self.fail("response does not indicate user has a dispatcher")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
             
@@ -363,6 +438,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("response does not indicate user was already registered")
         if reply.message_parameters_reference[0].user_is_admin != True:
             self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_has_dispatcher != True:
+            self.fail("response does not indicate user has a dispatcher")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
         log.info("test_registerUser: re-registration received GPB = "+str(reply.message_parameters_reference[0]))

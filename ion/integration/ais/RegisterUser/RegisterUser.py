@@ -13,7 +13,10 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.core.intercept.policy import user_has_admin_role
+from ion.core.intercept.policy import user_has_admin_role, \
+                                      user_has_dispatcher_queue, \
+                                      get_dispatcher_queue_for_user
+                                      
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -280,6 +283,7 @@ class RegisterUser(object):
       Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
       Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_has_dispatcher = user_has_dispatcher_queue(result.resource_reference.ooi_id)
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 

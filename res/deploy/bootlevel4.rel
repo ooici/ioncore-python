@@ -1,8 +1,8 @@
-{
+ {
     "type":"release",
-    "name":"EventsRel",
+    "name":"bootlevel4",
     "version": "0.1",
-    "description": "Event Notification related services",
+    "description": "Bootlevel 4 release file",
     "ioncore" : "0.1",
     "apps":[
         {'name':'datastore',            'version':'0.1', 'config':{}},

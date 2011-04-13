@@ -20,7 +20,7 @@ from zope.interface import implements
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
-from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
+from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator, InvalidRequestException
 
 from ion.core.data import store
 from ion.core.data.store import Query
@@ -99,7 +99,7 @@ class CassandraStore(TCPConnection):
         @retval Deferred that fires with the value of key
         """
         
-        log.debug("CassandraStore: Calling get on col %s " % key)
+        log.debug("CassandraStore: Calling get on key %s " % key)
         try:
             result = yield self.client.get(key, self._cache_name, column='value')
             value = result.column.value
@@ -145,7 +145,7 @@ class CassandraStore(TCPConnection):
         @note Deletes are lazy, so key may still be visible for some time.
         """
         yield self.client.remove(key, self._cache_name)
-    
+
     def on_deactivate(self, *args, **kwargs):
         #self._connector.disconnect()
         self._manager.shutdown()
@@ -157,6 +157,19 @@ class CassandraStore(TCPConnection):
         self._manager.shutdown()
         log.info('on_terminate: Lose TCP Connection')
     
+    def on_error(self, *args, **kwargs):
+        log.info("Called CassandraStore.on_error")
+        self._connector.disconnect()
+        self._manager.shutdown()
+        log.info('on_error: Lose TCP Connection')
+
+
+    @defer.inlineCallbacks
+    def on_activate(self, *args, **kwargs):
+
+        yield TCPConnection.on_activate(self)
+
+
 
 
 class CassandraIndexedStore(CassandraStore):
