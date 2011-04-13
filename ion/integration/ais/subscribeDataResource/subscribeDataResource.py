@@ -13,6 +13,10 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
+from ion.services.coi.resource_registry_beta.association_client import AssociationClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
+                                                                    TYPE_OF_ID, \
+                                                                    DATASET_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, \
                                                                     ResourceInstance
@@ -74,6 +78,7 @@ class SubscribeDataResource(object):
         log.debug('SubscribeDataResource.__init__()')
         self.mc    = ais.mc
         self.rc    = ais.rc
+        self.ac    = AssociationClient(proc=ais)
 
     def deleteDataResourceSubscription(self, msg):
         """
@@ -212,8 +217,24 @@ class SubscribeDataResource(object):
         datasource_resource = yield self.rc.get_instance(resource_id)
         
         #association crap
-        dataset_id = "FIXME, ASSOCIATIONS, MORON"
+        #can also do subject= 
+        found = yield self.ac.find_associations(obj=datasource_resource, \
+                                                    predicate_or_predicates=HAS_A_ID)
 
-        dataset_resource = yield self.rc.get_instance(dataset_id)
+        association = None
+        for a in found:
+            #ian is not convinced... but this should work
+            exists = yield self.ac.association_exists(a.SubjectReference.key, TYPE_OF_ID, DATASET_RESOURCE_TYPE_ID):
+            if exists:
+                #FIXME: if not association is None then we have data inconsistency!
+                association = a
+
+        #FIXME: if association is None: ERRORZ
+
+        dataset_resource = yield self.rc.get_associated_resource_subject(association)
+
+        #alternate method: (david says DON'T)
+        #dataset_reference = association.subject_reference
+        #dataset_resource = yield self.rc.get_instance(dataset_reference)
         
         defer.returnValue(dispatcher_resource, datasource_resource, dataset_resource)

@@ -12,8 +12,12 @@ from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
 from ion.services.dm.inventory import DatasetControllerClient
+from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
+from ion.services.coi.resource_registry_beta.association_client import AssociationClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, \
                                                                     ResourceInstance
@@ -104,6 +108,42 @@ message DataSourceResource {
 """
 
 
+SCHEDULER_ADD_REQ_TYPE = object_utils.create_type_identifier(object_id=2601, version=1)
+"""
+message AddTaskRequest {
+    enum _MessageTypeIdentifier {
+      _ID = 2601;
+      _VERSION = 1;
+    }
+
+    // desired_origin is where the event notification will originate from
+    //   this is not required to be sent... one will be generated if not
+    // interval is seconds between messages
+    // payload is string
+
+    optional string desired_origin    = 1;
+    optional uint64 interval_seconds  = 2;
+    optional string payload           = 3;
+
+}
+"""
+
+SCHEDULER_ADD_RSP_TYPE = object_utils.create_type_identifier(object_id=2602, version=1)
+"""
+message AddTaskResponse {
+    enum _MessageTypeIdentifier {
+      _ID = 2602;
+      _VERSION = 1;
+    }
+
+    // the string guid
+    // the origin  is where the event notifications will come from
+
+    optional string task_id = 1;
+    optional string origin  = 2;
+}
+"""
+
 
 class CreateDataResource(object):
 
@@ -113,13 +153,13 @@ class CreateDataResource(object):
         self.rc    = ais.rc
         self.dscc  = DatasetControllerClient(proc=ais)
         self.psc   = PubSubClient(proc=ais)
-
+        self.ac    = AssociationClient(proc=ais)
 
     @defer.inlineCallbacks
     def createDataResourceDap(self, msg):
         """
         @brief create a data resource based on the limited data we can receive from UX
-        @param msg GPB, 9217/1, 
+        @param msg GPB, 9217/1,
         @GPB{Input,9217,1}
         @GPB{Returns,9212,1}
         @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
@@ -165,8 +205,8 @@ class CreateDataResource(object):
     @defer.inlineCallbacks
     def createDataResource(self, msg):
         """
-        @brief create a data resource 
-        @param msg GPB, 9211/1, 
+        @brief create a data resource
+        @param msg GPB, 9211/1,
         @GPB{Input,9211,1}
         @GPB{Returns,9212,1}
         @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
@@ -176,7 +216,7 @@ class CreateDataResource(object):
         my_datasrc_id      = None
         my_dataset_id      = None
         my_association_id  = None
-        
+
         datasrc_resource      = None
         dataset_resource      = None
         association_resource  = None
@@ -206,37 +246,38 @@ class CreateDataResource(object):
             # next line could also be self.rc.reference_instance(datasrc_resource).key
             my_dataset_id = dataset_resource.key
 
-            # create topics
-            # call EOI: create_dataset_topics ( tim laroque or dave )
+            # FIXME create topics
+            # call EOI: create_dataset_topics ( tim laroque or dave ... BLOCKED FOR NOW )
 
-            # call the scheduler service client
+            # FIXME call the scheduler service client
+            #  it returns the scheduler task id, which i'll associate with the data source
             #
-            # interval_seconds=uint64, start_time, end_time, origin=string, payload
+            # interval_seconds=uint64, origin=string, payload
             # response is UUID + origin
-            # 
+            #
             # payload is the UpdateEvent, which contains the dataset id
             # target is the DS update topic
 
-            
-            topic_id = yield self.psc.declare_topic(msg)
 
-            
 
-            #FIXME, associate them!
-            #association_id = somepartof self.rc.create_association(subject, predicate, object)
+            #make association
+            association = yield self.ac.create_association(dataset_resource, HAS_A_ID, datasrc_resource)
+            #FIXME associate user with data source
 
-            marked = yield self._markResourceLifecycles([datasrc_resource, dataset_resource, association_resource],
-                                                        datasrc_resource.ACTIVE, datasrc_resource.RETIRED)
-            if not marked:
-                pass #fixme, raise error to do the cleanup
-                
+
+            #mark lifecycle states
+            datasrc_resource.ResourcesLifeCycleState = datasrc_resource.ACTIVE
+            dataset_resource.ResourcesLifeCycleState = dataset_resource.ACTIVE
+            yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
 
         except ReceivedApplicationError, ex:
             log.info('CreateDataResource.createDataResource(): Error attempting to FIXME: %s' %ex)
 
-            yield self._markResourceLifecycles([datasrc_resource, dataset_resource, association_resource], 
-                                               datasrc_resource.RETIRED, datasrc_resource.RETIRED)
+            #mark lifecycle states
+            datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
+            dataset_resource.ResourcesLifeCycleState = dataset_resource.RETIRED
+            yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                                      MessageName='AIS CreateDataResource error response')
@@ -252,44 +293,25 @@ class CreateDataResource(object):
         Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
         Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
         Response.message_parameters_reference[0].data_set_id     = my_dataset_id
-        Response.message_parameters_reference[0].association_id  = FIXME
+        Response.message_parameters_reference[0].association_id  = association.AssociationIdentity
         defer.returnValue(Response)
 
 
-    @defer.inlineCallbacks
-    def _markResourceLifecycles(self, resources, state, fallbackstate):
-        """
-        @brief attempt at a transactional lifecycle-state-setter for multiple resources
-        @param resources list of resources, "None" is a valid entry
-        @param state the state to set the resources to
-        @param fallbackstate the state to set the resources to if there is an error
-        @retval boolean success
-        """
-        #fixme: is this the best we can do?
-        try:
-            for r in resources:
-                if r:
-                    r.ResourcesLifeCycleState = state
-                    yield self.rc.put_instance(r)
+    def _createScheduledEvent(self, desired_origin, interval_seconds, payload):
+        sched_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG,
+                                                         ResourceName='datasource',
+                                                         ResourceDescription='Important Datasource Description')
+        
+        #FILL UP FIELDS, lists followed by scalars
+        datasrc_resource.property.extend(msg.property)
 
-            defer.returnValue(true)
 
-        except:
-            for r in resources:
-                if r:
-                    r.ResourceLifeCycleState = fallbackstate
-
-            for r in resources:
-                if r:
-                    yield self.rc.put_instance(r)
-
-            defer.returnValue(false)
 
     @defer.inlineCallbacks
     def _createDataSourceResource(self, msg):
         """
-        @brief create a data resource 
-        @param msg GPB, 9211/1, 
+        @brief create a data resource
+        @param msg GPB, 9211/1,
         @GPB{Input,9211,1}
         @retval data source resource
         """
@@ -317,6 +339,7 @@ class CreateDataResource(object):
         datasrc_resource.institution_id     = msg.institution_id
 
 
+        #fixme, put it with the others
         yield self.rc.put_instance(datasrc_resource)
         log.info("created data source " + str(datasrc_resrource))
 
