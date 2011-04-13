@@ -22,6 +22,8 @@ from ion.util.state_object import BasicStates
 from ion.util import procutils as pu
 
 from ion.core.process import process
+from ion.core.process.process import ProcessFactory
+
 from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore, CassandraError
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE, PERSISTENT_ARCHIVE, STORAGE_PROVIDER
 from ion.core.data import storage_configuration_utility
@@ -218,7 +220,7 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
                     break
             else:
                 retval = True
-                cf_cass.column_metadata.append(col_conf)
+                cf_cass.column_metadata.append(col_conf_names[name])
 
         return retval
 
@@ -300,6 +302,8 @@ class CassandraInitializationProcess(process.Process):
         else:
             log.warn('Process not yet active: waiting for termination!')
             reactor.callLater(1, terminate_when_active)
+
+factory = ProcessFactory(CassandraInitializationProcess)
 
 
 class CassandraTestHarnessClient(CassandraMixin, TCPConnection):
