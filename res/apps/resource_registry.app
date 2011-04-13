@@ -3,7 +3,7 @@
     "name":"resource_registry",
     "description": "ION resource registry application",
     "version": "0.1",
-    "mod": ("ion.zapps.resource_registry", [],{'username':None,'password':None}),
+    "mod": ("ion.zapps.resource_registry", [],{}),
     "modules": [
         "ion.zapps.resource_registry",
     ],

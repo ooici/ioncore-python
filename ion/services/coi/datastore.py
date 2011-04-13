@@ -36,9 +36,9 @@ from ion.core.data.storage_configuration_utility import REPOSITORY_KEY, BRANCH_N
 
 from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
 from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
-from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
 
-from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
+from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, get_cassandra_configuration
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
@@ -809,6 +809,8 @@ class DataStoreService(ServiceProcess):
         self.c_store = None
         self.b_store = None
 
+        # Get the configuration for cassandra - may or may not be used depending on the backend class
+        self._storage_conf = get_cassandra_configuration()
         
         # Get the arguments for preloading the datastore
         self.preload = {ION_PREDICATES_CFG:True,
@@ -820,6 +822,8 @@ class DataStoreService(ServiceProcess):
         self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
 
+
+
         log.info('DataStoreService.__init__()')
         
 
@@ -829,7 +833,15 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[COMMIT_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Cassandra Index Store")
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE],  **{"username": self._username, "password": self._password})
+
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+
+            self.c_store = self._backend_classes[COMMIT_CACHE](self._username, self._password, storage_provider, keyspace, COMMIT_CACHE)
+
+            yield self.c_store.initialize()
+            yield self.c_store.activate()
+
             yield self.register_life_cycle_object(self.c_store)
             
         else:
@@ -840,12 +852,21 @@ class DataStoreService(ServiceProcess):
             self._backend_classes[COMMIT_CACHE].kvs.clear()
 
             log.info("Instantiating In Memeory Index Store")
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self,**{'indices':COMMIT_INDEXED_COLUMNS} )
+            # Pass self for index store service implementation
+            self.c_store = self._backend_classes[COMMIT_CACHE](self, indices=COMMIT_INDEXED_COLUMNS )
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Store")
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE],  **{"username": self._username, "password": self._password})
+
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+            
+            self.b_store = self._backend_classes[COMMIT_CACHE](self._username, self._password, storage_provider, keyspace, BLOB_CACHE)
+
+            yield self.b_store.initialize()
+            yield self.b_store.activate()
+
             yield self.register_life_cycle_object(self.b_store)
         else:
 
@@ -854,20 +875,19 @@ class DataStoreService(ServiceProcess):
             self._backend_classes[BLOB_CACHE].kvs.clear()
 
             log.info("Instantiating In Memory Store")
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE], self)
+            # Pass self for store service implementation
+            self.b_store = self._backend_classes[BLOB_CACHE](self)
 
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
 
+        yield self.initialize_datastore()
 
-        
 
-
-    @defer.inlineCallbacks
     def slc_activate(self):
 
-        yield self.initialize_datastore()
+
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
