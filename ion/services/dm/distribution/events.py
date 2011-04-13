@@ -25,8 +25,8 @@ RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE       = object_utils.create_type_identifie
 TRIGGER_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2324, version=1)
 RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifier(object_id=2325, version=1)
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
-NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=7008, version=1)
-DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=7009, version=1)
+NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2327, version=1)
+DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2328, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
