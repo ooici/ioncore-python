@@ -338,12 +338,25 @@ class Process(BasicLifecycleObject, ResponseCodes):
         Process life cycle event: on termination of process (once)
         """
 
+    @defer.inlineCallbacks
     def on_error(self, cause= None, *args, **kwargs):
+
+        if len(self._registered_life_cycle_objects) > 0:
+            log.debug("Attempting to TERMINATE all registered LCOs")
+            # attempt to move all registered lcos to the terminated state cleanly!
+            try:
+                yield self._advance_life_cycle_objects(BasicStates.S_TERMINATED)
+            except:
+                log.debug("Error terminating registered LCOs, ignoring...")
+                pass
+
         if cause:
             log.error("Process error: %s" % cause)
             pass
         else:
             raise RuntimeError("Illegal process state change")
+
+        defer.returnValue(None)
 
     def is_spawned(self):
         return self.receiver.consumer != None
