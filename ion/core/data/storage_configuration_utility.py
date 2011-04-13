@@ -161,7 +161,9 @@ def get_cassandra_configuration(sysname=None):
 
     # The blob cache and the commit cache are not configurable in this object!
     if ion_ks['cf_defs'] is None:
-        ion_ks['cf_defs'].extend( [my_blob_cf, my_commit_cf])
+        ion_ks['cf_defs'] =[]
+
+    ion_ks['cf_defs'].extend( [my_blob_cf, my_commit_cf])
 
     # update the sysname
     sysname = sysname or ioninit.sys_name

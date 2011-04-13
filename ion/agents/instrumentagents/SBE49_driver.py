@@ -23,8 +23,9 @@ from twisted.internet.protocol import ClientCreator
 
 from collections import deque
 
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient, publish_msg_type
+#from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
+#from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient, publish_msg_type
+from ion.agents.instrumentagents.instrument_driver_deprecated import InstrumentDriver, InstrumentDriverClient, publish_msg_type
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 from ion.agents.instrumentagents.SBE49_constants import instrument_prompts
 
@@ -187,6 +188,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventInstrumentAsleep":
+            log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
             return 0
         else:
