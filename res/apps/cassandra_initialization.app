@@ -9,7 +9,7 @@
         'CassandraInitializationProcess'],
         {'cassandra_username':None,
         'cassandra_password':None,
-        'keyspace':None,
+        'keyspace':None, # Default to sysname!
         'error_if_existing':False}
     ),
     "registered": [

@@ -108,47 +108,52 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
         CassandraMixin.__init__(self, username, password, storage_conf, connect_to_keyspace=False)
         self.error_if_existing = error_if_existing
 
-
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
 
         TCPConnection.on_activate(self)
 
-
-        ks_cassandra = None
         try:
-            ks_cassandra = yield self.client.describe_keyspace(self._keyspace)
-
-            if self.error_if_existing:
-                raise CassandraSchemaError('KeySpace already exists. Cassandra Schema Initialization expected to create a new Keyspace!')
-
-        except NotFoundException, nfe:
-            log.info(nfe)
             ks_cassandra = None
+            try:
+                ks_cassandra = yield self.client.describe_keyspace(self._keyspace)
+
+                if self.error_if_existing:
+                    raise CassandraSchemaError('KeySpace already exists. Cassandra Schema Initialization expected to create a new Keyspace!')
+
+            except NotFoundException, nfe:
+                log.info(nfe)
+                ks_cassandra = None
 
 
-        ks_conf = build_telephus_ks(self._storage_conf[PERSISTENT_ARCHIVE])
-
-        if ks_cassandra is None:
-            log.debug('Creating Cassandra keyspace for CassandraInitialization: %s', self._keyspace)
-
-            yield self.client.system_add_keyspace(ks_conf)
-            yield self.client.set_keyspace(self._keyspace)
-
-        else:
-            yield self.client.set_keyspace(self._keyspace)
-
-            if ks_cassandra == ks_conf:
-                defer.returnValue(None)
-
-            # Make sure the key space properties have not been changed in the configuration
-            ks_properties = ['name', 'strategy_class', 'replication_factor']
-            for prop in ks_properties:
-                if getattr(ks_cassandra, prop) != getattr(ks_conf, prop):
-                    raise CassandraSchemaError('Can not modify cassandra keyspace properties of an existing keyspace: property - "%s"' % prop)
+            ks_conf = build_telephus_ks(self._storage_conf[PERSISTENT_ARCHIVE])
 
 
-            yield self._apply_cf_configuration(ks_conf, ks_cassandra)
+
+            if ks_cassandra is None:
+                log.debug('Creating Cassandra keyspace for CassandraInitialization: %s', self._keyspace)
+
+                yield self.client.system_add_keyspace(ks_conf)
+                yield self.client.set_keyspace(self._keyspace)
+
+            else:
+                yield self.client.set_keyspace(self._keyspace)
+
+                if ks_cassandra == ks_conf:
+                    defer.returnValue(None)
+
+                # Make sure the key space properties have not been changed in the configuration
+                ks_properties = ['name', 'strategy_class', 'replication_factor']
+                for prop in ks_properties:
+                    if getattr(ks_cassandra, prop) != getattr(ks_conf, prop):
+                        raise CassandraSchemaError('Can not modify cassandra keyspace properties of an existing keyspace: property - "%s"' % prop)
+
+
+                yield self._apply_cf_configuration(ks_conf, ks_cassandra)
+
+        finally:
+
+            self._manager.shutdown()
 
         defer.returnValue(None)
 
@@ -178,7 +183,8 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
 
                     for prop in cf_props:
 
-                        if getattr(cf_cass, prop) != getattr(cf_conf, prop):
+                        conf_prop = getattr(cf_conf, prop)
+                        if conf_prop is not None and conf_prop != getattr(cf_cass, prop):
                             raise CassandraSchemaError('Can not modify cassandra column family properties of an existing column family: property - "%s"' % prop)
 
 
@@ -214,7 +220,8 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
                     col_conf = col_conf_names[name]
 
                     for prop in col_props:
-                        if getattr(col_conf, prop) != getattr(col_cass,prop):
+                        conf_prop = getattr(col_conf, prop)
+                        if conf_prop is not None and conf_prop != getattr(col_cass,prop):
                             raise CassandraSchemaError('Can not modify cassandra column properties of an existing column: property - "%s"' % prop)
 
                     break
@@ -225,13 +232,18 @@ class CassandraSchemaProvider(CassandraMixin, TCPConnection):
         return retval
 
 
-    def on_deactivate(self, *args, **kwargs):
-        self._manager.shutdown()
-        log.info('on_deactivate: Lose Connection TCP')
+    def on_error(self, *args, **kwargs):
+        #self._manager.shutdown()
+        #manager shutdown called in on_activate
+        log.info('on_error: ')
+
+
 
     def on_terminate(self, *args, **kwargs):
-        self._manager.shutdown()
-        log.info('on_terminate: Lose Connection TCP')
+        #self._manager.shutdown()
+        #manager shutdown called in on_activate
+
+        log.info('on_terminate: ')
 
 
 def build_telephus_ks(storage_conf):
@@ -289,19 +301,38 @@ class CassandraInitializationProcess(process.Process):
 
         self.add_life_cycle_object(self.cassandra_bootstrap)
 
-
-
+    """
+    CODE FOR SELF SHUTDOWN CAUSES ERORRS WHEN THE SUP CALLS SHUTDOWN CHILDREN
     def plc_activate(self, *args, **kwargs):
 
         reactor.callLater(1, self.terminate_when_active)
 
-    def terminate_when_active(self):
+    def terminate_when_active(self, d=None):
+
+
+        if d is None:
+            d = defer.Deferred()
+
+        self.count += 1
+        if self.count > 5:
+            d.errback(CassandraSchemaError('CassandraInitializationProcess never activated!'))
 
         if self._get_state() is BasicStates.S_ACTIVE:
-            self.terminate()
+
+            d2 = self.terminate()
+            d2.addCallback(d.callback)
+        elif self._get_state() is BasicStates.S_ERROR:
+
+            d.callback(True)
+
         else:
             log.warn('Process not yet active: waiting for termination!')
-            reactor.callLater(1, terminate_when_active)
+            reactor.callLater(1, self.terminate_when_active, d)
+
+        return d
+    """
+
+
 
 factory = ProcessFactory(CassandraInitializationProcess)
 

@@ -157,6 +157,13 @@ class CassandraStore(TCPConnection):
         self._manager.shutdown()
         log.info('on_terminate: Lose TCP Connection')
     
+    def on_error(self, *args, **kwargs):
+        log.info("Called CassandraStore.on_error")
+        self._connector.disconnect()
+        self._manager.shutdown()
+        log.info('on_error: Lose TCP Connection')
+
+
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
 

@@ -35,6 +35,7 @@ class CassandraInitTest(IonTestCase):
 
     keyspace = 'TESTING_KEYSPACE'
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -52,7 +53,7 @@ class CassandraInitTest(IonTestCase):
 
         self.test_harness = test_harness
 
-
+    @itv(CONF)
     @defer.inlineCallbacks
     def tearDown(self):
 
@@ -65,6 +66,9 @@ class CassandraInitTest(IonTestCase):
         yield pu.asleep(2)
 
         yield self.test_harness.terminate()
+
+        yield pu.asleep(2)
+
 
         yield self._shutdown_processes()
         yield self._stop_container()
@@ -79,8 +83,6 @@ class CassandraInitTest(IonTestCase):
             yield self.test_harness.client.system_drop_keyspace(self.keyspace)
         except InvalidRequestException, ire:
             log.info(ire)
-            
-
 
         spargs = {'cassandra_username':self.uname, 'cassandra_password':self.pword, 'keyspace':self.keyspace, 'error_if_existing':True}
 
@@ -92,6 +94,9 @@ class CassandraInitTest(IonTestCase):
         ks = yield self.test_harness.client.describe_keyspace(self.keyspace)
 
         self.assertEqual(ks.name, self.keyspace)
+
+        
+        #yield cip.terminate_when_active()
 
 
     @itv(CONF)
@@ -122,6 +127,7 @@ class CassandraInitTest(IonTestCase):
         #self.failUnlessFailure(cip.spawn(), process.ProcessError)
         self.failUnlessFailure(cip.spawn(), ion.core.data.cassandra_bootstrap.CassandraSchemaError)
 
+        #yield cip.terminate_when_active()
 
 
     @itv(CONF)
@@ -154,5 +160,7 @@ class CassandraInitTest(IonTestCase):
 
         self.assertEqual(ks.name, ks_conf.name)
         self.assertEqual(len(ks.cf_defs), len(ks_conf.cf_defs))
+
+        #yield cip.terminate_when_active()
 
 

@@ -58,7 +58,7 @@ VALUE = 'value'
 ### Build up datastructures
 
 base_col_def = {'name':None,
-           'validation_class':'BytesType',
+           'validation_class':'org.apache.cassandra.db.marshal.BytesType',
            'index_type':None,
            'index_name':None}
 
@@ -67,11 +67,11 @@ base_cf_def ={
     'keyspace' : DEFAULT_KEYSPACE_NAME,
     'name' : None,
     'column_type' : 'Standard',
-    'comparator_type' : 'BytesType',
+    'comparator_type' : 'org.apache.cassandra.db.marshal.BytesType',
     'subcomparator_type' : None,
     'comment' : None,
     'column_metadata' : None,
-    'default_validation_class':'BytesType',
+    'default_validation_class':'org.apache.cassandra.db.marshal.BytesType',
 }
 
 base_ks_def = {
@@ -100,8 +100,8 @@ blob_cf['name']=BLOB_CACHE
 # No columns to declare for indexing
 
 ### Storage Keyspace Name is provided by the sysname!!!
-ion_ks = base_ks_def.copy()
-ion_ks['cf_defs'] = [blob_cf, commit_cf]
+#ion_ks = base_ks_def.copy()
+#ion_ks['cf_defs'] = [blob_cf, commit_cf]
 
 ###
 # CREATE A SINGLE EXPORTABLE DATA STRUCTURE
@@ -131,12 +131,12 @@ def get_cassandra_configuration(sysname=None):
     my_blob_cf = blob_cf.copy()
     my_commit_cf = commit_cf.copy()
 
-    my_ks = ion_ks.copy()
+    ion_ks = base_ks_def.copy()
 
     # Create the return value object
     confdict = {
         STORAGE_PROVIDER:storage_provider.copy(),
-        PERSISTENT_ARCHIVE:my_ks,
+        PERSISTENT_ARCHIVE:ion_ks,
         }
 
 
@@ -157,10 +157,11 @@ def get_cassandra_configuration(sysname=None):
         if k not in base_ks_def:
             raise StorageConfigurationError('Invalid keyspace configuration: key - "%s", value - "%s"' % (k,v))
         else:
-            my_ks[k]=v
+            ion_ks[k]=v
 
     # The blob cache and the commit cache are not configurable in this object!
-    my_ks['cf_defs'] = [my_blob_cf, my_commit_cf]
+    if ion_ks['cf_defs'] is None:
+        ion_ks['cf_defs'].extend( [my_blob_cf, my_commit_cf])
 
     # update the sysname
     sysname = sysname or ioninit.sys_name
@@ -168,7 +169,7 @@ def get_cassandra_configuration(sysname=None):
         raise StorageConfigurationError("storage_configuration_utility.py: no ioninit.sysname or sysname provided to get_cassandra_configuration")
 
     # Set the keyspace name to the sysname!
-    my_ks['name'] = sysname
+    ion_ks['name'] = sysname
     my_blob_cf['keyspace'] = sysname
     my_commit_cf['keyspace'] = sysname
 
