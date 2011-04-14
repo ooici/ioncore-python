@@ -235,8 +235,9 @@ class SBE37Driver(InstrumentDriver):
         Example formats:
         -273.2093,8214.78125, -205.137, 93504.1953, 04-06-2011, 13:41:34
         #-273.2093,8214.78125, -205.137, 93504.1953, 04-06-2011, 13:41:34
+        # 20.2347, 0.11958,    0.420,   0.6596, 1483.848, 04-13-2011, 16:30:08
         """
-        self._sample_pattern = r'^#?(-?\d+\.\d+), *(-?\d+\.\d+), *(-?\d+\.\d+)'
+        self._sample_pattern = r'^#? *(-?\d+\.\d+), *(-?\d+\.\d+), *(-?\d+\.\d+)'
         self._sample_pattern += r'(, *(-?\d+\.\d+))?(, *(-?\d+\.\d+))?'
         self._sample_pattern += r'(, *(\d+) +([a-zA-Z]+) +'
         self._sample_pattern += r'(\d+), *(\d+):(\d+):(\d+))?'
@@ -836,6 +837,7 @@ class SBE37Driver(InstrumentDriver):
             else:
                 sample_data = None
                 for line in self._data_lines:
+                    print line
                     sample_data = self._sample_parser.parse(line)
                     if sample_data:
                         break
