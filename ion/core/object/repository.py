@@ -144,7 +144,14 @@ class IndexHash(dict):
 
 
 
+
+
+
+
 class ObjectContainer(object):
+    """
+    Base class for the repository and merge container
+    """
 
     def __init__(self):
 
@@ -386,10 +393,10 @@ class Repository(ObjectContainer):
         self._detached_head = False
 
         
-        self._merge_containers=[]
+        self.merge=None
         """
-        When merging a repository state there are multiple MergeContainer objects which hold the state of the object
-        which is being merged. Access objects using: repo.Merging(ind).<field in the root object>
+        When merging a repository state there are multiple Merge Repository objects which hold the state of the object
+        which is being merged. Access objects using: repo.merge[ind].<field in the root object>
         """
         
         self._stash = {}
@@ -455,10 +462,7 @@ class Repository(ObjectContainer):
     @property
     def repository_key(self):
         return self._dotgit.repositorykey
-    
-    def merge_objects(self, ind):
-        return self._merge_containers[ind].root_object
-    
+
     
     def _set_upstream(self, source):
         self._upstream = source
@@ -520,8 +524,9 @@ class Repository(ObjectContainer):
         self._upstream.clear()
         self._process = None
 
-        for mc in self._merge_containers:
-            mc.clear()
+        if self.merge is not None:
+            for mr in self.merge:
+                mr.clear()
 
 
 
@@ -1013,7 +1018,7 @@ class Repository(ObjectContainer):
             
 
     #@defer.inlineCallbacks
-    def merge(self, branchname=None, commit_id = None):
+    def merge_with(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
         
@@ -1067,9 +1072,14 @@ class Repository(ObjectContainer):
         for cref in crefs:
             # Create a merge container to hold the merge object state for access
 
-            mc = MergeContainer(cref, self.index_hash.cache)
+            mr = MergeRepository(cref, self.index_hash.cache)
 
-            self._merge_containers.append(mc)
+            mr.load_root()
+            
+            if self.merge is None:
+                self.merge = MergeContainer()
+
+            self.merge.append(mr)
 
         
     @property
@@ -1364,7 +1374,7 @@ class Repository(ObjectContainer):
 
 
 
-class MergeContainer(ObjectContainer):
+class MergeRepository(ObjectContainer):
 
 
     def __init__(self, commit, cache):
@@ -1390,3 +1400,45 @@ class MergeContainer(ObjectContainer):
 
         self.load_links(obj)
 
+
+class MergeContainer(object):
+
+    def __init__(self):
+
+        self.merge_repos = []
+
+
+    def append(self,item):
+
+        self.merge_repos.append(item)
+
+
+    def _root_objects(self):
+
+        root_list=[]
+        for repo in self.merge_repos:
+
+            root_list.append(repo.root_object)
+
+        return root_list
+
+
+    def __iter__(self):
+
+        return self._root_objects().__iter__()
+
+    def iteritems(self):
+
+        return self._root_objects().iteritems()
+
+    def __len__(self):
+        return len(self.merge_repos)
+
+
+    def __getitem__(self, index):
+
+        return self.merge_repos[index].root_object
+
+    def get_commit(self,index):
+
+        return self.merge_repos[index].commit
