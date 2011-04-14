@@ -18,10 +18,10 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.data import cassandra
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY 
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, COMMIT_CACHE
 from ion.core.data.storage_configuration_utility import  BRANCH_NAME, SUBJECT_KEY,  SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE 
 from ion.core.data.storage_configuration_utility import  RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH
-
+from ion.core.data.storage_configuration_utility import get_cassandra_configuration, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_LIFE_CYCLE_STATE_ID, TYPE_OF_ID
 
@@ -64,29 +64,44 @@ class AssociationService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-    @defer.inlineCallbacks
-    def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
+    def __init__(self, *args, **kwargs):
+
+
+        ServiceProcess.__init__(self, *args, **kwargs)
 
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
-        index_store_class = pu.get_class(index_store_class_name)
+        self.index_store_class = pu.get_class(index_store_class_name)
 
 
-        assert store.IIndexStore.implementedBy(index_store_class), \
-            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'       
+        assert store.IIndexStore.implementedBy(self.index_store_class), \
+            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'
                 # Service life cycle state. Initialize service here. Can use yields.
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
         self._password = self.spawn_args.get("password", CONF.getValue("password",None))
+
+
+        # Get the configuration for cassandra - may or may not be used depending on the backend class
+        self._storage_conf = get_cassandra_configuration()
+
+
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        # Service life cycle state. Initialize service here. Can use yields.
         
-        if issubclass(index_store_class, cassandra.CassandraIndexedStore):
+        if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
             log.info("Instantiating Cassandra Index Store")
-            self.index_store = yield defer.maybeDeferred(index_store_class,  **{"username": self._username, "password": self._password})
-            self.index_store.initialize()
+
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+
+            self.index_store = self.index_store_class(self._username, self._password, storage_provider, keyspace, COMMIT_CACHE)
+
             yield self.register_life_cycle_object(self.index_store)
         else:
-            self.index_store = yield defer.maybeDeferred(index_store_class,  **{'indices':COMMIT_INDEXED_COLUMNS})
+            self.index_store = self.index_store_class(self, indices=COMMIT_INDEXED_COLUMNS )
 
-        log.info('SLC_INIT Association Service')
+        log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
     def op_get_subjects(self, predicate_object_query, headers, msg):

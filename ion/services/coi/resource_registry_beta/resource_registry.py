@@ -64,6 +64,8 @@ class ResourceRegistryService(ServiceProcess):
 
         self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='datastore'))
 
+        self.owned_by = None
+
         log.info('ResourceRegistryService.__init__()')
 
     @defer.inlineCallbacks
@@ -88,7 +90,7 @@ class ResourceRegistryService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
-    def slc_init(self):
+    def pull_owned_by(self):
 
         yield self.pull(self.datastore_service, OWNED_BY_ID)
         self.owned_by = self.workbench.get_repository(OWNED_BY_ID)
@@ -97,6 +99,10 @@ class ResourceRegistryService(ServiceProcess):
 
     @defer.inlineCallbacks
     def _register_resource_instance(self, resource_description, headers):
+
+
+        if self.owned_by is None:
+            yield self.pull_owned_by()
 
         # Get the user to associate with this new resource
         user_id = headers.get('user-id', 'ANONYMOUS')
