@@ -792,7 +792,7 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
         
         self._backend_classes={}
-        
+
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
         self._password = self.spawn_args.get("password", CONF.getValue("password",None))
 
