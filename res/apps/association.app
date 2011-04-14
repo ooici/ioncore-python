@@ -3,7 +3,7 @@
     "name":"association",
     "description": "ION association management application",
     "version": "0.1",
-    "mod": ("ion.zapps.association", [],{'username':None,'password':None}),
+    "mod": ("ion.zapps.association", [],{'cassandra_username':None,'cassandra_password':None}),
     "modules": [
         "ion.zapps.association",
     ],

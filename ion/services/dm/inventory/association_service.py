@@ -101,7 +101,7 @@ class AssociationService(ServiceProcess):
         else:
             self.index_store = self.index_store_class(self, indices=COMMIT_INDEXED_COLUMNS )
 
-        log.info('SLC_INIT Association Service')
+        log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
     def op_get_subjects(self, predicate_object_query, headers, msg):

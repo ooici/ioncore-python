@@ -19,7 +19,22 @@ of your file. Here's the config for the unit tests:
 },
 
 In this case, test_that_skips is not run - anything marked False
-is skipped.
+is skipped. The usual rules for selecting a directory, module, class or test to run
+still apply.
+
+
+It is also possible to turn on all ITV tests using this config file entry:
+'ion.util.itv_decorator':{
+    'Run ITV Tests':True
+},
+
+In this case all the tests in your trial path will run. For instance running:
+
+bin/trial ion.services.dm
+
+This will run all the tests under the ion/services/dm directory. Normally skip tests
+marked with the ITV decorator, but with 'Run ITV Tests':True the tests will not be skipped.
+
 
 @TODO:
     Using techniques from http://stackoverflow.com/questions/218616/getting-method-parameter-names-in-python

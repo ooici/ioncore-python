@@ -15,8 +15,7 @@ from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import topic_res_type_name, \
-                                                                    dataset_res_type_name, \
+from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
                                                                     identity_res_type_name, \
                                                                     datasource_res_type_name
 
@@ -36,7 +35,6 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID
                                                                     HAS_LIFE_CYCLE_STATE_ID, \
                                                                     OWNED_BY_ID, \
                                                                     SAMPLE_PROFILE_DATASET_ID, \
-                                                                    TOPIC_RESOURCE_TYPE_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
                                                                     IDENTITY_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID
@@ -48,11 +46,6 @@ class ManageResources(object):
     
    def __init__(self, ais):
       log.debug('ManageResources.__init__()')
-      TopicValues = TOPIC_RESOURCE_TYPE_ID, \
-                    self.__LoadTopicColumnData, \
-                    self.__PrintTopicAttributes, \
-                    self.__LoadTopicColumnHeadrers, \
-                    self.__LoadTopicAttributes
       DatasetValues = DATASET_RESOURCE_TYPE_ID, \
                       self.__LoadDatasetColumnData, \
                       self.__PrintDatasetAttributes, \
@@ -68,15 +61,13 @@ class ManageResources(object):
                          self.__PrintDatasourceAttributes, \
                          self.__LoadDatasourceColumnHeadrers, \
                          self.__LoadDatasourceAttributes
-      self.ResourceTypes = {'topics' : TopicValues,
-                            'datasets' : DatasetValues,
+      self.ResourceTypes = {'datasets' : DatasetValues,
                             'identities' : IdentityValues,
                             'datasources' : DatasourceValues
                            }
-      self.MapGpbTypeToResourceType = {1401 : 'identities',
-                                       4503 : 'datasources',
-                                       2317 : 'topics',
-                                       10001 : 'datasets',
+      self.MapGpbTypeToResourceType = {10001 : 'datasets',
+                                       1401 : 'identities',
+                                       4503 : 'datasources'                                     
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
@@ -121,10 +112,6 @@ class ManageResources(object):
       defer.returnValue(result)
 
         
-   def __PrintTopicAttributes(self, ds):
-      log.debug("Identity = \n"+str(ds))
-    
-
    def __PrintDatasetAttributes(self, ds):
       log.debug("Dataset = \n"+str(ds))
       for atrib in ds.root_group.attributes:
@@ -147,11 +134,6 @@ class ManageResources(object):
       log.debug('max_ingest_millis: ' + str(ds.max_ingest_millis))
 
 
-   def __LoadTopicColumnHeadrers(self, To):
-      To.column_names.append('OoiId')
-      To.column_names.append('Topic Name')
-
-
    def __LoadDatasetColumnHeadrers(self, To):
       To.column_names.append('OoiId')
       To.column_names.append('Title')
@@ -165,16 +147,6 @@ class ManageResources(object):
    def __LoadDatasourceColumnHeadrers(self, To):
       To.column_names.append('OoiId')
       To.column_names.append('Station ID')
-
-
-   def __LoadTopicColumnData(self, To, From, Id):
-      try:
-         To.attribute.append(Id)
-         To.attribute.append(From.topic_name)
-      
-      except:
-         estr = 'Object ERROR!'
-         log.exception(estr)
 
 
    def __LoadDatasetColumnData(self, To, From, Id):
@@ -270,23 +242,6 @@ class ManageResources(object):
 
       log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
       defer.returnValue(Response)
-
-
-   def __LoadTopicAttributes(self, To, From):
-      try:
-         To.resource.add()
-         To.resource[0].name = 'exchange_space_name'
-         To.resource[0].value = From.exchange_space_name
-         To.resource.add()
-         To.resource[1].name = 'exchange_point_name'
-         To.resource[1].value = From.exchange_point_name
-         To.resource.add()
-         To.resource[2].name = 'topic_name'
-         To.resource[2].value = From.topic_name
-      
-      except:
-         estr = 'Object ERROR!'
-         log.exception(estr)
 
 
    def __LoadDatasetAttributes(self, To, From):

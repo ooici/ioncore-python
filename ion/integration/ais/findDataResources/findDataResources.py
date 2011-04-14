@@ -14,6 +14,8 @@ from twisted.internet import defer
 from decimal import Decimal
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry_beta.association_client import AssociationClient, AssociationInstance, AssociationManager
+from ion.services.coi.resource_registry_beta.association_client import AssociationClientError
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
@@ -22,14 +24,20 @@ from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
 
+
 from ion.core.object import object_utils
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
+
+DNLD_BASE_THREDDS_URL = 'http://localhost:8081/thredds'
+DNLD_DIR_PATH = '/dodsC/scanData/'
+DNLD_FILE_TYPE = '.ncml'
 
 class FindDataResources(object):
     
@@ -40,87 +48,13 @@ class FindDataResources(object):
         self.mc = ais.mc
         self.dscc = DatasetControllerClient()
         self.asc = AssociationServiceClient()
+        self.ac = AssociationClient()
+
 
         self.dsID = None
 
     def setTestDatasetID(self, dsID):
         self.dsID = dsID
-
-    @defer.inlineCallbacks
-    #def __findResourcesOfType(self, resourceType):
-    def findResourcesOfType(self, resourceType):
-
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        pair = request.pairs.add()
-
-        # Set the predicate search term
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # Set the Object search term
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = resourceType
-        
-        pair.object = type_ref
-
-        # Add a life cycle state request
-        pair = request.pairs.add()
-
-        # Set the predicate search term
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = HAS_LIFE_CYCLE_STATE_ID
-
-        pair.predicate = pref
-
-        # Set the Object search term
-        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
-        pair.object = state_ref
-
-        result = yield self.asc.get_subjects(request)
-        
-        defer.returnValue(result)
-
-        
-    @defer.inlineCallbacks
-    def findResourcesOfTypeAndOwner(self, resourceType, owner):
-
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        pair = request.pairs.add()
-
-        # Set the predicate search term
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # Set the Object search term
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = ANONYMOUS_USER_ID
-        
-        pair.object = type_ref
-
-        # Add a life cycle state request
-        pair = request.pairs.add()
-
-        # Set the predicate search term
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # Set the Object search term
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = DATASET_RESOURCE_TYPE_ID
-        pair.object = state_ref
-
-        result = yield self.asc.get_subjects(request)
-        
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def findDataResources(self, msg):
@@ -137,6 +71,7 @@ class FindDataResources(object):
         #
         userID = msg.message_parameters_reference.user_ooi_id
 
+        self.downloadURL      = 'Uninitialized'
         self.filterByArea     = True
         self.filterByVertical = True
         self.filterByTime     = True
@@ -157,12 +92,8 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
         # Get the list of dataset resource IDs
-        dSetResults = yield self.findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
-
-        # Get the list of datasource resource IDs
-        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
 
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
@@ -178,11 +109,9 @@ class FindDataResources(object):
         j = 0
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
-            dSourceResID = dSourceResults.idrefs[i].key
-            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID: ' + dSourceResID)
+            log.debug('Working on dataset: ' + dSetResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
-            dSource = yield self.rc.get_instance(dSourceResID)
 
             minMetaData = {}
             self.__loadMinMetaData(dSet, minMetaData)
@@ -201,14 +130,20 @@ class FindDataResources(object):
                 self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+
+                dSourceResID = yield self.__getAssociatedSource(dSetResID)
+                dSource = yield self.rc.get_instance(dSourceResID)
                 
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+
+                self.__createDownloadURL(dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+
                 self.__printRootAttributes(dSet)
                 self.__printRootVariables(dSet)
                 self.__printSourceMetadata(dSource)
+                self.__printDownloadURL()
     
-                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-        
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
                 j = j + 1
             else:
                 log.debug("isInBounds is FALSE")
@@ -218,6 +153,7 @@ class FindDataResources(object):
 
 
         defer.returnValue(rspMsg)
+
 
     @defer.inlineCallbacks
     def findDataResourcesByUser(self, msg):
@@ -229,11 +165,24 @@ class FindDataResources(object):
 
         log.debug('findDataResourcesByUser Worker Class Method')
 
-        userID = msg.message_parameters_reference.user_ooi_id
+        if msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            userID = msg.message_parameters_reference.user_ooi_id
+        else:
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS findDataResourcesByUser error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [user_ooi_id] not found in message"
+            defer.returnValue(Response)
+            
+            
 
+        self.downloadURL       = 'Uninitialized'
         self.filterByArea     = True
         self.filterByVertical = True
         self.filterByTime     = True
+        self.bIsInAreaBounds      = True
+        self.bIsInVerticalBounds  = True
+        self.bIsInTimeBounds      = True
         
         bounds = {}
         self.__loadBounds(bounds, msg)
@@ -248,12 +197,8 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
         # Get the list of dataset resource IDs
-        dSetResults = yield self.findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
+        dSetResults = yield self.__findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
-
-        # Get the list of datasource resource IDs
-        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
 
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
@@ -269,11 +214,9 @@ class FindDataResources(object):
         j = 0
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
-            dSourceResID = dSourceResults.idrefs[i].key
-            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID: ' + dSourceResID)
+            log.debug('DHE: Working on datasetResID: ' + dSetResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
-            dSource = yield self.rc.get_instance(dSourceResID)
 
             minMetaData = {}
             self.__loadMinMetaData(dSet, minMetaData)
@@ -282,15 +225,30 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.filterByArea and self.__isInAreaBounds(minMetaData, bounds):
-                log.debug("isInAreaBounds is TRUE")
+            if self.filterByArea:
+                self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
+
+            if self.filterByVertical:
+                self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
+                                    
+            if self.filterByTime:
+                self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+
+                dSourceResID = yield self.__getAssociatedSource(dSetResID)
+                dSource = yield self.rc.get_instance(dSourceResID)
+                
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+
+                self.__createDownloadURL(dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+
                 self.__printRootAttributes(dSet)
                 self.__printRootVariables(dSet)
                 self.__printSourceMetadata(dSource)
+                self.__printDownloadURL()
     
-                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-        
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
                 j = j + 1
             else:
                 log.debug("isInBounds is FALSE")
@@ -300,6 +258,101 @@ class FindDataResources(object):
 
 
         defer.returnValue(rspMsg)
+
+
+    @defer.inlineCallbacks
+    def __findResourcesOfType(self, resourceType):
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        #
+        # Set up a resource type search term using:
+        # - TYPE_OF_ID as predicate
+        # - object of type: resourceType parameter as object
+        #
+        pair = request.pairs.add()
+    
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = resourceType
+        
+        pair.object = type_ref
+
+        # 
+        # Set up a life cycle state term using:
+        # - HAS_LIFE_CYCLE_STATE_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
+        result = yield self.asc.get_subjects(request)
+        
+        defer.returnValue(result)
+
+        
+    @defer.inlineCallbacks
+    def __findResourcesOfTypeAndOwner(self, resourceType, owner):
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        #
+        # Set up an owned_by_id search term using:
+        # - OWNED_BY_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = owner
+        
+        pair.object = type_ref
+
+        #
+        # Set up an owned_by_id search term using:
+        # - TYPE_OF_ID as predicate
+        # - object of type: resourceType parameter as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = resourceType
+        pair.object = type_ref
+
+        result = yield self.asc.get_subjects(request)
+        
+        defer.returnValue(result)
+
 
     def __loadMinMetaData(self, dSet, minMetaData):
         for attrib in dSet.root_group.attributes:
@@ -334,6 +387,7 @@ class FindDataResources(object):
                 minMetaData['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_positive':                
                 minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
+
 
     def __loadBounds(self, bounds, msg):
         """
@@ -387,6 +441,7 @@ class FindDataResources(object):
         else:
             self.filterByTime = False
 
+
     def __isInAreaBounds(self, minMetaData, bounds):
         """
         Determine if dataset resource is in area bounds.
@@ -413,6 +468,7 @@ class FindDataResources(object):
             return False
         
         return True
+
         
     def __isInVerticalBounds(self, minMetaData, bounds):
         """
@@ -452,15 +508,22 @@ class FindDataResources(object):
             
         return True
         
+        
     def __printBounds(self, bounds):
         boundNames = list(bounds)
         log.debug('Spatial and Temporal Bounds: ')
         for boundName in boundNames:
             log.debug('   %s = %s'  % (boundName, bounds[boundName]))
-    
+
+
+    def __printDownloadURL(self):
+        log.debug('Download URL: ' + self.downloadURL)
+
+
     def __printRootAttributes(self, ds):
         for atrib in ds.root_group.attributes:
             log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
+
     
     def __printRootVariables(self, ds):
         for var in ds.root_group.variables:
@@ -470,6 +533,7 @@ class FindDataResources(object):
             print "....Dimensions:"
             for dim in var.shape:
                 log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+
         
     def __printSourceMetadata(self, dSource):
         log.debug('source_type: ' + str(dSource.source_type))
@@ -481,9 +545,11 @@ class FindDataResources(object):
         log.debug('base_url: ' + dSource.base_url)
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
-    def __loadRootAttributes(self, rootAttributes, minMetaData, userID, resID):
+
+    def __loadRootAttributes(self, rootAttributes, minMetaData, userID, dSetResID):
         rootAttributes.user_ooi_id = userID
-        rootAttributes.data_resource_id = resID
+        rootAttributes.data_resource_id = dSetResID
+        rootAttributes.download_url = self.__createDownloadURL(dSetResID)
         for attrib in minMetaData:
             log.debug('Root Attribute: %s = %s'  % (attrib, minMetaData[attrib]))
             if  attrib == 'title':
@@ -517,14 +583,36 @@ class FindDataResources(object):
             elif attrib == 'ion_geospatial_vertical_positive':                
                 rootAttributes.ion_geospatial_vertical_positive = minMetaData[attrib]
 
-    """
-    def __loadRootVariable(self, rootVariable, ds, var):
-        #lat = ds.root_group.FindVariableByName('lat')
-        try:
-            rootVariable.standard_name  = var.GetStandardName()
-            rootVariable.units = var.GetUnits()
-            
-        except:            
-            estr = 'Object ERROR!'
-            log.exception(estr)
-    """
+
+    def __createDownloadURL(self, dSetResID):
+        #
+        #  opendap URL for accessing the data.
+        # The URL will be composed a couple parts:  <base_url_to_thredds> +
+        # <directory_path> + <resourceid>.ncml
+        #
+        # http://localhost:8081/thredds/dodsC/scanData/<resID>.ncml
+        #
+        self.downloadURL =  DNLD_BASE_THREDDS_URL + \
+                            DNLD_DIR_PATH + \
+                            dSetResID + \
+                            DNLD_FILE_TYPE
+        
+        return self.downloadURL
+
+    
+    @defer.inlineCallbacks
+    def __getAssociatedSource(self, dSetResID):
+        log.debug('__getAssociatedSource()')
+
+        ds = yield self.rc.get_instance(dSetResID)
+
+        results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
+        for association in results:
+            log.debug('Associated Source for Dataset: ' + \
+                      association.ObjectReference.key + \
+                      ' is: ' + association.SubjectReference.key)
+
+        defer.returnValue(association.SubjectReference.key)
+                      
+
+
