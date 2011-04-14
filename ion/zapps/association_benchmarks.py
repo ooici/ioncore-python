@@ -26,10 +26,12 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import NAME_CFG,DESCRIPTION_CFG 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import CONTENT_CFG, CONTENT_ARGS_CFG
-
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ANONYMOUS_USER_ID, OWNED_BY_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
+
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -38,6 +40,37 @@ from ion.core.object import object_utils
 #-- CC Application interface
 
 # Functions required
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+
+@defer.inlineCallbacks
+def find_by_owner(association_client, proc):
+        request = yield proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        
+        pair = request.pairs.add()
+        
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+        #Uncomment for FAIL
+        result = yield association_client.get_subjects(request)
+        """
+        #print len(result)
+        
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+        print len(key_list)   
+        """
+         
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
 
@@ -102,7 +135,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
             ds[NAME_CFG] = "".join((station_dataset_name, str(i)))
             yield ds[NAME_CFG],ds
      
-    num_datasets = 10       
+    num_datasets = 10      
     datasets = dict([ds for ds in make_datasets(num_datasets)])
     ION_DATASETS.update(datasets)
     
@@ -115,9 +148,9 @@ def start(container, starttype, app_definition, *args, **kwargs):
     diff = t2 - t1
     log.critical("spawn time %f"% ( diff))
     res = (supid.full, [appsup_desc])
-    sup = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)
-    association_client = AssociationServiceClient(sup)
-
+    proc = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)
+    association_client = AssociationServiceClient(proc)
+    yield find_by_owner(association_client, proc)
 
 
 
