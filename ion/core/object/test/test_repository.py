@@ -607,19 +607,18 @@ class RepositoryTest(unittest.TestCase):
         
         ab = yield repo.checkout(branchname='master')
 
-        #yield repo.merge(branchname='Merge')
-        repo.merge(branchname='Merge')
+        yield repo.merge_with(branchname='Merge')
 
 
-        self.assertEqual(ab.title, repo.merge_objects(0).title)
+        self.assertEqual(ab.title, repo.merge[0].title)
 
-        self.assertEqual(ab.person[0].name, repo.merge_objects(0).person[0].name)
+        self.assertEqual(ab.person[0].name, repo.merge[0].person[0].name)
         
-        self.assertNotIdentical(ab.person[0], repo.merge_objects(0).person[0])
+        self.assertNotIdentical(ab.person[0], repo.merge[0].person[0])
         
         # Can not modify merger objects   
-        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects(0), 'title', 'David')
-        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects(0).person[0], 'name', 'Matthew')
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge[0], 'title', 'David')
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge[0].person[0], 'name', 'Matthew')
         
         # Can modify workspace objects
         ab.person[0].name = 'Matthew'
@@ -627,7 +626,7 @@ class RepositoryTest(unittest.TestCase):
         
         # Can move object from merge to workspace
         ab.person.add()
-        ab.person[1] = repo.merge_objects(0).person[1]
+        ab.person[1] = repo.merge[0].person[1]
         
         self.assertEqual(ab.person[1].name, 'John')
         

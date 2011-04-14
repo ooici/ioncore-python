@@ -522,9 +522,16 @@ class ResourceInstance(object):
 
     ResourceObject = property(_get_resource_object, _set_resource_object)
 
+    def __str__(self):
+        output = '============== Resource ==============\n'
+        output += str(self.Resource) + '\n'
+        output += '============== Object ==============\n'
+        output += str(self.ResourceObject) + '\n'
+        output += '============ End Resource ============\n'
+        return output
 
     @property
-    def CompareToUpdates(self):
+    def Merge(self):
         """
         @ Brief This methods provides access to the committed resource states that
         are bing merged into the current version of the Resource.
@@ -532,7 +539,7 @@ class ResourceInstance(object):
         @result The result is a list of update objects which are in a read only state.
         """
 
-        updates = self.Repository.merge_objects
+        updates = self.Repository.merge
         if len(updates) == 0:
             log.warn('Invalid index into MergingResource. Current number of merged states is: %d' % (
             len(self.Repository.merge_objects)))
@@ -545,13 +552,6 @@ class ResourceInstance(object):
 
         return objects
 
-    def __str__(self):
-        output = '============== Resource ==============\n'
-        output += str(self.Resource) + '\n'
-        output += '============== Object ==============\n'
-        output += str(self.ResourceObject) + '\n'
-        output += '============ End Resource ============\n'
-        return output
 
     def VersionResource(self):
         """
@@ -560,8 +560,44 @@ class ResourceInstance(object):
         @retval the key for the new version
         """
 
+        return self.Repository.branch()
+
+
+
+    def CreateUpdateBranch(self, update=None):
+
         branch_key = self.Repository.branch()
+
+        # Set the LCS in the resource branch to UPDATE and the object to the update
+        self.ResourceLifeCycleState = self.UPDATE
+
+        if update is not None:
+
+            if update.ObjectType != self.ResourceObjectType:
+                log.error('Resource Type does not match update Type!')
+                log.error('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceObjectType)))
+                raise ResourceInstanceError('CreateUpdateBranch argument "update" must be of the same type as the resource to be updated!')
+
+            # Copy the update object into resource as the current state object.
+            self.Resource.resource_object = update
+
         return branch_key
+
+
+    def CurrentBranchKey(self):
+
+        return self.Repository.current_branch_key()
+
+    @defer.inlineCallbacks
+    def MergeWith(self, branchname, parent_branch=None):
+
+        if parent_branch is not None:
+            yield self.Repository.checkout(branchname=parent_branch)
+
+
+        yield self.Repository.merge_with(branchname=branchname)
+
+
 
     @defer.inlineCallbacks
     def MergeResourceUpdate(self, mode, *args):
@@ -586,7 +622,7 @@ class ResourceInstance(object):
         for update in args:
             if update.ObjectType != self.ResourceObjectType:
                 log.debug('Resource Type does not match update Type')
-                log.debug('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceType)))
+                log.debug('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceObjectType)))
                 raise ResourceInstanceError(
                     'update_instance argument "update" must be of the same type as the resource')
 
@@ -607,7 +643,7 @@ class ResourceInstance(object):
 
         # Set up the merge in the repository
         for b_name in merge_branches:
-            yield self.Repository.merge(branchname=b_name)
+            yield self.Repository.merge_with(branchname=b_name)
 
             # Remove the merge branch - it is only a local concern
             self.Repository.remove_branch(b_name)

@@ -712,7 +712,7 @@ class Repository(ObjectContainer):
         if not branch:
             raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
             
-        if len(branch.commitrefs)==0:
+        if len(branch.commitrefs) is 0:
             raise RepositoryError('This branch is empty - there is nothing to checkout!')
             
             
@@ -998,26 +998,25 @@ class Repository(ObjectContainer):
         
         
         # For each branch that we merged from - add a  reference
-        for mc in self._merge_containers:
-            mrgd = mc.commit
-            pref = cref.parentrefs.add()
-            pref.SetLinkByName('commitref',mrgd)
-            pref.relationship = pref.Relationship.MERGEDFROM
+        if self.merge is not None:
+            for mr in self.merge.merge_repos:
+                mrgd = mr.commit
+                pref = cref.parentrefs.add()
+                pref.SetLinkByName('commitref',mrgd)
+                pref.relationship = pref.Relationship.MERGEDFROM
             
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
         
         # Clear the merge root and merged from
-        self._merge_from = []
-        self._merge_root = []
-        
+        self.merge = None
         # Update the cref in the branch
         branch.commitrefs.SetLink(0,cref)
         
         return cref
             
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def merge_with(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
@@ -1073,6 +1072,11 @@ class Repository(ObjectContainer):
             # Create a merge container to hold the merge object state for access
 
             mr = MergeRepository(cref, self.index_hash.cache)
+
+
+            # Place holder until we deal with getting objects not currently present
+            
+            yield 1
 
             mr.load_root()
             
@@ -1438,7 +1442,3 @@ class MergeContainer(object):
     def __getitem__(self, index):
 
         return self.merge_repos[index].root_object
-
-    def get_commit(self,index):
-
-        return self.merge_repos[index].commit
