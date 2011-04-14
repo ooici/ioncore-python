@@ -4,7 +4,15 @@
 @file ion/res/config.py
 @author David Stuebe
 @author Tim LaRocque
-@TODO
+
+Sample Dataset are configure and loaded like so:
+'ion.services.coi.datastore_bootstrap.ion_preload_config':{
+    # Path to files relative to ioncore-python directory!
+    # Get files from:  http://ooici.net/ion_data/
+	'sample_traj_dataset' : '../../ion_data/SOS_Test.tar.gz',
+	'sample_station_dataset' : '../../ion_data/USGS_Test.tar.gz'
+},
+
 """
 import tarfile
 import ion.util.ionlog

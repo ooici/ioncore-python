@@ -8,8 +8,6 @@
 
 import os.path
 
-import pprint
-
 class Config(object):
     """
     Helper class managing config files
@@ -37,7 +35,7 @@ class Config(object):
     def __str__(self):
         result = ''
         result += 'Config File Name: %s \n' % self.filename
-        result += 'Config Content: \n %s' % pprint.pprint(self.obj)
+        result += 'Config Content: \n %s' % str(self.obj)
         return result
     
     def getObject(self):

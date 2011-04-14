@@ -13,6 +13,14 @@ new entry. Then follow the pattern to create a resource which will be filled in 
 If you have a more complex, nested resource, you must create a function to generate that resource. Follow the example
 in the ION_DATASETS section...
 
+'ion.services.coi.datastore_bootstrap.ion_preload_config':{
+    # Path to files relative to ioncore-python directory!
+    # Get files from:  http://ooici.net/ion_data/
+	'sample_traj_dataset' : '../../ion_data/SOS_Test.tar.gz',
+	'sample_station_dataset' : '../../ion_data/USGS_Test.tar.gz'
+},
+
+
 """
 
 import ion.util.ionlog

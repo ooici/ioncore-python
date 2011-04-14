@@ -41,8 +41,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     PRELOAD_CFG = 'preload'
 
-    spawnargs = {'cassandra_username':uname,
-                  'cassandra_password':pword,
+    spawnargs = {'username':uname,
+                  'password':pword,
                   }
 
     if isinstance(do_init, (str, unicode)):
