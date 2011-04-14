@@ -23,6 +23,8 @@ from ion.resources.dm_resource_descriptions import PubSubTopicResource, Subscrip
 
 from twisted.trial import unittest
 import socket
+import re
+import os
 
 def dump_dict(d,d2=None):
     print
@@ -33,10 +35,31 @@ def dump_dict(d,d2=None):
             print key, ' ', val
 
 
+"""
+List of mac addresses for machines which should run these tests. If no
+mac address of a NIC on the machine running the tests matches one in this
+list, the tests are skipped. This is to prevent the trial robot from
+commanding the instrument hardware, forcing these tests to be run
+intentially. Add the mac address of your development machine as
+returned by ifconfig to cause the tests to run for you locally.
+"""
+
+allowed_mac_addr_list = [
+    '00:26:bb:19:83:33'         # Edward's Macbook
+    ]
+
+mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
+mac_addr_re = re.compile(mac_addr_pattern,re.MULTILINE)
+#mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
+#RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
+
+    
+    
+
 class TestSBE37(IonTestCase):
     
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 60
+    timeout = 120
     
     # The instrument ID.
     instrument_id = '123'
@@ -59,6 +82,7 @@ class TestSBE37(IonTestCase):
         'ipaddr':sbe_host
     }
 
+    
     
     @defer.inlineCallbacks
     def setUp(self):
@@ -92,7 +116,8 @@ class TestSBE37(IonTestCase):
 
         self.driver_pid = yield self.sup.get_child_id('SBE37_driver')
 
-        self.driver_client = SBE37DriverClient(proc=self.sup,target=self.driver_pid)
+        self.driver_client = SBE37DriverClient(proc=self.sup,
+                                               target=self.driver_pid)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -104,7 +129,8 @@ class TestSBE37(IonTestCase):
     @defer.inlineCallbacks
     def test_configure(self):
 
-
+        #if not RUN_TESTS:
+        #    raise unittest.SkipTest("Do not run this test automatically.")
         raise unittest.SkipTest("Do not run this test automatically.")
 
 
@@ -129,6 +155,8 @@ class TestSBE37(IonTestCase):
     @defer.inlineCallbacks
     def test_connect(self):
 
+        #if not RUN_TESTS:
+        #    raise unittest.SkipTest("Do not run this test automatically.")
         raise unittest.SkipTest("Do not run this test automatically.")
 
         params = self.sbe_config
@@ -180,6 +208,8 @@ class TestSBE37(IonTestCase):
         altered state if the test fails.
         """
 
+        #if not RUN_TESTS:
+        #    raise unittest.SkipTest("Do not run this test automatically.")
         raise unittest.SkipTest("Do not run this test automatically.")
 
 
@@ -446,6 +476,8 @@ class TestSBE37(IonTestCase):
     def test_execute(self):
 
 
+        #if not RUN_TESTS:
+        #    raise unittest.SkipTest("Do not run this test automatically.")
         raise unittest.SkipTest("Do not run this test automatically.")
 
         params = self.sbe_config
@@ -486,6 +518,8 @@ class TestSBE37(IonTestCase):
         params[('CHAN_INSTRUMENT','INTERVAL')] = 5
         params[('CHAN_INSTRUMENT','OUTPUTSV')] = True
         params[('CHAN_INSTRUMENT','OUTPUTSAL')] = True
+        params[('CHAN_INSTRUMENT','TXREALTIME')] = True
+        params[('CHAN_INSTRUMENT','STORETIME')] = True
         
         reply = yield self.driver_client.set(params)
         current_state = yield self.driver_client.get_state()
@@ -514,6 +548,10 @@ class TestSBE37(IonTestCase):
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
+        
+        print reply
+        
+        dump_dict(result)
         
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
