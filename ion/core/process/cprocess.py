@@ -71,6 +71,7 @@ class Invocation(object):
         self.path = str(kwargs.get('path', Invocation.PATH_ANY))
         self.message = kwargs.get('message', None)
         self.content = kwargs.get('content', None)
+        self.process = kwargs.get('process', None)
         self.status = kwargs.get('status', Invocation.STATUS_PROCESS)
         self.route = str(kwargs.get('route', ""))
         self.workbench = kwargs.get('workbench',None)
