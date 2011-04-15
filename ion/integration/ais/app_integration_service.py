@@ -57,8 +57,9 @@ class AppIntegrationService(ServiceProcess):
     @defer.inlineCallbacks
     def op_findDataResources(self, content, headers, msg):
         """
-        @brief Find data resources associated with given userID
-        @param GPB containing OOID user ID, spatial, and temporal bounds.
+        @brief Find data resources that have been published, regardless
+        of owner.
+        @param GPB optional spatial and temporal bounds.
         @retval GPB with list of resource IDs.
         """
 
@@ -67,6 +68,30 @@ class AppIntegrationService(ServiceProcess):
             # Instantiate the worker class
             worker = FindDataResources(self)
             returnValue = yield worker.findDataResources(content)
+            yield self.reply_ok(msg, returnValue)
+
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            yield self.reply_err(msg, estr)
+
+        return
+
+    @defer.inlineCallbacks
+    def op_findDataResourcesByUser(self, content, headers, msg):
+        """
+        @brief Find data resources associated with given userID,
+        regardless of life cycle state.
+        @param GPB containing OOID user ID, and option spatial and temporal
+        bounds.
+        @retval GPB with list of resource IDs.
+        """
+
+        log.debug('op_findDataResourcesByUser service method.')
+        try:
+            # Instantiate the worker class
+            worker = FindDataResources(self)
+            returnValue = yield worker.findDataResourcesByUser(content)
             yield self.reply_ok(msg, returnValue)
 
         except KeyError:
@@ -86,12 +111,10 @@ class AppIntegrationService(ServiceProcess):
 
         log.info('op_getDataResourceDetail service method')
         try:
-            
             worker = GetDataResourceDetail(self)
-            
             returnValue = yield worker.getDataResourceDetail(content)
-            
             yield self.reply_ok(msg, returnValue)
+
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
@@ -110,10 +133,9 @@ class AppIntegrationService(ServiceProcess):
         log.info('op_createDownloadURL: '+str(content))
         try:
             worker = CreateDownloadURL(self)
-
             returnValue = yield worker.createDownloadURL(content)
-            
             yield self.reply_ok(msg, returnValue)   
+
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
@@ -194,6 +216,18 @@ class AppIntegrationServiceClient(ServiceClient):
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResources', message)
+        log.info('Service reply: ' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def findDataResourcesByUser(self, message):
+        yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('findDataResourcesByUser: ' + result.error_str)
+            defer.returnValue(result)
+        log.debug("AppIntegrationServiceClient: findDataResourcesByUser(): sending msg to AppIntegrationService.")
+        (content, headers, payload) = yield self.rpc_send('findDataResourcesByUser', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
