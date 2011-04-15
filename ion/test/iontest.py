@@ -163,11 +163,12 @@ class IonTestCase(unittest.TestCase):
         #    yield ioninit.container_instance.terminate()
 
         # fix Container args if we messed with them
-        if self._reset_container_args:
-            Container.args = self._old_container_args
-            self._old_container_args = None
-            self._reset_container_args = False
-            # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
+        if hasattr(self, '_reset_container_args'):
+            if self._reset_container_args:
+                Container.args = self._old_container_args
+                self._old_container_args = None
+                self._reset_container_args = False
+                # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
 
         # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
