@@ -14,7 +14,7 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.services.coi.resource_registry_beta import resource_client
@@ -23,7 +23,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -67,7 +67,6 @@ class DataStoreWorkBenchError(WorkBenchError):
     An Exception class for errors in the data store workbench
     """
 
-
 class DataStoreWorkbench(WorkBench):
 
 
@@ -86,6 +85,93 @@ class DataStoreWorkbench(WorkBench):
     def push(self, *args, **kwargs):
 
         raise NotImplementedError("The Datastore Service can not Push")
+
+    @defer.inlineCallbacks
+    def _get_blobs(self, repo, startkeys, filtermethod=None):
+        """
+        Common blob fetching helper method.
+        Used by checkout and pull.
+
+        @param  repo            Repository for the response.
+        @param  startkeys       The keys that should start the fetching process.
+        @param  filtermethod    A callable to be applied to all children of fetched items. If the callable returns true,
+                                the item is included.
+
+        @returns                A dictionary of keys => blobs.
+        """
+        # Slightly different machinary here than in the workbench - Could be made more similar?
+        blobs={}
+        keys_to_get=set(startkeys)
+        def_filter = lambda x: True
+        filtermethod = filtermethod or def_filter
+
+        while len(keys_to_get) > 0:
+            new_links_to_get = set()
+
+            def_list = []
+            #@TODO - put some error checking here so that we don't overflow due to a stupid request!
+            for key in keys_to_get:
+                # Short cut if we have already got it!
+                wse = repo.index_hash.get(key)
+
+                if wse:
+                    blobs[wse.key]=wse
+                    # get the object
+                    obj = repo._load_element(wse)
+
+                    # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
+                    new_links_to_get.update(obj.ChildLinks)
+                else:
+                    def_list.append(self._blob_store.get(key))
+
+
+            result_list = []
+            if def_list:
+                result_list = yield defer.DeferredList(def_list)
+
+            for result, blob in result_list:
+                assert result==True, 'Error getting link from blob store!'
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                blobs[wse.key]=wse
+
+                # Add it to the repository index
+                repo.index_hash[wse.key] = wse
+
+                # load the object so we can find its children
+                obj = repo._load_element(wse)
+
+                new_links_to_get.update(obj.ChildLinks)
+
+            keys_to_get.clear()
+            for link in new_links_to_get:
+                if not blobs.has_key(link.key) and filtermethod(link):
+                    keys_to_get.add(link.key)
+
+        defer.returnValue(blobs)
+
+    @defer.inlineCallbacks
+    def op_checkout(self, content, headers, msg):
+
+        if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
+             raise DataStoreWorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+            """
+            return (x.type not in content.excluded_types)
+
+        blobs = yield self._get_blobs(response.Repository, [content.commit_root_object], filtermethod)
+
+        for element in blobs.values():
+            link = response.blob_elements.add()
+            obj = response.Repository._wrap_message_object(element._element)
+
+            link.SetLink(obj)
+
+        yield self._process.reply_ok(msg, content=response)
 
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
@@ -189,56 +275,9 @@ class DataStoreWorkbench(WorkBench):
             link.SetLink(obj)
 
         if request.get_head_content:
-            # Slightly different machinary here than in the workbench - Could be made more similar?
-            blobs={}
-            links_to_get=set()
-            for commit in repo.current_heads():
 
-                links_to_get.add(commit.GetLink('objectroot'))
-
-
-            while len(links_to_get) > 0:
-
-                new_links_to_get = set()
-
-
-                def_list = []
-                #@TODO - put some error checking here so that we don't overflow due to a stupid request!
-                for link in links_to_get:
-                    # Short cut if we have already got it!
-                    wse = repo.index_hash.get(link.key)
-                    
-                    if wse:
-                        blobs[wse.key]=wse
-                        # get the object
-                        obj = repo.get_linked_object(link)
-
-                        new_links_to_get.update(obj.ChildLinks)
-                    else:
-                        def_list.append(self._blob_store.get(link.key))
-
-
-                result_list = []
-                if def_list:
-                    result_list = yield defer.DeferredList(def_list)
-
-                for result, blob in result_list:
-                    assert result==True, 'Error getting link from blob store!'
-                    wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                    blobs[wse.key]=wse
-
-                    # Add it to the repository index
-                    repo.index_hash[wse.key] = wse
-
-                    # load the object so we can find its children
-                    obj = repo._load_element(wse)
-
-                    new_links_to_get.update(obj.ChildLinks)
-
-                links_to_get =[]
-                for link in new_links_to_get:
-                    if not blobs.has_key(link.key):
-                        links_to_get.append(link)
+            keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
+            blobs = yield self._get_blobs(response.Repository, keys)
 
             for element in blobs.values():
                 link = response.blob_elements.add()
@@ -282,7 +321,7 @@ class DataStoreWorkbench(WorkBench):
             else:
 
                 if repo.status == repo.MODIFIED:
-                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
+                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', pushmsg.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
             # Get the latest commits in the repository
@@ -735,35 +774,6 @@ class DataStoreError(ApplicationError):
     """
 
 
-#class DataStoreClient(ServiceClient):
-#    """
-#    Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
-#    """
-#    
-#    def __init__(self, *args, **kwargs):
-#        kwargs['targetname'] = 'datastore'
-#        ServiceClient.__init__(self, *args, **kwargs)
-#    
-#    @defer.inlineCallbacks
-#    def get_preloaded_datasets_dict(self):
-#        """
-#        Retrieve the dictionary of preloaded dataset IDs
-#        """
-##        yield self._check_init()
-#        
-#        log.info("@@@--->>> DataStoreClient: Sending RPC message.  OP = 'get_preloaded_datasets_dict'")
-##        (content, headers, msg) = yield self.rpc_send('get_preloaded_datasets_dict', None)
-##        
-##        log.info("<<<---@@@ DataStoreClient: Incoming rpc reply to op: 'get_preloaded_datasets_dict'")
-##        log.debug("... Content\t" + str(content))
-##        log.debug("... Headers\t" + str(headers))
-##        log.debug("... Message\t" + str(msg))
-##        
-##        defer.returnValue(content)
-#        yield
-#        defer.returnValue({})
-
-
 class DataStoreService(ServiceProcess):
     """
     The data store is not yet persistent. At the moment all its stored objects
@@ -891,6 +901,7 @@ class DataStoreService(ServiceProcess):
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
+        self.op_checkout = self.workbench.op_checkout
 
 
     @defer.inlineCallbacks
@@ -1139,6 +1150,62 @@ class DataStoreService(ServiceProcess):
 
 
         return association_repo
+
+class DataStoreClient(ServiceClient):
+    """
+    Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
+    """
+    
+    def __init__(self, *args, **kwargs):
+        kwargs['targetname'] = 'datastore'
+        ServiceClient.__init__(self, *args, **kwargs)
+
+    @defer.inlineCallbacks
+    def push(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('push', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def pull(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('pull', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def checkout(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('checkout', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def fetch_blobs(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('fetch_blobs', content)
+        defer.returnValue(content)
+
+#    @defer.inlineCallbacks
+#    def get_preloaded_datasets_dict(self):
+#        """
+#        Retrieve the dictionary of preloaded dataset IDs
+#        """
+##        yield self._check_init()
+#
+#        log.info("@@@--->>> DataStoreClient: Sending RPC message.  OP = 'get_preloaded_datasets_dict'")
+##        (content, headers, msg) = yield self.rpc_send('get_preloaded_datasets_dict', None)
+##
+##        log.info("<<<---@@@ DataStoreClient: Incoming rpc reply to op: 'get_preloaded_datasets_dict'")
+##        log.debug("... Content\t" + str(content))
+##        log.debug("... Headers\t" + str(headers))
+##        log.debug("... Message\t" + str(msg))
+##
+##        defer.returnValue(content)
+#        yield
+#        defer.returnValue({})
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)

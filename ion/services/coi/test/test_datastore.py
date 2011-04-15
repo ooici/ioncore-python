@@ -5,6 +5,7 @@
 @author David Stuebe
 @author Matt Rodriguez
 """
+from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -29,12 +30,14 @@ from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
 from telephus.cassandra.ttypes import InvalidRequestException
 
-from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE
+from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -171,6 +174,72 @@ class DataStoreTest(IonTestCase):
 
         self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
 
+    @defer.inlineCallbacks
+    def test_checkout(self):
+        result = yield self.wb1.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID)
+        repo = self.wb1.workbench.get_repository(SAMPLE_PROFILE_DATASET_ID)
+        yield repo.checkout('master')
+
+        commit = repo._current_branch.commitrefs[0]
+        key = commit.GetLink('objectroot').key
+
+        msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
+        msg.commit_root_object = key
+
+        dsc = DataStoreClient()
+
+        content = yield dsc.checkout(msg)
+
+        # length of the blobs we got back here should be one less than in the repo (due to objectroot not being in response, i think?)
+        self.failUnlessEquals(len(content.blob_elements), len(repo.index_hash) - 1)
+
+        for blob in content.blob_elements:
+            self.failUnless(blob.key in repo.index_hash.keys())
+
+        # now do checkout with some filtering against certain types of messages
+        msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
+        msg.commit_root_object = key
+
+        for extype in [CDM_ARRAY_FLOAT32_TYPE]:
+            exobj = msg.excluded_types.add()
+            exobj.object_id = extype.object_id
+            exobj.version = extype.version
+
+        content = yield dsc.checkout(msg)
+
+        # should be less than the previous checkout
+        self.failUnless(len(content.blob_elements) < len(repo.index_hash) - 1)
+
+        # make sure all exist
+        for blob in content.blob_elements:
+            self.failUnless(blob.key in repo.index_hash.keys())
+
+        # make sure we didn't get any CDM_ARRAY_FLOAT32_TYPE items!
+        objids = set([x.type.object_id for x in content.blob_elements])
+        self.failIf(CDM_ARRAY_FLOAT32_TYPE.object_id in objids)
+
+        # checkout with multiple filtering
+        msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
+        msg.commit_root_object = key
+
+        for extype in [CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE]:
+            exobj = msg.excluded_types.add()
+            exobj.object_id = extype.object_id
+            exobj.version = extype.version
+
+        content = yield dsc.checkout(msg)
+
+        # should be less than the previous checkout
+        self.failUnless(len(content.blob_elements) < len(repo.index_hash) - 1)
+
+        # make sure all exist
+        for blob in content.blob_elements:
+            self.failUnless(blob.key in repo.index_hash.keys())
+
+        # make sure we didn't get any CDM_ARRAY_FLOAT32_TYPE or CDM_ATTRIBUTE_TYPE items!
+        objids = set([x.type.object_id for x in content.blob_elements])
+        self.failIf(CDM_ARRAY_FLOAT32_TYPE.object_id in objids)
+        self.failIf(CDM_ATTRIBUTE_TYPE.object_id in objids)
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):
