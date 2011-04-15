@@ -60,7 +60,7 @@ class NotificationAlertService(ServiceProcess):
         self.store = AttributeStoreClient(proc = self)
 
         #initialize index store for subscription information
-        SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_set_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path']
+        SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path']
         #ds = store.IndexStore(indices=columns)
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         self.index_store_class = pu.get_class(index_store_class_name)
@@ -97,11 +97,11 @@ class NotificationAlertService(ServiceProcess):
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
 
-        if not content.message_parameters_reference.IsFieldSet('data_set_id'):
+        if not content.message_parameters_reference.IsFieldSet('data_src_id'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [data_set_id] not found in message"
+             Response.error_str = "Required field [data_src_id] not found in message"
              defer.returnValue(Response)
 
         # check that subscription type enum is present in GPB
@@ -150,22 +150,22 @@ class NotificationAlertService(ServiceProcess):
 
         #add the subscription to the index store
         self.attributes = {'user_ooi_id':content.message_parameters_reference.user_ooi_id,
-                   'data_set_id': content.message_parameters_reference.data_set_id,
+                   'data_src_id': content.message_parameters_reference.data_src_id,
                    'subscription_type':content.message_parameters_reference.subscription_type,
                    'email_alerts_filter': content.message_parameters_reference.email_alerts_filter,
                    'dispatcher_alerts_filter':content.message_parameters_reference.dispatcher_alerts_filter,
                    'dispatcher_script_path': content.message_parameters_reference.dispatcher_script_path
         }
         log.info('NotificationAlertService.op_addSubscription attributes userid: %s', content.message_parameters_reference.user_ooi_id )
-        log.info('NotificationAlertService.op_addSubscription attributes datasrc id: %s', content.message_parameters_reference.data_set_id )
-        self.keyval = content.message_parameters_reference.data_set_id + content.message_parameters_reference.user_ooi_id
+        log.info('NotificationAlertService.op_addSubscription attributes datasrc id: %s', content.message_parameters_reference.data_src_id )
+        self.keyval = content.message_parameters_reference.data_src_id + content.message_parameters_reference.user_ooi_id
         log.info('NotificationAlertService.op_addSubscription attributes keyval id: %s', self.keyval )
         yield self.index_store.put(self.keyval , self.keyval, self.attributes)
 
         #Check that the item is in the store
         query = Query()
         query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.user_ooi_id)
-        query.add_predicate_eq('data_set_id', content.message_parameters_reference.data_set_id)
+        query.add_predicate_eq('data_src_id', content.message_parameters_reference.data_src_id)
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.op_addSubscription  Rows returned %s " % (rows,))
 
@@ -211,12 +211,12 @@ class NotificationAlertService(ServiceProcess):
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
 
-        # check that data_set_id name is present in GPB
-        if not content.message_parameters_reference.IsFieldSet('data_set_id'):
+        # check that data_src_id name is present in GPB
+        if not content.message_parameters_reference.IsFieldSet('data_src_id'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [data_set_id] not found in message"
+             Response.error_str = "Required field [data_src_id] not found in message"
              defer.returnValue(Response)
 
         # check that subscription_type enum is present in GPB
@@ -229,14 +229,14 @@ class NotificationAlertService(ServiceProcess):
 
 
 
-        log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.data_set_id)
+        log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.data_src_id)
         query = Query()
         query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.user_ooi_id)
-        query.add_predicate_eq('data_set_id', content.message_parameters_reference.data_set_id)
+        query.add_predicate_eq('data_src_id', content.message_parameters_reference.data_src_id)
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.op_removeSubscription  Rows returned %s " % (rows,))
 
-        self.keyval = content.message_parameters_reference.data_set_id + content.message_parameters_reference.user_ooi_id
+        self.keyval = content.message_parameters_reference.data_src_id + content.message_parameters_reference.user_ooi_id
         rc = yield self.index_store.get(self.keyval)
         log.info("NotificationAlertService.op_removeSubscription get by key: %s ", rc)
 
