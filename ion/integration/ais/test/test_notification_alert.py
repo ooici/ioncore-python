@@ -111,7 +111,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'test'
-        reqMsg.message_parameters_reference.data_set_id = 'dataset123'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
@@ -138,7 +138,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'test'
-        reqMsg.message_parameters_reference.data_set_id = 'dataset123'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
