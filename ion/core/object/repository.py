@@ -342,6 +342,8 @@ class Repository(ObjectContainer):
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
+    MERGEREQUIRED = 'This repository is currently being merged!'
+
 
     def __init__(self, head=None, repository_key=None, persistent=False):
         
@@ -1093,15 +1095,18 @@ class Repository(ObjectContainer):
           up to date
           changed
         """
-        
+
+        retval = None
         if self._workspace_root:
+
             if self._workspace_root.Modified:
-                return self.MODIFIED
+                retval = self.MODIFIED
             else:
-                return self.UPTODATE
+                retval = self.UPTODATE
         else:
-            return self.NOTINITIALIZED
-        
+            retval = self.NOTINITIALIZED
+
+        return retval
         
     def log_commits(self,branchname=None):
         
@@ -1409,12 +1414,25 @@ class MergeContainer(object):
 
     def __init__(self):
 
+        self.parent = None
+
+        self._merge_commits = {}
         self.merge_repos = []
 
 
     def append(self,item):
 
+        if not isinstance(item, MergeRepository):
+            raise RepositoryError('Can not add item to MergeContainer - it is not a MergeRepository')
+
+        if item.commit in self._merge_commits:
+            raise RepositoryError('Can not add item to MergeContainer - this commit is already merged')
+
+        # Add it to the list - for primary access, also add it to the dict!
         self.merge_repos.append(item)
+
+        self._merge_commits[item.commit] = item
+
 
 
     def _root_objects(self):
@@ -1430,10 +1448,6 @@ class MergeContainer(object):
     def __iter__(self):
 
         return self._root_objects().__iter__()
-
-    def iteritems(self):
-
-        return self._root_objects().iteritems()
 
     def __len__(self):
         return len(self.merge_repos)

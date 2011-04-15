@@ -241,7 +241,7 @@ class HelloDataUpdate(ServiceProcess):
 
 
         # Clobber the current state with the update
-        resource.ResourceObject = resource.CompareToUpdates[0]
+        resource.ResourceObject = resource.Merge[0].ResourceObject
         # resource.ResourceObject is a property setter/getter for the resource object
         # resource.CompareToUpdates is a getter for the list of updated states that are being merged
             
@@ -276,7 +276,7 @@ class HelloDataUpdate(ServiceProcess):
         #strongly typed in google protocol buffers!
         if request.MessageType != resource_request_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message class ResourceConfigurationRequest, received %s'
+            raise HelloDataUpdateError('Expected message class ResourceConfigurationRequest, received %s'
                                      % str(request))
 
         # Get the current state of the resource
@@ -288,16 +288,16 @@ class HelloDataUpdate(ServiceProcess):
         # Merge the current state with the update
         
         # Compare and resolve differences...
-        if resource.title != resource.CompareToUpdates[0].title:
+        if resource.title != resource.Merge[0].title:
             # resolve a difference in a string field...
-            resource.title = resource.CompareToUpdates[0].title
+            resource.title = resource.Merge[0].title
             
-        if resource.owner != resource.CompareToUpdates[0].owner:
+        if resource.owner != resource.Merge[0].owner:
             # resolve a difference in a object field
-            resource.owner = resource.CompareToUpdates[0].owner
+            resource.owner = resource.Merge[0].owner
 
         # merge something more complex...
-        for updated_person in resource.CompareToUpdates[0].person:
+        for updated_person in resource.Merge[0].person:
             # Resolve a difference between two lists of objects based on their ID #
             for idx, person in zip(range(len(resource.person)), resource.person):
                 

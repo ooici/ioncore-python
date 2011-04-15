@@ -786,9 +786,9 @@ class MergeContainerTest(unittest.TestCase):
 
         commit = self.repo._current_branch.commitrefs[0]
 
-        mc = repository.MergeContainer(commit, self.repo.index_hash.cache)
+        mc = repository.MergeRepository(commit, self.repo.index_hash.cache)
 
-        print mc.root_object
+        self.assertEqual(mc.root_object, self.ab)
 
     
     
