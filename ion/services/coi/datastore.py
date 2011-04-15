@@ -969,6 +969,9 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is not None:
                         self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
 
+                    else:
+                        del ION_DATASETS[key]
+
             for key, value in ION_DATA_SOURCES.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
@@ -978,7 +981,8 @@ class DataStoreService(ServiceProcess):
                     # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
                         self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
-
+                    else:
+                        del ION_DATA_SOURCES[key]
 
         if self.preload[ION_AIS_RESOURCES_CFG]:
             log.info('Preloading AIS Resources')
