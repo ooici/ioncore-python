@@ -125,8 +125,6 @@ class DeviceIOParser:
     command.
     """
     def __init__(self,pattern,getval,tostring=None):
-        """
-        """
         self.pattern = pattern
         self.regex = re.compile(pattern)
         self.value = None
@@ -144,10 +142,10 @@ class DeviceIOParser:
     
 class DeviceCommandSpecification:
     """
-    A unit of information about a device op_* function call for use by the
-    appropriate state handler for writing the command to the device, managing
-    the construction of a reply and firing the deferred returned by the
-    op_* call upon completion of the command.
+    A translation unit of a op_* function call into a sequence of low level
+    device commands for use by the appropriate state handler for writing the
+    commands to the device, managing the construction of a reply and
+    firing the deferred returned by the op_* call upon completion.
     """
     
     def __init__(self,command):
@@ -159,18 +157,30 @@ class DeviceCommandSpecification:
         self.reply = {'success':None,'result':{}}
         
     def do_reply(self):
+        """
+        Fire the command deferred with reply.
+        """
         self.deferred.callback(self.reply)
     
     def set_success(self,success_val,fail_val):
+        """
+        Set the overall command success message according to
+        any accumulated errors.
+        """
         if self.errors:
             self.reply['success'] = fail_val
         else:
             self.reply['success'] = success_val
     
     def set_previous_result(self,prev_result):
+        """
+        For composite device commands that set a success or other result
+        with each device command response prompt, use this function to
+        build up the composite result.
+        """
         self.reply['result'][self.previous_key] = prev_result
     
-    
+        
 
 class SBE37Driver(InstrumentDriver):
     """
@@ -239,8 +249,7 @@ class SBE37Driver(InstrumentDriver):
         """
         self._sample_pattern = r'^#? *(-?\d+\.\d+), *(-?\d+\.\d+), *(-?\d+\.\d+)'
         self._sample_pattern += r'(, *(-?\d+\.\d+))?(, *(-?\d+\.\d+))?'
-        self._sample_pattern += r'(, *(\d+) +([a-zA-Z]+) +'
-        self._sample_pattern += r'(\d+), *(\d+):(\d+):(\d+))?'
+        self._sample_pattern += r'(, *(\d+) +([a-zA-Z]+) +(\d+), *(\d+):(\d+):(\d+))?'
         self._sample_pattern += r'(, *(\d+)-(\d+)-(\d+), *(\d+):(\d+):(\d+))?'        
         self._sample_parser = DeviceIOParser(self._sample_pattern,
                                              self._get_sample)
@@ -598,6 +607,7 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
         
         if event == 'EVENT_ENTER':
             self._initialize()
@@ -630,7 +640,7 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
-        
+        self.debug_print(event)
         
         if event == 'EVENT_ENTER':
             
@@ -670,6 +680,7 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
         
         if event == 'EVENT_ENTER':
             self.getConnected()
@@ -701,8 +712,8 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
-        
-        
+        self.debug_print(event)
+            
         if event == 'EVENT_ENTER':
             self.getDisconnected()
             
@@ -732,6 +743,7 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
 
         if event == 'EVENT_ENTER':
             
@@ -790,11 +802,12 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
 
         if event == 'EVENT_ENTER':
-            
-            print 'entering autosample'
-            
+                        
+            # Initialize data buffer and copy device command buffer over
+            # from the acquire command spec.
             command_spec = self._driver_command_buffer[0]
             self._data_lines = []
             self._device_command_buffer = command_spec.device_command_buffer
@@ -805,36 +818,31 @@ class SBE37Driver(InstrumentDriver):
             
         elif event == 'EVENT_EXIT':
 
-            print 'exiting acquire sample'
-
+            # Clear the data buffer.
             self._data_lines = []
-            self._device_command_buffer = []
+            #self._device_command_buffer = []
             
-            command_spec = self._driver_command_buffer[0]
-            del self._driver_command_buffer[0]
+            # Pop the command spec, set success and fire the reply deferred.
+            command_spec = self._driver_command_buffer.pop(0)
             command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
             command_spec.do_reply()
                     
         elif event == 'EVENT_PROMPTED':
-            
-            print 'acquire_sample prompted'
-            print self._device_command_buffer
-            
+                        
             # Cancel looping wakeup if active.
             if self.wakeup_scheduler:
                 self.wakeup_scheduler.stop()
                 self.wakeup_scheduler = None
                 
-            # Write device command to device and remove from
-            # device command buffer.
-            if len(self._device_command_buffer) > 0:
-                cmd = self._device_command_buffer[0]
-                self.write_command(cmd+SBE37_NEWLINE)
-                del self._device_command_buffer[0]
+            # Pop the device command.
+            try:
+                
+                cmd = self._device_command_buffer.pop(0)
             
-            # If no further commands and we have not received a good
-            # result, set error and switch state
-            else:
+            # If no further commands, parse output, set result and switch
+            # state.
+            except IndexError:
+
                 sample_data = None
                 for line in self._data_lines:
                     print line
@@ -847,7 +855,12 @@ class SBE37Driver(InstrumentDriver):
                     self._driver_command_buffer[0].errors = True
                     
                 next_state = 'STATE_CONNECTED'
+
+            # Write the device command.
+            else:
                 
+                self.write_command(cmd+SBE37_NEWLINE)
+                                
         elif event == 'EVENT_DATA_RECEIVED':
             pass            
             
@@ -872,9 +885,12 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
 
         if event == 'EVENT_ENTER':
-            
+
+            # Clear the data buffer and copy the device command buffer
+            # from the autosample command spec.
             command_spec = self._driver_command_buffer[0]
             self._data_lines = []
             self._device_command_buffer = command_spec.device_command_buffer
@@ -885,14 +901,12 @@ class SBE37Driver(InstrumentDriver):
             
         elif event == 'EVENT_EXIT':
 
-            # Clear the command buffers.
-            self._device_command_buffer = []
-            command_spec = self._driver_command_buffer[0]
-            del self._driver_command_buffer[0]
-                
+            # Pop the command spec.                
+            command_spec = self._driver_command_buffer.pop(0)
+
             # If this is a stop command with getdata arg, populate the reply.
-            cmd = command_spec.command
-            if list(cmd) == ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']:
+            drv_cmd = command_spec.command
+            if list(drv_cmd) == ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']:
                 samples = []
                 for line in self._data_lines:
                     sample_data = self._sample_parser.parse(line)
@@ -900,61 +914,64 @@ class SBE37Driver(InstrumentDriver):
                         samples.append(sample_data)
                 command_spec.reply['result'] = samples
 
-            # Clear the data buffer and send the reply.
+            # Clear the data buffer, set success and fire reply deferred.
             self._data_lines = []            
             command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
             command_spec.do_reply()
                                     
         elif event == 'EVENT_PROMPTED':
             
-            print 'autosample prompted'
-            
             # Cancel looping wakeup if active.
             if self.wakeup_scheduler:
                 self.wakeup_scheduler.stop()
                 self.wakeup_scheduler = None
-                
+
+            # Get the driver command.                
             command_spec = self._driver_command_buffer[0]
             drv_cmd = command_spec.command
 
             if drv_cmd[0] == 'DRIVER_CMD_START_AUTO_SAMPLING':
 
-                # Write pending autosample command to the device and remove
-                # it from the buffer.
-                if len(self._device_command_buffer) > 0:
-                    cmd = self._device_command_buffer[0]
-                    print 'writing command ' + cmd
+                # Pop the pending autosample device command.
+                try:
+                    cmd = self._device_command_buffer.pop(0)
+
+                except IndexError:
+                    pass
+
+                # Write autosample device command, remove command spec
+                # from buffer, set result and fire the reply deferred.
+                else:
                     self.write_command(cmd+SBE37_NEWLINE)
-                    del self._device_command_buffer[0]
-                
-                # If that was the final autosample command, remove the driver
-                # command and send reply.
-                if len(self._device_command_buffer) == 0:
-                    self._device_command_buffer = []
-                    del self._driver_command_buffer[0]                
+                    self._driver_command_buffer.pop(0)
                     command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
                     command_spec.do_reply()
-                
+                    
+                                   
             elif drv_cmd[0] == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
 
-                # Write pending stop command to the device and remove it
-                # from the buffer.
-                if len(self._device_command_buffer) > 0:
-                    cmd = self._device_command_buffer[0]
-                    print 'writing command ' + cmd
-                    self.write_command(cmd+SBE37_NEWLINE)
-                    del self._device_command_buffer[0]
-                    
-                elif self._line_buffer == '':
-                    self.wakeup()
+                # Pop pending autosample stop device command.
+                try:
+                    cmd = self._device_command_buffer.pop(0)
                 
+                # If no further autosample stop device commands, send wakeup
+                # until we get the correct prompt to ensure we are in the
+                # right state.
+                except IndexError:
+                    if self._line_buffer == '':
+                        self.wakeup()
+                    else:
+                        next_state = 'STATE_CONNECTED'
+
+                # Write the autosample stop device command.                
                 else:
-                    next_state = 'STATE_CONNECTED'
+                    self.write_command(cmd+SBE37_NEWLINE)
+                    
                                         
         elif event == 'EVENT_STOP_AUTOSAMPLE':
 
-            print 'stop atuosample event'
-
+            # Do not clear data buffer, copy over the stop autosample
+            # device command buffer.
             command_spec = self._driver_command_buffer[0]
             self._device_command_buffer = command_spec.device_command_buffer
 
@@ -984,10 +1001,11 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
 
         if event == 'EVENT_ENTER':
             
-            # Clear data buffer and populate device command buffer.
+            # Clear data buffer and populate device command buffer directly.
             self._data_lines = []
             self._device_command_buffer = ['DS','DC']
            
@@ -997,37 +1015,51 @@ class SBE37Driver(InstrumentDriver):
             
         elif event == 'EVENT_EXIT':
             
-            # Clear data buffer and device command buffer.
+            # Clear data buffer.
             self._data_lines = []
-            self.device_cmd_buffer = []
 
-            # If there is a current driver command, this update was triggered
-            # by it. Remove current driver command from the buffer and fire
-            # driver command deferred.
-            if len(self._driver_command_buffer)>0:
-                command_spec = self._driver_command_buffer[0]
-                del self._driver_command_buffer[0]
+            # Pop the current command spec. If it exists, it triggered
+            # this update.
+            try:
+                
+                command_spec = self._driver_command_buffer.pop(0)
+            
+            # No command spec, update triggered internally. No action
+            # required.
+            except IndexError:
+                
+                pass
+            
+            # Current command spec exists, fire reply deferred.
+            else:
+                
                 command_spec.do_reply()
+
                     
         elif event == 'EVENT_PROMPTED':
             
-            print 'update_params: prompted'
             # Cancel the looping wakeup if active.
             if self.wakeup_scheduler:
                 self.wakeup_scheduler.stop()
                 self.wakeup_scheduler = None
                 
-            # Write the next device command to the device if present.
-            if len(self._device_command_buffer) > 0:
-                cmd = self._device_command_buffer[0]
-                self.write_command(cmd+SBE37_NEWLINE)
-                del self._device_command_buffer[0]
+            # Pop the next pending device command.
+            try:
                 
-            # If no device command, parse the parameter values from the
-            # data buffer and switch state.
-            else:
+                cmd = self._device_command_buffer.pop(0)
+
+            # If no further device command, parse the device output and
+            # switch state.
+            except IndexError:
+                
                 self._read_param_values(self._data_lines)
                 next_state = 'STATE_CONNECTED'
+
+            # Write command to device.
+            else:
+                
+                self.write_command(cmd+SBE37_NEWLINE)
+                
 
         elif event == 'EVENT_DATA_RECEIVED':
             pass
@@ -1052,9 +1084,12 @@ class SBE37Driver(InstrumentDriver):
         
         success = True
         next_state = None
+        self.debug_print(event)
 
         if event == 'EVENT_ENTER':
             
+            # Clear the data buffer and copy the device command buffer over
+            # from the command spec.
             command_spec = self._driver_command_buffer[0]
             self._data_lines = []
             self._device_command_buffer = command_spec.device_command_buffer
@@ -1065,12 +1100,11 @@ class SBE37Driver(InstrumentDriver):
             
         elif event == 'EVENT_EXIT':
             
-            # Clear the data buffer and device command buffer.
+            # Clear the data buffer.
             self._data_lines = []
-            self._device_command_buffer = []
+            #self._device_command_buffer = []
                     
         elif event == 'EVENT_PROMPTED':
-            print 'set_params: prompted'
             
             # Cancel the looping wakeup if active.
             if self.wakeup_scheduler:
@@ -1078,26 +1112,32 @@ class SBE37Driver(InstrumentDriver):
                 self.wakeup_scheduler = None
             
             # Validate previous response.
-            command = self._driver_command_buffer[0]
-            if command.previous_key:
-                if self._line_buffer == SBE37_PROMPT:
-                    command.set_previous_result(['OK'])
-                else:
-                    command.set_previous_result(errors['BAD_DRIVER_COMMAND'])
-                    command.errors = True
-
-            # If there is another set command in the buffer, execute it and
-            # set the previous set command value.
-            if len(self._device_command_buffer) > 0:
-                (set_key,set_val,set_cmd) = self._device_command_buffer[0]
-                command.previous_key = set_key
-                self.write_command(set_cmd+SBE37_NEWLINE)
-                del self._device_command_buffer[0]
-                
-            # If no next set command, add the set error flag and set next state.
+            command_spec = self._driver_command_buffer[0]
+            if self._line_buffer == SBE37_PROMPT:
+                prev_result = ['OK']
             else:
-                command.set_success(['OK'],errors['SET_DEVICE_ERR'])
+                prev_result = errors['BAD_DRIVER_COMMAND']
+            command_spec.set_previous_result(prev_result)
+            
+
+            # Pop the pending device set command.
+            try:
+                
+                (set_key,set_val,set_cmd) = self._device_command_buffer.pop(0)
+
+            # If no remainind device set commands, set success and switch
+            # state.
+            except IndexError:
+                
+                command_spec.set_success(['OK'],errors['SET_DEVICE_ERR'])
                 next_state = 'STATE_UPDATE_PARAMS'
+
+            # Write the device set command.                
+            else:
+                
+                command_spec.previous_key = set_key
+                self.write_command(set_cmd+SBE37_NEWLINE)
+            
             
         elif event == 'EVENT_DATA_RECEIVED':
             pass                
@@ -1289,10 +1329,10 @@ class SBE37Driver(InstrumentDriver):
                 yield self.reply_ok(msg,reply)
                 return
 
-        cmd = command[0]
+        drv_cmd = command[0]
         
         # Process acquire sample command.
-        if cmd == 'DRIVER_CMD_ACQUIRE_SAMPLE':
+        if drv_cmd == 'DRIVER_CMD_ACQUIRE_SAMPLE':
 
             # Create command spec and set event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -1327,7 +1367,7 @@ class SBE37Driver(InstrumentDriver):
                 return
 
         # Process start autosampling command.
-        elif cmd == 'DRIVER_CMD_START_AUTO_SAMPLING':
+        elif drv_cmd == 'DRIVER_CMD_START_AUTO_SAMPLING':
 
             # Create command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -1344,7 +1384,7 @@ class SBE37Driver(InstrumentDriver):
             command_spec.device_command_buffer = ['STARTNOW']                
 
         # Process stop autosampling command.
-        elif cmd == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
+        elif drv_cmd == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
 
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -1373,7 +1413,7 @@ class SBE37Driver(InstrumentDriver):
             command_spec.device_command_buffer = ['STOP']                
 
         # Process test command.
-        elif cmd == 'DRIVER_CMD_TEST':
+        elif drv_cmd == 'DRIVER_CMD_TEST':
             
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -1384,7 +1424,7 @@ class SBE37Driver(InstrumentDriver):
             yield self.reply_ok(msg,reply)
             return
 
-        elif cmd == 'DRIVER_CMD_CALIBRATE':
+        elif drv_cmd == 'DRIVER_CMD_CALIBRATE':
             
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -1395,7 +1435,7 @@ class SBE37Driver(InstrumentDriver):
             yield self.reply_ok(msg,reply)
             return
 
-        elif cmd == 'DRIVER_CMD_RESET':
+        elif drv_cmd == 'DRIVER_CMD_RESET':
                        
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
@@ -2061,6 +2101,12 @@ class SBE37Driver(InstrumentDriver):
         else:
             return '%e' % v
         
+    def debug_print(self,event):
+        """
+        Dump state and event status to stdio.
+        """
+        #print self.fsm.current_state + '  ' + event
+
 
 class SBE37DriverClient(InstrumentDriverClient):
     """
