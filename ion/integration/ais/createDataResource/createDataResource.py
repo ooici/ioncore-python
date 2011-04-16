@@ -262,7 +262,7 @@ class CreateDataResource(object):
 
             #make association
             association = yield self.ac.create_association(dataset_resource, HAS_A_ID, datasrc_resource)
-            #FIXME associate user with data source
+            #FIXME associate user with data source ?
 
 
             #mark lifecycle states

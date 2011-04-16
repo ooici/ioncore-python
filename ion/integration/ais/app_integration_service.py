@@ -28,6 +28,7 @@ from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetD
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 from ion.integration.ais.ManageResources.ManageResources import ManageResources
+from ion.integration.ais.createDataResource.createDataResource import CreateDataResource
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -197,6 +198,22 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
+    @defer.inlineCallbacks
+    def op_createDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_createDataResource: \n'+str(content))
+        worker = CreateDataResource(self)
+        log.debug('op_createDataResource: calling worker')
+        response = yield worker.createDataResourceDap(content);
+        yield self.reply_ok(msg, response)
+
+
+
+
+
+
 class AppIntegrationServiceClient(ServiceClient):
     """
     This is a service client for AppIntegrationServices.
@@ -341,6 +358,15 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
+    @defer.inlineCallbacks
+    def createDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.createDataResource: sending following message to getResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('createDataResource', message)
+        log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+
     @defer.inlineCallbacks
     def CheckRequest(self, request):
         # Check for correct request protocol buffer type

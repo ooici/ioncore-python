@@ -23,6 +23,8 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, \
                                                                     ResourceInstanceError
 
+from ion.core.intercept.policy import get_dispatcher_queue_for_user
+
 from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
@@ -70,15 +72,14 @@ message ResourceConfigurationResponse{
 """
 
 
-
-
 class SubscribeDataResource(object):
 
     def __init__(self, ais):
         log.debug('SubscribeDataResource.__init__()')
-        self.mc    = ais.mc
-        self.rc    = ais.rc
-        self.ac    = AssociationClient(proc=ais)
+        self.mc  = ais.mc
+        self.rc  = ais.rc
+        self.ac  = AssociationClient(proc=ais)
+        self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
 
     def deleteDataResourceSubscription(self, msg):
         """
@@ -130,12 +131,12 @@ class SubscribeDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            if not (msg.IsFieldSet("dispatcher_id") and 
-                    msg.IsFieldSet("script_path") and 
-                    msg.IsFieldSet("resource_id")):
+            if not (msg.IsFieldSet("user_ooi_id") and 
+                    msg.IsFieldSet("data_source_id") and
+                    msg.IsFieldSet("subscription_type")):
 
                 errtext = "SubscribeDataResource.createDataResourceSubscription(): " + \
-                    "required fields not provided (dispatcher_id, script_path, resource_id)"
+                    "required fields not provided (user_ooi_id, data_ource_id, subscription_type)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                                          MessageName='AIS SubscribeDataResource error response')
@@ -144,41 +145,14 @@ class SubscribeDataResource(object):
                 defer.returnValue(Response)
 
 
-            #msg.dispatcher_id
-            #msg.script_path
-            #msg.resource_id
-
-
-
-            
-            (f,ix,me) = self._getExistingResources(msg.resource_id, msg.dispatcher_id)
-
-        #get datasource/set association
-        #check that dataset_id exists, look it up
-
-        #create new dispatcherworkflowresource #7003
-        #associate: dispatcherresource has a dispatcherworkflowresource
-        #publish event: new subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
-
-
-
-
-
-            #FIXME, associate them!
-            #association_id = somepartof self.rc.create_association(subject, predicate, object)
-
-            marked = yield self._markResourceLifecycles([datasrc_resource, dataset_resource, association_resource],
-                                                        datasrc_resource.ACTIVE, datasrc_resource.RETIRED)
-            if not marked:
-                pass #fixme, raise error to do the cleanup
+            if msg.DISPATCHER == msg.subscription_type or msg.EMAILANDDISPATCHER == msg.subscription_type:
+                yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
                 
+            #FIXME: call maurice's code
 
 
         except ReceivedApplicationError, ex:
             log.info('SubscribeDataResource.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
-
-            yield self._markResourceLifecycles([datasrc_resource, dataset_resource, association_resource], 
-                                               datasrc_resource.RETIRED, datasrc_resource.RETIRED)
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                                      MessageName='AIS SubscribeDataResource error response')
@@ -192,19 +166,61 @@ class SubscribeDataResource(object):
                                                  MessageName='AIS SubscribeDataResource response')
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.SubscribeObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
-        Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
-        Response.message_parameters_reference[0].data_set_id     = my_dataset_id
-        Response.message_parameters_reference[0].association_id  = FIXME
+        #FIXME
         defer.returnValue(Response)
 
+
+    @defer.inlineCallbacks
+    def _dispatcherSubscribe(self, user_ooi_id, data_set_id, dispatcher_script_path):
+ 
+        dispatcher_id = get_dispatcher_queue_for_user(msg.user_ooi_id)
+
+        #get datasource/set association and resources
+        tmp = yield self._getExistingResources(msg.resource_id, dispatcher_id)
+        (dispatcher_resource, datasource_resource, dataset_resource) = tmp
+
+        #associate: dispatcherresource has a dispatcherworkflowresource
+        association = yield self.ac.create_association(dispatcher_resource, HAS_A_ID, workflow_resource)
+
+
+        #publish event: new subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
+        publisher = yield pfn.build(origin=dispatcher_id)
+
+        #Create the dispatcher workflow resource
+        dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, \
+                                                ResourceName='Dispatcher Workflow', \
+                                                ResourceDescription='Dispatcher Workflow Resource')
+        dwr.dataset_id = data_set_id
+        dwr.workflow_path = dispatcher_script_path
+        dwr.ResourcesLifecycleState = dwr.ACTIVE
+        yield self.rc.put_instance(dwr)
+        
+                
+        # Associate the workflow with the dispatcher_resource
+
+        # Make sure the association doesn't already exist..
+        assoc = yield self.ac.find_associations(self.dispatcher_resource, HAS_A_ID, dwr)
+        if assoc is not None and len(assoc) > 0:
+           log.warn("Association already exists! -- The dispatcher should already own this subscription!")
+           defer.returnValue(None) 
+        
+        # Otherwise create the association
+        assoc = yield self.ac.create_association(self.dispatcher_resource, HAS_A_ID, dwr)
+
+        
+        # Publish the new subscription notification
+        yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
+
+
+        defer.returnValue(None)
 
 
 
     @defer.inlineCallbacks
-    def _getExistingResources(self, resource_id, dispatcher_id):
+    def _getExistingResources(self, ds_resource_id, dispatcher_id):
         """
         @brief get the resources we need: dispatcher, datasource, dataset
-        @param resource_id string
+        @param ds_resource_id string
         @param dispatcher_id string
         @retval (dispatcher, datasource, dataset)
         """
@@ -214,9 +230,22 @@ class SubscribeDataResource(object):
     
         dispatcher_resource = yield self.rc.get_instance(dispatcher_id)
         
-        datasource_resource = yield self.rc.get_instance(resource_id)
+        datasource_resource = yield self.rc.get_instance(ds_resource_id)
         
-        #association crap
+        dataset_resource    = yield self._getOneAssociationSubject(HAS_A_ID, datasource_resource)
+        
+        defer.returnValue(dispatcher_resource, datasource_resource, dataset_resource)
+
+
+
+
+    @defer.inlineCallbacks
+    def _getOneAssociationSubject(self, the_predicate, the_object):
+        """
+        @brief get the subject side of an association when you only expect one
+        @return id of what you're after
+        """
+
         #can also do subject= 
         found = yield self.ac.find_associations(obj=datasource_resource, \
                                                     predicate_or_predicates=HAS_A_ID)
@@ -231,10 +260,10 @@ class SubscribeDataResource(object):
 
         #FIXME: if association is None: ERRORZ
 
-        dataset_resource = yield self.rc.get_associated_resource_subject(association)
 
         #alternate method: (david says DON'T)
         #dataset_reference = association.subject_reference
         #dataset_resource = yield self.rc.get_instance(dataset_reference)
-        
-        defer.returnValue(dispatcher_resource, datasource_resource, dataset_resource)
+
+        the_resource = yield self.rc.get_associated_resource_subject(association)
+        defer.returnValue(the_resource)
