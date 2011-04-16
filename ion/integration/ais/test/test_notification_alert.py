@@ -77,6 +77,11 @@ class NotificationAlertTest(IonTestCase):
                 'class':'IdentityRegistryService'
             },
             {
+                'name':'store_service',
+                'module':'ion.core.data.store_service',
+                'class':'StoreService'
+            },
+            {
                 'name':'notification_alert',
                 'module':'ion.integration.ais.notification_alert_service',
                 'class':'NotificationAlertService'
@@ -105,9 +110,10 @@ class NotificationAlertTest(IonTestCase):
         # create the register_user request GPBs
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test';
-        reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
-        reqMsg.message_parameters_reference.routing_key = 'arf_test';
+        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
         log.info("test_addSubscription: call the service")
         # try to register this user for the first time
@@ -131,9 +137,10 @@ class NotificationAlertTest(IonTestCase):
         log.debug('test_removeSubscription! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = "test";
-        reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
-        reqMsg.message_parameters_reference.routing_key = 'arf_test';
+        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
         log.info('Calling removeSubscription!!...')
         reply = yield self.nac.removeSubscription(reqMsg)
