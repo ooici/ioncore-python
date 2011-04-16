@@ -30,7 +30,6 @@ from ion.core.object import object_utils
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       OOI_ID_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
 
