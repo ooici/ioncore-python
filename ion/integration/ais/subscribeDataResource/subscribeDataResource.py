@@ -36,6 +36,9 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 
 #fixme, don't need all of these
 
+DISPATCHER_RESOURCE_TYPE           = object_utils.create_type_identifier(object_id=7002, version=1)
+DISPATCHER_WORKFLOW_RESOURCE_TYPE  = object_utils.create_type_identifier(object_id=7003, version=1)
+
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 """
 from ion-object-definitions/net/ooici/core/message/resource_request.proto
@@ -81,15 +84,27 @@ class SubscribeDataResource(object):
         self.ac  = AssociationClient(proc=ais)
         self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
 
+    def updateDataResourceSubscription(self, msg):
+        """
+        @brief update the subscription to a data resource 
+        @param msg GPB, 9201/1, 
+        @GPB{Input,9201,1}
+        @GPB{Returns,9201,1}
+        @retval success
+        """
+        log.info('SubscribeDataResource.updateDataResourceSubscription()\n')
+        #FIXME: just delete and re-add
+        defer.returnValue(None)
+
     def deleteDataResourceSubscription(self, msg):
         """
         @brief delete the subscription to a data resource 
         @param msg GPB, 9211/1, 
-        @GPB{Input,9207,1}
-        @GPB{Returns,9208,1}
+        @GPB{Input,9201,1}
+        @GPB{Returns,9201,1}
         @retval success
         """
-        log.info('SubscribeDataResource.modifyDataResourceSubscription()\n')
+        log.info('SubscribeDataResource.deletDataResourceSubscription()\n')
         #check that we have GPB for subscription_modify_type
         #get msg. dispatcher_id, script_path, data_source_resource_id
         #check that dispatcher_id exists -- look up the resource gpb #7002
@@ -103,7 +118,8 @@ class SubscribeDataResource(object):
         #create new dispatcherworkflowresource #7003
         #associate: dispatcherresource has a dispatcherworkflowresource
         #publish event: delete subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
-
+        
+        defer.returnValue(None)
         
 
     def createDataResourceSubscription(self, msg):
