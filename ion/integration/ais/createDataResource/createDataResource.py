@@ -11,8 +11,8 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
-from ion.services.dm.inventory import DatasetControllerClient
-from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
+from ion.services.dm.ingestion.ingestion import IngestionClient
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
@@ -29,7 +29,6 @@ from ion.core.object import object_utils
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       OOI_ID_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
                                                        CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE
@@ -262,7 +261,7 @@ class CreateDataResource(object):
 
             #make association
             association = yield self.ac.create_association(dataset_resource, HAS_A_ID, datasrc_resource)
-            #FIXME associate user with data source
+            #FIXME associate user with data source ?
 
 
             #mark lifecycle states
