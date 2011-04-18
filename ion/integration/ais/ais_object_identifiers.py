@@ -355,14 +355,29 @@ message GetResourceResponse {
 
 SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
 """
-message SubscriptionInfo {
-   enum _MessageTypeIdentifier {
-       _ID = 9201;
-       _VERSION = 1;
-   }
+message SubscriptionInfoReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9201;
+      _VERSION = 1;
+    }
 
-   optional string user_ooi_id=1;
-   optional string queue_id=1;
+    // The message parameters object
+    optional string user_ooi_id = 1;
+    optional string data_src_id = 2;
+    enum SubscriptionType {
+         EMAIL = 0;
+         DISPATCHER = 1;
+         EMAILANDDISPATCHER = 2;
+     }
+     optional SubscriptionType subscription_type = 3 [default = EMAIL];
+     enum AlertsFilter {
+          UPDATES = 0;
+          METADATACHENGE = 1;
+          DATASOURCEOFFLINE = 2;
+     }
+     optional AlertsFilter email_alerts_filter = 4;
+     optional AlertsFilter dispatcher_alerts_filter = 5;
+     optional string dispatcher_script_path = 6;
 }
 """
 
@@ -506,5 +521,30 @@ message SubscriptionCreateRspMsg {
     }
 
     optional bool success = 1;
+}
+"""
+
+GET_SUBSCRIPTION_LIST_REQ_TYPE = object_utils.create_type_identifier(object_id=9207, version=1)
+"""
+message SubscriptionInfoListReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9207;
+      _VERSION = 1;
+    }
+
+    optional string user_ooi_id = 1;
+
+}
+"""
+
+GET_SUBSCRIPTION_LIST_RESP_TYPE = object_utils.create_type_identifier(object_id=9208, version=1)
+"""
+message SubscriptionInfoListRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9208;
+      _VERSION = 1;
+    }
+
+    repeated SubscriptionInfoReqMsg subscription = 1;
 }
 """
