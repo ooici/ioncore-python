@@ -258,7 +258,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.debug(" -[]- Entered _spawn_dataset_agent(); state=%s" % (str(self._get_state())))
         # @todo: rethink this check
-        if self._get_state() is not BasicStates.S_READY:
+        if self._get_state() is not BasicStates.S_INIT:
             err_msg = "External child process cannot be spawned unless %s's service state is %s" % (__name__, str(BasicStates.S_READY))
             log.warn(err_msg)
             raise RuntimeError(err_msg)
@@ -545,7 +545,7 @@ class JavaAgentWrapper(ServiceProcess):
         jar_pathname = "res/apps/eoi_ds_agent/DatasetAgent.jar"   # STAR #
         
         
-        parent_host_name = self.container.exchange_manager.message_space.connection.hostname
+        parent_host_name = self.container.exchange_manager.message_space.hostname
         parent_xp_name = self.container.exchange_manager.exchange_space.name
         parent_scoped_name = self.get_scoped_name("system", str(self.declare['name']))      # @todo: validate that 'system' is the correct scope
         parent_callback_op = "binding_key_callback"
