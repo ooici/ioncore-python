@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/integration/ais/subscribeDataResource/subscribeDataResource.py
+@file ion/integration/ais/manage_data_resource_subscription/manage_data_resource_subscription.py
 @author Ian Katz
 @brief The worker class that implements the subscribeDataResource function for the AIS  (workflow #105)
 """
@@ -74,16 +74,16 @@ message ResourceConfigurationResponse{
 """
 
 
-class SubscribeDataResource(object):
+class ManageDataResourceSubscription(object):
 
     def __init__(self, ais):
-        log.debug('SubscribeDataResource.__init__()')
+        log.debug('ManageDataResourceSubscription.__init__()')
         self.mc  = ais.mc
         self.rc  = ais.rc
         self.ac  = AssociationClient(proc=ais)
         self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
 
-    def updateDataResourceSubscription(self, msg):
+    def update(self, msg):
         """
         @brief update the subscription to a data resource 
         @param msg GPB, 9201/1, 
@@ -91,11 +91,12 @@ class SubscribeDataResource(object):
         @GPB{Returns,9201,1}
         @retval success
         """
-        log.info('SubscribeDataResource.updateDataResourceSubscription()\n')
+        log.info('ManageDataResourceSubscription.updateDataResourceSubscription()\n')
         #FIXME: just delete and re-add
         defer.returnValue(None)
 
-    def deleteDataResourceSubscription(self, msg):
+
+    def delete(self, msg):
         """
         @brief delete the subscription to a data resource 
         @param msg GPB, 9211/1, 
@@ -103,7 +104,7 @@ class SubscribeDataResource(object):
         @GPB{Returns,9201,1}
         @retval success
         """
-        log.info('SubscribeDataResource.deletDataResourceSubscription()\n')
+        log.info('ManageDataResourceSubscription.deletDataResourceSubscription()\n')
         #check that we have GPB for subscription_modify_type
         #get msg. dispatcher_id, script_path, data_source_resource_id
         #check that dispatcher_id exists -- look up the resource gpb #7002
@@ -121,7 +122,7 @@ class SubscribeDataResource(object):
         defer.returnValue(None)
         
 
-    def createDataResourceSubscription(self, msg):
+    def create(self, msg):
         """
         @brief subscribe to a data resource 
         @param msg GPB, 
@@ -129,7 +130,7 @@ class SubscribeDataResource(object):
         @GPB{Returns,9204,1}
         @retval success
         """
-        log.info('SubscribeDataResource.createDataResourceSubscription()\n')
+        log.info('ManageDataResourceSubscription.createDataResourceSubscription()\n')
         
 
 
@@ -137,11 +138,11 @@ class SubscribeDataResource(object):
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:
-                errtext = "SubscribeDataResource.createDataResourceSubscription(): " + \
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "Expected SubscriptionCreateReqMsg type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                                         MessageName='AIS SubscribeDataResource error response')
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -150,11 +151,11 @@ class SubscribeDataResource(object):
                     msg.IsFieldSet("data_source_id") and
                     msg.IsFieldSet("subscription_type")):
 
-                errtext = "SubscribeDataResource.createDataResourceSubscription(): " + \
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "required fields not provided (user_ooi_id, data_ource_id, subscription_type)"
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                                         MessageName='AIS SubscribeDataResource error response')
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -167,18 +168,18 @@ class SubscribeDataResource(object):
 
 
         except ReceivedApplicationError, ex:
-            log.info('SubscribeDataResource.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
+            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                                     MessageName='AIS SubscribeDataResource error response')
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE,
-                                                 MessageName='AIS SubscribeDataResource response')
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.SubscribeObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
         #FIXME
