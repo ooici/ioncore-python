@@ -18,7 +18,6 @@ from ion.core.process.process import ProcessDesc
 from ion.core.pack import app_supervisor
 
 #from ion.core.ioninit import ion_config
-from ion.core import ioninit
 import time
 
 from ion.services.coi.datastore_bootstrap import dataset_bootstrap
@@ -187,13 +186,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'class':'AssociationService'
           }
     ]
-    association_proc = [
-        {'name':'association_service',
-         'module':'ion.services.dm.inventory.association_service',
-         'class':'AssociationService',
-         'spawnargs':spawnargs
-        }
-        ]
+        
     
     DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
     station_dataset_name = 'sample_station_dataset'
