@@ -474,10 +474,10 @@ class JavaAgentWrapper(ServiceProcess):
         msg.station_id.extend(datasource.station_id)
 
         msg.request_type = datasource.request_type
-        msg.top = datasource.top
-        msg.bottom = datasource.bottom
-        msg.left = datasource.left
-        msg.right = datasource.right
+        msg.request_bounds_north = datasource.request_bounds_north
+        msg.request_bounds_south = datasource.request_bounds_south
+        msg.request_bounds_west = datasource.request_bounds_west
+        msg.request_bounds_east = datasource.request_bounds_east
         msg.base_url = datasource.base_url
         msg.dataset_url = datasource.dataset_url
         msg.ncml_mask = datasource.ncml_mask
