@@ -40,7 +40,7 @@ List of mac addresses for machines which should run these tests. If no
 mac address of a NIC on the machine running the tests matches one in this
 list, the tests are skipped. This is to prevent the trial robot from
 commanding the instrument hardware, forcing these tests to be run
-intentially. Add the mac address of your development machine as
+intentionally. Add the mac address of your development machine as
 returned by ifconfig to cause the tests to run for you locally.
 """
 
@@ -556,8 +556,8 @@ class TestSBE37(IonTestCase):
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
-        self.assertIsInstance(result.get('sound velocity',None),float)
         self.assertIsInstance(result.get('pressure',None),float)
+        self.assertIsInstance(result.get('sound velocity',None),float)
         self.assertIsInstance(result.get('conductivity',None),float)
         self.assertIsInstance(result.get('time',None),tuple)
         self.assertIsInstance(result.get('date',None),tuple)
@@ -584,10 +584,10 @@ class TestSBE37(IonTestCase):
 
         self.assertEqual(success[0],'OK')
         for sample in result:
-            self.assertIsInstance(sample.get('temperature',None),float)
-            self.assertIsInstance(sample.get('salinity',None),float)
-            self.assertIsInstance(sample.get('sound velocity',None),float)
+            self.assertIsInstance(sample.get('temperature'),float)
+            self.assertIsInstance(sample.get('salinity'),float)
             self.assertIsInstance(sample.get('pressure',None),float)
+            self.assertIsInstance(sample.get('sound velocity',None),float)
             self.assertIsInstance(sample.get('conductivity',None),float)
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)

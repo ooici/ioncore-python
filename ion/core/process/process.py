@@ -338,12 +338,24 @@ class Process(BasicLifecycleObject, ResponseCodes):
         Process life cycle event: on termination of process (once)
         """
 
+    @defer.inlineCallbacks
     def on_error(self, cause= None, *args, **kwargs):
+
+        if len(self._registered_life_cycle_objects) > 0:
+            log.debug("Attempting to TERMINATE all registered LCOs")
+            # attempt to move all registered lcos to the terminated state cleanly!
+            try:
+                yield self._advance_life_cycle_objects(BasicStates.S_TERMINATED)
+            except Exception, ex:
+                log.debug("Error terminating registered LCOs, ignoring...")
+
         if cause:
             log.error("Process error: %s" % cause)
             pass
         else:
             raise RuntimeError("Illegal process state change")
+
+        defer.returnValue(None)
 
     def is_spawned(self):
         return self.receiver.consumer != None
@@ -437,9 +449,16 @@ class Process(BasicLifecycleObject, ResponseCodes):
         transitions = [BasicStates.E_INITIALIZE,    BasicStates.E_ACTIVATE,     BasicStates.E_TERMINATE]
 
         curidx = states.index(curstate)
-        log.debug("_advance_lco owning process is in state %s" % curstate)
+        log.debug("_advance_lco owning process (%s) is in state %s" % (self.id.full, curstate))
 
-        for idx, lco in enumerate(self._registered_life_cycle_objects):
+        @defer.inlineCallbacks
+        def helper(idx, lco):
+            """
+            This inline helper methods takes an index and LCO and advances that LCO to match the state in curstate.
+            It has an inlineCallbacks decorator to give back a deferred when called so we can wrap that in a deferredList
+            to operate on all LCOs in "parallel" - aka not cause an error in one's transitioning to stop transitioning
+            LCOs that happen to be later in the registered list.
+            """
             lcoidx = states.index(lco._get_state())
             log.debug("_advance_lco cur lco #%d is in state %s" % (idx, lco._get_state()))
 
@@ -447,8 +466,23 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 input = transitions[i]
 
                 log.debug("_advance_lco cur lco #%d about to put transition %s to %s" % (idx, input, str(lco)))
-                yield defer.maybeDeferred(lco._so_process, input)
-                log.debug("lco is now at %s" % lco._get_state())
+                try:
+                    yield defer.maybeDeferred(lco._so_process, input)
+
+                except Exception, ex:
+                    # @TODO: should not be catching this exception.
+                    # This should cause the deferred gen'd by inlineCallbacks to errback, which then gets wrapped
+                    # nicely by the deferred list. It should not throw an exception in the state object?!?
+                    log.debug("Exception occured in transition! Leaving this LCO as is. Ex: %s" % str(ex))
+                    break
+
+                log.debug("lco #%d is now at %s" % (idx, lco._get_state()))
+
+            defer.returnValue(None)
+
+        # build deferred list out of calling helper method on all registered LCOs
+        dl = defer.DeferredList([helper(idx, lco) for idx,lco in enumerate(self._registered_life_cycle_objects)])
+        yield dl
 
         defer.returnValue(None)
 

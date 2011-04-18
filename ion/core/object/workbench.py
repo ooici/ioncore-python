@@ -46,6 +46,8 @@ COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 PULL_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=46, version=1)
 PULL_RESPONSE_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=47, version=1)
 
+# used by op_checkout, response is BLOBS_MESSAGE_TYPE
+REQUEST_COMMIT_BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=48, version=1)
 
 
 PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1)
