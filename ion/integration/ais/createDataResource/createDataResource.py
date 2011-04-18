@@ -67,7 +67,7 @@ class CreateDataResource(object):
             # Check only the type recieved and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE:
-                errtext = "CreateDataResource.createDataResource(): " + \
+                errtext = "CreateDataResource.createDataResourceDap(): " + \
                     "Expected DataResourceCreateSimpleRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
@@ -210,7 +210,7 @@ class CreateDataResource(object):
         @GPB{Input,9211,1}
         @retval data source resource
         """
-        log.info('CreateDataResource.createDataResource()\n')
+        log.info('CreateDataResource._createDataSourceResource()\n')
         datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
 
         #FILL UP FIELDS, lists followed by scalars
