@@ -26,8 +26,9 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import NAME_CFG,DESCRIPTION_CFG 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import CONTENT_CFG, CONTENT_ARGS_CFG
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ANONYMOUS_USER_ID, OWNED_BY_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ANONYMOUS_USER_ID, OWNED_BY_ID, HAS_LIFE_CYCLE_STATE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
+from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID , TYPE_OF_ID, SAMPLE_PROFILE_DATASET_ID
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 
@@ -37,14 +38,20 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 from ion.core.object import object_utils
+
+from ion.core.cc.shell import control
 #-- CC Application interface
 
 # Functions required
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 @defer.inlineCallbacks
-def find_by_owner(association_client, proc):
-        request = yield proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+def find_by_owner():
+        
+        association_client = AssociationServiceClient()
+        
+        request = yield association_client.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
         
         pair = request.pairs.add()
         
@@ -62,14 +69,86 @@ def find_by_owner(association_client, proc):
         pair.object = type_ref
         #Uncomment for FAIL
         result = yield association_client.get_subjects(request)
-        """
+        
         #print len(result)
         
         key_list = []
         for idref in result.idrefs:
             key_list.append(idref.key)
-        print len(key_list)   
-        """
+          
+        defer.returnValue(len(key_list))
+        
+@defer.inlineCallbacks
+def find_by_lcs():
+    association_client = AssociationServiceClient()
+    request = yield association_client.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+
+    pair = request.pairs.add()
+
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = TYPE_OF_ID
+
+    pair.predicate = pref
+
+    # Set the Object search term
+
+    type_ref = request.CreateObject(IDREF_TYPE)
+    type_ref.key = IDENTITY_RESOURCE_TYPE_ID
+
+    pair.object = type_ref
+    # Add a life cycle state request
+    pair = request.pairs.add()
+
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+    pair.predicate = pref
+
+
+    # Set the Object search term
+    state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+    state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+    pair.object = state_ref
+
+    result = yield association_client.get_subjects(request)
+    key_list = []
+    for idref in result.idrefs:
+        key_list.append(idref.key)
+        
+    defer.returnValue(len(key_list))    
+
+@defer.inlineCallbacks
+def find_by_predicate():
+    association_client = AssociationServiceClient()
+    request = yield association_client.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+    pair = request.pairs.add()
+
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = OWNED_BY_ID
+
+    pair.predicate = pref
+
+
+    # Set the Subbject search term
+
+    type_ref = request.CreateObject(IDREF_TYPE)
+    type_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+    pair.subject = type_ref
+
+    # make the request
+    result = yield association_client.get_objects(request)
+
+
+    key_list = []
+    for idref in result.idrefs:
+        key_list.append(idref.key)
+
          
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
@@ -115,11 +194,11 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'spawnargs':spawnargs
         }
         ]
-    TESTING_SIGNIFIER = '3319A67F'
+    
     DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
     station_dataset_name = 'sample_station_dataset'
     stn_dataset_loc = CONF.getValue(station_dataset_name, None)
-    station_dataset_template =  {ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
+    station_dataset_template =  {ID_CFG:'',
                                  TYPE_CFG:DATASET_TYPE,
                                  NAME_CFG:station_dataset_name,
                                  DESCRIPTION_CFG:'An example of a station dataset',
@@ -128,14 +207,13 @@ def start(container, starttype, app_definition, *args, **kwargs):
                                  }
     log.info("stn_dataset_loc: %s " % (stn_dataset_loc))
     def make_datasets(num):
-        ds = station_dataset_template
-        id_cfg = ds[ID_CFG]
         for i in range(num):
-            ds[ID_CFG] = "-".join((id_cfg,str(i)))
+            ds = dict.copy(station_dataset_template)
+            ds[ID_CFG] = str(i)
             ds[NAME_CFG] = "".join((station_dataset_name, str(i)))
             yield ds[NAME_CFG],ds
      
-    num_datasets = 10      
+    num_datasets = 15 
     datasets = dict([ds for ds in make_datasets(num_datasets)])
     ION_DATASETS.update(datasets)
     
@@ -146,14 +224,13 @@ def start(container, starttype, app_definition, *args, **kwargs):
     supid = yield appsup_desc.spawn()
     t2 = time.time()
     diff = t2 - t1
-    log.critical("spawn time %f"% ( diff))
+    #log.critical("spawn time %f"% ( diff))
+    print "spawn time %f" % (diff,)
     res = (supid.full, [appsup_desc])
-    proc = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)
-    association_client = AssociationServiceClient(proc)
-    yield find_by_owner(association_client, proc)
-
-
-
+    
+    control.add_term_name('find_by_owner',find_by_owner)
+    control.add_term_name('find_by_lcs',find_by_lcs)
+    control.add_term_name('find_by_predicate',find_by_lcs)
     defer.returnValue(res)
 
 @defer.inlineCallbacks
