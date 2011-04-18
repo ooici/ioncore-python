@@ -150,8 +150,13 @@ class InstrumentDriverClient(ProcessClient):
         """
         """
 
-        assert(isinstance(params, dict)), 'Expected a params dict.'        
-        (content, headers, message) = yield self.rpc_send('execute',params)
+        assert(isinstance(params, dict)), 'Expected a params dict.'
+        timeout = params.get('timeout',None)
+        if not timeout:
+            timeout = 15
+            params['timeout'] = timeout
+        rpc_timeout = timeout + 5
+        (content, headers, message) = yield self.rpc_send('execute',params,timeout=rpc_timeout)            
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
