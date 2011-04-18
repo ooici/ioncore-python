@@ -362,6 +362,24 @@ class ResourceFieldProperty(object):
         raise AttributeError('Can not delete a Resource Instance property')
 
 
+class MergeResourceFieldProperty(object):
+    def __init__(self, name, res_prop, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        self.field_type = res_prop.field_type
+        self.field_enum = res_prop.field_enum
+
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._merge_repository.root_object.resource_object, self.name)
+
+    def __set__(self, resource_instance, value):
+        raise AttributeError('Can not set a Merge Resource Instance property')
+
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+
+
+
 class ResourceEnumProperty(object):
     def __init__(self, name, doc=None):
         self.name = name
@@ -375,6 +393,210 @@ class ResourceEnumProperty(object):
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Resource Instance property')
+
+
+class MergeResourceInstanceType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+
+    This approach is generally applicable to wrap data structures. It is extremely powerful!
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, merge_repository, *args, **kwargs):
+        # Cache the custom-built classes
+
+        # Check that the object we are wrapping is a Google Message object
+        if not isinstance(merge_repository, repository.MergeRepository):
+            raise ResourceInstanceError('MergeResourceInstance init argument must be an instance of a MergeRepository')
+
+        if merge_repository.root_object.ObjectType != RESOURCE_TYPE:
+            raise ResourceInstanceError('MergeResourceInstance init Repository is not a MergeRepository!')
+
+        resource_obj = merge_repository.root_object.resource_object
+
+        msgType, clsType = type(resource_obj), None
+
+        if msgType in MergeResourceInstanceType._type_cache:
+            clsType = MergeResourceInstanceType._type_cache[msgType]
+        else:
+            # Get the class name
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+
+            for propName, msgProp in msgType._Properties.items():
+                #print 'Key: %s; Type: %s' % (fieldName, type(message_field))
+                prop = MergeResourceFieldProperty(propName, msgProp)
+                clsDict[propName] = prop
+
+            for enumName, enumProp in msgType._Enums.items():
+                enum = ResourceEnumProperty(enumName)
+                clsDict[enumName] = enum
+
+            clsDict['_Properties'] = msgType._Properties
+            clsDict['_Enums'] = msgType._Enums
+
+            # Try rewriting using slots - would be more efficient...
+            def obj_setter(self, k, v):
+                # For the resource instance, there is only one class propety to set,
+                # so just create it using object.__setattr__
+                if not hasattr(self, k):
+                    raise AttributeError(\
+                        '''Cant add properties to the ION Resource Instance.\n'''
+                        '''Unknown property name - "%s"; value - "%s"''' % (k, v))
+                super(MergeResourceInstance, self).__setattr__(k, v)
+
+            clsDict['__setattr__'] = obj_setter
+
+            clsType = MergeResourceInstanceType.__new__(MergeResourceInstanceType, clsName, (cls,), clsDict)
+
+            MergeResourceInstanceType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(MergeResourceInstanceType, clsType).__call__(merge_repository, *args, **kwargs)
+        return obj
+
+class MergeResourceInstance(object):
+    """
+    @brief The resource instance is the vehicle through which a process
+    interacts with a resource instance. It hides the git semantics of the data
+    store and deals with resource specific properties.
+
+    @TODO how do we make sure that there is only one resource instance per resource? If the process creates multiple
+    resource instances to wrap the same resource we are in trouble. Need to find a way to keep a cache of the instances
+    """
+    __metaclass__ = MergeResourceInstanceType
+
+    def __init__(self, merge_repository):
+        """
+        Merge Resource Instance objects are created by the resource client
+        """
+        object.__setattr__(self, '_merge_repository', None)
+
+        self._merge_repository = merge_repository
+
+    @property
+    def MergeRepository(self):
+        return self._merge_repository
+
+    @property
+    def Resource(self):
+        repo = self._merge_repository
+        return repo.root_object
+
+    @property
+    def ResourceObject(self):
+        repo = self._merge_repository
+        return repo.root_object.resource_object
+
+    def ListSetFields(self):
+        """
+        Return a list of the names of the fields which have been set.
+        """
+        return self.ResourceObject.ListSetFields()
+
+    def IsFieldSet(self, field):
+        return self.ResourceObject.IsFieldSet(field)
+
+    @property
+    def ResourceIdentity(self):
+        """
+        @brief Return the resource identity as a string
+        """
+        return str(self.Resource.identity)
+
+    @property
+    def ResourceObjectType(self):
+        """
+        @brief Returns the resource type - A type identifier object - not the wrapped object.
+        """
+        # Resource type should be a Resource Identifier - UUID defined in preload_config and stored in the Resource Registry
+
+        return self.Resource.object_type.GPBMessage
+
+    @property
+    def ResourceTypeID(self):
+        """
+        @brief Returns the resource type identifier - the idref for the resource type instance.
+        """
+        # Resource type should be a Resource Identifier - UUID defined in preload_config and stored in the Resource Registry
+
+        return self.Resource.resource_type
+
+    @property
+    def ResourceLifeCycleState(self):
+        """
+        @brief Get the life cycle state of the resource
+        """
+        state = None
+        if self.Resource.lcs == self.Resource.LifeCycleState.NEW:
+            state = self.NEW
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.ACTIVE:
+            state = self.ACTIVE
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.INACTIVE:
+            state = self.INACTIVE
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.COMMISSIONED:
+            state = self.COMMISSIONED
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DECOMMISSIONED:
+            state = self.DECOMMISSIONED
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.RETIRED:
+            state = self.RETIRED
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DEVELOPED:
+            state = self.DEVELOPED
+
+        elif self.Resource.lcs == self.Resource.LifeCycleState.UPDATE:
+            state = self.UPDATE
+
+        return state
+
+    @property
+    def ResourceName(self):
+        return self.Resource.name
+
+    @property
+    def ResourceDescription(self):
+        return self.Resource.description
+
+
+class MergeResourceContainer(object):
+
+    def __init__(self):
+
+        self.parent = None
+
+        self._merge_commits = {}
+        self.merge_repos = []
+
+    def _append(self,item):
+
+        mri = MergeResourceInstance(item)
+
+        self.merge_repos.append(mri)
+
+        self._merge_commits[item.commit] = mri
+
+    def __iter__(self):
+
+        return self.merge_repos.__iter__()
+
+
+    def __len__(self):
+        return len(self.merge_repos)
+
+
+    def __getitem__(self, index):
+
+        return self.merge_repos[index]
+
+    
 
 
 class ResourceInstanceType(type):
@@ -488,9 +710,7 @@ class ResourceInstance(object):
         self.ResourceAssociationsAsObject.update_predicate_map(self.predicate_map)
         self.ResourceAssociationsAsSubject.update_predicate_map(self.predicate_map)
 
-        # association list
-        object.__setattr__(self, '_associations', {})
-
+        object.__setattr__(self, '_merge', None)
 
     @property
     def Repository(self):
@@ -507,7 +727,7 @@ class ResourceInstance(object):
     @property
     def Resource(self):
         repo = self._repository
-        return repo._workspace_root
+        return repo.root_object
 
 
     def _get_resource_object(self):
@@ -522,29 +742,6 @@ class ResourceInstance(object):
 
     ResourceObject = property(_get_resource_object, _set_resource_object)
 
-
-    @property
-    def CompareToUpdates(self):
-        """
-        @ Brief This methods provides access to the committed resource states that
-        are bing merged into the current version of the Resource.
-        @param ind is the index into list of merged states.
-        @result The result is a list of update objects which are in a read only state.
-        """
-
-        updates = self.Repository.merge_objects
-        if len(updates) == 0:
-            log.warn('Invalid index into MergingResource. Current number of merged states is: %d' % (
-            len(self.Repository.merge_objects)))
-            raise ResourceInstanceError(
-                'Invalid index access to Merging Resources. Either there is no merge or you picked an invalid index.')
-
-        objects = []
-        for resource in updates:
-            objects.append(resource.resource_object)
-
-        return objects
-
     def __str__(self):
         output = '============== Resource ==============\n'
         output += str(self.Resource) + '\n'
@@ -553,6 +750,32 @@ class ResourceInstance(object):
         output += '============ End Resource ============\n'
         return output
 
+    @property
+    def Merge(self):
+        """
+        @ Brief This method provides access to the committed resource states that
+        are bing merged into the current version of the Resource.
+        """
+
+        # Do some synchronization with the repository:
+
+        if self.Repository.merge is None:
+            # Clear the Resource clients list of merge stuff
+            self._merge = None
+            return None
+
+        if self._merge is None:
+            self._merge = MergeResourceContainer()
+
+        for commit, mr in self.Repository.merge._merge_commits.iteritems():
+
+            if commit not in self._merge._merge_commits:
+
+                self._merge._append(mr)
+
+        return self._merge
+
+
     def VersionResource(self):
         """
         @brief Create a new version of this resource - creates a new branch in
@@ -560,8 +783,44 @@ class ResourceInstance(object):
         @retval the key for the new version
         """
 
+        return self.Repository.branch()
+
+
+
+    def CreateUpdateBranch(self, update=None):
+
         branch_key = self.Repository.branch()
+
+        # Set the LCS in the resource branch to UPDATE and the object to the update
+        self.ResourceLifeCycleState = self.UPDATE
+
+        if update is not None:
+
+            if update.ObjectType != self.ResourceObjectType:
+                log.error('Resource Type does not match update Type!')
+                log.error('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceObjectType)))
+                raise ResourceInstanceError('CreateUpdateBranch argument "update" must be of the same type as the resource to be updated!')
+
+            # Copy the update object into resource as the current state object.
+            self.Resource.resource_object = update
+
         return branch_key
+
+
+    def CurrentBranchKey(self):
+
+        return self.Repository.current_branch_key()
+
+    @defer.inlineCallbacks
+    def MergeWith(self, branchname, parent_branch=None):
+
+        if parent_branch is not None:
+            yield self.Repository.checkout(branchname=parent_branch)
+
+
+        yield self.Repository.merge_with(branchname=branchname)
+
+
 
     @defer.inlineCallbacks
     def MergeResourceUpdate(self, mode, *args):
@@ -586,7 +845,7 @@ class ResourceInstance(object):
         for update in args:
             if update.ObjectType != self.ResourceObjectType:
                 log.debug('Resource Type does not match update Type')
-                log.debug('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceType)))
+                log.debug('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceObjectType)))
                 raise ResourceInstanceError(
                     'update_instance argument "update" must be of the same type as the resource')
 
@@ -607,7 +866,7 @@ class ResourceInstance(object):
 
         # Set up the merge in the repository
         for b_name in merge_branches:
-            yield self.Repository.merge(branchname=b_name)
+            yield self.Repository.merge_with(branchname=b_name)
 
             # Remove the merge branch - it is only a local concern
             self.Repository.remove_branch(b_name)

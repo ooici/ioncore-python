@@ -324,7 +324,8 @@ class PubSubService(ServiceProcess):
 
         # Already declared?
         try:
-            key = yield self._rev_find(request.exchange_point_name, EXCHANGE_POINT_RES_TYPE_ID,
+            key = yield self._rev_find(request.exchange_point_name,
+                                       EXCHANGE_POINT_RES_TYPE_ID,
                                        'exchange_point_name')
             log.info('Exchange point "%s" already created, returning %s' %
                      (request.exchange_point_name, key))
