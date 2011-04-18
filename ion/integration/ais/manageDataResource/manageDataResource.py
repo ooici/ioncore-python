@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/integration/ais/createDataResource/createDataResource.py
+@file ion/integration/ais/manageDataResource/manageDataResource.py
 @author Ian Katz
-@brief The worker class that implements the createDataResource function for the AIS  (workflow #105)
+@brief The worker class that implements the data resource functions for the AIS  (workflow #105, #106)
 """
 
 import ion.util.ionlog
@@ -42,10 +42,10 @@ SCHEDULER_ADD_RSP_TYPE         = object_utils.create_type_identifier(object_id=2
 
 
 
-class CreateDataResource(object):
+class ManageDataResource(object):
 
     def __init__(self, ais):
-        log.debug('CreateDataResource.__init__()')
+        log.debug('ManageDataResource.__init__()')
         self.mc    = ais.mc
         self.rc    = ais.rc
         self.dscc  = DatasetControllerClient(proc=ais)
@@ -54,7 +54,7 @@ class CreateDataResource(object):
         self.ing   = IngestionClient(proc=ais)
 
     @defer.inlineCallbacks
-    def createDataResourceDap(self, msg):
+    def createDap(self, msg):
         """
         @brief create a data resource based on the limited data we can receive from UX
         @param msg GPB, 9217/1,
@@ -67,7 +67,7 @@ class CreateDataResource(object):
             # Check only the type recieved and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE:
-                errtext = "CreateDataResource.createDataResourceDap(): " + \
+                errtext = "ManageDataResource.createDap(): " + \
                     "Expected DataResourceCreateSimpleRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
@@ -84,12 +84,12 @@ class CreateDataResource(object):
             # if that doesnt work try:
             #     createfull_msg.request_type = createfull_msg.ObjectResource.RequestType.DAP
 
-            ret = yield self.createDataResource(createfull_msg)
+            ret = yield self.create(createfull_msg)
             defer.returnValue(ret)
 
 
         except ReceivedApplicationError, ex:
-            log.info('CreateDataResource.createDataResourceDap(): Error attempting to FIXME: %s' %ex)
+            log.info('ManageDataResource.createDap(): Error attempting to FIXME: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
@@ -99,7 +99,7 @@ class CreateDataResource(object):
 
 
     @defer.inlineCallbacks
-    def createDataResource(self, msg):
+    def create(self, msg):
         """
         @brief create a data resource
         @param msg GPB, 9211/1,
@@ -107,7 +107,7 @@ class CreateDataResource(object):
         @GPB{Returns,9212,1}
         @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
         """
-        log.info('CreateDataResource.createDataResource()\n')
+        log.info('ManageDataResource.create()\n')
 
         my_datasrc_id      = None
         my_dataset_id      = None
@@ -121,7 +121,7 @@ class CreateDataResource(object):
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != CREATE_DATA_RESOURCE_REQ_TYPE:
-                errtext = "CreateDataResource.createDataResource(): " + \
+                errtext = "ManageDataResource.create(): " + \
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
@@ -169,7 +169,7 @@ class CreateDataResource(object):
 
 
         except ReceivedApplicationError, ex:
-            log.info('CreateDataResource.createDataResource(): Error attempting to FIXME: %s' %ex)
+            log.info('ManageDataResource.create(): Error attempting to FIXME: %s' %ex)
 
             #mark lifecycle states
             datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
@@ -210,7 +210,7 @@ class CreateDataResource(object):
         @GPB{Input,9211,1}
         @retval data source resource
         """
-        log.info('CreateDataResource._createDataSourceResource()\n')
+        log.info('ManageDataResource._createDataSourceResource()\n')
         datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
 
         #FILL UP FIELDS, lists followed by scalars
