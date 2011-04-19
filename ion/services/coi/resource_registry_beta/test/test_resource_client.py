@@ -319,8 +319,8 @@ class ResourceClientTest(IonTestCase):
         branch_key = resource.Repository._current_branch.branchkey
         cref = resource.Repository._current_branch.commitrefs[0]
 
-        # Make sure that you the MergingResource method raises an errro
-        self.assertRaises(ResourceInstanceError, getattr, resource, 'CompareToUpdates')
+        # Make sure that you the Merge method raises None when there is no merged stuff in the repository
+        self.assertEqual(resource.Merge, None)
 
         # Create an update to merge into it...
         update_repo, ab = self.rc.workbench.init_repository(ADDRESSLINK_TYPE)
@@ -342,20 +342,20 @@ class ResourceClientTest(IonTestCase):
         self.assertEqual(branch_key, resource.Repository._current_branch.branchkey)
         self.assertEqual(cref, resource.Repository._current_branch.commitrefs[0])
 
-        self.assertEqual(resource.person[0].name, 'David')\
+        self.assertEqual(resource.person[0].name, 'David')
 
         # Try getting the merge objects resource...
-        self.assertEqual(resource.CompareToUpdates[0].person[0].name, 'John')
+        self.assertEqual(resource.Merge[0].person[0].name, 'John')
 
-        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, resource.CompareToUpdates[0], 'title', 'David')
+        self.assertRaises(AttributeError,setattr, resource.Merge[0], 'title', 'David')
 
         # Set the resource object equal to the updated addressbook
-        resource.ResourceObject = resource.CompareToUpdates[0]
+        resource.ResourceObject = resource.Merge[0].ResourceObject
 
         self.assertEqual(resource.person[0].name, 'John')
 
-
         yield self.rc.put_instance(resource, resource.RESOLVED)
+
 
         resource.Repository.log_commits()
 

@@ -15,6 +15,7 @@ Sample Dataset are configure and loaded like so:
 
 """
 import tarfile
+from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -58,30 +59,46 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     
     result = False
     f = None
+    tar = None
     try:
 
         # Get an absolute path to the file
         filename = pu.get_ion_path(filename)
 
-        if filename.endswith('.tar.gz'):
+        if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
             log.debug('Untaring file...')
-            outname = filename.replace('.tar.gz', '.obj')
             tar = tarfile.open(filename, 'r')
-            try:
-                f = tar.extractfile(tar.next())
-            except:
-                pass
+            f = tar.extractfile(tar.next())
+
         else:
             f = open(filename, 'r')
         result = True
     except IOError, e:
         log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
-        
+
+    except ExtractError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
+
     if f is not None:
-        obj = codec.unpack_structure(f.read())
-        ds_svc.workbench.put_repository(obj.Repository)
-        resource_instance.ResourceObject = obj
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
+
+        root_obj = resource_instance.Repository._load_element(head_elm)
+        resource_instance.ResourceObject = root_obj
     
+        resource_instance.Repository.load_links(root_obj)
+
+        f.close()
+
+    if tar is not None:
+
+        tar.close()
+
+
+    log.debug('Bootstraping dataset from local byte array complete: "%s"' % filename)
+
+
+
     return result
 
 
@@ -103,7 +120,7 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
 
     # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
@@ -144,7 +161,7 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
 
     # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
@@ -443,7 +460,7 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     has_a_id = kwargs.get('has_a_id')
     has_a = ds_svc.workbench.get_repository(has_a_id)
 
-    datasource.Repository.commit('Commit source before creating associaiton')
+    datasource.Repository.commit('Commit source before creating association')
     
      # Just create it - the workbench/datastore will take care of the rest!
     asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)

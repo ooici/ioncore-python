@@ -25,6 +25,7 @@ from ion.core.data import store
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import SUBSCRIPTION_INFO_TYPE
+from ion.integration.ais.ais_object_identifiers import  GET_SUBSCRIPTION_LIST_REQ_TYPE, GET_SUBSCRIPTION_LIST_RESP_TYPE
 
 # Create CDM Type Objects
 SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
@@ -77,6 +78,11 @@ class NotificationAlertTest(IonTestCase):
                 'class':'IdentityRegistryService'
             },
             {
+                'name':'store_service',
+                'module':'ion.core.data.store_service',
+                'class':'StoreService'
+            },
+            {
                 'name':'notification_alert',
                 'module':'ion.integration.ais.notification_alert_service',
                 'class':'NotificationAlertService'
@@ -105,9 +111,10 @@ class NotificationAlertTest(IonTestCase):
         # create the register_user request GPBs
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test';
-        reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
-        reqMsg.message_parameters_reference.routing_key = 'arf_test';
+        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
         log.info("test_addSubscription: call the service")
         # try to register this user for the first time
@@ -131,9 +138,10 @@ class NotificationAlertTest(IonTestCase):
         log.debug('test_removeSubscription! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = "test";
-        reqMsg.message_parameters_reference.exchange_point = 'magnet.topic';
-        reqMsg.message_parameters_reference.routing_key = 'arf_test';
+        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
         log.info('Calling removeSubscription!!...')
         reply = yield self.nac.removeSubscription(reqMsg)
@@ -143,3 +151,26 @@ class NotificationAlertTest(IonTestCase):
             self.fail('rResponse is not an AIS_RESPONSE_MSG_TYPE GPB')
 
         log.info('test_removeSubscription complete')
+
+
+    @defer.inlineCallbacks
+    def test_getSubscriptionList(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+
+        # Use the message client to create a message object
+        log.debug('test_getSubscriptionList! instantiating FindResourcesMsg.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+
+
+        log.info('Calling getSubscriptionList!!...')
+        reply = yield self.nac.getSubscriptionList(reqMsg)
+        log.info('getSubscriptionList returned:\n'+str(reply))
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        log.info('test_getSubscriptionList complete')        

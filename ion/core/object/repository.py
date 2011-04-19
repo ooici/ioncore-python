@@ -100,6 +100,7 @@ class IndexHash(dict):
         """ D.copy() -> a shallow copy of D """
         raise NotImplementedError('IndexHash does not support copy')
 
+
     @staticmethod # known case
     def fromkeys(S, v=None):
         """
@@ -144,11 +145,208 @@ class IndexHash(dict):
 
 
 
-class Repository(object):
+
+
+
+class ObjectContainer(object):
+    """
+    Base class for the repository and merge container
+    """
+
+    def __init__(self):
+
+
+        self._workspace = {}
+        """
+        A dictionary containing objects which are not yet indexed, linked by a
+        counter refrence in the current workspace
+        """
+
+        self._workspace_root = None
+        """
+        Pointer to the current root object in the workspace
+        """
+
+
+        self.index_hash = IndexHash()
+        """
+        All content elements are stored here - from incoming messages and
+        new commits - everything goes here. Now it can be decoded for a checkout
+        or sent in a message.
+        """
+
+        self._commit_index = {}
+        """
+        Required for get_linked_object
+        """
+
+
+    @property
+    def root_object(self):
+        return self._workspace_root
+
+
+    def clear(self):
+        """
+        Clear the repository in preparation for python garbage collection
+        """
+         # Do some clean up!
+        for item in self._workspace.itervalues():
+            item.Invalidate()
+
+        self._workspace.clear()
+        self.index_hash.clear()
+        self._workspace_root = None
+
+    def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):
+        """
+        Factory method for making wrapped GPB objects from the repository
+        """
+        message = rootclass()
+
+        obj = self._wrap_message_object(message, obj_id, addtoworkspace)
+
+        return obj
+
+    def _wrap_message_object(self, message, obj_id=None, addtoworkspace=True):
+
+        if not obj_id:
+            obj_id = self.new_id()
+        obj = gpb_wrapper.Wrapper(message)
+        obj._repository = self
+        obj._root = obj
+        obj._parent_links = set()
+        obj._child_links = set()
+        obj._derived_wrappers={}
+        obj._read_only = False
+        obj._myid = obj_id
+        obj._modified = True
+        obj._invalid = False
+
+        if addtoworkspace:
+            self._workspace[obj_id] = obj
+
+        return obj
+
+    def get_linked_object(self, link):
+
+        if link.ObjectType != LINK_TYPE:
+            raise RepositoryError('Illegal argument type in get_linked_object.')
+
+
+        if not link.IsFieldSet('key'):
+            return None
+
+        if self._workspace.has_key(link.key):
+
+            obj = self._workspace.get(link.key)
+            # Make sure the parent is set...
+            #self.set_linked_object(link, obj)
+
+            obj.AddParentLink(link)
+
+            return obj
+
+        elif self._commit_index.has_key(link.key):
+            # make sure the parent is set...
+            obj = self._commit_index.get(link.key)
+            obj.AddParentLink(link)
+            return obj
+
+        elif self.index_hash.has_key(link.key):
+            # @TODO - is this safe? Can the k/v be GC'd in the weakref dict inbetween haskey and get?
+            element = self.index_hash.get(link.key)
+
+        else:
+
+            log.debug('Linked object not found. Need non local object: %s' % str(link))
+
+            raise KeyError('Object not found in the local work bench.')
+
+
+
+        if not link.type.object_id == element.type.object_id and \
+                link.type.version == element.type.version:
+            #@TODO Consider removing this somewhat costly check...
+            raise RepositoryError('The link type does not match the element type found!')
+
+        obj = self._load_element(element)
+
+        # For objects loaded from the hash the parent child relationship must be set
+        #self.set_linked_object(link, obj)
+        obj.AddParentLink(link)
+
+        if obj.ObjectType == COMMIT_TYPE:
+            self._commit_index[obj.MyId]=obj
+            obj.ReadOnly = True
+
+        elif link.Root.ObjectType == COMMIT_TYPE:
+            # if the link is a commit but the linked object is not then it is a root object
+            # The default for a root object should be ReadOnly = False
+            self._workspace[obj.MyId]=obj
+            obj.ReadOnly = False
+
+        else:
+            # When getting an object from it's parent, use the parents readonly setting
+            self._workspace[obj.MyId]=obj
+            obj.ReadOnly = link.ReadOnly
+
+        return obj
+
+    def load_links(self, obj, excluded_types=None):
+        """
+        Load the child objects into the work space recursively
+        """
+        excluded_types = excluded_types or []
+
+        for link in obj.ChildLinks:
+            if not link.type.GPBMessage in excluded_types:
+                child = self.get_linked_object(link)
+                self.load_links(child, excluded_types)
+
+    def _load_element(self, element):
+
+        # check that the calculated value in element.sha1 matches the stored value
+        if not element.key == element.sha1:
+            #@TODO Consider removing this somewhat costly check - it is already done when an object is read from a message
+            raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
+            'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
+
+        cls = object_utils.get_gpb_class_from_type_id(element.type)
+
+        # Do not automatically load it into a particular space...
+        obj = self._create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
+
+        # If it is a leaf element set the bytes for the object, do not load it
+        # If it is not a leaf element load it and find its child links
+        if element.isleaf:
+
+            obj._bytes = element.value
+
+        else:
+            obj.ParseFromString(element.value)
+            obj.FindChildLinks()
+
+
+        obj.Modified = False
+
+        # Make a note in the element of the child links as well!
+        for child in obj.ChildLinks:
+            element.ChildLinks.add(child.key)
+
+        return obj
+
+
+
+
+
+class Repository(ObjectContainer):
     
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
+    MERGEREQUIRED = 'This repository is currently being merged!'
+
 
     def __init__(self, head=None, repository_key=None, persistent=False):
         
@@ -198,19 +396,12 @@ class Repository(object):
         """
         
         self._detached_head = False
+
         
-        
-        self._merge_from = []
+        self.merge=None
         """
-        Keep track of branches which were merged into this one!
-        Like _current_brach, _merge_from is a list of links - not the actual
-        commit refs
-        """
-        
-        self._merge_root=[]
-        """
-        When merging a repository state there are multiple root object in a
-        read only state from which you can draw values using repo.Merging[ind].[field]
+        When merging a repository state there are multiple Merge Repository objects which hold the state of the object
+        which is being merged. Access objects using: repo.merge[ind].<field in the root object>
         """
         
         self._stash = {}
@@ -276,11 +467,7 @@ class Repository(object):
     @property
     def repository_key(self):
         return self._dotgit.repositorykey
-    
-    @property
-    def merge_objects(self):
-        return self._merge_root
-    
+
     
     def _set_upstream(self, source):
         self._upstream = source
@@ -333,15 +520,18 @@ class Repository(object):
 
         self._dotgit.Invalidate()
 
-        self._workspace = None
-        self.index_hash = None
-        self._commit_index = None
+        self._workspace.clear()
+        self.index_hash.clear()
+        self._commit_index.clear()
         self._current_branch = None
-        self.branchnicknames = None
-        self._merge_from = None
-        self._stash = None
-        self._upstream = None
+        self.branchnicknames.clear()
+        self._stash.clear()
+        self._upstream.clear()
         self._process = None
+
+        if self.merge is not None:
+            for mr in self.merge:
+                mr.clear()
 
 
 
@@ -527,7 +717,7 @@ class Repository(object):
         if not branch:
             raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
             
-        if len(branch.commitrefs)==0:
+        if len(branch.commitrefs) is 0:
             raise RepositoryError('This branch is empty - there is nothing to checkout!')
             
             
@@ -747,6 +937,9 @@ class Repository(object):
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
 
+            # Reset the commit counter - used for debuging only
+            gpb_wrapper.WrapperType.recurse_counter.count=0
+
             self._workspace_root.RecurseCommit(structure)
 
             cref = self._create_commit_ref(comment=comment)
@@ -784,6 +977,7 @@ class Repository(object):
         """
         # Now add a Commit Ref
         # make a new commit ref
+
         commit_cls = object_utils.get_gpb_class_from_type_id(COMMIT_TYPE)
         cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
@@ -813,18 +1007,18 @@ class Repository(object):
         
         
         # For each branch that we merged from - add a  reference
-        for mrgd in self._merge_from:
-            pref = cref.parentrefs.add()
-            pref.SetLinkByName('commitref',mrgd)
-            pref.relationship = pref.Relationship.MERGEDFROM
+        if self.merge is not None:
+            for mr in self.merge.merge_repos:
+                mrgd = mr.commit
+                pref = cref.parentrefs.add()
+                pref.SetLinkByName('commitref',mrgd)
+                pref.relationship = pref.Relationship.MERGEDFROM
             
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
         
         # Clear the merge root and merged from
-        self._merge_from = []
-        self._merge_root = []
-        
+        self.merge = None
         # Update the cref in the branch
         branch.commitrefs.SetLink(0,cref)
         
@@ -832,7 +1026,7 @@ class Repository(object):
             
 
     @defer.inlineCallbacks
-    def merge(self, branchname=None, commit_id = None):
+    def merge_with(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
         
@@ -882,19 +1076,24 @@ class Repository(object):
             raise RepositoryError('merge takes either a branchname argument or a commit_id argument!')
         
         assert len(crefs) > 0, 'Illegal state reached in Repository Merge function!'
-        
+
         for cref in crefs:
-            self._merge_from.append(cref)
+            # Create a merge container to hold the merge object state for access
+
+            mr = MergeRepository(cref, self.index_hash.cache)
+
+
+            # Place holder until we deal with getting objects not currently present
             
-            rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
-            merge_root = rootobj
-            merge_root.ReadOnly = True
-            # The child objects inherit there ReadOnly setting from the root
-            yield self.load_remote_links(rootobj)
+            yield 1
+
+            mr.load_root()
             
-            self._merge_root.append(merge_root)
-        
-        
+            if self.merge is None:
+                self.merge = MergeContainer()
+
+            self.merge.append(mr)
+
         
     @property
     def status(self):
@@ -903,15 +1102,18 @@ class Repository(object):
           up to date
           changed
         """
-        
+
+        retval = None
         if self._workspace_root:
+
             if self._workspace_root.Modified:
-                return self.MODIFIED
+                retval = self.MODIFIED
             else:
-                return self.UPTODATE
+                retval = self.UPTODATE
         else:
-            return self.NOTINITIALIZED
-        
+            retval = self.NOTINITIALIZED
+
+        return retval
         
     def log_commits(self,branchname=None):
         
@@ -953,109 +1155,13 @@ class Repository(object):
         obj = self._wrap_message_object(cls())
         return obj
         
-        
-    def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
-        """
-        Factory method for making wrapped GPB objects from the repository
-        """
-        message = rootclass()
-            
-        obj = self._wrap_message_object(message, obj_id, addtoworkspace)
-            
-        return obj
-        
-    def _wrap_message_object(self, message, obj_id=None, addtoworkspace=True):
-        
-        if not obj_id:
-            obj_id = self.new_id()
-        obj = gpb_wrapper.Wrapper(message)
-        obj._repository = self
-        obj._root = obj
-        obj._parent_links = set()
-        obj._child_links = set()
-        obj._derived_wrappers={}
-        obj._read_only = False
-        obj._myid = obj_id
-        obj._modified = True
-        obj._invalid = False
-
-        if addtoworkspace:
-            self._workspace[obj_id] = obj
-                        
-        return obj
-        
     def new_id(self):
         """
         This id is a purely local concern - not used outside the local scope.
         """
         self._object_counter += 1
         return str(self._object_counter)
-     
-    def get_linked_object(self, link):
-                
-        if link.ObjectType != LINK_TYPE:
-            raise RepositoryError('Illegal argument type in get_linked_object.')
-                
-                
-        if not link.IsFieldSet('key'):
-            return None
-                
-        if self._workspace.has_key(link.key):
-            
-            obj = self._workspace.get(link.key)
-            # Make sure the parent is set...
-            #self.set_linked_object(link, obj)
 
-            obj.AddParentLink(link)
-
-            return obj
-
-        elif self._commit_index.has_key(link.key):
-            # make sure the parent is set...
-            obj = self._commit_index.get(link.key)
-            obj.AddParentLink(link)
-            return obj
-
-        elif self.index_hash.has_key(link.key):
-            # @TODO - is this safe? Can the k/v be GC'd in the weakref dict inbetween haskey and get?
-            element = self.index_hash.get(link.key)
-            
-        else:
-            
-            log.debug('Linked object not found. Need non local object: %s' % str(link))
-            
-            raise KeyError('Object not found in the local work bench.')
-            
-            
-            
-        if not link.type.object_id == element.type.object_id and \
-                link.type.version == element.type.version:
-            #@TODO Consider removing this somewhat costly check...
-            raise RepositoryError('The link type does not match the element type found!')
-            
-        obj = self._load_element(element)
-            
-        # For objects loaded from the hash the parent child relationship must be set
-        #self.set_linked_object(link, obj)
-        obj.AddParentLink(link)
-        
-        if obj.ObjectType == COMMIT_TYPE:
-            self._commit_index[obj.MyId]=obj
-            obj.ReadOnly = True
-                
-        elif link.Root.ObjectType == COMMIT_TYPE:
-            # if the link is a commit but the linked object is not then it is a root object
-            # The default for a root object should be ReadOnly = False
-            self._workspace[obj.MyId]=obj
-            obj.ReadOnly = False
-            
-        else:
-            # When getting an object from it's parent, use the parents readonly setting
-            self._workspace[obj.MyId]=obj
-            obj.ReadOnly = link.ReadOnly
-            
-        return obj
-            
     @defer.inlineCallbacks
     def get_remote_linked_object(self, link):
             
@@ -1088,17 +1194,6 @@ class Repository(object):
 
         for element in elements:
             self.index_hash[element.key] = element
-
-            
-            
-    def load_links(self, obj):
-        """
-        Load the child objects into the work space recursively
-        """
-        for link in obj.ChildLinks:
-            child = self.get_linked_object(link)  
-            self.load_links(child)
-            
 
     @defer.inlineCallbacks
     def load_remote_links(self, items):
@@ -1286,5 +1381,80 @@ class Repository(object):
         tp = link.type
         object_utils.set_type_from_obj(value, tp)
         #link.type = object_utils.get_type_from_obj(value)
-            
-    
+
+
+
+
+class MergeRepository(ObjectContainer):
+
+
+    def __init__(self, commit, cache):
+
+        ObjectContainer.__init__(self)
+
+        self.index_hash.cache = cache
+
+        # The commit does not belong to the Merge container - it is an object from the repository
+        self.commit = commit
+
+        self.load_root()
+
+
+
+    def load_root(self):
+
+        obj = self.commit.objectroot
+
+        self._workspace_root = obj
+
+        obj.ReadOnly = True
+
+        self.load_links(obj)
+
+
+class MergeContainer(object):
+
+    def __init__(self):
+
+        self.parent = None
+
+        self._merge_commits = {}
+        self.merge_repos = []
+
+
+    def append(self,item):
+
+        if not isinstance(item, MergeRepository):
+            raise RepositoryError('Can not add item to MergeContainer - it is not a MergeRepository')
+
+        if item.commit in self._merge_commits:
+            raise RepositoryError('Can not add item to MergeContainer - this commit is already merged')
+
+        # Add it to the list - for primary access, also add it to the dict!
+        self.merge_repos.append(item)
+
+        self._merge_commits[item.commit] = item
+
+
+
+    def _root_objects(self):
+
+        root_list=[]
+        for repo in self.merge_repos:
+
+            root_list.append(repo.root_object)
+
+        return root_list
+
+
+    def __iter__(self):
+
+        return self._root_objects().__iter__()
+
+    def __len__(self):
+        return len(self.merge_repos)
+
+
+    def __getitem__(self, index):
+
+        return self.merge_repos[index].root_object

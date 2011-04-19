@@ -464,10 +464,10 @@ class AssociationServiceTest(IonTestCase):
 
         # Set the Subbject search term
 
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = SAMPLE_PROFILE_DATASET_ID
+        subject_ref = request.CreateObject(IDREF_TYPE)
+        subject_ref.key = SAMPLE_PROFILE_DATASET_ID
 
-        pair.subject = type_ref
+        pair.subject = subject_ref
 
         # make the request
         result = yield self.asc.get_objects(request)

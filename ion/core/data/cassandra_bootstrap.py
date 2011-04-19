@@ -200,7 +200,7 @@ class CassandraSchemaProvider(object):
             yield self._apply_cf_configuration(ks_conf, ks_cassandra)
 
 
-        defer.returnValue(None)
+        defer.returnValue(True)
 
 
     @defer.inlineCallbacks
