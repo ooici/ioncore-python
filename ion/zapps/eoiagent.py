@@ -22,7 +22,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     Required function:  Invoked during the startup of this app
     '''
     jaw_proc = [
-        {'name':'JavaWrapperAgent',
+        {'name':'JavaAgentWrapper',
          'module':'ion.integration.eoi.agent.java_agent_wrapper',
          'class':'JavaAgentWrapper',
         }, ]
