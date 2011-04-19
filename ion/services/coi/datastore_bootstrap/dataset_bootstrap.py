@@ -59,6 +59,7 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     
     result = False
     f = None
+    tar = None
     try:
 
         # Get an absolute path to the file
@@ -87,6 +88,11 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     
         resource_instance.Repository.load_links(root_obj)
 
+        f.close()
+
+    if tar is not None:
+
+        tar.close()
 
 
     log.debug('Bootstraping dataset from local byte array complete: "%s"' % filename)

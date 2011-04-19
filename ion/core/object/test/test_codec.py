@@ -148,12 +148,14 @@ class LargeCodecTest(unittest.TestCase):
 
         filename = pu.get_ion_path(filename)
 
-        #tar = tarfile.open(filename, 'r')
-        #f = tar.extractfile(tar.next())
-
-        f = open(filename,'r')
+        tar = tarfile.open(filename, 'r')
+        f = tar.extractfile(tar.next())
+        #f = open(filename,'r')
 
         obj = codec.unpack_structure(f.read())
+
+        f.close()
+        tar.close()
 
         self.wb.put_repository(obj.Repository)
 
@@ -167,7 +169,11 @@ class LargeCodecTest(unittest.TestCase):
         self.assertNotEqual(repo.root_object._repository, obj._repository)
 
 
+        print 'SHIT'
+
         repo.commit('My Junk')
+
+        print 'SHIT NOW'
 
 
         self.assertEqual(repo.root_object, obj)
