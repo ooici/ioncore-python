@@ -704,7 +704,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_getResourceTypes(self):
 
-        ResourceTypes = ['datasets', 'identities', 'datasources']
+        ResourceTypes = ['datasets', 'identities', 'datasources', 'epucontrollers']
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
@@ -734,6 +734,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the getResourcesOfType request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourcesOfType request')
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
+        
         msg.message_parameters_reference.resource_type = "datasets"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
@@ -746,6 +747,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        
         msg.message_parameters_reference.resource_type = "identities"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
@@ -758,7 +760,21 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        
         msg.message_parameters_reference.resource_type = "datasources"
+        reply = yield self.aisc.getResourcesOfType(msg)
+        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
+            self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
+        if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
+            self.fail('response to getResourcesOfType has no column_names field')
+        if not reply.message_parameters_reference[0].IsFieldSet('resources'):
+            self.fail('response to getResourcesOfType has no resources field')
+        
+        msg.message_parameters_reference.resource_type = "epucontrollers"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -780,6 +796,19 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the getResources request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResource request')
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCE_REQUEST_TYPE)
+        
+        msg.message_parameters_reference.ooi_id = "agentservices_epu_controller"  #epu controller
+        reply = yield self.aisc.getResource(msg)
+        log.debug('getResource returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.message_parameters_reference[0].ObjectType != GET_RESOURCE_RESPONSE_TYPE:
+            self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
+        if not reply.message_parameters_reference[0].IsFieldSet('resource'):
+            self.fail('response to getResourcesOfType has no resource field')
+        
+        """
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F1"  #data set
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -790,6 +819,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        
         msg.message_parameters_reference.ooi_id = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"   #anonymous identity
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -800,6 +830,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F2"  #data source
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -810,6 +841,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        """
+        
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
