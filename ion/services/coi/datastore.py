@@ -1119,12 +1119,15 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            if not content(resource_instance, self, **kwargs):
+            load_result = content(resource_instance, self, **kwargs)
+
+            if not load_result:
                 set_content_ok = False
-        
+
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
             return resource_instance
+
         else:
             self.workbench.clear_repository_key(resource_key)
             log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % resource_name)
