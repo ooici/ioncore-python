@@ -75,16 +75,15 @@ class GetDataResourceDetail(object):
         #
         log.debug('getDataResourceDetail getting datasource resource instance')
         worker = FindDataResources(self.ais)
-        dSourceResults = yield worker.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
+        dSourceResID = None
+        dSourceResID = yield worker.getAssociatedSource(resID)
 
 
         #
         # Currently forcing to index 0 to fake association
         #
-        if len(dSourceResults.idrefs) > 0:
-            dSourceResID = dSourceResults.idrefs[0].key
-            log.debug('Working on dSourceResID: ' + dSourceResID)
+        if not (dSourceResID is None):
+            log.debug('Associated datasourceID: ' + dSourceResID)
             
             dSource = yield self.rc.get_instance(dSourceResID)
         else:            
