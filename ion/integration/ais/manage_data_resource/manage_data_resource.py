@@ -90,7 +90,7 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-        
+
             datasrc_resource = yield self.rc.get_instance(msg.data_source_resource_id)
 
             if msg.IsFieldSet("update_interval_seconds"):
@@ -125,7 +125,7 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
-    
+
     @defer.inlineCallbacks
     def delete(self, msg):
         """
@@ -158,11 +158,13 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            #store ids that were deleted, and return them later. 
+            #store ids that were deleted, and return them later.
             deletions = []
             delete_resources = []
             for data_source_resource_id in msg.data_source_resource_id:
-    
+
+                #FIXME: if user does not own this data set, don't delete it
+
                 #FIXME: stop scheduling
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
@@ -201,7 +203,7 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
-    
+
 
 
     @defer.inlineCallbacks
@@ -234,6 +236,20 @@ class ManageDataResource(object):
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
+
+            # at least PRETEND to make an effort
+            missing = self._missingResourceRequestFields(msg)
+            if "" != missing:
+                errtext = "ManageDataResource.create(): " + \
+                    "Missing these required fields in DataResourceCreateRequest: " + missing
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+
+            #FIXME: need to do cfchecker validation before we proceed
 
             # create the data source
             datasrc_resource = yield self._createDataSourceResource(msg)
@@ -302,7 +318,7 @@ class ManageDataResource(object):
 
     def _createScheduledEvent(self, desired_origin, interval_seconds, payload):
         sched_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
-        
+
         #FILL UP FIELDS, lists followed by scalars
         datasrc_resource.property.extend(msg.property)
 
@@ -354,7 +370,7 @@ class ManageDataResource(object):
         @return id of what you're after
         """
 
-        #can also do obj= 
+        #can also do obj=
         found = yield self.ac.find_associations(subject=datasource_resource, \
                                                 predicate_or_predicates=HAS_A_ID)
 
@@ -369,3 +385,45 @@ class ManageDataResource(object):
 
         the_resource = yield self.rc.get_associated_resource_object(association)
         defer.returnValue(the_resource)
+
+    def _missingResourceRequestFields(self, msg):
+        """
+        @brief make sure that all the required fields are set
+        @return string empty string for no errors or message describing the unset fields
+        """
+        ret = ""
+
+        #this seems very un-GPB-ish, to have to check fields...
+        #FIXME: comment out things that aren't actually required
+        req_fields = ["user_id", 
+                      "source_type",
+                      "request_type",
+                      "request_bounds_north",
+                      "request_bounds_south",
+                      "request_bounds_west",
+                      "request_bounds_east",
+                      "base_url",
+                      "dataset_url",
+                      #"ncml_mask",
+                      "max_ingest_millis",
+                      "ion_title",
+                      #"ion_description",
+                      #"ion_institution_id",
+                      "update_interval_seconds",
+                      #"update_start_datetime_millis",
+                      ]
+                      
+        
+        #FIXME: what do about these repeated fields?
+        #repeated string property = 3;
+        #repeated string station_id = 4;
+
+        #check em
+        for f in req_fields:
+            if not msg.IsFieldSet(f):
+                if "" == ret:
+                    ret = f
+                else:
+                    ret = ret + ", " + f
+
+        return f
