@@ -30,6 +30,7 @@ MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
 BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
 LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 
+ArrayStructureType = object_utils.create_type_identifier(object_id=10025, version=1)
 
 from ion.core.object import object_utils
 
@@ -344,6 +345,8 @@ class Repository(ObjectContainer):
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
     MERGEREQUIRED = 'This repository is currently being merged!'
 
+
+    DefaultExcludedTypes = [ArrayStructureType,]
 
     def __init__(self, head=None, repository_key=None, persistent=False):
         
@@ -687,7 +690,7 @@ class Repository(ObjectContainer):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=[]):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=None):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
@@ -695,7 +698,11 @@ class Repository(ObjectContainer):
 
         @TODO implement exclude types list in fetching/loading objects!
         """
-        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s"' % (branchname, commit_id, older_than))
+
+        if exclude_types is None:
+            exclude_types = self.DefaultExcludedTypes
+
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types' % (branchname, commit_id, older_than, exclude_types))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -827,7 +834,11 @@ class Repository(ObjectContainer):
         rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
-        yield self.load_remote_links(rootobj)
+        #yield self.load_remote_links(rootobj)
+        try:
+            self.load_links(rootobj, exclude_types)
+        except KeyError, ke:
+            log.info('Us')
         # @TODO figure out if there is any point to checking the value of the result?
 
         
