@@ -7,6 +7,7 @@
 spacial and temporal parameters.
 """
 
+import time, datetime
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -123,10 +124,10 @@ class FindDataResources(object):
             if self.filterByArea:
                 self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
 
-            if self.filterByVertical:
+            if self.bIsInAreaBounds and self.filterByVertical:
                 self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
                                     
-            if self.filterByTime:
+            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
                 self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
@@ -228,10 +229,10 @@ class FindDataResources(object):
             if self.filterByArea:
                 self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
 
-            if self.filterByVertical:
+            if self.bIsInAreaBounds and self.filterByVertical:
                 self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
                                     
-            if self.filterByTime:
+            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
                 self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
@@ -389,6 +390,10 @@ class FindDataResources(object):
                 minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
 
 
+    def __loadTimeBounds(self, bounds, msg):
+        log.debug('__loadTimeBounds')
+
+        
     def __loadBounds(self, bounds, msg):
         """
         Load up the bounds dictionary object with the given spatial and temporal
@@ -432,12 +437,16 @@ class FindDataResources(object):
             self.filterByVertical = False
 
         if msg.message_parameters_reference.IsFieldSet('minTime'):
-            bounds['minTime'] = msg.message_parameters_reference.minTime
+            tmpTime = datetime.datetime.strptime(msg.message_parameters_reference.minTime, \
+                                                           '%Y-%m-%dT%H:%M:%SZ')
+            bounds['minTime'] = time.mktime(tmpTime.timetuple())
         else:
             self.filterByTime = False
 
         if msg.message_parameters_reference.IsFieldSet('maxTime'):
-            bounds['maxTime'] = msg.message_parameters_reference.maxTime
+            tmpTime = datetime.datetime.strptime(msg.message_parameters_reference.maxTime, \
+                                                           '%Y-%m-%dT%H:%M:%SZ')
+            bounds['maxTime'] = time.mktime(tmpTime.timetuple())
         else:
             self.filterByTime = False
 
@@ -451,25 +460,25 @@ class FindDataResources(object):
         """
         log.debug('__isInAreaBounds()')
 
-        if minMetaData['ion_geospatial_lat_min'] > bounds['minLat']:
-            log.debug(' %f is outside bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
+        if minMetaData['ion_geospatial_lat_min'] < bounds['minLat']:
+            log.debug(' %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
             return False
             
         if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
+            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
             return False
             
-        if minMetaData['ion_geospatial_lon_min'] > bounds['minLon']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
+        if minMetaData['ion_geospatial_lon_min'] < bounds['minLon']:
+            log.debug('%s is < bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
             return False
             
         if minMetaData['ion_geospatial_lon_max'] > bounds['maxLon']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
+            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
             return False
         
         return True
 
-        
+
     def __isInVerticalBounds(self, minMetaData, bounds):
         """
         Determine if dataset resource is in vertical bounds.
@@ -480,14 +489,15 @@ class FindDataResources(object):
         log.debug('__isInVerticalBounds()')
 
         if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
+            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
             return False
             
         if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
+            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
             return False
         
         return True
+
         
     def __isInTimeBounds(self, minMetaData, bounds):
         """
@@ -497,17 +507,30 @@ class FindDataResources(object):
           - dSet
         """
         log.debug('__isInTimeBounds()')
-
-        if minMetaData['ion_time_coverage_start'] > bounds['minTime']:
-            log.debug(' %s is outside bounds %s' % (minMetaData['ion_time_coverage_start'], bounds['minTime']))
+        
+        """
+        try:
+            boundMinTime = time.mktime(bounds['minTime'].timetuple())
+            print boundMinTime
+            
+        except ValueError:
+            log.error('datetime.strptime did not work!!!!!')
+        """
+            
+        tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_start'], '%Y-%m-%dT%H:%M:%SZ')
+        dataMinTime = time.mktime(tmpTime.timetuple())
+        if dataMinTime < bounds['minTime']:
+            log.debug(' %s is < bounds %s' % (dataMinTime, bounds['minTime']))
             return False
             
-        if minMetaData['ion_time_coverage_end'] > bounds['maxTime']:
-            log.debug('%s is outside bounds %s' % (minMetaData['ion_time_coverage_end'], bounds['maxTime']))
+        tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_end'], '%Y-%m-%dT%H:%M:%SZ')
+        dataMaxTime = time.mktime(tmpTime.timetuple())
+        if dataMaxTime > bounds['maxTime']:
+            log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
             return False
             
         return True
-        
+
         
     def __printBounds(self, bounds):
         boundNames = list(bounds)
@@ -524,7 +547,7 @@ class FindDataResources(object):
         for atrib in ds.root_group.attributes:
             log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
 
-    
+
     def __printRootVariables(self, ds):
         for var in ds.root_group.variables:
             log.debug('Root Variable: %s' % str(var.name))
@@ -534,7 +557,7 @@ class FindDataResources(object):
             for dim in var.shape:
                 log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
 
-        
+
     def __printSourceMetadata(self, dSource):
         log.debug('source_type: ' + str(dSource.source_type))
         for property in dSource.property:
@@ -599,7 +622,7 @@ class FindDataResources(object):
         
         return self.downloadURL
 
-    
+
     @defer.inlineCallbacks
     def __getAssociatedSource(self, dSetResID):
         log.debug('__getAssociatedSource()')

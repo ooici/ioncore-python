@@ -118,22 +118,28 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         #reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
-        reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
-        reqMsg.message_parameters_reference.minLongitude = -74.13
-        reqMsg.message_parameters_reference.maxLongitude = -73.50
-        #reqMsg.message_parameters_reference.minVertical  = 20
+        #reqMsg.message_parameters_reference.minLatitude  = -50
+        #reqMsg.message_parameters_reference.maxLatitude  = -40
+        #reqMsg.message_parameters_reference.minLongitude = 20
+        #reqMsg.message_parameters_reference.maxLongitude = 30
+        reqMsg.message_parameters_reference.minLatitude  = 30
+        reqMsg.message_parameters_reference.maxLatitude  = 45
+        reqMsg.message_parameters_reference.minLongitude = -75
+        reqMsg.message_parameters_reference.maxLongitude = -70
+        reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
 
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
 
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
         i = 0
-        while i < len(rspMsg.message_parameters_reference[0].dataResourceSummary):
+        while i < numResReturned:
             if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('user_ooi_id'):
                 self.fail('response to findDataResources has no user_ooi_id field')
             if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('data_resource_id'):
@@ -193,14 +199,14 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         #reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
+        reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
         reqMsg.message_parameters_reference.minLongitude = -74.13
         reqMsg.message_parameters_reference.maxLongitude = -73.50
-        #reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
 
         log.debug('Calling findDataResourcesByUser to without ooi_user_id: should fail.')
@@ -215,14 +221,14 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude  = 40.2216682434
-        reqMsg.message_parameters_reference.maxLatitude  = 40.2216682434
-        reqMsg.message_parameters_reference.minLongitude = -74.13
-        reqMsg.message_parameters_reference.maxLongitude = -73.50
-        #reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.minLatitude  = -50
+        reqMsg.message_parameters_reference.maxLatitude  = -40
+        reqMsg.message_parameters_reference.minLongitude = 20
+        reqMsg.message_parameters_reference.maxLongitude = 30
+        reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')

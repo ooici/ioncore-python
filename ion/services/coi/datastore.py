@@ -589,7 +589,20 @@ class DataStoreWorkbench(WorkBench):
         yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
 
+    @defer.inlineCallbacks
+    def op_put_blobs(self, request, headers, message):
+        log.info("op_put_blobs")
+        if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid put blobs request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        def_list = []
+        for blob in request.blob_elements:
+            def_list.append(self._blob_store.put(blob.key, blob))
+
+        yield defer.DeferredList(def_list)
+
+        yield self._process.reply_ok(message)
+        log.info("op_put_blobs: Complete!")
 
     @defer.inlineCallbacks
     def op_fetch_blobs(self, request, headers, message):
@@ -1106,12 +1119,15 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            if not content(resource_instance, self, **kwargs):
+            load_result = content(resource_instance, self, **kwargs)
+
+            if not load_result:
                 set_content_ok = False
-        
+
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
             return resource_instance
+
         else:
             self.workbench.clear_repository_key(resource_key)
             log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % resource_name)

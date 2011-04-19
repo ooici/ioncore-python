@@ -189,12 +189,12 @@ def unpack_structure(serialized_container):
 
     repo.branch(nickname='master')
 
+    # Now load the rest of the linked objects - down to the leaf nodes.
+    repo.load_links(root_obj)
+
     # Create a commit to record the state when the message arrived
     cref = repo.commit(comment='Message for you Sir!')
 
-
-    # Now load the rest of the linked objects - down to the leaf nodes.
-    repo.load_links(root_obj)
 
     log.debug('unpack_structure: returning root_obj:'+str(root_obj))
 

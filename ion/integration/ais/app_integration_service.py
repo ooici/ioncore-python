@@ -28,6 +28,9 @@ from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetD
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 from ion.integration.ais.ManageResources.ManageResources import ManageResources
+from ion.integration.ais.manage_data_resource.manage_data_resource import ManageDataResource
+from ion.integration.ais.manage_data_resource_subscription.manage_data_resource_subscription import ManageDataResourceSubscription
+
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -197,6 +200,78 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
+    @defer.inlineCallbacks
+    def op_createDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_createDataResource: \n'+str(content))
+        worker = ManageDataResource(self)
+        log.debug('op_createDataResource: calling worker')
+        response = yield worker.create(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_updateDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_updateDataResource: \n'+str(content))
+        worker = ManageDataResource(self)
+        log.debug('op_updateDataResource: calling worker')
+        response = yield worker.update(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_deleteDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_deleteDataResource: \n'+str(content))
+        worker = ManageDataResource(self)
+        log.debug('op_deleteDataResource: calling worker')
+        response = yield worker.delete(content);
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_createDataResourceSubscription(self, content, headers, msg):
+        """
+        @brief subscribe to a data resource
+        """
+        log.debug('op_createDataResourceSubscription: \n'+str(content))
+        worker = ManageDataResourceSubscription(self)
+        log.debug('op_createDataResourceSubscription: calling worker')
+        response = yield worker.create(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_deleteDataResourceSubscription(self, content, headers, msg):
+        """
+        @brief delete subscription to a data resource
+        """
+        log.debug('op_deleteDataResourceSubscription: \n'+str(content))
+        worker = ManageDataResourceSubscription(self)
+        log.debug('op_deleteDataResourceSubscription: calling worker')
+        response = yield worker.delete(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_updateDataResourceSubscription(self, content, headers, msg):
+        """
+        @brief update subscription to a data resource
+        """
+        log.debug('op_updateDataResourceSubscription: \n'+str(content))
+        worker = ManageDataResourceSubscription(self)
+        log.debug('op_updateDataResourceSubscription: calling worker')
+        response = yield worker.update(content);
+        yield self.reply_ok(msg, response)
+
+
+
+
+
+
 class AppIntegrationServiceClient(ServiceClient):
     """
     This is a service client for AppIntegrationServices.
@@ -341,6 +416,55 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
+    @defer.inlineCallbacks
+    def createDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('createDataResource', message)
+        log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def updateDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
+        log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def deleteDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
+        log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def createDataResourceSubscription(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.createDataResourceSubscription: sending following message:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('createDataResourceSubscription', message)
+        log.debug('AIS_client.createDataResourceSubscription: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def deleteDataResourceSubscription(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.deleteDataResourceSubscription: sending following message:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('deleteDataResourceSubscription', message)
+        log.debug('AIS_client.deleteDataResourceSubscription: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def updateDataResourceSubscription(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.updateDataResourceSubscription: sending following message:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('updateDataResourceSubscription', message)
+        log.debug('AIS_client.updateDataResourceSubscription: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+
     @defer.inlineCallbacks
     def CheckRequest(self, request):
         # Check for correct request protocol buffer type

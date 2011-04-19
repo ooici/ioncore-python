@@ -5,6 +5,7 @@
 @author David Stuebe
 @author Matt Rodriguez
 """
+import base64
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE
 
 import ion.util.ionlog
@@ -37,7 +38,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
 from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE
-from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
+from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE, StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -196,50 +197,114 @@ class DataStoreTest(IonTestCase):
         for blob in content.blob_elements:
             self.failUnless(blob.key in repo.index_hash.keys())
 
-        # now do checkout with some filtering against certain types of messages
-        msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
-        msg.commit_root_object = key
-
-        for extype in [CDM_ARRAY_FLOAT32_TYPE]:
-            exobj = msg.excluded_types.add()
-            exobj.object_id = extype.object_id
-            exobj.version = extype.version
-
-        content = yield dsc.checkout(msg)
-
-        # should be less than the previous checkout
-        self.failUnless(len(content.blob_elements) < len(repo.index_hash) - 1)
-
-        # make sure all exist
+        # load em into this object
         for blob in content.blob_elements:
-            self.failUnless(blob.key in repo.index_hash.keys())
+            element = StructureElement(blob.GPBMessage)
+            content.Repository.index_hash[element.key] = element
 
-        # make sure we didn't get any CDM_ARRAY_FLOAT32_TYPE items!
-        objids = set([x.type.object_id for x in content.blob_elements])
-        self.failIf(CDM_ARRAY_FLOAT32_TYPE.object_id in objids)
+        element = content.Repository.index_hash[key]
+        objroot = content.Repository._load_element(element)
+        content.Repository.load_links(objroot, [])
 
-        # checkout with multiple filtering
-        msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
-        msg.commit_root_object = key
+        # a list of all keys in the full dataset with no filtering. we use this below to compute difference
+        # lists.
+        ckeys = [x.key for x in content.blob_elements]
 
-        for extype in [CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE]:
-            exobj = msg.excluded_types.add()
-            exobj.object_id = extype.object_id
-            exobj.version = extype.version
+        def does_blob_have_parent_of_type(rep, curblob, parentblobs, targetkey, targetgpbtype, counter=0):
+            """
+            Helper method to find if a target node (by key) is or has a parent of targetgpbtype.
 
-        content = yield dsc.checkout(msg)
+            Performs a recursive DFS from the root node (as a StructureElement), maintaining a list of
+            all parents to that recursive call. When the target key is found, those parents are checked to
+            ensure that one of them is in the targetgpbtype list.
 
-        # should be less than the previous checkout
-        self.failUnless(len(content.blob_elements) < len(repo.index_hash) - 1)
+            @param  rep             The repository to use to look up nodes by key.
+            @param  curblob         The current node we're looking at, as a StructureElement.
+            @param  parentblobs     A list of parent nodes we have visited, as StructureElements. The first
+                                    item in this list is the most recent parent, aka the immediate parent of
+                                    curblob.
+            @param  targetkey       The key of the node we're looking for.
+            @param  targetgpbtype   A list of target GPB types we want to make sure the targetkey is a child
+                                    of.
+            @param  counter         Debug parameter for recursion depth.
 
-        # make sure all exist
-        for blob in content.blob_elements:
-            self.failUnless(blob.key in repo.index_hash.keys())
+            @returns    A boolean if the target node is parented by one of the targetgpbtypes. None if the key
+                        was never found.
+            """
 
-        # make sure we didn't get any CDM_ARRAY_FLOAT32_TYPE or CDM_ATTRIBUTE_TYPE items!
-        objids = set([x.type.object_id for x in content.blob_elements])
-        self.failIf(CDM_ARRAY_FLOAT32_TYPE.object_id in objids)
-        self.failIf(CDM_ATTRIBUTE_TYPE.object_id in objids)
+            if curblob.key == targetkey:
+
+                if curblob.type in targetgpbtype:
+                    return True
+
+                for ttype in targetgpbtype:
+                    if ttype in [x.type for x in parentblobs]:
+                        return True
+
+                return False
+
+            newchilds = []
+            for x in curblob.ChildLinks:
+
+                # @TODO: why is this sometimes a string?
+                if isinstance(x, str):
+                    newchilds.append(x)
+                else:
+                    newchilds.append(x.key)
+
+            for childkey in newchilds:
+                childblob = rep.index_hash[childkey]
+
+                retval = does_blob_have_parent_of_type(rep, childblob, [curblob] + parentblobs, targetkey, targetgpbtype, counter+1)
+                if retval is not None:
+                    return retval
+
+            return None
+
+        # run a checkout for every item in this list. the items in this list signify excluding items of the types
+        # in the lists.
+        
+        for excludetypes in [[CDM_ARRAY_FLOAT32_TYPE], [CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE]]:
+
+            # checkout with multiple filtering
+            msg = yield self.wb1.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
+            msg.commit_root_object = key
+
+            for extype in excludetypes:
+                exobj = msg.excluded_types.add()
+                exobj.object_id = extype.object_id
+                exobj.version = extype.version
+
+            content4 = yield dsc.checkout(msg)
+
+            # should be less than the previous checkout
+            self.failUnless(len(content4.blob_elements) < len(repo.index_hash) - 1)
+
+            # make sure all exist
+            for blob in content4.blob_elements:
+                self.failUnless(blob.key in repo.index_hash.keys())
+
+            # make sure we didn't get any items of excludetypes
+            objids = set([x.type.object_id for x in content4.blob_elements])
+            for extype in excludetypes:
+                self.failIf(extype.object_id in objids)
+
+            # diff content4's keys against unfiltered keys
+            c3keys      = [x.key for x in content4.blob_elements]
+            difflist    = [x for x in ckeys if not x in c3keys]
+
+            # mathematically this has to be true...
+            self.failUnlessEquals(len(difflist) + len(c3keys), len(ckeys))
+    
+            # load all blobs into the index hash of the message
+            for blob in content4.blob_elements:
+                element = StructureElement(blob.GPBMessage)
+                content4.Repository.index_hash[element.key] = element
+
+            # make sure all excluded nodes are or are parented by one of the two excluded types.
+            for blobkey in difflist:
+                retval = does_blob_have_parent_of_type(repo, repo.index_hash[objroot.MyId], [], blobkey, excludetypes)
+                self.failUnless(retval)
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):

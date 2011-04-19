@@ -8,19 +8,19 @@ These classes are the lowest level of the object management stack
 TODO:
 Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 """
-import sys
 
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
 import struct
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
-    
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
@@ -274,6 +274,11 @@ class WrappedScalarProperty(WrappedProperty):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
 
 
+class CommitCounter(object):
+    """
+    Class used to count the number of recursive calls to commit a data structure
+    """
+    count = 0
 
 class WrapperType(type):
     """
@@ -284,6 +289,10 @@ class WrapperType(type):
     """
 
     _type_cache = {}
+
+
+    recurse_counter = CommitCounter()
+
 
     def __call__(cls, gpbMessage, *args, **kwargs):
         # Cache the custom-built classes
@@ -306,6 +315,8 @@ class WrapperType(type):
             clsDict['_GPBClass'] = gpbMessage.__class__
             clsDict['_Properties'] = properties
             clsDict['_Enums'] = enums
+
+            clsDict['recurse_count'] = WrapperType.recurse_counter
 
             # Now setup the properties to map through to the GPB object
             descriptor = msgType.DESCRIPTOR
@@ -933,6 +944,7 @@ class Wrapper(object):
     __metaclass__ = WrapperType
 
 
+
     def __init__(self, gpbMessage):
         """
         Initialize the Wrapper class and set up it message type.
@@ -1280,8 +1292,14 @@ class Wrapper(object):
         Recursively build up the serialized structure elements which are needed
         to commit this wrapper and reset all the links using its CAS name.
         """
+
+        #print self.Debug()
+
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        self.recurse_count.count += 1
+        log.debug('Entering Recurse Commit: recurse counter - %d, child links - %d, objects to commit - %d' % (self.recurse_count.count, len(self.ChildLinks), len(structure)) )
 
         if not  self.Modified:
             # This object is already committed!
@@ -1290,16 +1308,23 @@ class Wrapper(object):
         # Create the Structure Element in which the binary blob will be stored
         se = StructureElement()
         repo = self.Repository
+
         for link in  self.ChildLinks:
 
             # Test to see if it is already serialized!
-            child_se = repo.index_hash.get(link.key, None)
+            child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
+            #child_se = repo.index_hash.get(link.key, None)
+
+            #print 'Setting child Link:', child_se
             if  child_se is not None:
 
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
 
             else:
+
+                #print 'SE for child not found - determining number of child links'
+
                 child = repo.get_linked_object(link)
 
                 # Determine whether this is a leaf node
@@ -1308,6 +1333,8 @@ class Wrapper(object):
                 else:
                     link.isleaf = False
 
+
+                #print 'Calling Recurse Commit on child'
                 child.RecurseCommit(structure)
 
             # Save the link info as a convience for sending!
@@ -1346,19 +1373,24 @@ class Wrapper(object):
                 # Get the other object with the same name...
                 other = repo._workspace[se.key]
 
+
                 # if the value of a field has been set to the same value again,
                 # it will be re serialized and re hashed. This is not a conflict!
                 if not other is self:
 
-                    self.ParentLinks = set.union(self.ParentLinks, other.ParentLinks)
+
+                    self.ParentLinks.update(other.ParentLinks)
 
                     # Here, we don't want to modify a parent if it is already correct.
                     # The hash conflict provides a back door by which a parent, which is
                     # already benn correctly committed might be modified if we are not careful
                     for link in self.ParentLinks:
-                        if link.key != se.key:
-                            link.key = se.key
 
+
+                        # if it is invalid - the parent has already been serialized
+                        if not link.Invalid and link.key != se.key:
+                            link.key = se.key
+                    """
                     msg = '=============================================\n'
                     msg += '''DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure. This is not an error, but the state of this composite is now shared.\n'''
                     msg +='Shared Object: %s' % self.Debug()
@@ -1367,8 +1399,9 @@ class Wrapper(object):
                         msg +='Parent: %s' % (link.Root.Debug())
                     msg +='Old references to the object are now invalid!\n'
                     msg += '============================================='
-                    #log.warn(msg)
-
+                    log.warn(msg)
+                    """
+                    
                     # Force the object to be reloaded from the workbench!
                     del repo._workspace[se.key]
                     other.Invalidate()
@@ -1388,6 +1421,7 @@ class Wrapper(object):
         # This will only be reached once for a given child object. Set all parents
         # now and the child will return as unmodified when the other parents ask it
         # to recurse commit.
+
         for link in self.ParentLinks:
             link.key = self.MyId
 
@@ -1555,6 +1589,7 @@ class Wrapper(object):
         output += 'Wrapper IsRoot: %s \n' % self.IsRoot
         output += 'Wrapper ParentLinks: %s \n' % str(self.ParentLinks)
         output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
+        output += 'Wrapper Type: %s \n' % str(self.ObjectType)
         output += 'Wrapper current value:\n'
         output += str(self) + '\n'
         output += '================== Wrapper Complete =========================\n'

@@ -1,30 +1,27 @@
 #!/usr/bin/env python
 """
-@file ion/agents/instrumentagents/test/test_SBE49.py
-@brief This module has test cases to test out SeaBird SBE49 instrument software
-    including the driver. This assumes that generic InstrumentAgent code has
-    been tested by another test case
-@author Steve Foley
-@see ion.agents.instrumentagents.test.test_instrument
+@file ion/agents/instrumentagents/test/test_SBE37.py
+@brief Test cases for the SBE37 driver.
+@author Edward Hunter
 """
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
-from ion.test.iontest import IonTestCase
-
-from ion.agents.instrumentagents.SBE37_driver import SBE37DriverClient
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-
-from ion.services.dm.distribution.pubsub_service import PubSubClient
-
-import ion.util.procutils as pu
-from ion.resources.dm_resource_descriptions import PubSubTopicResource, SubscriptionResource
-
-from twisted.trial import unittest
-import socket
 import re
 import os
+
+from twisted.internet import defer
+from twisted.trial import unittest
+
+import ion.util.ionlog
+import ion.util.procutils as pu
+from ion.test.iontest import IonTestCase
+from ion.agents.instrumentagents.SBE37_driver import SBE37DriverClient
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+from ion.agents.instrumentagents.SBE37_driver import DriverException
+from ion.agents.instrumentagents.instrument_agent import errors
+
+
+log = ion.util.ionlog.getLogger(__name__)
+
 
 def dump_dict(d,d2=None):
     print
@@ -90,8 +87,6 @@ class TestSBE37(IonTestCase):
 
         yield self._start_container()
         
-        #fqdn = socket.get
-
         self.simulator = Simulator(self.instrument_id,self.simulator_port)        
         simulator_ports = self.simulator.start()
         simulator_port = simulator_ports[0]
@@ -101,10 +96,6 @@ class TestSBE37(IonTestCase):
             
         
         services = [
-            {'name':'pubsub_service',
-             'module':'ion.services.dm.distribution.pubsub_service',
-             'class':'DataPubsubService'},
-
             {'name':'SBE37_driver',
              'module':'ion.agents.instrumentagents.SBE37_driver',
              'class':'SBE37Driver',
@@ -540,19 +531,21 @@ class TestSBE37(IonTestCase):
         self.assertEqual(success[0],'OK')
         self.assertEqual(current_state,'STATE_CONNECTED')        
 
+        # Comment this out for automated testing.
+        # It is useful to examine the instrument parameters during
+        # interactive testing.
         dump_dict(result)
 
         # Acquire a polled sample and verify result.
+        
         params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_ACQUIRE_SAMPLE']}
+        
         reply = yield self.driver_client.execute(params)
+            
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-        
-        print reply
-        
-        dump_dict(result)
-        
+                    
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
@@ -562,6 +555,7 @@ class TestSBE37(IonTestCase):
         self.assertIsInstance(result.get('time',None),tuple)
         self.assertIsInstance(result.get('date',None),tuple)
         self.assertEqual(current_state,'STATE_CONNECTED')
+        
         
         # Test and verify autosample mode.
         params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_START_AUTO_SAMPLING']}
@@ -576,12 +570,33 @@ class TestSBE37(IonTestCase):
         yield pu.asleep(30)
 
         # Test and verify autosample exit and check sample data.
-        params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']}
-        reply = yield self.driver_client.execute(params)
-        current_state = yield self.driver_client.get_state()
-        success = reply['success']
-        result = reply['result']
+        params = {
+            'channels':['CHAN_INSTRUMENT'],
+            'command':['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA'],
+            'timeout':10
+            }
 
+        # If a timeout occurs in stop, reattempt until the test times out.
+        # Note: if this times out the instrument will be stuck in autosample
+        # mode and require manual reset.
+        while True:
+  
+            reply = yield self.driver_client.execute(params)
+            current_state = yield self.driver_client.get_state()
+            success = reply['success']
+            result = reply['result']
+            
+            if success[0] == 'OK':
+                break
+                            
+            elif success[1] == 'TIMEOUT':
+                pass
+            
+            else:
+                # Some other error occurred.
+                self.fail('DRIVER_CMD_STOP_AUTO_SAMPLING failed with error:'+str(success))
+
+        # We succeeded in completing the stop. Verify the samples recovered.
         self.assertEqual(success[0],'OK')
         for sample in result:
             self.assertIsInstance(sample.get('temperature'),float)
@@ -605,6 +620,84 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,'STATE_DISCONNECTED')
         
         
+        
+    """
+    The following is for experimenting with error callbacks only and not
+    intended as part of the unit test regime.
+    @defer.inlineCallbacks
+    def test_errors(self):
 
+        #if not RUN_TESTS:
+        #    raise unittest.SkipTest("Do not run this test automatically.")
+        raise unittest.SkipTest("Do not run this test automatically.")
+
+
+        params = self.sbe_config
+
+        # We should begin in the unconfigured state.
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual(current_state,'STATE_UNCONFIGURED')
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(params)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(result,params)
+        self.assertEqual(current_state,'STATE_DISCONNECTED')
+
+
+        # Establish connection to device and verify.
+        try:
+            reply = yield self.driver_client.connect()
+        except:
+            self.fail('Could not connect to the device.')
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,'STATE_CONNECTED')
+
+
+        params = {
+            'command':['DRIVER_CMD_TEST_ERRORS'],
+            'channels':['CHAN_INSTRUMENT']
+                }
+        
+        try:
+            reply = yield self.driver_client.execute(params)
+        except Exception, e:
+            print '***exception'
+            print e
+            print '***type'
+            print type(e)
+            print '***dir'
+            print dir(e)
+            print '***message'
+            print e.message
+            print '***content'
+            print e.msg_content
+        else:
+            print reply
+
+
+
+
+        
+        # Dissolve the connection to the device.
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,'STATE_DISCONNECTED')
+    """
 
 
