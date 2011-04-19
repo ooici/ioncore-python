@@ -159,16 +159,15 @@ class LargeCodecTest(unittest.TestCase):
 
         # Now test copying it!
 
-        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
+        repo = self.wb.create_repository()
 
         # Set a nonsense field to see if we can copy the datastructure!
-        repo.root_object.owner = obj
+        repo.root_object = repo.copy_object(obj)
 
-
-        self.assertNotEqual(repo.root_object.owner._repository, obj._repository)
+        self.assertNotEqual(repo.root_object._repository, obj._repository)
 
 
         repo.commit('My Junk')
 
 
-        self.assertEqual(repo.root_object.owner, obj)
+        self.assertEqual(repo.root_object, obj)

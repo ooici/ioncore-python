@@ -78,16 +78,20 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     except ExtractError, e:
         log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
 
+    if f is not None:
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
 
-    head_elm, obj_dict = codec._unpack_container(f.read())
-    resource_instance.Repository.index_hash.update(obj_dict)
-
-    root_obj = resource_instance.Repository._load_element(head_elm)
-    resource_instance.ResourceObject = root_obj
+        root_obj = resource_instance.Repository._load_element(head_elm)
+        resource_instance.ResourceObject = root_obj
     
-    resource_instance.Repository.load_links(root_obj)
+        resource_instance.Repository.load_links(root_obj)
+
+
 
     log.debug('Bootstraping dataset from local byte array complete: "%s"' % filename)
+
+
 
     return result
 
