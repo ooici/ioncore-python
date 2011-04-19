@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/association_service.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief A service to provide indexing and search capability of objects in the datastore
 """
 
@@ -16,7 +17,11 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data import cassandra
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import  BRANCH_NAME, SUBJECT_KEY,  SUBJECT_BRANCH, RESOURCE_OBJECT_TYPE 
+from ion.core.data.storage_configuration_utility import  RESOURCE_LIFE_CYCLE_STATE, REPOSITORY_KEY, OBJECT_BRANCH
+from ion.core.data.storage_configuration_utility import get_cassandra_configuration, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_LIFE_CYCLE_STATE_ID, TYPE_OF_ID
 
@@ -33,6 +38,10 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16, version=1)
 PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
+ASSOCIATION_QUERY_MSG_TYPE = object_utils.create_type_identifier(object_id=27, version=1)
+BOOL_MSG_TYPE = object_utils.create_type_identifier(object_id=30, version=1)
+
+
 QUERY_RESULT_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
@@ -55,23 +64,50 @@ class AssociationService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
+    def __init__(self, *args, **kwargs):
+
+
+        ServiceProcess.__init__(self, *args, **kwargs)
+
+        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
+        self.index_store_class = pu.get_class(index_store_class_name)
+
+
+        assert store.IIndexStore.implementedBy(self.index_store_class), \
+            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'
+                # Service life cycle state. Initialize service here. Can use yields.
+        self._username = self.spawn_args.get("username", CONF.getValue("username", None))
+        self._password = self.spawn_args.get("password", CONF.getValue("password",None))
+
+
+        # Get the configuration for cassandra - may or may not be used depending on the backend class
+        self._storage_conf = get_cassandra_configuration()
+
+
+
     @defer.inlineCallbacks
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
+        
+        if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
+            log.info("Instantiating Cassandra Index Store")
 
-        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
 
-        index_store_class = pu.get_class(index_store_class_name)
-        assert store.IIndexStore.implementedBy(index_store_class), \
-            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'
+            self.index_store = self.index_store_class(self._username, self._password, storage_provider, keyspace, COMMIT_CACHE)
 
+            yield self.register_life_cycle_object(self.index_store)
+        else:
+            self.index_store = self.index_store_class(self, indices=COMMIT_INDEXED_COLUMNS )
 
-        self.index_store = yield defer.maybeDeferred(index_store_class, self, **{'indices':COMMIT_INDEXED_COLUMNS})
-
-        log.info('SLC_INIT Association Service')
+        log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
     def op_get_subjects(self, predicate_object_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_subjects
+        """
         log.info('op_get_subjects: ')
 
         if predicate_object_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
@@ -85,6 +121,9 @@ class AssociationService(ServiceProcess):
         type_of_pair = None
 
         subjects = set()
+
+        # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+        subject_keys = set()
 
         first_pair = True
 
@@ -132,8 +171,7 @@ class AssociationService(ServiceProcess):
             # subject_pointers is the resulting set of pointers to the current state of the association subject
             subjects_pointers = set()
 
-            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
-            subject_keys = set()
+            current_keys = set()
             for key, row in rows.items():
 
 
@@ -142,6 +180,7 @@ class AssociationService(ServiceProcess):
                 if not first_pair and row[SUBJECT_KEY] not in subject_keys:
                     # The result we are looking for is an intersection operation. If this key is not here escape!
                     continue
+                current_keys.add(row[SUBJECT_KEY])
 
                 # Get the latest commits for the Subject_Key
                 subject_query = store.Query()
@@ -174,8 +213,10 @@ class AssociationService(ServiceProcess):
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
                 subjects = subjects_pointers
+                subject_keys.update(current_keys)
                 first_pair = False
             else:
+                subject_keys.intersection_update(current_keys)
                 subjects.intersection_update(subjects_pointers)
 
 
@@ -196,7 +237,7 @@ class AssociationService(ServiceProcess):
 
 
             if life_cycle_pair:
-                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
 
             # Get all the results that meet the type / state query
@@ -227,7 +268,7 @@ class AssociationService(ServiceProcess):
                 q.add_predicate_gt(BRANCH_NAME,'')
 
                 if life_cycle_pair:
-                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
+                    q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, str(life_cycle_pair.object.lcs))
 
                 if type_of_pair:
                     q.add_predicate_eq(RESOURCE_OBJECT_TYPE, type_of_pair.object.key)
@@ -267,9 +308,12 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_get_objects(self, subject_predicate_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_objects
+        """
         log.info('op_get_objects: ')
 
-        if subject_predicate_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
+        if subject_predicate_query.MessageType != SUBJECT_PREDICATE_QUERY_TYPE:
             raise AssociationServiceError('Unexpected type received \n %s' % str(subject_predicate_query), subject_predicate_query.ResponseCodes.BAD_REQUEST)
 
 
@@ -280,6 +324,9 @@ class AssociationService(ServiceProcess):
         objects = set()
 
         first_pair = True
+
+        # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
+        object_keys = set()
 
         for pair in subject_predicate_query.pairs:
 
@@ -302,13 +349,14 @@ class AssociationService(ServiceProcess):
             # subject_pointers is the resulting set of pointers to the current state of the association subject
             objects_pointers = set()
 
-            # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
-            object_keys = set()
+            current_keys=set()
             for key, row in rows.items():
 
                 if not first_pair and row[OBJECT_KEY] not in object_keys:
                     # The result we are looking for is an intersection operation. If this key is not her escape!
                     continue
+
+                current_keys.add(row[OBJECT_KEY])
 
                 # Get the latest commits for the Subject_Key
                 object_query = store.Query()
@@ -330,7 +378,7 @@ class AssociationService(ServiceProcess):
                         # We do not need to determine ancestry - the branch name is the same!
 
                         # return the pointer to this commit - this is the latest version of the associated subject!
-                        totalkey = (row[SUBJECT_KEY] , row[OBJECT_BRANCH])
+                        totalkey = (row[OBJECT_KEY] , row[OBJECT_BRANCH])
 
                         # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
                         objects_pointers.add(totalkey)
@@ -341,11 +389,13 @@ class AssociationService(ServiceProcess):
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
                 objects = objects_pointers
+                object_keys.update(current_keys)
                 first_pair = False
             else:
+                object_keys.intersection_update(current_keys)
                 objects.intersection_update(objects_pointers)
 
-        log.info('Found %s objects!' % len(subjects))
+        log.info('Found %s objects!' % len(objects))
 
 
         list_of_objects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
@@ -366,6 +416,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_object_associations(self, object_reference, headers, msg):
+        """
+        @see AssociationServiceClient.object_associations
+        """
         log.info('op_get_objects: ')
 
         if object_reference.MessageType != IDREF_TYPE:
@@ -386,7 +439,7 @@ class AssociationService(ServiceProcess):
         # Make a place to store the branches found for each association
         repo_branches={}
 
-        for key, row in rows:
+        for key, row in rows.items():
 
             branches = repo_branches.get(row[REPOSITORY_KEY],None)
             if branches is None:
@@ -398,13 +451,13 @@ class AssociationService(ServiceProcess):
             else:
                 branches.add(row[BRANCH_NAME])
 
+            if object_reference.IsFieldSet('branch') is True:
+                if  True and row[OBJECT_BRANCH] == object_reference.branch:
+                    pass
 
-            if row[OBJECT_BRANCH] == object_reference.branch:
-                pass
-
-            else:
-                # Get the objects commits and check in parents!
-                raise NotImplementedError('Branches in an association are not yet supported')
+                else:
+                    # Get the objects commits and check in parents!
+                    raise NotImplementedError('Branches in an association are not yet supported')
 
 
             link = list_of_associations.idrefs.add()
@@ -421,6 +474,9 @@ class AssociationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_subject_associations(self, subject_reference, headers, msg):
+        """
+        @see AssociationServiceClient.subject_associations
+        """
         log.info('op_get_objects: ')
 
         if subject_reference.MessageType != IDREF_TYPE:
@@ -439,7 +495,7 @@ class AssociationService(ServiceProcess):
         # Make a place to store the branches found for each association
         repo_branches={}
 
-        for key, row in rows:
+        for key, row in rows.items():
 
             branches = repo_branches.get(row[REPOSITORY_KEY],None)
             if branches is None:
@@ -451,12 +507,14 @@ class AssociationService(ServiceProcess):
             else:
                 branches.add(row[BRANCH_NAME])
 
-            if row[SUBJECT_BRANCH] == subject_reference.branch:
-                pass
+            if subject_reference.IsFieldSet('branch') is True:
 
-            else:
-                # Get the objects commits and check in parents!
-                raise NotImplementedError('Branches in an association are not yet supported')
+                if row[SUBJECT_BRANCH] == subject_reference.branch:
+                    pass
+
+                else:
+                    # Get the objects commits and check in parents!
+                    raise NotImplementedError('Branches in an association are not yet supported')
 
 
             link = list_of_associations.idrefs.add()
@@ -468,6 +526,114 @@ class AssociationService(ServiceProcess):
             link.SetLink(idref)
 
         yield self.reply_ok(msg, list_of_associations)
+
+
+
+    @defer.inlineCallbacks
+    def op_get_association(self, association_query, headers, msg):
+        log.info('op_get_association: ')
+
+        rows = yield self._get_association(association_query)
+
+        if len(rows) == 1:
+
+            key, row = rows.popitem()
+            response = yield self.message_client.create_instance(IDREF_TYPE)
+            response.key = row[REPOSITORY_KEY]
+            response.branch = row[BRANCH_NAME]
+
+        elif len(rows)==0:
+
+            raise AssociationServiceError('No association found for the specified triple!', association_query.ResponseCodes.NOT_FOUND)
+
+        else:
+
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_association_exists(self, association_query, headers, msg):
+        """
+        @see AssociationServiceClient.association_exists
+        """
+
+        log.info('op_association_exists: ')
+
+        rows = yield self._get_association(association_query)
+
+        response = yield self.message_client.create_instance(MessageContentTypeID=BOOL_MSG_TYPE)
+        if not rows:
+            response.result = False
+        elif len(rows)==1:
+            response.result = True
+        else:
+            raise AssociationServiceError('More than one association found for the specified triple!', association_query.ResponseCodes.BAD_REQUEST)
+
+
+        yield self.reply_ok(msg, response)
+
+
+
+
+    def _get_association(self, association_query):
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        return self.index_store.query(q)
+
+
+    @defer.inlineCallbacks
+    def op_get_associations(self, association_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_associations
+        """
+        log.info('op_get_association: ')
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        if association_query.IsFieldSet('subject'):
+            q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        if association_query.IsFieldSet('predicate'):
+            q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        if association_query.IsFieldSet('object'):
+            q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        rows = yield self.index_store.query(q)
+
+        response = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+
+        for key, row in rows.iteritems():
+            
+            link = response.idrefs.add()
+
+            idref= response.CreateObject(IDREF_TYPE)
+            idref.key = row[REPOSITORY_KEY]
+            idref.branch = row[BRANCH_NAME]
+
+            link.SetLink(idref)
+
+        yield self.reply_ok(msg, response)
 
 
 
@@ -484,6 +650,15 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_subjects(self, msg):
+        """
+        @brief Find the subjects which have associations including the given predicate object pairs.
+        Example Pairs: TypeOf - Dataset, LifeCycleState - Active, Owner - John Doe
+            Would return all active dataset resources owned by John Doe
+        @param params msg, GPB 15/1, a Predicate Object query message
+        @retval Query Results GPB 22/1
+        @GPB{Input,15,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('get_subjects', msg)
@@ -492,6 +667,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_objects(self, msg):
+        """
+        @brief Find the objects which have associations including the given subject predicate pairs.
+        @param params msg, GPB 16/1, a Subject Predicate query message
+        @retval Query Results GPB 22/1
+        @GPB{Input,16,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_objects', msg)
@@ -501,6 +683,13 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_subject_associations(self, msg):
+        """
+        @brief Get all the associations of a given subject
+        @param params msg, GPB 4/1, an IDRef for the subject in question
+        @retval Query Results GPB 22/1
+        @GPB{Input,4,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('subject_associations', msg)
@@ -509,13 +698,64 @@ class AssociationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def get_object_associations(self, msg):
+        """
+        @brief Get all the associations of a given object
+        @param params msg, GPB 4/1, an IDRef for the object in question
+        @retval Query Results GPB 22/1
+        @GPB{Input,14,1}
+        @GPB{Returns,22,1}
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('object_associations', msg)
 
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def get_association(self, msg):
+        """
+        @brief Get the identity of the association between these objects
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval IdRef of an association GPB 4/1
+        @GPB{Input,27,1}
+        @GPB{Returns,4,1}
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('get_association', msg)
+
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations(self, msg):
+        """
+        @brief Get the associations between any of subject, predicate and object. Becareful - you can ask very big questions with this method!
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval Query Results GPB 22/1
+        @GPB{Input,27,1}
+        @GPB{Returns,22,1}
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations', msg)
+
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def association_exists(self, msg):
+        """
+        @brief Get the identity of the association between these objects
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval Boolen Result Message GPB 22/1
+        @GPB{Input,27,1}
+        @GPB{Returns,30,1}
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('association_exists', msg)
+
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AssociationService)

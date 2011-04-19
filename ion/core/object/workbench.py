@@ -17,6 +17,7 @@ from google.protobuf import message
 from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
+from ion.core.object import association_manager
 
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
@@ -45,6 +46,8 @@ COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 PULL_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=46, version=1)
 PULL_RESPONSE_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=47, version=1)
 
+# used by op_checkout, response is BLOBS_MESSAGE_TYPE
+REQUEST_COMMIT_BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=48, version=1)
 
 
 PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1)
@@ -153,23 +156,22 @@ class WorkBench(object):
             commit_msg = 'Created association'
         association_repo.commit(commit_msg)
 
-        return association_repo
+        association = association_manager.AssociationInstance(association_repo, self)
+
+        return association
 
 
     def _set_association(self,  association_repo, thing, partname):
 
-        if hasattr(thing, 'Repository'):
-            # Allow passing a Resource Instance to create an association
-            thing = thing.Repository
-
-
-        if not isinstance(thing, repository.Repository):
+        if not hasattr(thing, 'Repository'):
             log.error('Association Error: type, value', type(thing),str(thing))
-            raise WorkBenchError('Invalid object passed to Create Association. Only Resource Instances or Object Repositories can be passed as subject, predicate or object')
+            raise WorkBenchError('Invalid object passed to Create Association. Only Object Repositories and Instance types can be passed as subject, predicate or object')
+
+        thing_repo = thing.Repository
 
 
         id_ref = association_repo.create_object(IDREF_TYPE)
-        thing.set_repository_reference(id_ref, current_state=True)
+        thing_repo.set_repository_reference(id_ref, current_state=True)
 
         association_repo.root_object.SetLinkByName(partname,id_ref)
 
@@ -266,6 +268,10 @@ class WorkBench(object):
         targetname = self._process.get_scoped_name('system', origin)
 
         log.info('Target Name "%s"' % str(targetname))
+
+
+        if not isinstance(repo_name, (str, unicode)):
+            raise TypeError('Invalid argument (repo_nae) type to workbench pull. Should be string, received: "%s"' % type(repo_name))
         repo = self.get_repository(repo_name)
         
         commit_list = []
@@ -338,6 +344,7 @@ class WorkBench(object):
         # Where to get objects not yet transfered.
         repo.upstream['service'] = origin
         repo.upstream['process'] = headers.get('reply-to')
+
 
         defer.returnValue(result)
 
@@ -506,12 +513,32 @@ class WorkBench(object):
         if not hasattr(repo_or_repos, '__iter__'):
             repos = [repo_or_repos,]
 
+        for item in repos:
+            if not hasattr(item, 'Repository'):
+                raise WorkBenchError('Invalid argument to push. Only Repositories or Instance objects which wrap a repository may be pushed!')
+
+        # Get any associations that we may need to push
+        repositories_and_associations = set()
+        for repo in repos:
+            repositories_and_associations.add(repo)
+
+            set_of_subject_associations = repo.Repository.associations_as_subject.get_associations()
+            repositories_and_associations.update(set_of_subject_associations)
+
+            set_of_object_associations = repo.Repository.associations_as_object.get_associations()
+            repositories_and_associations.update(set_of_object_associations)
+
+        instances = list(repositories_and_associations)
+
 
         # Create push message
         pushmsg = yield self._process.message_client.create_instance(PUSH_MESSAGE_TYPE)
 
         #Iterate the list and build the message to send
-        for repo in repos:
+        for instance in instances:
+
+            # Just in case this thing is an instance object
+            repo = instance.Repository
 
             commit_head = repo.commit_head
             if commit_head is None:

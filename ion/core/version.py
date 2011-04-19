@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 
-"""
-@file ion/core/version.py
-@author Adam R. Smith
-@brief sets the version for ION classes
-"""
-
+# This file is auto-generated. You should not modify by hand.
 from _version import Version
 
 # VERSION !!! This is the main version !!!
-version = Version('ion', 0, 4, 4)
-
+version = Version('ion', 0, 4, 7)

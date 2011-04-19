@@ -14,7 +14,7 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.services.coi.resource_registry_beta import resource_client
@@ -23,7 +23,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -36,16 +36,16 @@ from ion.core.data.storage_configuration_utility import REPOSITORY_KEY, BRANCH_N
 
 from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
 from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
-from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
 
-from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
+from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, get_cassandra_configuration
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -67,7 +67,6 @@ class DataStoreWorkBenchError(WorkBenchError):
     An Exception class for errors in the data store workbench
     """
 
-
 class DataStoreWorkbench(WorkBench):
 
 
@@ -86,6 +85,93 @@ class DataStoreWorkbench(WorkBench):
     def push(self, *args, **kwargs):
 
         raise NotImplementedError("The Datastore Service can not Push")
+
+    @defer.inlineCallbacks
+    def _get_blobs(self, repo, startkeys, filtermethod=None):
+        """
+        Common blob fetching helper method.
+        Used by checkout and pull.
+
+        @param  repo            Repository for the response.
+        @param  startkeys       The keys that should start the fetching process.
+        @param  filtermethod    A callable to be applied to all children of fetched items. If the callable returns true,
+                                the item is included.
+
+        @returns                A dictionary of keys => blobs.
+        """
+        # Slightly different machinary here than in the workbench - Could be made more similar?
+        blobs={}
+        keys_to_get=set(startkeys)
+        def_filter = lambda x: True
+        filtermethod = filtermethod or def_filter
+
+        while len(keys_to_get) > 0:
+            new_links_to_get = set()
+
+            def_list = []
+            #@TODO - put some error checking here so that we don't overflow due to a stupid request!
+            for key in keys_to_get:
+                # Short cut if we have already got it!
+                wse = repo.index_hash.get(key)
+
+                if wse:
+                    blobs[wse.key]=wse
+                    # get the object
+                    obj = repo._load_element(wse)
+
+                    # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
+                    new_links_to_get.update(obj.ChildLinks)
+                else:
+                    def_list.append(self._blob_store.get(key))
+
+
+            result_list = []
+            if def_list:
+                result_list = yield defer.DeferredList(def_list)
+
+            for result, blob in result_list:
+                assert result==True, 'Error getting link from blob store!'
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                blobs[wse.key]=wse
+
+                # Add it to the repository index
+                repo.index_hash[wse.key] = wse
+
+                # load the object so we can find its children
+                obj = repo._load_element(wse)
+
+                new_links_to_get.update(obj.ChildLinks)
+
+            keys_to_get.clear()
+            for link in new_links_to_get:
+                if not blobs.has_key(link.key) and filtermethod(link):
+                    keys_to_get.add(link.key)
+
+        defer.returnValue(blobs)
+
+    @defer.inlineCallbacks
+    def op_checkout(self, content, headers, msg):
+
+        if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
+             raise DataStoreWorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+            """
+            return (x.type not in content.excluded_types)
+
+        blobs = yield self._get_blobs(response.Repository, [content.commit_root_object], filtermethod)
+
+        for element in blobs.values():
+            link = response.blob_elements.add()
+            obj = response.Repository._wrap_message_object(element._element)
+
+            link.SetLink(obj)
+
+        yield self._process.reply_ok(msg, content=response)
 
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
@@ -189,56 +275,9 @@ class DataStoreWorkbench(WorkBench):
             link.SetLink(obj)
 
         if request.get_head_content:
-            # Slightly different machinary here than in the workbench - Could be made more similar?
-            blobs={}
-            links_to_get=set()
-            for commit in repo.current_heads():
 
-                links_to_get.add(commit.GetLink('objectroot'))
-
-
-            while len(links_to_get) > 0:
-
-                new_links_to_get = set()
-
-
-                def_list = []
-                #@TODO - put some error checking here so that we don't overflow due to a stupid request!
-                for link in links_to_get:
-                    # Short cut if we have already got it!
-                    wse = repo.index_hash.get(link.key)
-                    
-                    if wse:
-                        blobs[wse.key]=wse
-                        # get the object
-                        obj = repo.get_linked_object(link)
-
-                        new_links_to_get.update(obj.ChildLinks)
-                    else:
-                        def_list.append(self._blob_store.get(link.key))
-
-
-                result_list = []
-                if def_list:
-                    result_list = yield defer.DeferredList(def_list)
-
-                for result, blob in result_list:
-                    assert result==True, 'Error getting link from blob store!'
-                    wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                    blobs[wse.key]=wse
-
-                    # Add it to the repository index
-                    repo.index_hash[wse.key] = wse
-
-                    # load the object so we can find its children
-                    obj = repo._load_element(wse)
-
-                    new_links_to_get.update(obj.ChildLinks)
-
-                links_to_get =[]
-                for link in new_links_to_get:
-                    if not blobs.has_key(link.key):
-                        links_to_get.append(link)
+            keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
+            blobs = yield self._get_blobs(response.Repository, keys)
 
             for element in blobs.values():
                 link = response.blob_elements.add()
@@ -282,7 +321,7 @@ class DataStoreWorkbench(WorkBench):
             else:
 
                 if repo.status == repo.MODIFIED:
-                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
+                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', pushmsg.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
             # Get the latest commits in the repository
@@ -550,7 +589,20 @@ class DataStoreWorkbench(WorkBench):
         yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
 
+    @defer.inlineCallbacks
+    def op_put_blobs(self, request, headers, message):
+        log.info("op_put_blobs")
+        if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid put blobs request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        def_list = []
+        for blob in request.blob_elements:
+            def_list.append(self._blob_store.put(blob.key, blob))
+
+        yield defer.DeferredList(def_list)
+
+        yield self._process.reply_ok(message)
+        log.info("op_put_blobs: Complete!")
 
     @defer.inlineCallbacks
     def op_fetch_blobs(self, request, headers, message):
@@ -665,7 +717,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
                     attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
-                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
 
 
                 elif  root_type == TERMINOLOGY_TYPE:
@@ -735,35 +787,6 @@ class DataStoreError(ApplicationError):
     """
 
 
-#class DataStoreClient(ServiceClient):
-#    """
-#    Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
-#    """
-#    
-#    def __init__(self, *args, **kwargs):
-#        kwargs['targetname'] = 'datastore'
-#        ServiceClient.__init__(self, *args, **kwargs)
-#    
-#    @defer.inlineCallbacks
-#    def get_preloaded_datasets_dict(self):
-#        """
-#        Retrieve the dictionary of preloaded dataset IDs
-#        """
-##        yield self._check_init()
-#        
-#        log.info("@@@--->>> DataStoreClient: Sending RPC message.  OP = 'get_preloaded_datasets_dict'")
-##        (content, headers, msg) = yield self.rpc_send('get_preloaded_datasets_dict', None)
-##        
-##        log.info("<<<---@@@ DataStoreClient: Incoming rpc reply to op: 'get_preloaded_datasets_dict'")
-##        log.debug("... Content\t" + str(content))
-##        log.debug("... Headers\t" + str(headers))
-##        log.debug("... Message\t" + str(msg))
-##        
-##        defer.returnValue(content)
-#        yield
-#        defer.returnValue({})
-
-
 class DataStoreService(ServiceProcess):
     """
     The data store is not yet persistent. At the moment all its stored objects
@@ -775,16 +798,6 @@ class DataStoreService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='datastore',
                                              version='0.1.0',
                                              dependencies=[])
-
-#    @defer.inlineCallbacks
-#    def op_get_preloaded_datasets_dict(self, content, headers, msg):
-#        log.info("<<<---@@@ DataStoreService: Incoming call to op_get_preloaded_datasets_dict()")
-#        log.debug('DataStoreService.op_get_preloaded_datasets_dict(): returning the preloaded datasets dictionary')
-##        return self.preloaded_datasets_dict
-#        log.info("@@@--->>> DataStoreService: Sending preloaded datasets dictionary to sender")
-#        res = yield self.reply_ok(msg, self.preloaded_datasets_dict)
-##        defer.returnValue(res)
-
 
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
@@ -802,7 +815,7 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
         
         self._backend_classes={}
-        
+
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
         self._password = self.spawn_args.get("password", CONF.getValue("password",None))
 
@@ -819,17 +832,20 @@ class DataStoreService(ServiceProcess):
         self.c_store = None
         self.b_store = None
 
+        # Get the configuration for cassandra - may or may not be used depending on the backend class
+        self._storage_conf = get_cassandra_configuration()
         
         # Get the arguments for preloading the datastore
         self.preload = {ION_PREDICATES_CFG:True,
                         ION_RESOURCE_TYPES_CFG:True,
                         ION_IDENTITIES_CFG:True,
-                        ION_DATASETS_CFG:False,}
+                        ION_DATASETS_CFG:False,
+                        ION_AIS_RESOURCES_CFG:False}
 
-        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(CONF.getValue(PRELOAD_CFG, {}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
-        
-#        self.preloaded_datasets_dict = {}
+
+
 
         log.info('DataStoreService.__init__()')
         
@@ -840,39 +856,65 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[COMMIT_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Cassandra Index Store")
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE],  **{"username": self._username, "password": self._password})
+
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+
+            self.c_store = self._backend_classes[COMMIT_CACHE](self._username, self._password, storage_provider, keyspace, COMMIT_CACHE)
+
+            yield self.c_store.initialize()
+            yield self.c_store.activate()
+
             yield self.register_life_cycle_object(self.c_store)
             
         else:
 
+            log.info("Clearing The In Memeory Index Store")
+
+            self._backend_classes[COMMIT_CACHE].indices.clear()
+            self._backend_classes[COMMIT_CACHE].kvs.clear()
+
             log.info("Instantiating In Memeory Index Store")
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self,**{'indices':COMMIT_INDEXED_COLUMNS} )
+            # Pass self for index store service implementation
+            self.c_store = self._backend_classes[COMMIT_CACHE](self, indices=COMMIT_INDEXED_COLUMNS )
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
             log.info("Instantiating Store")
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE],  **{"username": self._username, "password": self._password})
+
+            storage_provider = self._storage_conf[STORAGE_PROVIDER]
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+            
+            self.b_store = self._backend_classes[COMMIT_CACHE](self._username, self._password, storage_provider, keyspace, BLOB_CACHE)
+
+            yield self.b_store.initialize()
+            yield self.b_store.activate()
+
             yield self.register_life_cycle_object(self.b_store)
         else:
+
+            log.info("Clearing The In Memeory Store")
+
+            self._backend_classes[BLOB_CACHE].kvs.clear()
+
             log.info("Instantiating In Memory Store")
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE], self)
+            # Pass self for store service implementation
+            self.b_store = self._backend_classes[BLOB_CACHE](self)
 
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
 
+        yield self.initialize_datastore()
 
-        
 
-
-    @defer.inlineCallbacks
     def slc_activate(self):
 
-        yield self.initialize_datastore()
+
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
-
+        self.op_checkout = self.workbench.op_checkout
 
 
     @defer.inlineCallbacks
@@ -880,7 +922,6 @@ class DataStoreService(ServiceProcess):
         """
         This method is used to preload required content into the datastore
         """
-
 
         if self.preload[ION_PREDICATES_CFG]:
 
@@ -893,8 +934,23 @@ class DataStoreService(ServiceProcess):
                     predicate_repo = self._create_predicate(value)
                     if predicate_repo is None:
                         raise DataStoreError('Failed to create predicate: %s' % str(value))
-                    self._create_ownership_association(predicate_repo, ROOT_USER_ID)
+                    #@TODO make associations to predicates!
 
+
+
+        # Load the Root User!
+        if self.preload[ION_IDENTITIES_CFG]:
+            log.info('Preloading Identities')
+
+            root_description = ION_IDENTITIES.get(root_name)
+            exists = yield self.workbench.test_existence(ROOT_USER_ID)
+            if not exists:
+                log.info('Preloading ROOT USER')
+
+                resource_instance = self._create_resource(root_description)
+                if resource_instance is None:
+                    raise DataStoreError('Failed to create Identity Resource: %s' % str(root_description))
+                self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
             log.info('Preloading Resource Types')
@@ -907,7 +963,7 @@ class DataStoreService(ServiceProcess):
 
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
-                        raise DataStoreError('Failed to Resource Type Resource: %s' % str(value))
+                        raise DataStoreError('Failed to create Resource Type Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
 
@@ -921,7 +977,7 @@ class DataStoreService(ServiceProcess):
 
                     resource_instance = self._create_resource(value)
                     if resource_instance is None:
-                        raise DataStoreError('Failed to Identity Resource: %s' % str(value))
+                        raise DataStoreError('Failed to create Identity Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
                     
         if self.preload[ION_DATASETS_CFG]:
@@ -933,8 +989,39 @@ class DataStoreService(ServiceProcess):
                     log.info('Preloading DataSet:' + str(value.get(NAME_CFG)))
 
                     resource_instance = self._create_resource(value)
+                    # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
                         self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+                    else:
+                        del ION_DATASETS[key]
+
+            for key, value in ION_DATA_SOURCES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading DataSource:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    # Do not fail if returning none - may or may not load data from disk
+                    if resource_instance is not None:
+                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+                    else:
+                        del ION_DATA_SOURCES[key]
+
+        if self.preload[ION_AIS_RESOURCES_CFG]:
+            log.info('Preloading AIS Resources')
+
+            for key, value in ION_AIS_RESOURCES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading AIS Resource:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to create AIS Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+
 
         yield self.workbench.flush_initialization_to_backend()
 
@@ -1028,16 +1115,19 @@ class DataStoreService(ServiceProcess):
 
         elif isinstance(content, FunctionType):
             #execute the function on the resource_instance!
-            kwargs = {}
+            kwargs = {'has_a_id':HAS_A_ID}
             if description.has_key(CONTENT_ARGS_CFG):
-                kwargs = description[CONTENT_ARGS_CFG]
-            if not content(resource_instance, self, **kwargs):
+                kwargs.update(description[CONTENT_ARGS_CFG])
+
+            load_result = content(resource_instance, self, **kwargs)
+
+            if not load_result:
                 set_content_ok = False
-            
-        
+
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
             return resource_instance
+
         else:
             self.workbench.clear_repository_key(resource_key)
             log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % resource_name)
@@ -1056,18 +1146,82 @@ class DataStoreService(ServiceProcess):
 
         # Set the predicate
         id_ref = association_repo.create_object(IDREF_TYPE)
-        id_ref.key = OWNED_BY_ID
+        owned_by_repo = self.workbench.get_repository(OWNED_BY_ID)
+        if owned_by_repo is None:
+            raise DataStoreError('Owned_By predicate not found during preload.')
+        owned_by_repo.set_repository_reference(id_ref, current_state=True)
+
         association_repo.root_object.predicate = id_ref
 
         # Set teh Object
         id_ref = association_repo.create_object(IDREF_TYPE)
-        id_ref.key = user_id
+        owner_repo = self.workbench.get_repository(user_id)
+        if owner_repo is None:
+            raise DataStoreError('Owner resource not found during preload.')
+        owner_repo.set_repository_reference(id_ref, current_state=True)
+
         association_repo.root_object.object = id_ref
 
         association_repo.commit('Ownership association created for preloaded object.')
 
 
         return association_repo
+
+class DataStoreClient(ServiceClient):
+    """
+    Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
+    """
+    
+    def __init__(self, *args, **kwargs):
+        kwargs['targetname'] = 'datastore'
+        ServiceClient.__init__(self, *args, **kwargs)
+
+    @defer.inlineCallbacks
+    def push(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('push', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def pull(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('pull', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def checkout(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('checkout', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def fetch_blobs(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('fetch_blobs', content)
+        defer.returnValue(content)
+
+#    @defer.inlineCallbacks
+#    def get_preloaded_datasets_dict(self):
+#        """
+#        Retrieve the dictionary of preloaded dataset IDs
+#        """
+##        yield self._check_init()
+#
+#        log.info("@@@--->>> DataStoreClient: Sending RPC message.  OP = 'get_preloaded_datasets_dict'")
+##        (content, headers, msg) = yield self.rpc_send('get_preloaded_datasets_dict', None)
+##
+##        log.info("<<<---@@@ DataStoreClient: Incoming rpc reply to op: 'get_preloaded_datasets_dict'")
+##        log.debug("... Content\t" + str(content))
+##        log.debug("... Headers\t" + str(headers))
+##        log.debug("... Message\t" + str(msg))
+##
+##        defer.returnValue(content)
+#        yield
+#        defer.returnValue({})
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)

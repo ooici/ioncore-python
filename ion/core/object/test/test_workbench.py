@@ -30,120 +30,129 @@ from ion.test.iontest import IonTestCase
 
 
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
-invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
+INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
+PREDICATE_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 
 class WorkBenchTest(unittest.TestCase):
-        
+
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
-        
-        repo = self.wb.create_repository(addresslink_type)
+
+        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
 
         ab = repo.root_object
-                        
-        p = repo.create_object(person_type)
+
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
         ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
-        
+
         ab.owner = p
-            
+
         ab.person.add()
         ab.person[0] = p
-        
+
         ab.person.add()
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
         ph = p.phone.add()
         ph.type = p.PhoneType.WORK
         ph.number = '111 222 3333'
-        
+
         ab.person[1] = p
-        
+
         self.ab = ab
         self.repo = repo
-        
-    def test_invalid_type(self):
-        
-        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type )
-            
+
+    def test_INVALID_TYPE(self):
+
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, INVALID_TYPE )
+
     def test_simple_commit(self):
-        
+
         cref = self.repo.commit(comment='testing commit')
         self.assertEqual(cref, self.repo._current_branch.commitrefs[0].MyId)
-        
+
         self.assertIn(self.ab.MyId, self.repo.index_hash.keys())
         self.assertIn(self.ab.person[0].MyId, self.repo.index_hash.keys())
         self.assertIn(self.ab.person[1].MyId, self.repo.index_hash.keys())
         self.assertIn(self.ab.owner.MyId, self.repo.index_hash.keys())
-        
+
         self.assertIn(cref, self.repo.index_hash.keys())
-        
+
         cref_se = self.repo.index_hash.get(cref)
         self.assertEqual(len(cref_se.ChildLinks),1)
         self.assertIn(self.ab.MyId, cref_se.ChildLinks)
 
-        
+
     def test_create_repo(self):
-            
+
         # Try it with no arguments
-        repo = self.wb.create_repository()   
+        repo = self.wb.create_repository()
         rootobj = repo.root_object
-            
+
         rkey = repo.repository_key
         self.assertEqual(repo, self.wb.get_repository(rkey))
         self.assertEqual(rootobj, None)
-            
-            
+
+
         # Try it with a root object this time
-        repo = self.wb.create_repository(addressbook_type)
+        repo = self.wb.create_repository(ADDRESSBOOK_TYPE)
         rootobj = repo.root_object
-            
+
         rkey = repo.repository_key
         self.assertEqual(repo, self.wb.get_repository(rkey))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
-            
+
         # Try it with a nickname for the repository
-        repo = self.wb.create_repository(root_type=addressbook_type, nickname='David')
+        repo = self.wb.create_repository(root_type=ADDRESSBOOK_TYPE, nickname='David')
         rootobj = repo.root_object
-            
+
         self.assertEqual(repo, self.wb.get_repository('David'))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
-        
+
     def test_associations(self):
 
         # Copy the address book object from the setup method to three new objects and use them in an association
         self.ab.title = 'subject'
-        subject = self.wb.create_repository(addresslink_type)
+        subject = self.wb.create_repository(ADDRESSLINK_TYPE)
         subject.root_object = self.ab
         subject.commit('a subject')
 
-        self.ab.title = 'predicate'
-        predicate = self.wb.create_repository(addresslink_type)
-        predicate.root_object = self.ab
+        predicate = self.wb.create_repository(PREDICATE_TYPE)
+        predicate.root_object.word = 'predicate'
         predicate.commit('a predicate')
 
         self.ab.title = 'object'
-        obj = self.wb.create_repository(addresslink_type)
+        obj = self.wb.create_repository(ADDRESSLINK_TYPE)
         obj.root_object = self.ab
         obj.commit('a object')
 
 
         association = self.wb.create_association(subject, predicate, obj)
 
-        self.assertEqual(association.root_object.subject.key, subject.repository_key)
-        self.assertEqual(association.root_object.predicate.key, predicate.repository_key)
-        self.assertEqual(association.root_object.object.key, obj.repository_key)
+        self.assertEqual(association.SubjectReference.key, subject.repository_key)
+        self.assertEqual(association.PredicateReference.key, predicate.repository_key)
+        self.assertEqual(association.ObjectReference.key, obj.repository_key)
+
+        self.assertIn(association, subject.associations_as_subject.get_associations())
+        self.assertIn(association, subject.associations_as_subject.get_associations_by_predicate(predicate.repository_key))
+
+        self.assertIn(association, obj.associations_as_object.get_associations())
+        self.assertIn(association, obj.associations_as_object.get_associations_by_predicate(predicate.repository_key))
+
+        self.assertIn(association, predicate.associations_as_predicate.get_associations())
+        self.assertIn(association, predicate.associations_as_predicate.get_associations_by_predicate(predicate.repository_key))
 
 
     def test_clear_non_persistent(self):
@@ -232,11 +241,11 @@ class WorkBenchProcessTest(IonTestCase):
         workbench_process2 = self._get_procinstance(child_proc2)
 
 
-        repo = workbench_process1.workbench.create_repository(addresslink_type)
+        repo = workbench_process1.workbench.create_repository(ADDRESSLINK_TYPE)
 
         ab = repo.root_object
 
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -308,7 +317,7 @@ class WorkBenchProcessTest(IonTestCase):
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
-        
+
         self.assertEqual(repo2._workspace_root, None)
 
         # Objects are sent in the pull (get_head_content is True)
@@ -389,7 +398,7 @@ class WorkBenchProcessTest(IonTestCase):
 
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
-        
+
         # Can't easily test that the messaging works properly - but make sure result is good
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
@@ -494,7 +503,7 @@ class WorkBenchProcessTest(IonTestCase):
         log.info('Pushing to: %s' % str(self.proc2.id.full))
         result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
-        
+
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
 
@@ -555,7 +564,7 @@ class WorkBenchProcessTest(IonTestCase):
         log.info('Pushing tpo: %s' % str(self.proc2.id.full))
         result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
-        
+
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
 

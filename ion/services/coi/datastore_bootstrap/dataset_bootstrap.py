@@ -4,9 +4,18 @@
 @file ion/res/config.py
 @author David Stuebe
 @author Tim LaRocque
-@TODO
+
+Sample Dataset are configure and loaded like so:
+'ion.services.coi.datastore_bootstrap.ion_preload_config':{
+    # Path to files relative to ioncore-python directory!
+    # Get files from:  http://ooici.net/ion_data/
+	'sample_traj_dataset' : '../../ion_data/SOS_Test.tar.gz',
+	'sample_station_dataset' : '../../ion_data/USGS_Test.tar.gz'
+},
+
 """
 import tarfile
+from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -50,30 +59,46 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     
     result = False
     f = None
+    tar = None
     try:
 
         # Get an absolute path to the file
         filename = pu.get_ion_path(filename)
 
-        if filename.endswith('.tar.gz'):
+        if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
             log.debug('Untaring file...')
-            outname = filename.replace('.tar.gz', '.obj')
             tar = tarfile.open(filename, 'r')
-            try:
-                f = tar.extractfile(tar.next())
-            except:
-                pass
+            f = tar.extractfile(tar.next())
+
         else:
             f = open(filename, 'r')
         result = True
     except IOError, e:
         log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
-        
+
+    except ExtractError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
+
     if f is not None:
-        obj = codec.unpack_structure(f.read())
-        ds_svc.workbench.put_repository(obj.Repository)
-        resource_instance.ResourceObject = obj
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
+
+        root_obj = resource_instance.Repository._load_element(head_elm)
+        resource_instance.ResourceObject = root_obj
     
+        resource_instance.Repository.load_links(root_obj)
+
+        f.close()
+
+    if tar is not None:
+
+        tar.close()
+
+
+    log.debug('Bootstraping dataset from local byte array complete: "%s"' % filename)
+
+
+
     return result
 
 
@@ -83,7 +108,23 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     # Create the coresponding datasource object #
     #-------------------------------------------#
     # Datasource: NDBC SOS Glider data
-    
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
     datasource.source_type = datasource.SourceType.SOS
     datasource.property.append('salinity')
     datasource.station_id.append('48900')
@@ -106,7 +147,26 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     # Create the coresponding datasource object #
     #-------------------------------------------#
     # Datasource: USGS waterservices
-    
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
     datasource.source_type = datasource.SourceType.USGS
     datasource.property.append('00010')
     datasource.property.append('00060')
@@ -392,7 +452,19 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     #-------------------------------------------#
     # Create the coresponding datasource object #
     #-------------------------------------------#
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
     
+     # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
     datasource.source_type = datasource.SourceType.SOS
     datasource.property.append('sea_water_temperature')
     datasource.station_id.append('41012')
@@ -406,7 +478,7 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
     datasource.max_ingest_millis = 6000
-    
+
     return True
 
 

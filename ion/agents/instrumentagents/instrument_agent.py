@@ -5,11 +5,12 @@
 @author Steve Foley
 @brief Instrument Agent, Driver, and Client class definitions
 """
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+
+from uuid import uuid4
 
 from twisted.internet import defer
-
+import ion.util.ionlog
+import ion.util.procutils as pu
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.exception import ReceivedError
@@ -23,191 +24,11 @@ from uuid import uuid4
 import ion.util.procutils as pu
 
 
-"""
-Constants/Enumerations for tags in capabilities dict structures.
-"""
-ci_commands             = 'ci_commands'
-ci_parameters           = 'ci_parameters'
-instrument_commands     = 'instrument_commands'
-instrument_parameters   = 'instrument_parameters'
+from ion.agents.instrumentagents.instrument_agent_constants import *
 
 
-"""
-Observatory state names.
-"""
-ci_state_list = [
-    'CI_STATE_UNKNOWN',
-    'CI_STATE_POWERED_DOWN',
-    'CI_STATE_UNINITIALIZED',
-    'CI_STATE_INACTIVE',
-    'CI_STATE_STOPPED',
-    'CI_STATE_IDLE',
-    'CI_STATE_OBSERVATORY_MODE',
-    'CI_STATE_DIRECT_ACCESS_MODE'
-]
+log = ion.util.ionlog.getLogger(__name__)
 
-"""
-Observatory transition names.
-"""
-ci_transition_list = [
-    'CI_TRANS_INITIALIZE',
-    'CI_TRANS_RESET',
-    'CI_TRANS_GO_ACTIVE',
-    'CI_TRANS_GO_INACTIVE',
-    'CI_TRANS_CLEAR',
-    'CI_TRANS_RESUME',
-    'CI_TRANS_RUN',
-    'CI_TRANS_PAUSE',
-    'CI_TRANS_OBSERVATORY_MODE',
-    'CI_TRANS_DIRECT_ACCESS_MODE'
-    
-]
-
-
-"""
-Observatory commands names.
-"""
-ci_command_list = [
-    'CI_CMD_STATE_TRANSITION',
-    'CI_CMD_TRANSMIT_DATA'
-]
-
-"""
-Parameter names for instrument agents.
-"""
-ci_param_list = [
-    'CI_PARAM_DATA_TOPICS',
-    'CI_PARAM_EVENT_TOPICS',
-    'CI_PARAM_STATE_TOPICS',
-    'CI_PARAM_DRIVER_ADDRESS',
-    'CI_PARAM_RESOURCE_ID',
-    'CI_PARAM_TIME_SOURCE',
-    'CI_PARAM_CONNECTION_METHOD',
-    'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT',
-    'CI_PARAM_MAX_TRANSACTION_TIMEOUT',
-    'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'
-]
-
-"""
-List of observatory status names.
-"""
-ci_status_list = [
-    'CI_STATUS_AGENT_STATE',
-    'CI_STATUS_CHANNEL_NAMES',
-    'CI_STATUS_INSTRUMENT_CONNECTION_STATE',
-    'CI_STATUS_ALARMS',
-    'CI_STATUS_TIME_STATUS',
-    'CI_STATUS_BUFFER_SIZE',
-    'CI_STATUS_AGENT_VERSION',
-    'CI_STATUS_DRIVER_VERSION'    
-]
-
-"""
-Agent parameter and metadata types.
-"""
-ci_param_types = [
-    'CI_TYPE_DATATYPE',             # This type.
-    'CI_TYPE_INT',                  # int.
-    'CI_TYPE_FLOAT',                # float.
-    'CI_TYPE_BOOL',                 # bool.
-    'CI_TYPE_STRING',               # str.
-    'CI_TYPE_INT_RANGE',            # (int,int).
-    'CI_TYPE_FLOAT_RANGE',          # (float,float).
-    'CI_TYPE_TIMESTAMP',            # (int seconds,int nanoseconds).
-    'CI_TYPE_TIME_DURATION',        # TBD.
-    'CI_TYPE_PUBSUB_TOPIC_DICT',    # dict of topic strings.
-    'CI_TYPE_RESOURCE_ID',          # str (possible validation).
-    'CI_TYPE_ADDRESS',              # str (possible validation).
-    'CI_TYPE_ENUM'                  # str with valid values.
-]
-
-
-"""
-Used by the existing drivers...need to fix.
-"""
-publish_msg_type = {
-    'Error':'Error',
-    'StateChange':'StateChange',
-    'ConfigChange':'ConfigChange',
-    'Data':'Data',
-    'Event':'Event'
-}
-
-"""
-Publish message types.
-"""
-publish_msg_types = [
-    'PUBLISH_MSG_ERROR',                        
-    'PUBLISH_MSG_STATE_CHANGE',
-    'PUBLISH_MSG_CONIFG_CHANGE',
-    'PUBLISH_MSG_DATA',
-    'PUBLISH_MSG_EVENT'    
-]
-
-"""
-Time source of device fronted by agent.
-"""
-time_sources = [
-    'TIME_NOT_SPECIFIED',                       #
-    'TIME_PTP_DIRECT',                          # IEEE 1588 PTP connection directly supported.
-    'TIME_NTP_UNICAST',                         # NTP unicast to the instrument.
-    'TIME_NTP_BROADCAST',                       # NTP broadcast to the instrument.
-    'TIME_LOCAL_OSCILLATOR',                    # Device has own clock.
-    'TIME_DRIVER_SET_INTERVAL'                  # Driver sets clock at interval.
-]
-
-"""
-Connection method to agent and device.
-"""
-connection_methods = [
-    'CONNECTION_NOT_SPECIFIED',                #
-    'CONNECTION_OFFLINE',                      # Device offline.
-    'CONNECTION_CABLED_OBSERVATORY',           # Accessible through cabled observatory, available full time.
-    'CONNECTION_SHORE_NETWORK',                # Connected through full time shore connection.
-    'CONNECTION_PART_TIME_SCHEDULED',          # Comes online on scheduled basis. Outages normal.
-    'CONNECTION_PART_TIME_RANDOM'              # Comes online as needed. Outages normal.
-]
-
-"""
-Observatory alarm conditions.
-"""
-status_alarms = {
-    'ALARM_CANNOT_PUBLISH'              : ('ALARM_CANNOT_PUBLISH','Attempted to publish but cannot.'),
-    'ALARM_INSTRUMENT_UNREACHABLE'      : ('ALARM_INSTRUMENT_UNREACHABLE','Instrument cannot be contacted when it should be.'),
-    'ALARM_MESSAGING_ERROR'             : ('ALARM_MESSAGING_ERROR','Error when sending messages.'),
-    'ALARM_HARDWARE_ERROR'              : ('ALARM_HARDWARE_ERROR','Hardware problem detected.'),
-    'ALARM_UNKNOWN_ERROR'               : ('ALARM_UNKNOWN_ERROR','An unknown error has occurred.')   
-}
-    
-"""
-Names of observatory and device capability lists.
-"""
-capabilities_list = [
-    'CAP_OBSERVATORY_COMMANDS',         # Common and specific observatory command names.
-    'CAP_OBSERVATORY_PARAMS',           # Common and specific observatory parameter names.
-    'CAP_OBSERVATORY_STATUSES',         # Common and specific observatory status names.
-    'CAP_METADATA',                     # Common and specific metadata names.
-    'CAP_DEVICE_COMMANDS',              # Common and specific device command names.
-    'CAP_DEVICE_PARAMS',                # Common and specific device parameter names.
-    'CAP_DEVICE_STATUSES'               # Common and specific device status names.
-]
-
-"""
-Parameter names for agent and device metadata.
-"""
-metadata_list = [
-    'META_DATATYPE',
-    'META_PHYSICAL_PARAMETER_TYPE',
-    'META_MINIMUM_VALUE',
-    'META_MAXIMUM_VALUE',    
-    'META_UNITS',
-    'META_UNCERTAINTY',
-    'META_LAST_CHANGE_TIMESTAMP',
-    'META_WRITABLE',
-    'META_VALID_VALUES',    
-    'META_FRIENDLY_NAME',
-    'META_DESCRIPTION'
-]
 
 """
 Instrument agent observatory metadata.
@@ -266,198 +87,160 @@ ci_param_metadata = {
 
 
 
-"""
-Agent errors.
-"""
-errors = {
-    'INVALID_DESTINATION'       : ['ERROR','INVALID_DESTINATION','Intended destination for a message or operation is not valid.'],
-    'TIMEOUT'                   : ['ERROR','TIMEOUT','The message or operation timed out.'],
-    'NETWORK_FAILURE'           : ['ERROR','NETWORK_FAILURE','A network failure has been detected.'],
-    'NETWORK_CORRUPTION'        : ['ERROR','NETWORK_CORRUPTION','A message passing through the network has been determined to be corrupt.'],
-    'OUT_OF_MEMORY'	        : ['ERROR','OUT_OF_MEMORY','There is no more free memory to complete the operation.'],
-    'LOCKED_RESOURCE'	        : ['ERROR','LOCKED_RESOURCE','The resource being accessed is in use by another exclusive operation.'],
-    'RESOURCE_NOT_LOCKED'       : ['ERROR','RESOURCE_NOT_LOCKED','Attempted to unlock a free resource.'],
-    'RESOURCE_UNAVAILABLE'      : ['ERROR','RESOURCE_UNAVAILABLE','The resource being accessed is unavailable.'],
-    'TRANSACTION_REQUIRED'      : ['ERROR','TRANSACTION_REQUIRED','The operation requires a transaction with the agent.'],
-    'UNKNOWN_ERROR'             : ['ERROR','UNKNOWN_ERROR','An unknown error has been encountered.'],
-    'PERMISSION_ERROR'          : ['ERROR','PERMISSION_ERROR','The user does not have the correct permission to access the resource in the desired way.'],
-    'INVALID_TRANSITION'        : ['ERROR','INVALID_TRANSITION','The transition being requested does not apply for the current state.'],
-    'INCORRECT_STATE'           : ['ERROR','INCORRECT_STATE','The operation being requested does not apply to the current state.'],
-    'UNKNOWN_TRANSITION'        : ['ERROR','UNKNOWN_TRANSITION','The specified state transition does not exist.'],
-    'CANNOT_PUBLISH'	        : ['ERROR','CANNOT_PUBLISH','An attempt to publish has failed.'],
-    'INSTRUMENT_UNREACHABLE'    : ['ERROR','INSTRUMENT_UNREACHABLE','The agent cannot communicate with the device.'],
-    'MESSAGING_ERROR'           : ['ERROR','MESSAGING_ERROR','An error has been encountered during a messaging operation.'],
-    'HARDWARE_ERROR'            : ['ERROR','HARDWARE_ERROR','An error has been encountered with a hardware element.'],
-    'WRONG_TYPE'                : ['ERROR','WRONG_TYPE','The type of operation is not valid in the current state.'],
-    'INVALID_COMMAND'           : ['ERROR','INVALID_COMMAND','The command is not valid in the given context.'],    
-    'UNKNOWN_COMMAND'           : ['ERROR','UNKNOWN_COMMAND','The command is not recognized.'],
-    'NOT_IMPLEMENTED'           : ['ERROR','NOT_IMPLEMENTED','The command is not implemented.'],
-    'INVALID_TRANSACTION_ID'    : ['ERROR','INVALID_TRANSACTION_ID','The transaction ID is not a valid value.'],
-    'INVALID_DRIVER'            : ['ERROR','INVALID_DRIVER','Driver or driver client invalid.'],
-    'GET_OBSERVATORY_ERR'       : ['ERROR','GET_OBSERVATORY_ERR','Could not retrieve all parameters.'],
-    'EXE_OBSERVATORY_ERR'       : ['ERROR','EXE_OBSERVATORY_ERR','Could not execute observatory command.'],
-    'SET_OBSERVATORY_ERR'       : ['ERROR','SET_OBSERVATORY_ERR','Could not set all parameters.'],
-    'PARAMETER_READ_ONLY'       : ['ERROR','PARAMETER_READ_ONLY','Parameter is read only.'],
-    'INVALID_PARAMETER'         : ['ERROR','INVALID_PARAMETER','The parameter is not available.'],
-    'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.'],
-    'INVALID_METADATA'          : ['ERROR','INVALID_METADATA','The metadata parameter is not available.'],
-    'NO_PARAM_METADATA'         : ['ERROR','NO_PARAM_METADATA','The parameter has no associated metadata.'],
-    'INVALID_STATUS'            : ['ERROR','INVALID_STATUS','The status parameter is not available.'],
-    'INVALID_CAPABILITY'        : ['ERROR','INVALID_CAPABILITY','The capability parameter is not available.']
-}
 
 
 class InstrumentDriver(Process):
     """
-    A base driver class. This is intended to provide the common parts of
-    the interface that instrument drivers should follow in order to use
-    common InstrumentAgent methods. This should never really be instantiated.
     """
-    def op_fetch_params(self, content, headers, msg):
-        """
-        Using the instrument protocol, fetch a parameter from the instrument
-        @param content A list of parameters to fetch
-        @retval A dictionary with the parameter and value of the requested
-            parameter
-        """
-
-    def op_set_params(self, content, headers, msg):
-        """
-        Using the instrument protocol, set a parameter on the instrument
-        @param content A dictionary with the parameters and values to set
-        @retval A small dict of parameter and value on success, empty dict on
-            failure
-        """
-
+    
     def op_execute(self, content, headers, msg):
         """
-        Using the instrument protocol, execute the requested command
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Result code of some sort
         """
 
-    def op_configure_driver(self, content, headers, msg):
+        
+    def op_get(self, content, headers, msg):
         """
-        This method takes a dict of settings that the driver understands as
-        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
-        is the bootstrap information for the driver and includes enough
-        information for the driver to start communicating with the instrument.
-        @param content A dict with parameters for the driver
         """
+
+
+    def op_set(self, content, headers, msg):
+        """
+        """
+
+
+    def op_get_status(self, content, headers, msg):
+        """
+        """
+
+
+    def op_get_state(self,content,headers,msg):
+        """
+        """
+
+
+    def op_configure(self, content, headers, msg):
+        """
+        """
+
+
+    def op_initialize(self, content, headers, msg):
+        """
+        """
+
+
+    def op_connect(self, content, headers, msg):
+        """
+        """
+
 
     def op_disconnect(self, content, headers, msg):
         """
-        Disconnect from the instrument
-        @param none
         """
+
+
+
 
 class InstrumentDriverClient(ProcessClient):
     """
-    The base class for the instrument driver client interface. This interface
-    is designed to be used by the instrument agent to work with the driver.
     """
 
     @defer.inlineCallbacks
-    def fetch_params(self, param_list):
+    def execute(self, params):
         """
-        Using the instrument protocol, fetch a parameter from the instrument
-        @param param_list A list or tuple of parameters to fetch
-        @retval A dictionary with the parameter and value of the requested
-            parameter
+        """
+
+        assert(isinstance(params, dict)), 'Expected a params dict.'
+        timeout = params.get('timeout',None)
+        if not timeout:
+            timeout = 15
+            params['timeout'] = timeout
+        rpc_timeout = timeout + 5
+        (content, headers, message) = yield self.rpc_send('execute',params,timeout=rpc_timeout)            
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def get(self, params):
+        """
         """
                 
-        assert(isinstance(param_list, (list, tuple)))
-        (content, headers, message) = yield self.rpc_send('fetch_params',
-                                                          param_list)
-        assert(isinstance(content, dict))
+        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
+        (content, headers, message) = yield self.rpc_send('get',params)        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def set_params(self, param_dict):
+    def set(self, params):
         """
-        Using the instrument protocol, set a parameter on the instrument
-        @param param_dict A dictionary with the parameters and values to set
-        @retval A small dict of parameter and value on success, empty dict on
-            failure
         """
         
-        assert(isinstance(param_dict, dict))
-        (content, headers, message) = yield self.rpc_send('set_params',
-                                                          param_dict)
-        assert(isinstance(content, dict))
+        assert(isinstance(params, dict)), 'Expected a params dict.'        
+        (content, headers, message) = yield self.rpc_send('set',params)        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
-
 
 
     @defer.inlineCallbacks
-    def execute(self, command):
+    def get_status(self, params):
         """
-        Using the instrument protocol, execute the requested command
-        @param command An ordered list of lists where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Result code of some sort
         """
-        log.debug("Driver client executing command: %s", command)
-        assert(isinstance(command, (list, tuple))), "Bad Driver client execute type"
-        (content, headers, message) = yield self.rpc_send('execute',
-                                                          command)
+        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
+        (content, headers, message) = yield self.rpc_send('get_status',params)        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
-    @defer.inlineCallbacks
-    def get_status(self, arg):
-        """
-        Using the instrument protocol, gather status from the instrument
-        @param arg The argument needed for gathering status
-        @retval Result message of some sort
-        """
-        (content, headers, message) = yield self.rpc_send('get_status', arg)
-        defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def configure_driver(self, config_vals):
+    def get_state(self):
         """
-        This method takes a dict of settings that the driver understands as
-        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
-        is the bootstrap information for the driver and includes enough
-        information for the driver to start communicating with the instrument.
-        @param config_vals A dict with parameters for the driver
         """
-        assert(isinstance(config_vals, dict))
-        (content, headers, message) = yield self.rpc_send('configure_driver',
-                                                          config_vals)
+        (content, headers, message) = yield self.rpc_send('get_state',None)        
+        #assert(isinstance(content, dict)), 'Expected a reply content dict.'
+        assert(isinstance(content,str)), 'Expected a state string reply.'
         defer.returnValue(content)
 
-    @defer.inlineCallbacks
-    def initialize(self, arg):
-        """
-        Disconnect from the instrument
-        @param none
-        @retval Result code of some sort
-        """
-        #assert(isinstance(command, dict))
-        log.debug("DHE: in initialize!")
-        (content, headers, message) = yield self.rpc_send('initialize',
-                                                          arg)
-        defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def disconnect(self, command):
+    def configure(self, params):
         """
-        Disconnect from the instrument
-        @param none
-        @retval Result code of some sort
         """
-        #assert(isinstance(command, dict))
-        log.debug("DHE: in IDC disconnect!")
-        (content, headers, message) = yield self.rpc_send('disconnect',
-                                                          command)
+
+        assert(isinstance(params, dict)), 'Expected a params dict.'        
+        (content, headers, message) = yield self.rpc_send('configure',params)        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def initialize(self):
+        """
+        """
+        
+        (content, headers, message) = yield self.rpc_send('initialize',None)        
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def connect(self):
+        """
+        """
+        
+        (content, headers, message) = yield self.rpc_send('connect',None)
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def disconnect(self):
+        """
+        """
+        
+        (content, headers, message) = yield self.rpc_send('disconnect',None)
+        defer.returnValue(content)
+
+
+        
 
 class InstrumentAgent(ResourceAgent):
     """
@@ -472,7 +255,7 @@ class InstrumentAgent(ResourceAgent):
     """
     The software version of the instrument agent.
     """
-    version = '0.1'
+    version = '0.1.0'
     
     @classmethod
     def get_version(cls):
@@ -482,15 +265,63 @@ class InstrumentAgent(ResourceAgent):
         return cls.version
     
     
+    @defer.inlineCallbacks
     def plc_init(self):
         log.debug("***IA initializing")
+        # Initialize base class.
         ResourceAgent.plc_init(self)
-        self.pubsub_client = PubSubClient(proc=self)
+                        
+        """
+        The ID of the instrument this agent represents.
+        """
+        self.instrument_id = self.spawn_args.get('instrument-id',None)
+        
+        """
+        Driver process and client descriptions. Parameter dictionaries
+        used to launch driver processes, and dynamically construct driver
+        client objects. 
+        """
+        self.driver_desc = self.spawn_args.get('driver-desc',None)
+        self.client_desc = self.spawn_args.get('client-desc',None)
+        
+        """
+        The ProcessDesc object for the driver process.
+        """
+        self.driver_process_description = None
+        if self.driver_desc:
+            self.driver_process_description = ProcessDesc(**(self.driver_desc))
+
 
         """
-        The driver client to communicate with the child driver
+        The driver process ID. Attempt to launch the process if the process
+        description is set.
+        """
+        self.driver_pid = None
+        if self.driver_process_description:
+            self.driver_pid = yield self.spawn_child(self.driver_process_description)
+        else:
+            yield
+
+
+        """
+        The pubsub client.
+        """
+        #self.pubsub_client = PubSubClient(proc=self)
+        self.pubsub_client = None
+
+
+        """
+        The driver client to communicate with the child driver. Attempt to construct
+        this object if there is a driver PID and a client description dict containing
+        module and class attributes.
         """
         self.driver_client = None
+        if self.driver_pid and self.client_desc and self.client_desc.has_key('module') and self.client_desc.has_key('class'):
+            import_str = 'from ' + self.client_desc['module'] + ' import ' + self.client_desc['class']
+            ctor_str = 'self.driver_client = ' + self.client_desc['class'] + '(proc=self,target=self.driver_pid)'
+            exec import_str
+            exec ctor_str
+
         
         """
 	The queue where we publish events, of any sort, for now
@@ -581,7 +412,16 @@ class InstrumentAgent(ResourceAgent):
             'Peers' : None
         }
 
-
+    """
+    do we need this here?
+    @defer.inlineCallbacks
+    def plc_terminate(self):
+        #yield self.driver_pd.shutdown()
+        #'In plc terminate'
+        #ResourceAgent.plc_terminate()
+        pass
+    """   
+       
         
     @defer.inlineCallbacks
     def _register_publisher(self):
@@ -714,7 +554,6 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected transaction ID str.'
         assert(isinstance(optype,str)), 'Expected str optype.'
 
-
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
             result = self._start_transaction(self.default_transaction_timeout)
@@ -724,10 +563,11 @@ class InstrumentAgent(ResourceAgent):
             else:
                 return False
         
+        
         # Allow only gets without a current or created transaction.
         if tid == 'none' and self.transaction_id == None and optype == 'get':
             return True
-        
+                
         # Otherwise, the given ID must match the outstanding one
         if tid == self.transaction_id:
             return True
@@ -762,6 +602,7 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(cmd,(tuple,list))), 'Expected a command list or tuple.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
     
+    
         reply = {'success':None,'result':None,'transaction_id':None}
     
         if tid != 'create' and tid != 'none' and len(tid) != 36:
@@ -782,6 +623,7 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg,reply)
             return
           
+          
                                                 
         reply['transaction_id'] = self.transaction_id    
         
@@ -792,7 +634,7 @@ class InstrumentAgent(ResourceAgent):
                 reply['success'] = errors['UNKNOWN_TRANSITION']
             else:
                 # output = self.agent_fsm.state_transition(cmd[1])
-                # TODO FSM integration
+                # TODO FSM and driver integration
                 reply['success'] = ['OK']
         elif cmd[0] == 'CI_CMD_TRANSMIT_DATA':
             reply['success'] = errors['NOT_IMPLEMENTED']
@@ -1488,7 +1330,7 @@ class InstrumentAgent(ResourceAgent):
         knowledge of the device or a previous get_capabilities query.
         @param content A dict
             {'channels':[chan_arg,...,chan_arg],'command':[command,arg,...,argN]),'transaction_id':transaction_id)
-       @retval A reply message with a dict
+        @retval A reply message with a dict
             {'success':success,'result':{chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
             'transaction_id':transaction_id}. 
         """
@@ -1916,13 +1758,10 @@ class InstrumentAgent(ResourceAgent):
     def _get_buffer_size(self):
         """
         Return the total size in characters of the data buffer.
+        Assumes the buffer is a list of string data lines.
         """
         return sum(map(lambda x: len(x),self.data_buffer))
         
-
-
-
-
 
         
 class InstrumentAgentClient(ResourceAgentClient):

@@ -21,7 +21,7 @@ from ion.core import ioninit
 from ion.core.messaging import ion_reply_codes
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
-from ion.core.exception import ReceivedError
+from ion.core.exception import ReceivedError, ApplicationError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
@@ -205,6 +205,17 @@ class ProcessTest(IonTestCase):
             log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks
+    def test_apperror_in_op(self):
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
+        pid1 = yield self.test_sup.spawn_child(child1)
+
+        try:
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_apperror','content123')
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            log.info('Process 1 responded to error correctly')
+
+    @defer.inlineCallbacks
     def test_send_byte_string(self):
         """
         @brief Test that any arbitrary byte string can be sent through the
@@ -306,6 +317,106 @@ class ProcessTest(IonTestCase):
         #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
         #yield lcop.register_life_cycle_object(lco5)
 
+    @defer.inlineCallbacks
+    def test_register_lco_during_transition(self):
+        # test a process which registers lcos during init/activate
+        lcap = life_cycle_process.LCOProcessAddingObjects()
+        self.failUnlessEquals(len(lcap._registered_life_cycle_objects), 0)
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_INIT)
+
+        yield lcap.initialize()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_READY)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_READY)
+
+        yield lcap.activate()
+        self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_init._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.failUnlessEquals(lcap._obj_activate._get_state(), state_object.BasicStates.S_ACTIVE)
+
+    @defer.inlineCallbacks
+    def test_register_lco_terminate_on_error(self):
+        # test registered lcos with an owning process that Errors - should nicely advance each registered LCO
+        # to the TERMINATED state upon error
+        ep = DeadOnActivateProcess()
+
+        eplco1 = life_cycle_process.LifeCycleObject()
+        eplco2 = life_cycle_process.LifeCycleObject()
+        eplco3 = life_cycle_process.LifeCycleObject()
+
+        ep.register_life_cycle_object(eplco1)
+        ep.register_life_cycle_object(eplco2)
+        ep.register_life_cycle_object(eplco3)
+
+        # calls initialize, activate, DIES
+        try:
+            yield ep.spawn()
+        except:
+            pass
+
+        self.failUnlessEquals(ep._get_state(), state_object.BasicStates.S_ERROR)
+        self.failUnlessEquals(eplco1._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.failUnlessEquals(eplco2._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.failUnlessEquals(eplco3._get_state(), state_object.BasicStates.S_TERMINATED)
+
+    @defer.inlineCallbacks
+    def test_register_lco_terminate_on_error_with_misbehaving_lco(self):
+        # test registered LCOs with an owning process that Errors: this time we have a misbehaving LCO
+        # that won't terminate properly
+        ep2 = DeadOnActivateProcess()
+
+        ep2lco1 = life_cycle_process.LifeCycleObject()
+        ep2lco2 = life_cycle_process.LifeCycleObject()
+        ep2lco3 = MisbehavingLCO()
+
+        ep2.register_life_cycle_object(ep2lco1)
+        ep2.register_life_cycle_object(ep2lco2)
+        ep2.register_life_cycle_object(ep2lco3)
+
+        # calls initialize, activate, DIES
+        try:
+            yield ep2.spawn()
+        except:
+            pass
+
+        self.failUnlessEquals(ep2._get_state(), state_object.BasicStates.S_ERROR)
+        self.failUnlessEquals(ep2lco1._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.failUnlessEquals(ep2lco2._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.failUnlessEquals(ep2lco3._get_state(), state_object.BasicStates.S_ERROR)      # did not terminate
+
+        # test registered LCOs with an owning process that Errors: this time we have a misbehaving LCO in the middle
+        # of the registered LCOs
+        ep3 = DeadOnActivateProcess()
+
+        ep3lco1 = life_cycle_process.LifeCycleObject()
+        ep3lco2 = MisbehavingLCO()
+        ep3lco3 = life_cycle_process.LifeCycleObject()
+
+        ep3.register_life_cycle_object(ep3lco1)
+        ep3.register_life_cycle_object(ep3lco2)
+        ep3.register_life_cycle_object(ep3lco3)
+
+        # calls initialize, activate, DIES
+        try:
+            yield ep3.spawn()
+        except:
+            pass
+
+        self.failUnlessEquals(ep3._get_state(), state_object.BasicStates.S_ERROR)
+        self.failUnlessEquals(ep3lco1._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.failUnlessEquals(ep3lco2._get_state(), state_object.BasicStates.S_ERROR)       # did not terminate
+        self.failUnlessEquals(ep3lco3._get_state(), state_object.BasicStates.S_TERMINATED)  # terminated fine as its in parallel
+
+class DeadOnActivateProcess(Process):
+    """
+    Simple testing class to put it in the error state.
+    """
+    def on_activate(self, *args, **kwargs):
+        raise StandardError("oh noes, I did what I said I would do!")
+
+class MisbehavingLCO(life_cycle_process.LifeCycleObject):
+    def on_terminate(self, *args, **kwargs):
+        raise StandardError("I don't want to terminate!")
+
 class EchoProcess(Process):
 
     @defer.inlineCallbacks
@@ -324,6 +435,14 @@ class EchoProcess(Process):
     def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
+
+        # This is never reached!
+        yield self.reply_ok(msg, content=content)
+
+    @defer.inlineCallbacks
+    def op_echo_apperror(self, content, headers, msg):
+        log.info("Message received: "+str(content))
+        raise ApplicationError("I'm supposed to fail")
 
         # This is never reached!
         yield self.reply_ok(msg, content=content)

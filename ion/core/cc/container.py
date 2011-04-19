@@ -157,8 +157,6 @@ class Container(BasicLifecycleObject):
         return self.proc_manager.terminate_process(*args, **kwargs)
 
     # Exchange management, handled by ExchangeManager
-    def declare_messaging(self, *args, **kwargs):
-        return self.exchange_manager.declare_messaging(*args, **kwargs)
     def configure_messaging(self, *args, **kwargs):
         return self.exchange_manager.configure_messaging(*args, **kwargs)
     def new_consumer(self, *args, **kwargs):
@@ -169,9 +167,9 @@ class Container(BasicLifecycleObject):
     # App management, handled by AppManager
     def start_app(self, *args, **kwargs):
         return self.app_manager.start_app(*args, **kwargs)
-
-    def start_rel(self, rel_filename):
-        pass
+    # Release management, handled by AppManager
+    def start_rel(self, *args, **kwargs):
+        return self.app_manager.start_rel(*args, **kwargs)
 
     # Container Events
 

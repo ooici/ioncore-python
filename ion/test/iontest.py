@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @brief test case for ION integration and system test cases (and some unit tests)
 """
+import os
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -12,21 +13,17 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import bootstrap, ioninit
+from ion.core import bootstrap
 from ion.core import ioninit
 from ion.core.cc import service
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
-from ion.core.process.process import IProcess, Process
+from ion.core.process.process import IProcess, Process, request
 from ion.data.store import Store
-import ion.util.procutils as pu
-import os
-
 from ion.resources import description_utility
-
-from ion.core.process.process import request
+import ion.util.procutils as pu
 
 # The following modules must be imported here, because they load config
 # files. If done while in test, it does not work!
@@ -49,7 +46,7 @@ class IonTestCase(unittest.TestCase):
     twisted_container_service = None #hack
 
     @defer.inlineCallbacks
-    def _start_container(self, sysname=None, start_app=None):
+    def _start_container(self, sysname=None, start_apps=None):
         """
         Starting and initialzing the container with a connection to a broker.
         """
@@ -65,7 +62,13 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
         # This is where dependent apps can be included
-        mopt['scripts'] = [CONF['start_app']] or start_app
+        if start_apps and type(start_apps) in (tuple, list):
+            apps = []
+            for app in start_apps:
+                apps.append("../res/apps/%s.app" % app)
+            mopt['scripts'] = apps
+        elif CONF['start_app']:
+            mopt['scripts'] = [CONF['start_app']]
 
         # Little trick to have no consecutive failures if previous setUp() failed
         # @note This is not fail fast and does not always work. TEMPORARY.
@@ -121,13 +124,6 @@ class IonTestCase(unittest.TestCase):
         defer.returnValue(msg_instance)
 
     @defer.inlineCallbacks
-    def _start_core_services(self):
-        sup = yield bootstrap.spawn_processes(bootstrap.ion_core_services,
-                                              self.test_sup)
-        log.info("============Core ION services started============")
-        defer.returnValue(sup)
-
-    @defer.inlineCallbacks
     def _stop_container(self):
         """
         Taking down the container's connection to the broker an preparing for
@@ -167,11 +163,12 @@ class IonTestCase(unittest.TestCase):
         #    yield ioninit.container_instance.terminate()
 
         # fix Container args if we messed with them
-        if self._reset_container_args:
-            Container.args = self._old_container_args
-            self._old_container_args = None
-            self._reset_container_args = False
-            # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
+        if hasattr(self, '_reset_container_args'):
+            if self._reset_container_args:
+                Container.args = self._old_container_args
+                self._old_container_args = None
+                self._reset_container_args = False
+                # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
 
         # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
@@ -190,9 +187,6 @@ class IonTestCase(unittest.TestCase):
             return proc.shutdown()
         else:
             return self.test_sup.shutdown_child_procs()
-
-    def _declare_messaging(self, messaging):
-        return bootstrap.declare_messaging(messaging)
 
     def _spawn_processes(self, procs, sup=None):
         sup = sup if sup else self.test_sup

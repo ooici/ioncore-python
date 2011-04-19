@@ -132,7 +132,7 @@ class BrokerController:
                  type='', 
                  passive=False, 
                  durable=False,
-                 auto_delete=False, 
+                 auto_delete=True, 
                  internal=False, 
                  nowait=False,
                  arguments={}
@@ -162,7 +162,7 @@ class BrokerController:
         q = yield self.channel.queue_declare(
                 queue=name, 
                 durable=False, 
-                exclusive=False,
+                exclusive=True,
                 auto_delete=True
         )    
         returnValue(q)

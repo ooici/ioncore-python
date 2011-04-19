@@ -14,8 +14,11 @@ from instrument_hsm import InstrumentHsm
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
 from twisted.internet.protocol import ClientCreator
 
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient, publish_msg_type
+#from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
+#from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient, publish_msg_type
+from ion.agents.instrumentagents.instrument_driver_deprecated import InstrumentDriver
+from ion.agents.instrumentagents.instrument_driver_deprecated import InstrumentDriverClient
+from ion.agents.instrumentagents.instrument_driver_deprecated import publish_msg_type
 from ion.agents.instrumentagents.WHSentinelADCP_constants import instrument_commands
 from ion.agents.instrumentagents.WHSentinelADCP_constants import instrument_prompts
 

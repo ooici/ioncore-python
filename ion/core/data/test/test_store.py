@@ -8,10 +8,6 @@
 @author Matt Rodriguez
 @test Service test of IStore Implementation
 
-@TODO - Right now skiptest causes an error when used with a cassandra connection
- Once this is fixed we can skip individual tests. For now we must skip all or none
- by skipping the setUp or a method inside it!
-
 """
 
 import ion.util.ionlog
@@ -26,6 +22,8 @@ from ion.core.data import store
 from ion.core.data import cassandra
 from ion.core.data import index_store_service
 from ion.core.data import store_service
+from ion.core.data import storage_configuration_utility
+
 # Import the workbench and the Persistent Archive Resource Objects!
 from ion.core.object import workbench
 
@@ -34,10 +32,15 @@ from ion.core.data.store import Query
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+
 from ion.util.itv_decorator import itv
 
+from ion.test.iontest import IonTestCase
 
-from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
+from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap, CassandraSchemaProvider
+from ion.core.data.cassandra_bootstrap import STORAGE_PROVIDER, PERSISTENT_ARCHIVE, IndexType
+
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
 columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
@@ -164,32 +167,89 @@ class StoreServiceTest(IStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-
-
-
-
 class BootstrapStoreTest(IStoreTest):
 
+    columns = []
+
+    column_family = 'store_test_cf'
+
+
     @itv(CONF)
+    @defer.inlineCallbacks
     def _setup_backend(self):
-        store = CassandraStoreBootstrap("ooiuser", "oceans11")
-        store.initialize()
-        store.activate()
-        return defer.succeed(store)
+
+
+        uname = CONF.getValue('cassandra_username', None)
+        pword = CONF.getValue('cassandra_password', None)
+        storage_provider = CONF.getValue(STORAGE_PROVIDER,None)
+
+        keyspace = 'store_test_ks'
+
+        test_ks = storage_configuration_utility.base_ks_def.copy()
+        test_ks['name'] = keyspace
+
+        storage_conf = {
+        STORAGE_PROVIDER:storage_provider,
+        PERSISTENT_ARCHIVE:test_ks,
+        }
+
+        test_cf = storage_configuration_utility.base_cf_def.copy()
+        test_cf['name'] = self.column_family
+        test_cf['keyspace'] = keyspace
+        test_cf['column_metadata'] = []
+
+
+        test_ks['cf_defs']=[test_cf]
+
+
+        for col in self.columns:
+            test_col = storage_configuration_utility.base_col_def.copy()
+
+            test_col['name'] = col
+            test_col['index_type'] = IndexType.KEYS
+            test_cf['column_metadata'].append(test_col)
+
+
+        self.test_harness = CassandraSchemaProvider(uname,pword,storage_conf,error_if_existing=False)
+
+        self.test_harness.connect()
+
+        yield self.test_harness.run_cassandra_config()
+
+        yield self.test_harness.client.truncate(self.column_family)
+
+        store = self.create_store(uname, pword, storage_provider, keyspace, self.column_family)
+
+        yield store.initialize()
+        yield store.activate()
+
+
+        defer.returnValue(store)
+
+
+    def create_store(self, uname, pword, storage_provider, keyspace, column_family):
+
+        return CassandraStoreBootstrap(uname, pword, storage_provider, keyspace, column_family)
+
 
     @defer.inlineCallbacks
     def tearDown(self):
+
+        # Clear it, don't drop it...
+        yield self.test_harness.client.truncate(self.column_family)
+
+        self.test_harness.disconnect()
+
         try:
             yield self.ds.terminate()
         except Exception, ex:
             log.info("Exception raised in tearDown %s" % (ex,))
 
 
-class CassandraStoreTest(IStoreTest):
+class CassandraStoreTest(BootstrapStoreTest):
 
 
-    @itv(CONF)
-    def _setup_backend(self):
+    def create_store(self, uname, pword, storage_provider, keyspace, cf_name):
 
         ### This is a short cut to use resource objects without a process
         wb = workbench.WorkBench('No Process: Testing only')
@@ -199,27 +259,25 @@ class CassandraStoreTest(IStoreTest):
 
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
-        #cas_host.host = 'amoeba.ucsd.edu'
-        #cas_host.host = 'localhost'
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-        cas_host.port = 9160
+
+        cas_host.host = storage_provider['host']
+        cas_host.port = storage_provider['port']
 
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'StoreTestKeyspace'
-        #cassandra_keyspace.name = 'Keyspace1'
+        cassandra_keyspace.name = keyspace
 
         ### Create a Credentials resource - for cassandra a SimplePassword object
         cache_repository, simple_password  = wb.init_repository(simple_password_type)
         # only the name of the column family is required
-        simple_password.username = 'ooiuser'
-        simple_password.password = 'oceans11'
+        simple_password.username = uname or ''
+        simple_password.password = pword or ''
 
         ### Create a Cache resource - for cassandra a ColumnFamily object
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
-        column_family.name = 'TestCF'
+        column_family.name = cf_name
 
 
         store = cassandra.CassandraStore(cassandra_cluster, \
@@ -227,24 +285,12 @@ class CassandraStoreTest(IStoreTest):
                                          simple_password, \
                                          column_family)
 
-
-        store.initialize()
-        store.activate()
-
-
-        return defer.succeed(store)
-
-
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        try:
-            yield self.ds.terminate()
-        except Exception, ex:
-            log.info("Exception raised in tearDown %s" % (ex,))
+        return store
 
 
 class IndexStoreTest(IStoreTest):
+
+    columns = ['full_name', 'state', 'birth_date']
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -256,7 +302,7 @@ class IndexStoreTest(IStoreTest):
         """return a deferred which returns a initiated instance of a
         backend
         """
-        ds = store.IndexStore(indices=['full_name', 'state', 'birth_date'])
+        ds = store.IndexStore(indices=self.columns)
 
         return defer.succeed(ds)
 
@@ -481,6 +527,7 @@ class IndexStoreTest(IStoreTest):
 
 class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
 
+
     @defer.inlineCallbacks
     def setUp(self):
         yield IStoreTest.setUp(self)
@@ -497,7 +544,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         self.timeout = 30
         services = [
             {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-             'spawnargs':{'indices':['full_name', 'state', 'birth_date']}},
+             'spawnargs':{'indices':self.columns}},
 
         ]
         sup = yield self._spawn_processes(services)
@@ -516,33 +563,24 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class BootstrapIndexedStoreTest(IStoreTest):
+class BootstrapIndexedStoreTest(BootstrapStoreTest, IndexStoreTest):
 
-    @itv(CONF)
-    def _setup_backend(self):
-        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
-        store.initialize()
-        store.activate()
-        return defer.succeed(store)
+    columns = IndexStoreTest.columns
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        try:
-            yield self.ds.terminate()
-        except Exception, ex:
-            log.info("Exception raised in tearDown %s" % (ex,))
+    column_family = 'index_store_test_cf'
 
 
-class CassandraIndexedStoreTest(IndexStoreTest):
+    def create_store(self, uname, pword, storage_provider, keyspace, column_family):
 
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield IStoreTest.setUp(self)
-        yield self.put_stuff_for_tests()
-        defer.returnValue(None)
+        return CassandraIndexedStoreBootstrap(uname, pword, storage_provider, keyspace, column_family)
 
-    def _setup_backend(self):
+
+
+class CassandraIndexedStoreTest(BootstrapIndexedStoreTest):
+
+
+
+    def create_store(self, uname, pword, storage_provider, keyspace, cf_name):
         """
         @note The column_metadata in the cache is not correct. The column family on the
         server has a few more indexes.
@@ -556,40 +594,40 @@ class CassandraIndexedStoreTest(IndexStoreTest):
 
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
-        #cas_host.host = 'amoeba.ucsd.edu'
-        #cas_host.host = 'localhost'
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-        cas_host.port = 9160
+        
+        cas_host.host = storage_provider['host']
+        cas_host.port = storage_provider['port']
 
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'StoreTestKeyspace'
-        #cassandra_keyspace.name = 'Keyspace1'
+        cassandra_keyspace.name = keyspace
 
         ### Create a Credentials resource - for cassandra a SimplePassword object
         cache_repository, simple_password  = wb.init_repository(simple_password_type)
         # only the name of the column family is required
-        simple_password.username = 'ooiuser'
-        simple_password.password = 'oceans11'
+        simple_password.username = uname or ''
+        simple_password.password = pword or ''
 
         ### Create a Cache resource - for Cassandra a ColumnFamily object
 
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
-        column_family.name = 'TestCF'
+        column_family.name = cf_name
 
         self.cache = column_family
         self.cache_repository = cache_repository
-        column = cache_repository.create_object(columndef_type)
-        #column_repository, column  = wb.init_repository(columndef_type) # This is wrong...
-        column.column_name = "state"
-        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
-        #IndexType.KEYS is 0, and IndexType is an enum
-        column.index_type = 0
-        column.index_name = 'stateIndex'
-        self.cache.column_metadata.add()
-        self.cache.column_metadata[0] = column
+
+        for col in self.columns:
+            column = cache_repository.create_object(columndef_type)
+            column.column_name = col
+            column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+            #IndexType.KEYS is 0, and IndexType is an enum
+            column.index_type = IndexType.KEYS
+
+
+            link = self.cache.column_metadata.add()
+            link.SetLink(column)
 
 
         store = cassandra.CassandraIndexedStore(cassandra_cluster, \
@@ -597,13 +635,5 @@ class CassandraIndexedStoreTest(IndexStoreTest):
                                                 simple_password, \
                                                 column_family)
 
-        store.initialize()
-        store.activate()
+        return store
 
-
-        return defer.succeed(store)
-
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.terminate()

@@ -30,17 +30,6 @@ class BootstrapTest1(IonTestCase):
 
         yield self._stop_container()
 
-    @defer.inlineCallbacks
-    def test_startContainerAndServices(self):
-        yield self._start_container()
-        yield self._start_core_services()
-
-        log.info("Started container and core services")
-
-        yield self._stop_container()
-
-
-
 class BootstrapTest2(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):

@@ -80,9 +80,6 @@ class HostStatusTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _start_service(self):
-        messaging = {'registry':{'name_type':'fanout', 'args':{'scope':'system'}}}
-        yield self._declare_messaging(messaging)
-
         # By default ion.services.coi.host_status loops indefinitely
         # at 60 second intervals.  The default behavior can be modified
         # with spawnargs.

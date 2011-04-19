@@ -62,7 +62,9 @@ class ResourceRegistryService(ServiceProcess):
         self.fetch_blobs = self.workbench.fetch_blobs
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
-        self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='No Data Store service name provided!'))
+        self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='datastore'))
+
+        self.owned_by = None
 
         log.info('ResourceRegistryService.__init__()')
 
@@ -88,7 +90,7 @@ class ResourceRegistryService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
-    def slc_init(self):
+    def pull_owned_by(self):
 
         yield self.pull(self.datastore_service, OWNED_BY_ID)
         self.owned_by = self.workbench.get_repository(OWNED_BY_ID)
@@ -97,6 +99,10 @@ class ResourceRegistryService(ServiceProcess):
 
     @defer.inlineCallbacks
     def _register_resource_instance(self, resource_description, headers):
+
+
+        if self.owned_by is None:
+            yield self.pull_owned_by()
 
         # Get the user to associate with this new resource
         user_id = headers.get('user-id', 'ANONYMOUS')
@@ -156,7 +162,7 @@ class ResourceRegistryService(ServiceProcess):
 
 
         # push the new resource to the data store
-        yield self.push(self.datastore_service, [resource_repository, ownership_association])
+        yield self.push(self.datastore_service, resource_repository)
         # If the push fails hand back the workbench error
 
         response.MessageResponseCode = response.ResponseCodes.OK

@@ -25,9 +25,6 @@ from ion.core.exception import ConfigurationError, FatalError, StartupError
 from ion.core.ioninit import ion_config
 from ion.util.config import Config
 
-CONF = ioninit.config(__name__)
-CF_app_dir_path = CONF['app_dir_path']
-
 START_PERMANENT = "permanent"
 
 class AppLoader(object):
@@ -48,19 +45,36 @@ class AppLoader(object):
 
     @classmethod
     @defer.inlineCallbacks
-    def start_application(cls, container, appdef, app_manager=None):
+    def start_application(cls, container, appdef, app_manager=None, app_config=None, app_args=None):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
 
         modname = appdef.mod[0]
-        modargs = appdef.mod[1]
+        modargs = appdef.mod[1] if len(appdef.mod) >= 2 else []
+        modkwargs = appdef.mod[2] if (len(appdef.mod) >= 3 and appdef.mod[2] is not None) else {}
+        if app_args and type(modkwargs) is dict and type(app_args) is dict:
+            modkwargs.update(app_args)
+
+        # Look for command line arguments for this app
+        startup_app_args = ioninit.cont_args.get("apparg_" + appdef.name, None)
+        if startup_app_args:
+            if type(startup_app_args) is dict:
+                modkwargs.update(startup_app_args)
+            elif type(startup_app_args) is str and startup_app_args.startswith('{'):
+                try:
+                    # Evaluate args and expect they are dict as str
+                    evargs = eval(startup_app_args)
+                    if type(evargs) is dict:
+                        modkwargs.update(evargs)
+                except Exception, ex:
+                    log.warn('Invalid argument format: %s' % str(ex))
 
         appmod = namedAny(modname)
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
 
         # @todo The backward reference to the app_manager is not nice at all
-        
+
         # Load dependent apps
         #if appdef.applications and app_manager:
         #    if type(appdef.applications) in (list, tuple):
@@ -85,16 +99,25 @@ class AppLoader(object):
         # Overriding ion configuration with config entries
         if appdef.config:
             if type(appdef.config) is dict:
-                log.debug("Applying app %s configuration" % appdef.name)
+                log.debug("Applying app '%s' configuration" % appdef.name)
                 ion_config.update(appdef.config)
             else:
-                raise ConfigurationError("Application %s app config not a dict: %s" %(
+                raise ConfigurationError("Application '%s' app config not a dict: %s" %(
+                    appdef.name, type(appdef.config)))
+
+        if app_config:
+            if type(app_config) is dict:
+                log.debug("Overriding app '%s' configuration" % appdef.name)
+                ion_config.update(app_config)
+            else:
+                log.warn("Application '%s' app config not a dict: %s" %(
                     appdef.name, type(appdef.config)))
 
         log.debug("Application '%s' starting" % appdef.name)
         try:
             res = yield defer.maybeDeferred(appmod.start,
-                                container, START_PERMANENT, appdef, *modargs)
+                                container, START_PERMANENT, appdef,
+                                *modargs, **modkwargs)
         except Exception, ex:
             log.exception("Application %s start failed" % appdef.name)
             appdef._state = None
@@ -147,6 +170,10 @@ class AppDefinition(object):
             self.applications = []
         if not hasattr(self, "config"):
             self.config = {}
+        if not hasattr(self, "args"):
+            self.args = {}
+        if not hasattr(self, "processapp"):
+            self.processapp = []
 
 class IAppModule(Interface):
     """

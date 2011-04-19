@@ -7,6 +7,7 @@
     interaction patterns)
 """
 
+from twisted.python import failure
 from twisted.python.reflect import namedAny
 from zope.interface import implements, Interface
 
@@ -14,7 +15,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ConversationError
+from ion.core.exception import ConversationError, ConversationTimeoutError, ConversationUnexpectedError, ConversationFailureError
 from ion.util.state_object import FSMFactory, StateObject, BasicStates
 import ion.util.procutils as pu
 
@@ -164,12 +165,15 @@ class ConversationRole(StateObject):
 
     def error(self, *args, **kwargs):
         log.error("Conversation ERROR: Exception %r %r" % (args, kwargs))
+        #return failure.Failure(ConversationFailureError())
 
     def unexpected(self, *args, **kwargs):
         log.error("Conversation ERROR: UNEXPECTED MSG")
+        #return failure.Failure(ConversationUnexpectedError())
 
     def timeout(self, *args, **kwargs):
         log.error("Conversation ERROR: TIMEOUT")
+        #return failure.Failure(ConversationTimeoutError())
 
 class ConversationTypeSpec(object):
     """

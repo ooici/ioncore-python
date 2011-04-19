@@ -1,0 +1,70 @@
+{
+    "type":"release",
+    "name":"Release1Configuration",
+    "version": "0.1",
+    "description": "Release 1 deployment configuration. Core and AIS services",
+    "ioncore" : "0.4.7",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+        # Bootlevel 4
+        {'name':'datastore',            'version':'0.1',
+                                        'config':{
+                                            'ion.services.coi.datastore':{
+                                                'blobs':'ion.core.data.store.Store',
+                                                'commits':'ion.core.data.store.IndexStore',
+                                                'preload':{'ion_datasets':True}
+                                            }
+                                        }
+        },
+
+        #{'name':'ds1',
+        # 'module':'ion.services.coi.datastore',
+        # 'class':'DataStoreService',
+        #     'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
+        #                  COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
+        #
+
+        {'name':'association_service',  'version':'0.1',
+                                        'processapp':('association_service','ion.services.dm.inventory.association_service','AssociationService'),
+                                        'config':{
+                                            'ion.services.dm.inventory.association_service':{
+                                                'index_store_class':'ion.core.data.store.IndexStore',
+                                                #'index_store_class':'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
+                                            },
+                                        },
+                                        'args':{'username':None,'password':None},
+        },
+
+        #{'name':'indexstore',           'version':'0.1',
+        #},
+
+        {'name':'resource_registry',    'version':'0.1',
+                                        'processapp':('resource_registry','ion.services.coi.resource_registry_beta.resource_registry','ResourceRegistryService'),
+                                        'config':{
+                                            'ion.services.coi.resource_registry_beta.resource_registry':{
+                                                'datastore_service':'datastore'
+                                            }
+                                        },
+                                        'args':{'username':None,'password':None},
+        },
+
+        {'name':'exchange_management',  'version':'0.1',
+                                        'processapp':('exchange_management','ion.services.coi.exchange.exchange_management','ExchangeManagementService'),
+        },
+
+        {'name':'pubsub',               'version':'0.1',
+                                        'processapp':('pubsub','ion.services.dm.distribution.pubsub_service','PubSubService'),
+        },
+
+        {'name':'identity_registry',    'version':'0.1',
+                                        'processapp':('identity_registry','ion.services.coi.identity_registry','IdentityRegistryService'),
+        },
+
+        {'name':'app_integration',      'version':'0.1',
+                                        'processapp':('app_integration','ion.integration.ais.app_integration_service','AppIntegrationService'),
+        },
+    ]
+}

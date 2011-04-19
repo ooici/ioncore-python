@@ -1,0 +1,12 @@
+ {
+    "type":"release",
+    "name":"bootlevel4_local",
+    "version": "0.1",
+    "description": "Bootlevel 4 release file (local in memory version)",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'datastore',            'version':'0.1', 'config':{'ion.services.coi.datastore':{'blobs':'ion.core.data.store.Store', 'commits':'ion.core.data.store.IndexStore', 'preload':{'ion_datasets':True}}}},
+        {'name':'association',          'version':'0.1', 'config':{'ion.services.dm.inventory.association_service':{'index_store_class':'ion.core.data.store.IndexStore'}}},
+        {'name':'resource_registry',    'version':'0.1', 'config':{'ion.services.coi.resource_registry_beta.resource_registry':{'datastore_service':'datastore'}}},
+    ]
+}

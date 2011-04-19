@@ -36,6 +36,9 @@ class Options(usage.Options):
                 ["broker_port", "p", 5672, "Message space broker port"],
                 ["broker_vhost", "v", "/", "Message space..."],
                 ["broker_heartbeat", None, 0, "Heartbeat rate [seconds]"],
+                ["broker_username", None, "guest", "Username to log into virtual host as"],
+                ["broker_password", None, "guest", ""],
+                ["broker_credfile", None, None, "File containing broker username and password"],
                 ["boot_script", "b", None, "Boot script (python source)."],
                 ["args", "a", None, "Additional startup arguments such as sysname=me" ],
                     ]
@@ -142,7 +145,7 @@ class CapabilityContainer(service.Service):
         The file may be an .app, a .rel, or a python code script.
         """
 
-        # Try two script locations, one for IDEs and another for shell. 
+        # Try two script locations, one for IDEs and another for shell.
         for script in self.config['scripts']:
             script = os.path.abspath(script)
             if not os.path.isfile(script):
@@ -151,9 +154,9 @@ class CapabilityContainer(service.Service):
                 log.error('Bad startup script path: %s' % script)
             else:
                 if script.endswith('.app'):
-                    yield self.container.start_app(script)
+                    yield self.container.start_app(app_filename=script)
                 elif script.endswith('.rel'):
-                    yield self.container.start_rel(script)
+                    yield self.container.start_rel(rel_filename=script)
                 else:
                     log.info("Executing script %s ..." % script)
                     execfile(script, {})
