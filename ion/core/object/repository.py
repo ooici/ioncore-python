@@ -937,6 +937,9 @@ class Repository(ObjectContainer):
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
 
+            # Reset the commit counter - used for debuging only
+            gpb_wrapper.WrapperType.recurse_counter.count=0
+
             self._workspace_root.RecurseCommit(structure)
 
             cref = self._create_commit_ref(comment=comment)
@@ -974,6 +977,7 @@ class Repository(ObjectContainer):
         """
         # Now add a Commit Ref
         # make a new commit ref
+
         commit_cls = object_utils.get_gpb_class_from_type_id(COMMIT_TYPE)
         cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
