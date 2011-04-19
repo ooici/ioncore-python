@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/integration/ais/createDataResource/createDataResource.py
+@file ion/integration/ais/manageDataResource/manageDataResource.py
 @author Ian Katz
-@brief The worker class that implements the createDataResource function for the AIS  (workflow #105)
+@brief The worker class that implements the data resource functions for the AIS  (workflow #105, #106)
 """
 
 import ion.util.ionlog
@@ -31,7 +31,11 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
-                                                       CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE
+                                                       CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE, \
+                                                       UPDATE_DATA_RESOURCE_REQ_TYPE, \
+                                                       UPDATE_DATA_RESOURCE_RSP_TYPE, \
+                                                       DELETE_DATA_RESOURCE_REQ_TYPE, \
+                                                       DELETE_DATA_RESOURCE_RSP_TYPE
 
 INGESTER_CREATETOPICS_REQ_MSG  = object_utils.create_type_identifier(object_id=2003, version=1)
 RESOURCE_CFG_REQUEST_TYPE      = object_utils.create_type_identifier(object_id=10, version=1)
@@ -42,10 +46,10 @@ SCHEDULER_ADD_RSP_TYPE         = object_utils.create_type_identifier(object_id=2
 
 
 
-class CreateDataResource(object):
+class ManageDataResource(object):
 
     def __init__(self, ais):
-        log.debug('CreateDataResource.__init__()')
+        log.debug('ManageDataResource.__init__()')
         self.mc    = ais.mc
         self.rc    = ais.rc
         self.dscc  = DatasetControllerClient(proc=ais)
@@ -53,22 +57,32 @@ class CreateDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
 
-    @defer.inlineCallbacks
-    def createDataResourceDap(self, msg):
-        """
-        @brief create a data resource based on the limited data we can receive from UX
-        @param msg GPB, 9217/1,
-        @GPB{Input,9217,1}
-        @GPB{Returns,9212,1}
-        @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
-        """
 
+    @defer.inlineCallbacks
+    def update(self, msg):
+        """
+        @brief update a data resource
+        @param msg GPB, 9215/1,
+        @GPB{Input,9215,1}
+        @GPB{Returns,9216,1}
+        @retval success
+        """
         try:
-            # Check only the type recieved and linked object types. All fields are
+            # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
-            if msg.MessageType != CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE:
-                errtext = "CreateDataResource.createDataResource(): " + \
-                    "Expected DataResourceCreateSimpleRequest type, got " + str(msg)
+            if msg.MessageType != UPDATE_DATA_RESOURCE_REQ_TYPE:
+                errtext = "ManageDataResource.update(): " + \
+                    "Expected DataResourceUpdateRequest type, got " + str(msg)
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+            if not (msg.IsFieldSet("data_source_resource_id")):
+
+                errtext = "ManageDataResource.update(): " + \
+                    "required fields not provided (data_source_resource_id)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
 
@@ -76,20 +90,25 @@ class CreateDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
+        
+            datasrc_resource = yield self.rc.get_instance(msg.data_source_resource_id)
 
-            createfull_msg = yield self.mc.create_instance(CREATE_DATA_RESOURCE_REQ_TYPE, 1)
+            if msg.IsFieldSet("update_interval_seconds"):
+                dispatcher_resource.update_interval_seconds = msg.update_interval_seconds
+                #FIXME: change scheduling
 
-            #fill in any fields that can happen automatically
-            createfull_msg.request_type = createfull_msg.RequestType.DAP
-            # if that doesnt work try:
-            #     createfull_msg.request_type = createfull_msg.ObjectResource.RequestType.DAP
+            if msg.IsFieldSet("ion_institution_id"):
+                dispatcher_resource.ion_institution_id = msg.ion_institution_id
 
-            ret = yield self.createDataResource(createfull_msg)
-            defer.returnValue(ret)
+            if msg.IsFieldSet("ion_description"):
+                dispatcher_resource.ion_description = msg.ion_description
+
+            yield self.rc.put_resource(datasrc_resource)
 
 
         except ReceivedApplicationError, ex:
-            log.info('CreateDataResource.createDataResourceDap(): Error attempting to FIXME: %s' %ex)
+            log.info('ManageDataResource.update(): Error: %s' %ex)
+
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
@@ -98,8 +117,95 @@ class CreateDataResource(object):
 
 
 
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+
+        Response.message_parameters_reference.add()
+        Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
+        Response.message_parameters_reference[0].success = True
+        defer.returnValue(Response)
+
+
+    
     @defer.inlineCallbacks
-    def createDataResource(self, msg):
+    def delete(self, msg):
+        """
+        @brief delete a data resource
+        @param msg GPB, 9213/1,
+        @GPB{Input,9213,1}
+        @GPB{Returns,9214,1}
+        @retval success
+        """
+        try:
+            # Check only the type received and linked object types. All fields are
+            #strongly typed in google protocol buffers!
+            if msg.MessageType != DELETE_DATA_RESOURCE_REQ_TYPE:
+                errtext = "ManageDataResource.deelete(): " + \
+                    "Expected DataResourceDeleteRequest type, got " + str(msg)
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+            if not (msg.IsFieldSet("data_source_resource_id")):
+
+                errtext = "ManageDataResource.delete(): " + \
+                    "required fields not provided (data_source_resource_id)"
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+            #store ids that were deleted, and return them later. 
+            deletions = []
+            delete_resources = []
+            for data_source_resource_id in msg.data_source_resource_id:
+    
+                #FIXME: stop scheduling
+                datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
+                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
+
+                #lifecycle states...GO
+                datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
+                dataset_resource.ResourcesLifeCycleState = dataset_resource.RETIRED
+
+                delete_resources.append(datasrc_resource)
+                delete_resources.append(dataset_resource)
+                deletions.append(data_source_resource_id)
+
+            yield self.rc.put_resource_transaction(delete_resources)
+
+
+
+        except ReceivedApplicationError, ex:
+            log.info('ManageDataResource.delete(): Error: %s' %ex)
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+            Response.error_num =  ex.msg_content.MessageResponseCode
+            Response.error_str =  ex.msg_content.MessageResponseBody
+            defer.returnValue(Response)
+
+
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+
+        Response.message_parameters_reference.add()
+        Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
+        for d in deletions:
+            i = len(Response.message_parameters_reference[0].successfully_deleted_id)
+            Response.message_parameters_reference[0].successfully_deleted_id.add()
+            Response.message_parameters_reference[0].successfully_deleted_id[i] = d
+
+        defer.returnValue(Response)
+
+
+    
+
+
+    @defer.inlineCallbacks
+    def create(self, msg):
         """
         @brief create a data resource
         @param msg GPB, 9211/1,
@@ -107,7 +213,7 @@ class CreateDataResource(object):
         @GPB{Returns,9212,1}
         @retval IDs of new objects, GPB 9212/1, otherwise an AIS error GPB
         """
-        log.info('CreateDataResource.createDataResource()\n')
+        log.info('ManageDataResource.create()\n')
 
         my_datasrc_id      = None
         my_dataset_id      = None
@@ -121,7 +227,7 @@ class CreateDataResource(object):
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != CREATE_DATA_RESOURCE_REQ_TYPE:
-                errtext = "CreateDataResource.createDataResource(): " + \
+                errtext = "ManageDataResource.create(): " + \
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
@@ -169,7 +275,7 @@ class CreateDataResource(object):
 
 
         except ReceivedApplicationError, ex:
-            log.info('CreateDataResource.createDataResource(): Error attempting to FIXME: %s' %ex)
+            log.info('ManageDataResource.create(): Error attempting to FIXME: %s' %ex)
 
             #mark lifecycle states
             datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
@@ -210,7 +316,7 @@ class CreateDataResource(object):
         @GPB{Input,9211,1}
         @retval data source resource
         """
-        log.info('CreateDataResource.createDataResource()\n')
+        log.info('ManageDataResource._createDataSourceResource()\n')
         datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
 
         #FILL UP FIELDS, lists followed by scalars
@@ -228,6 +334,7 @@ class CreateDataResource(object):
         datasrc_resource.ncml_mask                     = msg.ncml_mask
         datasrc_resource.max_ingest_millis             = msg.max_ingest_millis
         datasrc_resource.ion_title                     = msg.ion_title
+        datasrc_resource.ion_description               = msg.ion_description
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
         datasrc_resource.update_start_datetime_millis  = msg.start_time
 
@@ -237,3 +344,28 @@ class CreateDataResource(object):
         log.info("created data source " + str(datasrc_resrource))
 
         defer.returnValue(datasrc_resource)
+
+
+
+    @defer.inlineCallbacks
+    def _getOneAssociationObject(self, the_subject, the_predicate):
+        """
+        @brief get the subject side of an association when you only expect one
+        @return id of what you're after
+        """
+
+        #can also do obj= 
+        found = yield self.ac.find_associations(subject=datasource_resource, \
+                                                predicate_or_predicates=HAS_A_ID)
+
+        association = None
+        for a in found:
+            exists = yield self.ac.association_exists(a.ObjectReference.key, TYPE_OF_ID, DATASOURCE_RESOURCE_TYPE_ID)
+            if exists:
+                #FIXME: if not association is None then we have data inconsistency!
+                association = a
+
+        #FIXME: if association is None: ERRORZ
+
+        the_resource = yield self.rc.get_associated_resource_object(association)
+        defer.returnValue(the_resource)
