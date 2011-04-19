@@ -10,15 +10,23 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.util.itv_decorator import itv
+import tarfile
+
 from twisted.trial import unittest
 from twisted.internet import defer
 
+from ion.util import procutils as pu
 
 from net.ooici.play import addressbook_pb2
 
 from ion.core.object import codec
 from ion.core.object import workbench
 from ion.core.object import object_utils
+
+
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -126,3 +134,41 @@ class CodecTest(unittest.TestCase):
 
 
 
+
+class LargeCodecTest(unittest.TestCase):
+
+    def setUp(self):
+        wb = workbench.WorkBench('No Process Test')
+        self.wb = wb
+
+    @itv(CONF)
+    def test_copy_large_structure(self):
+
+        filename = CONF.getValue('filename')
+
+        filename = pu.get_ion_path(filename)
+
+        #tar = tarfile.open(filename, 'r')
+        #f = tar.extractfile(tar.next())
+
+        f = open(filename,'r')
+
+        obj = codec.unpack_structure(f.read())
+
+        self.wb.put_repository(obj.Repository)
+
+        # Now test copying it!
+
+        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
+
+        # Set a nonsense field to see if we can copy the datastructure!
+        repo.root_object.owner = obj
+
+
+        self.assertNotEqual(repo.root_object.owner._repository, obj._repository)
+
+
+        repo.commit('My Junk')
+
+
+        self.assertEqual(repo.root_object.owner, obj)

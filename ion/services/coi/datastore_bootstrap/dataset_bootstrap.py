@@ -66,7 +66,6 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
 
         if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
             log.debug('Untaring file...')
-            outname = filename.replace('.tar.gz', '.obj')
             tar = tarfile.open(filename, 'r')
             f = tar.extractfile(tar.next())
 
@@ -79,10 +78,6 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     except ExtractError, e:
         log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
 
-
-    #obj = codec.unpack_structure(f.read())
-    #ds_svc.workbench.put_repository(obj.Repository)
-    #resource_instance.ResourceObject = obj
 
     head_elm, obj_dict = codec._unpack_container(f.read())
     resource_instance.Repository.index_hash.update(obj_dict)
