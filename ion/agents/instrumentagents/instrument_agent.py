@@ -18,6 +18,7 @@ from ion.data.dataobject import ResourceReference, DataObject
 from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.resources.dm_resource_descriptions import PublisherResource
+from ion.services.dm.distribution.events import LoggingEventPublisher
 from uuid import uuid4
 import ion.util.procutils as pu
 
@@ -482,7 +483,7 @@ class InstrumentAgent(ResourceAgent):
     
     
     def plc_init(self):
-        
+        log.debug("***IA initializing")
         ResourceAgent.plc_init(self)
         self.pubsub_client = PubSubClient(proc=self)
 
@@ -490,6 +491,14 @@ class InstrumentAgent(ResourceAgent):
         The driver client to communicate with the child driver
         """
         self.driver_client = None
+        
+        """
+	The queue where we publish events, of any sort, for now
+	"""
+	pubproc = Process()
+	yield pubproc.spawn()
+	self.logEventPublisher = LoggingEventPublisher(process=pubproc,
+						       origin=str(self.id)+"-event")
         
         """
         A dictionary of the topics where data is published, indexed by transducer
@@ -528,6 +537,7 @@ class InstrumentAgent(ResourceAgent):
         An integer in seconds for the maximum allowable timeout to wait for a new transaction.
         """
         self.max_transaction_timeout = 120
+        log.debug("*** Set max_transaction_timeout")
     
         """
         An integer in seconds for the maximum time a transaction may be open.
@@ -662,10 +672,13 @@ class InstrumentAgent(ResourceAgent):
         """        
 
         result = self._end_transaction(content)
+            
+	# Publish an end transaction message...mainly as a test for now
+        yield self.logEventPublisher.create_and_publish_event("Transaction ended!")
+        
         yield self.reply_ok(msg,result)
                 
     
-
     def _end_transaction(self,tid):
         """
         End the current transaction.
@@ -684,7 +697,6 @@ class InstrumentAgent(ResourceAgent):
         else:
             result['success'] = errors['LOCKED_RESOURCE']
 
-            
         return result
         
 
@@ -2236,6 +2248,5 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(result)
         """
         pass
-
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentAgent)
