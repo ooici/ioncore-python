@@ -293,13 +293,16 @@ class ObjectContainer(object):
 
         return obj
 
-    def load_links(self, obj):
+    def load_links(self, obj, excluded_types=None):
         """
         Load the child objects into the work space recursively
         """
+        excluded_types = excluded_types or []
+
         for link in obj.ChildLinks:
-            child = self.get_linked_object(link)
-            self.load_links(child)
+            if not link.type.GPBMessage in excluded_types:
+                child = self.get_linked_object(link)
+                self.load_links(child, excluded_types)
 
     def _load_element(self, element):
 
@@ -1148,16 +1151,13 @@ class Repository(ObjectContainer):
         obj = self._wrap_message_object(cls())
         return obj
         
-        
     def new_id(self):
         """
         This id is a purely local concern - not used outside the local scope.
         """
         self._object_counter += 1
         return str(self._object_counter)
-     
 
-            
     @defer.inlineCallbacks
     def get_remote_linked_object(self, link):
             
@@ -1190,8 +1190,6 @@ class Repository(ObjectContainer):
 
         for element in elements:
             self.index_hash[element.key] = element
-
-            
 
     @defer.inlineCallbacks
     def load_remote_links(self, items):
