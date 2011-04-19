@@ -71,17 +71,16 @@ class GetDataResourceDetail(object):
             defer.returnValue(RspMsg)
 
         #
-        # Currently there is no association for dataset to datasource.
+        # Find the datasource associated with this dataset; for now, instantiate
+        # a FindDataResources worker object. The getAssociatedSource should be
+        # moved into a common worker class; it's currently in the FindDataResources
+        # class, which doesn't use it.
         #
         log.debug('getDataResourceDetail getting datasource resource instance')
         worker = FindDataResources(self.ais)
         dSourceResID = None
         dSourceResID = yield worker.getAssociatedSource(resID)
 
-
-        #
-        # Currently forcing to index 0 to fake association
-        #
         if not (dSourceResID is None):
             log.debug('Associated datasourceID: ' + dSourceResID)
             
@@ -101,7 +100,6 @@ class GetDataResourceDetail(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE)
 
         rspMsg.message_parameters_reference[0].data_resource_id = resID
-        # Fill in the rest of the message with the CF metadata
 
         i = 0
         for var in ds.root_group.variables:
