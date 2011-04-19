@@ -168,12 +168,6 @@ class LargeCodecTest(unittest.TestCase):
 
         self.assertNotEqual(repo.root_object._repository, obj._repository)
 
-
-        print 'SHIT'
-
         repo.commit('My Junk')
-
-        print 'SHIT NOW'
-
 
         self.assertEqual(repo.root_object, obj)
