@@ -1108,23 +1108,14 @@ class DataStoreService(ServiceProcess):
 
             load_result = content(resource_instance, self, **kwargs)
 
-            print resource_instance.root_group
-
             if not load_result:
                 set_content_ok = False
-        print 'MDSKNDSM<ND'
 
         if set_content_ok:
-            print 'MDSKNDSM<NDAAAAA'
-
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
-            print 'MDSKNDSM<ND222'
-
             return resource_instance
+
         else:
-
-            print 'MDSKNDSM<NDBBBBBBB'
-
             self.workbench.clear_repository_key(resource_key)
             log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % resource_name)
             return None
