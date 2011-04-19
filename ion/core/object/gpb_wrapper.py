@@ -275,6 +275,9 @@ class WrappedScalarProperty(WrappedProperty):
 
 
 class CommitCounter(object):
+    """
+    Class used to count the number of recursive calls to commit a data structure
+    """
     count = 0
 
 class WrapperType(type):
