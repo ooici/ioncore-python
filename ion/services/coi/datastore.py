@@ -589,7 +589,20 @@ class DataStoreWorkbench(WorkBench):
         yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
 
+    @defer.inlineCallbacks
+    def op_put_blobs(self, request, headers, message):
+        log.info("op_put_blobs")
+        if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid put blobs request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        def_list = []
+        for blob in request.blob_elements:
+            def_list.append(self._blob_store.put(blob.key, blob))
+
+        yield defer.DeferredList(def_list)
+
+        yield self._process.reply_ok(message)
+        log.info("op_put_blobs: Complete!")
 
     @defer.inlineCallbacks
     def op_fetch_blobs(self, request, headers, message):

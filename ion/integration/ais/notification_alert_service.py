@@ -37,6 +37,7 @@ from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import  GET_SUBSCRIPTION_LIST_REQ_TYPE, GET_SUBSCRIPTION_LIST_RESP_TYPE
 from ion.integration.ais.ais_object_identifiers import SUBSCRIPTION_INFO_TYPE
 #from ion.integration.ais.ais_object_identifiers import RESOURCE_CFG_REQUEST_TYPE
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
@@ -252,6 +253,39 @@ class NotificationAlertService(ServiceProcess):
         yield self.reply_ok(msg, respMsg)
 
 
+
+    @defer.inlineCallbacks
+    def op_getSubscriptionList(self, content, headers, msg):
+        """
+        @brief remove a subscription from the set of queues to monitor
+        @param
+        @retval none
+        """
+        log.debug('NotificationAlertService.op_getSubscriptionList \n'+str(content))
+
+        # Check only the type received
+        if content.MessageType != AIS_REQUEST_MSG_TYPE:
+            raise NotificationAlertError('Expected message class AIS_REQUEST_MSG_TYPE, received %s'% str(content))
+
+        # check that ooi_id is present in GPB
+        if not content.message_parameters_reference.IsFieldSet('user_ooi_id'):
+             # build AIS error response
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response.error_num = Response.ResponseCodes.BAD_REQUEST
+             Response.error_str = "Required field [user_ooi_id] not found in message"
+             defer.returnValue(Response)
+
+
+        # create the register_user request GPBs
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
+        respMsg.message_parameters_reference.add()
+        respMsg.message_parameters_reference[0] = respMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
+        respMsg.result = respMsg.ResponseCodes.OK
+
+        log.info('NotificationAlertService.op_getSubscriptionList complete')
+        yield self.reply_ok(msg, respMsg)
+
+
     @defer.inlineCallbacks
     def CheckRequest(self, request):
       # Check for correct request protocol buffer type
@@ -299,6 +333,14 @@ class NotificationAlertServiceClient(ServiceClient):
         log.debug('NAS_client.removeSubscription: sending following message to removeSubscription:\n%s' % str(message))
         (content, headers, payload) = yield self.rpc_send('removeSubscription', message)
         log.debug('NAS_client.removeSubscription: reply:\n' + str(content))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def getSubscriptionList(self, message):
+        yield self._check_init()
+        log.debug('NAS_client.getSubscriptionList: sending following message to getSubscriptionList:\n%s' % str(message))
+        (content, headers, payload) = yield self.rpc_send('getSubscriptionList', message)
+        log.debug('NAS_client.getSubscriptionList: reply:\n' + str(content))
         defer.returnValue(content)
 
 
