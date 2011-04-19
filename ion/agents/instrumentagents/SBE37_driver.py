@@ -26,8 +26,11 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = True
-#DEBUG_PRINT = False
+#DEBUG_PRINT = True
+DEBUG_PRINT = False
+#IO_LOG = True
+IO_LOG = False
+IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
 
 ###############################################################################
 # Constants specific to the SBE37Driver. 
@@ -139,19 +142,22 @@ class DeviceCommandSpecification:
     firing the deferred returned by the op_* call upon completion.
     """
     
-    def __init__(self,command,msg=None):
+    def __init__(self,command):
         self.command = command
         self.device_command_buffer = None
         self.previous_key = None
         self.errors = False
         self.deferred = None
+        self.timeoutf = None
         self.reply = {'success':None,'result':{}}
-        self.msg = msg
         
     def do_reply(self):
         """
         Fire the command deferred with reply.
         """
+        if self.timeoutf != None:
+            self.timeoutf.cancel()
+            self.timeoutf = None
         if self.deferred != None:
             d,self.deferred = self.deferred, None
             d.callback(self.reply)
@@ -164,6 +170,7 @@ class DeviceCommandSpecification:
         if self.deferred != None:
             d,self.deferred = self.deferred, None
             d.callback(reply)
+        self.timeoutf = None
     
     def set_success(self,success_val,fail_val):
         """
@@ -192,6 +199,7 @@ class SBE37Driver(InstrumentDriver):
     """
     Implements the abstract InstrumentDriver interface for the SBE37.
     """
+
 
     def __init__(self, *args, **kwargs):
         
@@ -249,6 +257,19 @@ class SBE37Driver(InstrumentDriver):
         The deferred that handles blocking on connect messages.
         """
         self._connection_complete_deferred = None        
+        
+        """
+        Device IO Logfile parameters. The device io log is used to precisely
+        trace communication with the device for design and debugging purposes.
+        If enabled, a new file is create everytime a op_connect is attempted.
+        """
+        self._logfile = None
+        self._start_time = time.localtime()
+        self._logfile_name = ('SBE37_driver_io_log_%i_%i_%i.txt'
+                              % (self._start_time[3],self._start_time[4],
+                                 self._start_time[5]))
+        self._logfile_path = IO_LOG_DIR+self._logfile_name
+        
         
         """
         The data pattern and regular expression used to match and parse
@@ -1061,23 +1082,28 @@ class SBE37Driver(InstrumentDriver):
             
             # Cancel the looping wakeup if active.
             self._stop_wakeup()
-                
-            # Pop the next pending device command.
-            try:
-                
-                cmd = self._device_command_buffer.pop(0)
 
-            # If no further device command, parse the device output and
-            # switch state.
-            except IndexError:
+            if self._line_buffer == '':
+                self._debug_print('detected empty line buffer')
+                self._wakeup()
                 
-                self._read_param_values(self._data_lines)
-                next_state = 'STATE_CONNECTED'
-
-            # Write command to device.
             else:
-                
-                self._write_command(cmd+SBE37_NEWLINE)
+            
+                # Pop the next pending device command.
+                try:
+                    
+                    cmd = self._device_command_buffer.pop(0)
+    
+                # If no further device command, parse the device output and
+                # switch state.
+                except IndexError:
+                    
+                    self._read_param_values(self._data_lines)
+                    next_state = 'STATE_CONNECTED'
+    
+                # Write command to device.
+                else:
+                    self._write_command(cmd+SBE37_NEWLINE)
                 
 
         elif event == 'EVENT_DATA_RECEIVED':
@@ -1087,7 +1113,6 @@ class SBE37Driver(InstrumentDriver):
             success = False
 
         return (success,next_state)
-
 
     def state_handler_set(self,event,params):
         """
@@ -1121,10 +1146,10 @@ class SBE37Driver(InstrumentDriver):
             
             # Clear the data buffer.
             self._data_lines = []
-            #self._device_command_buffer = []
                     
         elif event == 'EVENT_PROMPTED':
             
+            #print 'line buf: '+self._line_buffer+'xx'
             # Cancel the looping wakeup if active.
             self._stop_wakeup()
             
@@ -1153,9 +1178,9 @@ class SBE37Driver(InstrumentDriver):
             else:
                 
                 command_spec.previous_key = set_key
+                #print 'writing command '+set_cmd
                 self._write_command(set_cmd+SBE37_NEWLINE)
-            
-            
+
         elif event == 'EVENT_DATA_RECEIVED':
             pass                
                         
@@ -1233,7 +1258,6 @@ class SBE37Driver(InstrumentDriver):
         Send an EVENT_DISCONNECT_COMPLETE.
         """
 
-        #self.__cleanUpConnection()
         self._instrument_connection = None
         self.fsm.on_event('EVENT_DISCONNECT_COMPLETE')
 
@@ -1243,7 +1267,12 @@ class SBE37Driver(InstrumentDriver):
         Called by the twisted framework when a data fragment is received.
         Update line and data buffers. Send EVENT_DATA_RECEIVED and
         EVENT_PROMPTED if a prompt is detected.
+        @param dataFrag a string data fragment received.
         """
+        
+        # Write the fragment to the IO log if it is enabled.
+        if IO_LOG:
+            self._logfile.write(dataFrag)
         
         # Add the fragment to the line buffer.
         self._line_buffer += dataFrag
@@ -1318,7 +1347,7 @@ class SBE37Driver(InstrumentDriver):
         reply = {'success':None,'result':None}
         command = content.get('command',None)
         channels = content.get('channels',None)
-        timeout = content.get('timeout',15)
+        timeout = content.get('timeout',None)
 
         # Fail if required parameters absent.
         if not command:
@@ -1387,7 +1416,7 @@ class SBE37Driver(InstrumentDriver):
                 return
 
             # Set up the reply deferred and fire the command event.  
-            reply = yield self._process_command(command_spec,event)
+            reply = yield self._process_command(command_spec,event,timeout)
 
 
         # Process start autosampling command.
@@ -1408,14 +1437,14 @@ class SBE37Driver(InstrumentDriver):
             command_spec.device_command_buffer = ['STARTNOW']                
 
             # Set up the reply deferred and fire the command event.  
-            reply = yield self._process_command(command_spec,event)
+            reply = yield self._process_command(command_spec,event,timeout)
 
 
         # Process stop autosampling command.
         elif drv_cmd == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
             
             # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command,msg)
+            command_spec = DeviceCommandSpecification(command)
             event = 'EVENT_STOP_AUTOSAMPLE'
 
             # The acquire command only applies to the instrument as a whole.
@@ -1672,6 +1701,11 @@ class SBE37Driver(InstrumentDriver):
             status of the connect operation.
         """
 
+        # Open the logfile if configured.
+        if IO_LOG:
+            self._logfile = open(self._logfile_path,'w',0)
+
+
         # Create the connection complete deferred and fire EVENT_CONNECT.
         reply = yield self._process_connect() 
         yield self.reply_ok(msg, reply)
@@ -1822,6 +1856,11 @@ class SBE37Driver(InstrumentDriver):
         Process a device command.
         Append the command to the driver command buffer and fire the
         event associated with the arrival of the command.
+        @param command_spec a DeviceCommandSpecification that describes
+            the command to execute.
+        @param event the event to handle the command.
+        @param timeout the driver timeout after which the driver will
+            cancel the command and return a timeout error.
         @retval A deferred that will be fired upon conclusion of the
         command processing with a command specific reply message.
         """
@@ -1838,11 +1877,11 @@ class SBE37Driver(InstrumentDriver):
         if timeout > 0:
 
             def _timeoutf(cs,driver):
-                driver._debug_print('in timeout func')
+                driver._debug_print('in timeout func for command '+ str(cs.command))
     
                 # If this command is still active apply timeout ops.
                 # If this doesn't match, then the operation completed normally
-                # and was already poped from the buffer.
+                # and was already popped from the buffer.
                 if len(self._driver_command_buffer) > 0:
                     if cs == self._driver_command_buffer[0]:
         
@@ -1857,7 +1896,8 @@ class SBE37Driver(InstrumentDriver):
                         driver._debug_print('firing timeout')
                         cs.do_timeout()
         
-            reactor.callLater(timeout,_timeoutf,command_spec,self)                    
+            command_spec.timeoutf = reactor.callLater(timeout,_timeoutf,
+                                                     command_spec,self)                    
         
         # Fire the command received event and return deferred.
         if self.fsm.on_event(event):
@@ -1914,7 +1954,10 @@ class SBE37Driver(InstrumentDriver):
         """
         Write a command to the device.
         """
-        
+        # Write the fragment to the IO log if it is enabled.
+        if IO_LOG:
+            self._logfile.write('***'+cmd+'***')
+
         if self._instrument_connection:
             self._instrument_connection.transport.write(cmd)
             self._instrument_connection.transport.doWrite()                
@@ -1955,7 +1998,9 @@ class SBE37Driver(InstrumentDriver):
                     break
             if new_val != None:
                 val['value'] = new_val
-            
+            else:
+                self._debug_print('could not update '+key[1])
+
     
     def _get_parameters(self,params):
         """
@@ -2159,16 +2204,6 @@ class SBE37Driver(InstrumentDriver):
             return None
         
         return '%02i%02i%02i' % (hours,minutes,seconds)
-
-
-    @staticmethod
-    def _string_to_time(timestr):
-        """
-        Extract a time tuple from an sbe37 time string.
-        @param str a string containing time information in sbe37 format.
-        @retval a time tuple, or None if the input string is not valid.        
-        """
-        pass
 
 
     @staticmethod
