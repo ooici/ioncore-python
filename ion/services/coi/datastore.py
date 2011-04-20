@@ -915,6 +915,7 @@ class DataStoreService(ServiceProcess):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
+        self.op_put_blobs = self.workbench.op_put_blobs
 
 
     @defer.inlineCallbacks

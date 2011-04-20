@@ -30,7 +30,10 @@ MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
 BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
 LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 
-ArrayStructureType = object_utils.create_type_identifier(object_id=10025, version=1)
+REQUEST_COMMIT_BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=48, version=1)
+
+
+ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
 from ion.core.object import object_utils
 
@@ -181,7 +184,11 @@ class ObjectContainer(object):
         Required for get_linked_object
         """
 
-
+        self._process=None
+        """
+        Need for access to sending messages!
+        """
+        
     @property
     def root_object(self):
         return self._workspace_root
@@ -305,6 +312,36 @@ class ObjectContainer(object):
                 child = self.get_linked_object(link)
                 self.load_links(child, excluded_types)
 
+    @defer.inlineCallbacks
+    def checkout_commit(self, commit, exclude_types):
+
+        root_obj = None
+
+        link = commit.GetLink('objectroot')
+        try:
+
+            # Catch only KeyErrors!
+            root_obj = self.get_linked_object(link)
+
+            self.load_links(root_obj, exclude_types)
+
+        except KeyError, ke:
+
+            log.info('Local checkout failed - fetching remote objects.')
+
+
+
+            
+
+        finally:
+            # Make sure there is at least one yield
+            yield
+
+
+        defer.returnValue(root_obj)
+
+
+
     def _load_element(self, element):
 
         # check that the calculated value in element.sha1 matches the stored value
@@ -349,7 +386,7 @@ class Repository(ObjectContainer):
     MERGEREQUIRED = 'This repository is currently being merged!'
 
 
-    DefaultExcludedTypes = [ArrayStructureType,]
+    DefaultExcludedTypes = [ARRAY_STRUCTURE_TYPE,]
 
     def __init__(self, head=None, repository_key=None, persistent=False):
         
@@ -417,10 +454,6 @@ class Repository(ObjectContainer):
         The upstream source of this repository. 
         """
 
-        self._process=None
-        """
-        Need for access to sending messages!
-        """
 
         if not isinstance(persistent, bool):
             raise RepositoryError('Invalid argument type to set the persistent property of a repository')
@@ -704,8 +737,11 @@ class Repository(ObjectContainer):
 
         if exclude_types is None:
             exclude_types = self.DefaultExcludedTypes
+        elif not hasattr(exclude_types, '__iter__'):
+            raise RepositoryError('Invalid exclude_types argument passed to checkout')
 
-        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types' % (branchname, commit_id, older_than, exclude_types))
+
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, exclude_types))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -834,15 +870,9 @@ class Repository(ObjectContainer):
             
         # Automatically fetch the object from the hashed dictionary
 
-        rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
+        rootobj = yield self.checkout_commit(cref, exclude_types)
         self._workspace_root = rootobj
-        
-        #yield self.load_remote_links(rootobj)
-        try:
-            self.load_links(rootobj, exclude_types)
-        except KeyError, ke:
-            log.info('Us')
-        # @TODO figure out if there is any point to checking the value of the result?
+
 
         
         self._detached_head = detached
@@ -1236,41 +1266,6 @@ class Repository(ObjectContainer):
             res = True
 
         defer.returnValue(res)
-            
-    def _load_element(self, element):
-        
-        #log.debug('_load_element' + str(element))
-
-        # check that the calculated value in element.sha1 matches the stored value
-        if not element.key == element.sha1:
-            #@TODO Consider removing this somewhat costly check - it is already done when an object is read from a message
-            raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
-
-        cls = object_utils.get_gpb_class_from_type_id(element.type)
-                                
-        # Do not automatically load it into a particular space...
-        obj = self._create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
-            
-        # If it is a leaf element set the bytes for the object, do not load it
-        # If it is not a leaf element load it and find its child links
-        if element.isleaf:
-            
-            obj._bytes = element.value
-            
-        else:
-            obj.ParseFromString(element.value)
-            obj.FindChildLinks()
-
-
-        obj.Modified = False
-        
-        # Make a note in the element of the child links as well!
-        for child in obj.ChildLinks:
-            element.ChildLinks.add(child.key)
-        
-        return obj
-        
         
     def copy_object(self, value, deep_copy=True):
         """
