@@ -56,12 +56,6 @@ class FindDataResources(object):
         self.asc = AssociationServiceClient()
         self.ac = AssociationClient()
 
-
-        self.dsID = None
-
-    def setTestDatasetID(self, dsID):
-        self.dsID = dsID
-
     @defer.inlineCallbacks
     def findDataResources(self, msg):
         """

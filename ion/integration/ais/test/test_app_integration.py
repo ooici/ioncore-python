@@ -143,7 +143,7 @@ class AppIntegrationTest(IonTestCase):
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         #
-        # Send a message with no bounds
+        # Send a message with bounds
         #
         
         # Create a message client
@@ -152,11 +152,6 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude  = -50
-        #reqMsg.message_parameters_reference.maxLatitude  = -40
-        #reqMsg.message_parameters_reference.minLongitude = 20
-        #reqMsg.message_parameters_reference.maxLongitude = 30
         reqMsg.message_parameters_reference.minLatitude  = 30
         reqMsg.message_parameters_reference.maxLatitude  = 45
         reqMsg.message_parameters_reference.minLongitude = -75
