@@ -98,12 +98,11 @@ class EchoServiceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-         yield self._start_container()
-         yield self._spawn_processes(self.services)
+        yield self._start_container()
+        yield self._spawn_processes(self.services)
 
-         self.send_content = 'content123'
-
-         self.echo_client = EchoServiceClient()
+        # Don't create send_content and echo_client here - this method is over-ridden in ion-integration
+        # Want to keep the same tests - but change setUp and tearDown!
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -115,22 +114,33 @@ class EchoServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def test_echo(self):
 
+        self.send_content = 'content123'
+
+        self.echo_client = EchoServiceClient()
+
         result_content = yield self.echo_client.echo(self.send_content)
         self.assertEqual(result_content, self.send_content)
 
     @defer.inlineCallbacks
     def test_echo_fail(self):
 
+        self.send_content = 'content123'
+
+        self.echo_client = EchoServiceClient()
         yield self.failUnlessFailure(self.echo_client.echo_fail(self.send_content), ReceivedApplicationError)
 
     @defer.inlineCallbacks
     def test_echo_exception(self):
+        self.send_content = 'content123'
 
+        self.echo_client = EchoServiceClient()
         yield self.failUnlessFailure(self.echo_client.echo_exception(self.send_content), ReceivedContainerError)
 
     @defer.inlineCallbacks
     def test_echo_apperror(self):
+        self.send_content = 'content123'
 
+        self.echo_client = EchoServiceClient()
         yield self.failUnlessFailure(self.echo_client.echo_apperror(self.send_content), ReceivedApplicationError)
 
     
