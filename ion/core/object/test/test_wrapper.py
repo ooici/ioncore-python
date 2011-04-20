@@ -149,11 +149,11 @@ class WrapperMethodsTest(unittest.TestCase):
 
         att = gpb_wrapper.Wrapper._create_object(ATTRIBUTE_TYPE)
 
-        att.data_type = att.DataType.BOOLEAN
+        att.data_type = att.DataType.DOUBLE
 
-        self.assertEqual(att.data_type, att.DataType.BOOLEAN)
+        self.assertEqual(att.data_type, att.DataType.DOUBLE)
 
-        self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
+        self.assertRaises(AttributeError, setattr, att.DataType, 'DOUBLE', 'this is not a double')
 
 
     def test_listsetfields_message_type(self):
