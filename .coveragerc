@@ -28,6 +28,10 @@ omit =
     *test_extra_coverage*
     # omit __init__.py file
     *__init__*
+    # omit tests
+    */test/*
+    # omit sandbox from buildbot
+    /*/sandbox/*
 
 [html]
 directory = coverage_results
