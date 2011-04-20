@@ -33,9 +33,12 @@ CDM_GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 CDM_DIMENSION_TYPE = create_type_identifier(object_id=10018, version=1)
 CDM_ATTRIBUTE_TYPE = create_type_identifier(object_id=10017, version=1)
 CDM_ARRAY_INT32_TYPE = create_type_identifier(object_id=10009, version=1)
+CDM_ARRAY_UINT32_TYPE = create_type_identifier(object_id=10010, version=1)
+CDM_ARRAY_INT64_TYPE = create_type_identifier(object_id=10011, version=1)
 CDM_ARRAY_FLOAT32_TYPE = create_type_identifier(object_id=10013, version=1)
+CDM_ARRAY_FLOAT64_TYPE = create_type_identifier(object_id=10014, version=1)
 CDM_ARRAY_STRING_TYPE = create_type_identifier(object_id=10015, version=1)
-
+CDM_ARRAY_OPAQUE_TYPE = create_type_identifier(object_id=10016, version=1)
 
 class OOIObjectError(Exception):
     """
@@ -219,7 +222,7 @@ class WrappedRepeatedScalarProperty(WrappedProperty):
         return ScalarContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Scalar in ION Object')
+        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object')
 
         return None
     
@@ -399,9 +402,9 @@ class WrapperType(type):
 
     def _add_specializations(cls, obj_type, clsDict):
 
-        #-----------------------------------#
+        #-------------------------------------#
         # Wrapper_Dataset Specialized Methods #
-        #-----------------------------------#
+        #-------------------------------------#
         def _make_root_group(self, name=''):
             """
             Specialized method for CDM (dataset) Objects to append a group object with the given name
@@ -450,10 +453,13 @@ class WrapperType(type):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
-            if not values or not isinstance(values, list):
-                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
-            if not data_type or not isinstance(data_type, int):
-                raise TypeError('Type mismatch for argument "data_type" -- Expected %s; received %s with value: "%s"' % (repr(int), type(data_type), str(data_type)))
+            if values is None or (isinstance(values, list) and 0 == len(values)):
+                raise ValueError('Invalid argument "values" -- Please specify a non-empty list')
+            if not data_type or not isinstance(data_type, (int, long)):
+                raise TypeError('Type mismatch for argument "data_type" -- Expected int or long; received %s with value: "%s"' % (type(data_type), str(data_type)))
+
+            if not isinstance(values, list):
+                values = [values]
 
             # @todo: all items must be the same type...  this includes ommiting/casting null values
             #        since they will cause an error when stored in the GPB array representation
@@ -476,20 +482,42 @@ class WrapperType(type):
 
             # Set the datatype based on the type of values being given
             # @todo: add support for remaining array types (currently only string attributes are even used)
+            # @todo: because many object types are not support fully here -- where should we put value checking...
+            #        ex: since bool is stored as int, prevent any value other than 0 and 1
+            def _attach_byte_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.BYTE
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_UINT32_TYPE)
+            def _attach_short_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.SHORT
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT32_TYPE)
             def _attach_int32_array(parent, atrib_inst):
                 atrib_inst.data_type = atrib_inst.DataType.INT
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT32_TYPE)
+            def _attach_int64_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.LONG
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT64_TYPE)
             def _attach_float32_array(parent, atrib_inst):
                 atrib_inst.data_type = atrib_inst.DataType.FLOAT
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_FLOAT32_TYPE)
+            def _attach_float64_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.DOUBLE
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_FLOAT64_TYPE)
+            def _attach_char_array(parent, atrib_inst): # CHAR doesnt exist in GPB
+                atrib_inst.data_type = atrib_inst.DataType.CHAR
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
             def _attach_string_array(parent, atrib_inst):
                 # @todo: modify this to support unicode types (GPB stringArray already supports it)
                 atrib_inst.data_type = atrib_inst.DataType.STRING
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
 
-            attach_array_definitions = {self.DataType.STRING : _attach_string_array,
-                                        self.DataType.INT    : _attach_int32_array,
-                                        self.DataType.FLOAT  : _attach_float32_array}
+            attach_array_definitions = {self.DataType.BYTE    : _attach_byte_array,
+                                        self.DataType.SHORT   : _attach_short_array,
+                                        self.DataType.INT     : _attach_int32_array,
+                                        self.DataType.LONG    : _attach_int64_array,
+                                        self.DataType.FLOAT   : _attach_float32_array,
+                                        self.DataType.DOUBLE  : _attach_float64_array,
+                                        self.DataType.CHAR    : _attach_char_array,
+                                        self.DataType.STRING  : _attach_string_array}
 
             attach_array_definitions[data_type](self, atrib)
 
@@ -712,7 +740,25 @@ class WrapperType(type):
             return result
 
 
-        def __remove_attribute(self, name):
+        def _cdm_resource_has_attribute(self, name):
+            """
+            Specialized method for CDM Objects to check existance of an attribute object by its name
+            """
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
+
+            result = False
+            for att in self.attributes:
+                if att.name == name:
+                    result = True
+                    break
+
+            return result
+
+
+        def _remove_attribute(self, name):
             """
             Removes an attribute with the given name from this CDM Object (GROUP)
             @return: The attribute which was removed as a convenience
@@ -724,23 +770,32 @@ class WrapperType(type):
             return atr
 
 
-        def _set_attribute(self, name, values):
+        def _set_attribute(self, name, values, data_type=None):
             """
             Specialized method for CDM Objects to set values for existing attributes
+            @raise ValueError: When setting an attribute to a different data_type, if
+                               data_type is not explicitly specified a ValueError will be raised
             """
             # @attention: Should we allow an empty list of values for an attribute?
             if not isinstance(name, str):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
-            if not values or not isinstance(values, list):
-                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
+            if values is None or (isinstance(values, list) and 0 == len(values)):
+                raise ValueError('Invalid argument "values", please specify a non-empty list')
+            
+            if not isinstance(values, list):
+                values = [values]
 
-            atr = __remove_attribute(self, name)
+            atr = _remove_attribute(self, name)
+            data_type = data_type or atr.data_type
             try:
-                _add_attribute(self, name, int(atr.data_type), values)
+                _add_attribute(self, name, int(data_type), values)
+                log.warn('Old references to the attribute "%s" are now detached and will not point to the new attribute value' % name)
             except Exception, ex:
                 log.warn('WARNING! Exception may have left this resource in an invalid state')
+                atr_link = self.attributes.add()
+                atr_link.SetLink(atr)
                 raise ex
 
 
@@ -797,6 +852,19 @@ class WrapperType(type):
             Specialized method for CDM Objects to find the length of an attribute object's values
             """
             return len(self.array.value)
+
+        def _get_attribute_data_type(self):
+            """
+            Specialized method for CDM Objects to retrieve the attribute data_type as a long.
+            This value can be used to compare equality with other attributes' data_types
+            """
+            return self.data_type
+        
+        def _attribute_is_same_type(self, attribute):
+            if not hasattr(attribute, 'GetDataType'):
+                raise TypeError('The datatype of the given attribute cannot be found.:  Please specify an instance of "%s".  Recieved "%s"' % (type(self), type(attribute)))
+            
+            return self.GetDataType() == attribute.GetDataType()
 
 
         #--------------------------------------#
@@ -878,6 +946,8 @@ class WrapperType(type):
             clsDict['FindVariableByName'] = _find_variable_by_name
             clsDict['FindVariableIndexByName'] = _find_variable_index_by_name
             clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            clsDict['HasAttribute'] = _cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = _remove_attribute
             clsDict['SetAttribute'] = _set_attribute
             clsDict['SetDimension'] = _set_dimension
 
@@ -892,6 +962,8 @@ class WrapperType(type):
             # clsDict['SetValue'] = _get_attribute_values
             # clsDict['SetValues'] = _get_attribute_values
             clsDict['GetLength'] = _get_attribute_values_length
+            clsDict['GetDataType'] = _get_attribute_data_type
+            clsDict['IsSameType'] = _attribute_is_same_type
 
 
         elif obj_type == CDM_VARIABLE_TYPE:
@@ -902,6 +974,8 @@ class WrapperType(type):
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            clsDict['HasAttribute'] = _cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = _remove_attribute
             clsDict['SetAttribute'] = _set_attribute
             clsDict['SetDimension'] = _set_dimension
 
