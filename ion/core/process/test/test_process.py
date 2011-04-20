@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
-from ion.core.exception import ReceivedError, ApplicationError
+from ion.core.exception import ReceivedContainerError, ReceivedApplicationError, ApplicationError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
@@ -192,27 +192,40 @@ class ProcessTest(IonTestCase):
         self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly after init')
 
+
     @defer.inlineCallbacks
-    def test_error_in_op(self):
+    def test_echo(self):
         child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid1 = yield self.test_sup.spawn_child(child1)
 
-        try:
-            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_exception','content123')
-            self.fail("ReceivedError expected")
-        except ReceivedError, re:
-            log.info('Process 1 responded to error correctly')
+        send_content = 'content123'
+        (result_content,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo',send_content)
+        self.assertEqual(result_content, send_content)
 
     @defer.inlineCallbacks
-    def test_apperror_in_op(self):
+    def test_echo_fail(self):
         child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid1 = yield self.test_sup.spawn_child(child1)
 
-        try:
-            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_apperror','content123')
-            self.fail("ReceivedError expected")
-        except ReceivedError, re:
-            log.info('Process 1 responded to error correctly')
+        yield self.failUnlessFailure(self.test_sup.rpc_send(pid1,'echo_fail','content123'), ReceivedApplicationError)
+
+
+    @defer.inlineCallbacks
+    def test_echo_exception(self):
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
+        pid1 = yield self.test_sup.spawn_child(child1)
+
+        yield self.failUnlessFailure(self.test_sup.rpc_send(pid1,'echo_exception','content123'), ReceivedContainerError)
+
+
+
+    @defer.inlineCallbacks
+    def test_echo_apperror(self):
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
+        pid1 = yield self.test_sup.spawn_child(child1)
+
+        yield self.failUnlessFailure(self.test_sup.rpc_send(pid1,'echo_apperror','content123'), ReceivedApplicationError)
+
 
     @defer.inlineCallbacks
     def test_send_byte_string(self):
@@ -428,7 +441,7 @@ class EchoProcess(Process):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
         # Reply as though we caught an exception!
-        yield self.reply_err(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
+        yield self.reply_err(msg,content=None, exception=ex, response_code=self.BAD_REQUEST)
 
     @defer.inlineCallbacks
     def op_echo_exception(self, content, headers, msg):
@@ -441,7 +454,7 @@ class EchoProcess(Process):
     @defer.inlineCallbacks
     def op_echo_apperror(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        raise ApplicationError("I'm supposed to fail")
+        raise ApplicationError("I'm supposed to fail", self.BAD_REQUEST)
 
         # This is never reached!
         yield self.reply_ok(msg, content=content)
