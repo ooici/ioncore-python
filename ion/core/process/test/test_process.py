@@ -17,8 +17,7 @@ import hashlib
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.core import ioninit
-from ion.core.messaging import ion_reply_codes
+
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError, ApplicationError

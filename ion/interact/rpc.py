@@ -14,7 +14,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
-from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.messaging.message_client import MessageInstance
 from ion.interact.conversation import ConversationType, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
 from ion.util.state_object import BasicStates
