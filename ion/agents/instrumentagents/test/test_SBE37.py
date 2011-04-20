@@ -537,9 +537,11 @@ class TestSBE37(IonTestCase):
         dump_dict(result)
 
         # Acquire a polled sample and verify result.
-        
-        params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_ACQUIRE_SAMPLE']}
-        
+        params = {
+            'channels':['CHAN_INSTRUMENT'],
+            'command':['DRIVER_CMD_ACQUIRE_SAMPLE'],
+            'timeout':10
+            }
         reply = yield self.driver_client.execute(params)
             
         current_state = yield self.driver_client.get_state()
@@ -558,7 +560,11 @@ class TestSBE37(IonTestCase):
         
         
         # Test and verify autosample mode.
-        params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_START_AUTO_SAMPLING']}
+        params = {
+            'channels':['CHAN_INSTRUMENT'],
+            'command':['DRIVER_CMD_START_AUTO_SAMPLING'],
+            'timeout':10
+            }
         reply = yield self.driver_client.execute(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
@@ -587,9 +593,11 @@ class TestSBE37(IonTestCase):
             result = reply['result']
             
             if success[0] == 'OK':
+                # The command succeeded.
                 break
                             
             elif success[1] == 'TIMEOUT':
+                # The driver command timed out, try again.
                 pass
             
             else:

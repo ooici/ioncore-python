@@ -92,7 +92,47 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.updateDataResourceSubscription()\n')
-        #FIXME: just delete and re-add
+
+
+        try:
+            # Check only the type received and linked object types. All fields are
+            #strongly typed in google protocol buffers!
+            if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
+                    "Expected SubscriptionCreateReqMsg type, got " + str(msg)
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+            #FIXME: just delete and re-add
+
+
+
+        except ReceivedApplicationError, ex:
+            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+            Response.error_num =  ex.msg_content.MessageResponseCode
+            Response.error_str =  ex.msg_content.MessageResponseBody
+            defer.returnValue(Response)
+
+
+
+
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        #Response.message_parameters_reference.add()
+        #Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
+        #Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
+        #Response.message_parameters_reference[0].data_set_id     = my_dataset_id
+        #Response.message_parameters_reference[0].association_id  = association.AssociationIdentity
+        defer.returnValue(Response)
+
+
+
         defer.returnValue(None)
 
 
@@ -105,21 +145,49 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.deletDataResourceSubscription()\n')
-        #check that we have GPB for subscription_modify_type
-        #get msg. dispatcher_id, script_path, data_source_resource_id
-        #check that dispatcher_id exists -- look up the resource gpb #7002
-        #get dispatcher id, name queue
-        #check that datasource_resource exists, look it up
-        #fixme: resource visibility / permission check?
-        #get datasource/set association
-        #check that dataset_id exists, look it up
 
-        #look up 
-        #create new dispatcherworkflowresource #7003
-        #associate: dispatcherresource has a dispatcherworkflowresource
-        #publish event: delete subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
-        
-        defer.returnValue(None)
+        try:
+            # Check only the type received and linked object types. All fields are
+            #strongly typed in google protocol buffers!
+            if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
+                    "Expected SubscriptionCreateReqMsg type, got " + str(msg)
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+
+
+            #check that we have GPB for subscription_modify_type
+            #get msg. dispatcher_id, script_path, data_source_resource_id
+            #check that dispatcher_id exists -- look up the resource gpb #7002
+            #get dispatcher id, name queue
+
+            #FIXME, other stuff
+
+
+        except ReceivedApplicationError, ex:
+            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+
+            Response.error_num =  ex.msg_content.MessageResponseCode
+            Response.error_str =  ex.msg_content.MessageResponseBody
+            defer.returnValue(Response)
+
+
+
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        #Response.message_parameters_reference.add()
+        #Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
+        #Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
+        #Response.message_parameters_reference[0].data_set_id     = my_dataset_id
+        #Response.message_parameters_reference[0].association_id  = association.AssociationIdentity
+        defer.returnValue(Response)
+
         
 
     def create(self, msg):
