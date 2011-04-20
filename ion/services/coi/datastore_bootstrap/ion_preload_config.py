@@ -242,6 +242,7 @@ HAS_LIFE_CYCLE_STATE_ID = ION_PREDICATES[has_life_cycle_state_name][ID_CFG]
 # Dataset names
 anonymous_name = 'ANONYMOUS'
 root_name = 'ROOT'
+myooici_name = 'myooici'
 
 identity_type = create_type_identifier(object_id=1401, version=1)
 ION_IDENTITIES = {
@@ -256,6 +257,19 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                                        'email':'',
                                        'life_cycle_state':''}
                         },
+
+myooici_name:{ID_CFG:'A7B44115-34BC-4553-B51E-1D87617F12E0',
+                          TYPE_CFG:identity_type,
+                          NAME_CFG:myooici_name,
+                          DESCRIPTION_CFG:'The first test user - poor sole!.',
+                          CONTENT_CFG:{'subject':'/DC=org/DC=cilogon/C=US/O=Google/CN=test user A501',
+                                       'certificate':'ADD CERTIFICATE!',
+                                       'rsa_private_key':'ADD PRIVATE KEY!',
+                                       'dispatcher_queue':'',
+                                       'email':'myooici@gmail.com',
+                                       'life_cycle_state':''}
+                        },
+
 
 root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           TYPE_CFG:identity_type,
@@ -274,6 +288,8 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
 
 ROOT_USER_ID = ION_IDENTITIES[root_name][ID_CFG]
 ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
+MYOOICI_USER_ID = ION_IDENTITIES[myooici_name][ID_CFG]
+
 
 
 ##### Define Datasets and data sources #####:
