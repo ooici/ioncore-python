@@ -177,9 +177,10 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_checkout(self):
-        result = yield self.wb1.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID)
+        result = yield self.wb1.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID,excluded_types=[])
         repo = self.wb1.workbench.get_repository(SAMPLE_PROFILE_DATASET_ID)
-        yield repo.checkout('master')
+
+        yield repo.checkout('master',excluded_types=[])
 
         commit = repo._current_branch.commitrefs[0]
         key = commit.GetLink('objectroot').key

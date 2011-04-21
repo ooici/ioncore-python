@@ -329,10 +329,16 @@ class WorkBench(object):
 
 
     @defer.inlineCallbacks
-    def pull(self, origin, repo_name, get_head_content=True):
+    def pull(self, origin, repo_name, get_head_content=True, excluded_types=None):
         """
         Pull the current state of the repository
         """
+
+        if excluded_types is None:
+            excluded_types = repository.Repository.DefaultExcludedTypes
+        elif not hasattr(excluded_types, '__iter__'):
+            raise WorkBenchError('Invalid excluded_types argument passed to checkout')
+
 
         # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
@@ -360,6 +366,12 @@ class WorkBench(object):
         pullmsg.repository_key = repo.repository_key
         pullmsg.get_head_content = get_head_content
         pullmsg.commit_keys.extend(commit_list)
+
+        if get_head_content:
+            for extype in excluded_types:
+                exobj = pullmsg.excluded_types.add()
+                exobj.object_id = extype.object_id
+                exobj.version = extype.version
 
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)

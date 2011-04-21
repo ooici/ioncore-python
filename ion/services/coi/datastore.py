@@ -253,7 +253,15 @@ class DataStoreWorkbench(WorkBench):
         if request.get_head_content:
 
             keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
-            blobs = yield self._get_blobs(response.Repository, keys)
+
+
+            def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in request.excluded_types)
+
+            blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.values():
                 link = response.blob_elements.add()

@@ -159,6 +159,7 @@ class ObjectContainer(object):
     Base class for the repository and merge container
     """
 
+    DefaultExcludedTypes = [ARRAY_STRUCTURE_TYPE,]
 
     def __init__(self):
 
@@ -325,7 +326,7 @@ class ObjectContainer(object):
                 self.load_links(child, excluded_types)
 
 
-    def checkout_local_commit(self, commit, exclude_types):
+    def checkout_local_commit(self, commit, excluded_types):
 
         # Get the link to the root object
         link = commit.GetLink('objectroot')
@@ -334,12 +335,12 @@ class ObjectContainer(object):
         root_obj = self.get_linked_object(link)
 
         # Load the object structure
-        self.load_links(root_obj, exclude_types)
+        self.load_links(root_obj, excluded_types)
 
         return root_obj
 
     @defer.inlineCallbacks
-    def checkout_remote_commit(self, commit, exclude_types):
+    def checkout_remote_commit(self, commit, excluded_types):
         """
         Use the message client from the process to create a message
         Can not use the datastore client because of import problems...
@@ -353,13 +354,12 @@ class ObjectContainer(object):
 
         link = commit.GetLink('objectroot')
         request.commit_root_object = link.key
-        for extype in exclude_types:
+        for extype in excluded_types:
             exobj = request.excluded_types.add()
             exobj.object_id = extype.object_id
             exobj.version = extype.version
 
         try:
-            print 'Upstream:',self.upstream
             result, headers, msg = yield proc.rpc_send(self.upstream, 'checkout', request)
 
         except ReceivedApplicationError, rae:
@@ -372,24 +372,25 @@ class ObjectContainer(object):
         for blob in result.blob_elements:
             element = gpb_wrapper.StructureElement(blob.GPBMessage)
             self.index_hash[element.key] = element
+            #print element
 
         element = self.index_hash[link.key]
         root_obj = self._load_element(element)
 
-        self.load_links(root_obj, exclude_types)
+        self.load_links(root_obj, excluded_types)
 
 
         defer.returnValue(root_obj)
 
 
 
-    def checkout_commit(self, commit, exclude_types):
+    def checkout_commit(self, commit, excluded_types):
         """
         @brief Checkout_commit will checkout the content of a commit. It will attempt to get
         the content from the local repository. Failing that it will attempt to get it from a
         remote process.
         @param commit is the commit object to checkout
-        @param exclude_types is a list of type objects to exclude while checking out the structure
+        @param excluded_types is a list of type objects to exclude while checking out the structure
         @retval the result maybe deferred as a result of the non local checkout. yielding will
         return the root_object.
         """
@@ -397,7 +398,7 @@ class ObjectContainer(object):
         root_obj = None
 
         try:
-            root_obj = self.checkout_local_commit(commit, exclude_types)
+            root_obj = self.checkout_local_commit(commit, excluded_types)
 
         except KeyError, ke:
 
@@ -405,7 +406,7 @@ class ObjectContainer(object):
 
         if root_obj is None:
 
-            root_obj = self.checkout_remote_commit(commit, exclude_types)
+            root_obj = self.checkout_remote_commit(commit, excluded_types)
 
 
         return root_obj
@@ -456,8 +457,6 @@ class Repository(ObjectContainer):
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
     MERGEREQUIRED = 'This repository is currently being merged!'
 
-
-    DefaultExcludedTypes = [ARRAY_STRUCTURE_TYPE,]
 
     def __init__(self, head=None, repository_key=None, persistent=False):
         
@@ -783,7 +782,7 @@ class Repository(ObjectContainer):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=None):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, excluded_types=None):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
@@ -792,13 +791,13 @@ class Repository(ObjectContainer):
         @TODO implement exclude types list in fetching/loading objects!
         """
 
-        if exclude_types is None:
-            exclude_types = self.DefaultExcludedTypes
-        elif not hasattr(exclude_types, '__iter__'):
-            raise RepositoryError('Invalid exclude_types argument passed to checkout')
+        if excluded_types is None:
+            excluded_types = self.DefaultExcludedTypes
+        elif not hasattr(excluded_types, '__iter__'):
+            raise RepositoryError('Invalid excluded_types argument passed to checkout')
 
 
-        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, exclude_types))
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, excluded_types))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -927,7 +926,7 @@ class Repository(ObjectContainer):
             
         # Automatically fetch the object from the hashed dictionary
 
-        rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, exclude_types)
+        rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, excluded_types)
         self._workspace_root = rootobj
 
 
