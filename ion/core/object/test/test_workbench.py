@@ -203,6 +203,7 @@ class WorkBenchProcess(Process):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
+        self.op_checkout = self.workbench.op_checkout
 
 
 

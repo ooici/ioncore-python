@@ -23,6 +23,8 @@ from ion.core.object import object_utils
 
 from ion.core.object import association_manager
 
+from ion.core.exception import ApplicationError, ReceivedApplicationError, ReceivedContainerError
+
 from ion.util import procutils as pu
 
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
@@ -37,7 +39,7 @@ ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, vers
 
 from ion.core.object import object_utils
 
-class RepositoryError(Exception):
+class RepositoryError(ApplicationError):
     """
     An exception class for errors in the object management repository 
     """
@@ -157,6 +159,7 @@ class ObjectContainer(object):
     Base class for the repository and merge container
     """
 
+
     def __init__(self):
 
 
@@ -188,7 +191,12 @@ class ObjectContainer(object):
         """
         Need for access to sending messages!
         """
-        
+
+        self.upstream=None
+        """
+        The upstream source of this repository.
+        """
+
     @property
     def root_object(self):
         return self._workspace_root
@@ -205,6 +213,10 @@ class ObjectContainer(object):
         self._workspace.clear()
         self.index_hash.clear()
         self._workspace_root = None
+
+        self._process = None
+        self.upstream = None
+
 
     def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):
         """
@@ -312,33 +324,92 @@ class ObjectContainer(object):
                 child = self.get_linked_object(link)
                 self.load_links(child, excluded_types)
 
-    @defer.inlineCallbacks
-    def checkout_commit(self, commit, exclude_types):
 
-        root_obj = None
+    def checkout_local_commit(self, commit, exclude_types):
+
+        # Get the link to the root object
+        link = commit.GetLink('objectroot')
+
+        # Catch only KeyErrors!
+        root_obj = self.get_linked_object(link)
+
+        # Load the object structure
+        self.load_links(root_obj, exclude_types)
+
+        return root_obj
+
+    @defer.inlineCallbacks
+    def checkout_remote_commit(self, commit, exclude_types):
+        """
+        Use the message client from the process to create a message
+        Can not use the datastore client because of import problems...
+        """
+
+        proc = self._process
+        if proc is None:
+            raise RepositoryError('Can not make a non-local checkout without a process!')
+
+        request = yield proc.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
 
         link = commit.GetLink('objectroot')
+        request.commit_root_object = link.key
+        for extype in exclude_types:
+            exobj = request.excluded_types.add()
+            exobj.object_id = extype.object_id
+            exobj.version = extype.version
+
         try:
+            print 'Upstream:',self.upstream
+            result, headers, msg = yield proc.rpc_send(self.upstream, 'checkout', request)
 
-            # Catch only KeyErrors!
-            root_obj = self.get_linked_object(link)
+        except ReceivedApplicationError, rae:
+            log.error(rae)
+            raise RepositoryError('Received application error during remote checkout operation!', 404)
+        except ReceivedContainerError, rce:
+            log.error(rce)
+            raise RepositoryError('Received container error during remote checkout operation!', 404)
 
-            self.load_links(root_obj, exclude_types)
+        for blob in result.blob_elements:
+            element = gpb_wrapper.StructureElement(blob.GPBMessage)
+            self.index_hash[element.key] = element
 
-        except KeyError, ke:
+        element = self.index_hash[link.key]
+        root_obj = self._load_element(element)
 
-            log.info('Local checkout failed - fetching remote objects.')
-
-
-
-            
-
-        finally:
-            # Make sure there is at least one yield
-            yield
+        self.load_links(root_obj, exclude_types)
 
 
         defer.returnValue(root_obj)
+
+
+
+    def checkout_commit(self, commit, exclude_types):
+        """
+        @brief Checkout_commit will checkout the content of a commit. It will attempt to get
+        the content from the local repository. Failing that it will attempt to get it from a
+        remote process.
+        @param commit is the commit object to checkout
+        @param exclude_types is a list of type objects to exclude while checking out the structure
+        @retval the result maybe deferred as a result of the non local checkout. yielding will
+        return the root_object.
+        """
+
+        root_obj = None
+
+        try:
+            root_obj = self.checkout_local_commit(commit, exclude_types)
+
+        except KeyError, ke:
+
+            log.info('Making none local checkout')
+
+        if root_obj is None:
+
+            root_obj = self.checkout_remote_commit(commit, exclude_types)
+
+
+        return root_obj
+
 
 
 
@@ -448,11 +519,6 @@ class Repository(ObjectContainer):
         """
         A place to stash the work space under a saved name.
         """
-        
-        self._upstream={}
-        """
-        The upstream source of this repository. 
-        """
 
 
         if not isinstance(persistent, bool):
@@ -504,15 +570,6 @@ class Repository(ObjectContainer):
     def repository_key(self):
         return self._dotgit.repositorykey
 
-    
-    def _set_upstream(self, source):
-        self._upstream = source
-        
-    def _get_upstream(self):
-        return self._upstream
-    
-    upstream = property(_get_upstream, _set_upstream)
-
     def _set_persistent(self, value):
         if not isinstance(value, bool):
             raise RepositoryError('Invalid argument type to set the persistent property of a repository')
@@ -562,7 +619,7 @@ class Repository(ObjectContainer):
         self._current_branch = None
         self.branchnicknames.clear()
         self._stash.clear()
-        self._upstream.clear()
+        self.upstream = None
         self._process = None
 
         if self.merge is not None:
@@ -870,7 +927,7 @@ class Repository(ObjectContainer):
             
         # Automatically fetch the object from the hashed dictionary
 
-        rootobj = yield self.checkout_commit(cref, exclude_types)
+        rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, exclude_types)
         self._workspace_root = rootobj
 
 
