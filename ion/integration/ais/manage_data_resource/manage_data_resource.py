@@ -31,7 +31,6 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
-                                                       CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE, \
                                                        UPDATE_DATA_RESOURCE_REQ_TYPE, \
                                                        UPDATE_DATA_RESOURCE_RSP_TYPE, \
                                                        DELETE_DATA_RESOURCE_REQ_TYPE, \
@@ -247,10 +246,13 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
 
-            #FIXME: need to do cfchecker validation before we proceed
+            #FIXME: need to do cfchecker validation before we proceed.  this service doesn't exist yet.
 
-            #FIXME: if max_ingest_millis isn't set, default to 30000 (30 seconds before ingest timeout)
-            #FIXME: find out what that default should really be.
+            #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
+            #FIXME: find out what that default should really be.  
+            if not msg.IsFieldSet("max_ingest_millis"):
+                msg.max_ingest_millis = 30000
+
 
             # get user resource so we can associate it later
             user_resource = yield self.rc.get_instance(msg.user_id)
@@ -400,17 +402,17 @@ class ManageDataResource(object):
         req_fields = ["user_id", 
                       "source_type",
                       "request_type",
-                      "request_bounds_north",
-                      "request_bounds_south",
-                      "request_bounds_west",
-                      "request_bounds_east",
+                      #"request_bounds_north",
+                      #"request_bounds_south",
+                      #"request_bounds_west",
+                      #"request_bounds_east",
                       #"ncml_mask",
                       #"max_ingest_millis",
                       "ion_title",
-                      #"ion_description",
+                      "ion_description",
                       "ion_institution_id",
                       "update_interval_seconds",
-                      #"update_start_datetime_millis",
+                      "update_start_datetime_millis",
                       ]
                       
         

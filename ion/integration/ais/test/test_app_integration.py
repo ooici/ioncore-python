@@ -171,6 +171,35 @@ class AppIntegrationTest(IonTestCase):
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
+        #
+        # Send a message with bounds
+        #
+        
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # Use the message client to create a message object
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.minLatitude  = -50
+        #reqMsg.message_parameters_reference.maxLatitude  = 45
+        reqMsg.message_parameters_reference.minLongitude = -70
+        #reqMsg.message_parameters_reference.maxLongitude = -70
+        reqMsg.message_parameters_reference.minVertical  = 10
+        #reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2008-08-01T00:50:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2008-08-01T15:50:00Z'
+
+        
+        log.debug('Calling findDataResources to get list of resources.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
     @defer.inlineCallbacks
     def test_findDataResourcesByUser(self):
 
@@ -327,16 +356,6 @@ class AppIntegrationTest(IonTestCase):
                     str(rspMsg.message_parameters_reference[0].data_resource_id) + \
                     str('\n'))
 
-                log.debug('Minimum Metadata Variables:\n')
-                for var in rspMsg.message_parameters_reference[0].variable:
-                    log.debug('  Variable:\n')
-                    log.debug('    standard_name: ' + var.standard_name + '\n')
-                    log.debug('    long_name: ' + var.long_name + '\n')
-                    log.debug('    units: ' + var.units + '\n')
-                    for attrib in var.other_attributes:
-                        log.debug('    Other Attributes:\n')
-                        log.debug('      ' + str(attrib) + str('\n'))
-
                 dSource = rspMsg.message_parameters_reference[0].source
                 log.debug('Source Metadata for Dataset:\n')
                 for property in dSource.property:
@@ -347,6 +366,53 @@ class AppIntegrationTest(IonTestCase):
                 log.debug('  RequestType: ' + str(dSource.request_type))
                 log.debug('  Base URL: ' + dSource.base_url)
                 log.debug('  Max Ingest Millis: ' + str(dSource.max_ingest_millis))
+
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('title'):
+                    #self.fail('response to findDataResources has no title field')
+                    log.error('response to findDataResources has no title field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('institution'):
+                    #self.fail('response to findDataResources has no institution field')
+                    log.error('response to findDataResources has no institution field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('source'):
+                    #self.fail('response to findDataResources has no source field')
+                    log.error('response to findDataResources has no source field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('references'):
+                    #self.fail('response to findDataResources has no references field')
+                    log.error('response to findDataResources has no references field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_time_coverage_start'):
+                    self.fail('response to findDataResources has no ion_time_coverage_start field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_time_coverage_end'):
+                    self.fail('response to findDataResources has no ion_time_coverage_end field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('summary'):
+                    #self.fail('response to findDataResources has no summary field')
+                    log.error('response to findDataResources has no summary field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('comment'):
+                    #self.fail('response to findDataResources has no comment field')
+                    log.error('response to findDataResources has no comment field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_lat_min'):
+                    self.fail('response to findDataResources has no ion_geospatial_lat_min field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_lat_max'):
+                    self.fail('response to findDataResources has no ion_geospatial_lat_max field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_lon_min'):
+                    self.fail('response to findDataResources has no ion_geospatial_lon_min field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_lon_max'):
+                    self.fail('response to findDataResources has no ion_geospatial_lon_max field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_vertical_min'):
+                    self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_vertical_max'):
+                    self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
+                if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_vertical_positive'):
+                    self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
+
+                log.debug('Minimum Metadata Variables:\n')
+                for var in rspMsg.message_parameters_reference[0].variable:
+                    log.debug('  Variable:\n')
+                    log.debug('    standard_name: ' + var.standard_name + '\n')
+                    log.debug('    long_name: ' + var.long_name + '\n')
+                    log.debug('    units: ' + var.units + '\n')
+                    for attrib in var.other_attributes:
+                        log.debug('    Other Attributes:\n')
+                        log.debug('      ' + str(attrib) + str('\n'))
 
 
         
