@@ -212,6 +212,20 @@ message CreateDownloadURLRspMsg {
 }
 """
 
+# NameValuePairType GPB from ion-object-definitions/net/ooici/integration/ais/common/name_value_pair_type.proto
+NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
+"""
+message NameValuePairType {
+   enum _MessageTypeIdentifier {
+       _ID = 9125;
+       _VERSION = 1;
+   }
+
+   optional string name = 1;
+   optional string value = 2;
+}
+"""
+
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """
@@ -226,9 +240,9 @@ message RegisterIonUserRequest {
 }
 """
 
-UPDATE_USER_EMAIL_TYPE = object_utils.create_type_identifier(object_id=9102, version=1)
+UPDATE_USER_PROFILE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9102, version=1)
 """
-message UpdateUserEmail {
+message UpdateUserProfileRequest {
    enum _MessageTypeIdentifier {
        _ID = 9102;
        _VERSION = 1;
@@ -236,32 +250,49 @@ message UpdateUserEmail {
    // objects in a protofile are called messages
    optional string user_ooi_id=1;
    optional string email_address=2;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=3;
 }
 """
 
-UPDATE_USER_DISPATCH_QUEUE_TYPE = object_utils.create_type_identifier(object_id=9103, version=1)
-"""
-message UpdateUserDispatcherQueue {
-   enum _MessageTypeIdentifier {
-       _ID = 9103;
-       _VERSION = 1;
-   }
-   optional string user_ooi_id=1;
-   optional string queue_name=2;
-}
-"""
-
-REGISTER_USER_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9104, version=1)
+REGISTER_USER_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9103, version=1)
 """
 message RegisterIonUserResponse {
    enum _MessageTypeIdentifier {
-       _ID = 9104;
+       _ID = 9103;
        _VERSION = 1;
    }
 
    optional string ooi_id=1;
    optional bool user_is_admin=2;
    optional bool user_already_registered=3;
+   optional bool user_is_early_adopter=4;
+   optional bool user_is_data_provider=5;
+   optional bool user_is_marine_operator=6;
+}
+"""
+
+GET_USER_PROFILE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9104, version=1)
+"""
+message GetUserProfileRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9104;
+       _VERSION = 1;
+   }
+
+   optional string user_ooi_id=1;
+}
+"""
+
+GET_USER_PROFILE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9105, version=1)
+"""
+message GetUserProfileResponse {
+   enum _MessageTypeIdentifier {
+       _ID = 9105;
+       _VERSION = 1;
+   }
+
+   optional string email_address=1;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=2;
 }
 """
 
@@ -327,19 +358,6 @@ message GetResourceRequest {
 }
 """
 
-NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
-"""
-message NameValuePair {
-   enum _MessageTypeIdentifier {
-       _ID = 9125;
-       _VERSION = 1;
-   }
-
-   optional string name = 1;
-   optional string value = 2;
-}
-"""
-
 GET_RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9126, version=1)
 """
 
@@ -349,7 +367,7 @@ message GetResourceResponse {
        _VERSION = 1;
    }
 
-   repeated net.ooici.integration.ais.manageResources.NameValuePair resource = 1;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType resource = 1;
 }
 """
 
