@@ -18,7 +18,6 @@ import subprocess
 from twisted.internet import defer
 from ion.core.object import object_utils
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
-#from ion.core.messaging.ion_reply_codes import ResponseCodes as RC
 
 # Imports: Messages and events
 from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory, PublisherFactory

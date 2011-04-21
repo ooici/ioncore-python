@@ -53,7 +53,6 @@ class ManageDataResource(object):
         self.mc    = ais.mc
         self.rc    = ais.rc
         self.dscc  = DatasetControllerClient(proc=ais)
-        self.psc   = PubSubClient(proc=ais)
         self.ac    = AssociationClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
 
@@ -74,7 +73,7 @@ class ManageDataResource(object):
                 errtext = "ManageDataResource.update(): " + \
                     "Expected DataResourceUpdateRequest type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -84,14 +83,13 @@ class ManageDataResource(object):
                 errtext = "ManageDataResource.update(): " + \
                     "required fields not provided (data_source_resource_id)"
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-        
-            datasrc_resource = yield self.rc.get_instance(msg.data_source_resource_id)
+            datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
 
             if msg.IsFieldSet("update_interval_seconds"):
                 dispatcher_resource.update_interval_seconds = msg.update_interval_seconds
@@ -109,7 +107,7 @@ class ManageDataResource(object):
         except ReceivedApplicationError, ex:
             log.info('ManageDataResource.update(): Error: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
@@ -117,7 +115,7 @@ class ManageDataResource(object):
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
@@ -125,7 +123,7 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
-    
+
     @defer.inlineCallbacks
     def delete(self, msg):
         """
@@ -142,7 +140,7 @@ class ManageDataResource(object):
                 errtext = "ManageDataResource.deelete(): " + \
                     "Expected DataResourceDeleteRequest type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -152,17 +150,19 @@ class ManageDataResource(object):
                 errtext = "ManageDataResource.delete(): " + \
                     "required fields not provided (data_source_resource_id)"
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            #store ids that were deleted, and return them later. 
+            #store ids that were deleted, and return them later.
             deletions = []
             delete_resources = []
             for data_source_resource_id in msg.data_source_resource_id:
-    
+
+                #FIXME: if user does not own this data set, don't delete it
+
                 #FIXME: stop scheduling
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
@@ -182,14 +182,14 @@ class ManageDataResource(object):
         except ReceivedApplicationError, ex:
             log.info('ManageDataResource.delete(): Error: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
@@ -201,7 +201,7 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
-    
+
 
 
     @defer.inlineCallbacks
@@ -230,10 +230,30 @@ class ManageDataResource(object):
                 errtext = "ManageDataResource.create(): " + \
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
+
+            # at least PRETEND to make an effort
+            missing = self._missingResourceRequestFields(msg)
+            if "" != missing:
+                errtext = "ManageDataResource.create(): " + \
+                    "Missing/incorrect required fields in DataResourceCreateRequest: " + missing
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+
+            #FIXME: need to do cfchecker validation before we proceed
+
+            #FIXME: if max_ingest_millis isn't set, default to 30000 (30 seconds before ingest timeout)
+            #FIXME: find out what that default should really be.
+
+            # get user resource so we can associate it later
+            user_resource = yield self.rc.get_instance(msg.user_id)
 
             # create the data source
             datasrc_resource = yield self._createDataSourceResource(msg)
@@ -248,7 +268,7 @@ class ManageDataResource(object):
             my_dataset_id = dataset_resource.key
 
             # create topics
-            topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG, 1)
+            topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
             self.ing.create_dataset_topics()
 
@@ -262,10 +282,9 @@ class ManageDataResource(object):
             # target is the DS update topic
 
 
-
             #make association
-            association = yield self.ac.create_association(dataset_resource, HAS_A_ID, datasrc_resource)
-            #FIXME associate user with data source ?
+            association = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
+            association = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
 
             #mark lifecycle states
@@ -282,7 +301,7 @@ class ManageDataResource(object):
             dataset_resource.ResourcesLifeCycleState = dataset_resource.RETIRED
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
@@ -290,7 +309,7 @@ class ManageDataResource(object):
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
@@ -301,8 +320,8 @@ class ManageDataResource(object):
 
 
     def _createScheduledEvent(self, desired_origin, interval_seconds, payload):
-        sched_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
-        
+        sched_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG)
+
         #FILL UP FIELDS, lists followed by scalars
         datasrc_resource.property.extend(msg.property)
 
@@ -317,7 +336,7 @@ class ManageDataResource(object):
         @retval data source resource
         """
         log.info('ManageDataResource._createDataSourceResource()\n')
-        datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG, 1)
+        datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG)
 
         #FILL UP FIELDS, lists followed by scalars
         datasrc_resource.property.extend(msg.property)
@@ -354,7 +373,7 @@ class ManageDataResource(object):
         @return id of what you're after
         """
 
-        #can also do obj= 
+        #can also do obj=
         found = yield self.ac.find_associations(subject=datasource_resource, \
                                                 predicate_or_predicates=HAS_A_ID)
 
@@ -369,3 +388,49 @@ class ManageDataResource(object):
 
         the_resource = yield self.rc.get_associated_resource_object(association)
         defer.returnValue(the_resource)
+
+    def _missingResourceRequestFields(self, msg):
+        """
+        @brief make sure that all the required fields are set
+        @return string empty string for no errors or message describing the unset fields
+        """
+
+        #this seems very un-GPB-ish, to have to check fields...
+        #FIXME: comment out things that aren't actually required
+        req_fields = ["user_id", 
+                      "source_type",
+                      "request_type",
+                      "request_bounds_north",
+                      "request_bounds_south",
+                      "request_bounds_west",
+                      "request_bounds_east",
+                      #"ncml_mask",
+                      #"max_ingest_millis",
+                      "ion_title",
+                      #"ion_description",
+                      "ion_institution_id",
+                      "update_interval_seconds",
+                      #"update_start_datetime_millis",
+                      ]
+                      
+        
+        #FIXME: what do about these repeated fields?
+        #repeated string property = 3;
+        #repeated string station_id = 4;
+
+        #check em
+        ret = ""
+
+        if msg.IsFieldSet("base_url") and msg.IsFieldSet("dataset_url"):
+            ret = "ONLY ONE OF (base_url, dataset_url)"
+        elif not (msg.IsFieldSet("base_url") or msg.IsFieldSet("dataset_url")):
+            ret = "ONE OF (base_url, dataset_url)"
+
+        for f in req_fields:
+            if not msg.IsFieldSet(f):
+                if "" == ret:
+                    ret = f
+                else:
+                    ret = ret + ", " + f
+
+        return ret

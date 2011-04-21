@@ -6,24 +6,14 @@
 @brief test case for process base class
 """
 
-import os
-import hashlib
-
 from twisted.trial import unittest
 from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import ioninit
-from ion.core.messaging import ion_reply_codes
-from ion.core.process.process import Process, ProcessDesc, ProcessFactory
-from ion.core.cc.container import Container
-from ion.core.exception import ReceivedError
-from ion.core.messaging.receiver import Receiver, WorkerReceiver
-from ion.core.id import Id
-from ion.test.iontest import IonTestCase, ReceiverProcess
-import ion.util.procutils as pu
+from ion.core.process.process import Process, ProcessFactory
+
 from ion.util import state_object
 
 

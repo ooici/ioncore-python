@@ -89,7 +89,9 @@ class AppIntegrationTest(IonTestCase):
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
         ]
+        log.debug('AppIntegrationTest.setUp(): spawning processes')
         sup = yield self._spawn_processes(services)
+        log.debug('AppIntegrationTest.setUp(): spawned processes')
 
         self.sup = sup
 
@@ -111,17 +113,45 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Testing findDataResources.')
 
+        #
+        # Send a message with no bounds
+        #
+        
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude  = -50
-        #reqMsg.message_parameters_reference.maxLatitude  = -40
-        #reqMsg.message_parameters_reference.minLongitude = 20
-        #reqMsg.message_parameters_reference.maxLongitude = 30
+        #reqMsg.message_parameters_reference.minLatitude  = 30
+        #reqMsg.message_parameters_reference.maxLatitude  = 45
+        #reqMsg.message_parameters_reference.minLongitude = -75
+        #reqMsg.message_parameters_reference.maxLongitude = -70
+        #reqMsg.message_parameters_reference.minVertical  = 20
+        #reqMsg.message_parameters_reference.maxVertical  = 30
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
+        #reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
+        #reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
+
+        
+        log.debug('Calling findDataResources to get list of resources.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        #
+        # Send a message with bounds
+        #
+        
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # Use the message client to create a message object
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.minLatitude  = 30
         reqMsg.message_parameters_reference.maxLatitude  = 45
         reqMsg.message_parameters_reference.minLongitude = -75
@@ -138,51 +168,8 @@ class AppIntegrationTest(IonTestCase):
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
-        i = 0
-        while i < numResReturned:
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('user_ooi_id'):
-                self.fail('response to findDataResources has no user_ooi_id field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('data_resource_id'):
-                self.fail('response to findDataResources has no resource_id field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('title'):
-                #self.fail('response to findDataResources has no title field')
-                log.error('response to findDataResources has no title field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('institution'):
-                #self.fail('response to findDataResources has no institution field')
-                log.error('response to findDataResources has no institution field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('source'):
-                #self.fail('response to findDataResources has no source field')
-                log.error('response to findDataResources has no source field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('references'):
-                #self.fail('response to findDataResources has no references field')
-                log.error('response to findDataResources has no references field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
-                self.fail('response to findDataResources has no ion_time_coverage_start field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
-                self.fail('response to findDataResources has no ion_time_coverage_end field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('summary'):
-                #self.fail('response to findDataResources has no summary field')
-                log.error('response to findDataResources has no summary field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('comment'):
-                #self.fail('response to findDataResources has no comment field')
-                log.error('response to findDataResources has no comment field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('download_url'):
-                self.fail('response to findDataResources has no download_url field')
-            i = i + 1                
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
     @defer.inlineCallbacks
     def test_findDataResourcesByUser(self):
@@ -312,10 +299,10 @@ class AppIntegrationTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
-        reqMsg.message_parameters_reference.minLatitude = 40.2216682434
-        reqMsg.message_parameters_reference.maxLatitude = 40.2216682434
-        reqMsg.message_parameters_reference.minLongitude = -74.13
-        reqMsg.message_parameters_reference.maxLongitude = -73.50
+        #reqMsg.message_parameters_reference.minLatitude = 40.2216682434
+        #reqMsg.message_parameters_reference.maxLatitude = 40.2216682434
+        #reqMsg.message_parameters_reference.minLongitude = -74.13
+        #reqMsg.message_parameters_reference.maxLongitude = -73.50
         
         log.debug('Calling findDataResources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
@@ -748,7 +735,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_getResourceTypes(self):
 
-        ResourceTypes = ['datasets', 'identities', 'datasources']
+        ResourceTypes = ['datasets', 'identities', 'datasources', 'epucontrollers']
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
@@ -778,6 +765,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the getResourcesOfType request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourcesOfType request')
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
+        
         msg.message_parameters_reference.resource_type = "datasets"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
@@ -790,6 +778,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        
         msg.message_parameters_reference.resource_type = "identities"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
@@ -802,7 +791,21 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        
         msg.message_parameters_reference.resource_type = "datasources"
+        reply = yield self.aisc.getResourcesOfType(msg)
+        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
+            self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
+        if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
+            self.fail('response to getResourcesOfType has no column_names field')
+        if not reply.message_parameters_reference[0].IsFieldSet('resources'):
+            self.fail('response to getResourcesOfType has no resources field')
+        
+        msg.message_parameters_reference.resource_type = "epucontrollers"
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -824,6 +827,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the getResources request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResource request')
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCE_REQUEST_TYPE)
+        
+        msg.message_parameters_reference.ooi_id = "agentservices_epu_controller"  #epu controller
+        reply = yield self.aisc.getResource(msg)
+        log.debug('getResource returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.message_parameters_reference[0].ObjectType != GET_RESOURCE_RESPONSE_TYPE:
+            self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
+        if not reply.message_parameters_reference[0].IsFieldSet('resource'):
+            self.fail('response to getResourcesOfType has no resource field')
+        
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F1"  #data set
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -834,6 +849,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        
         msg.message_parameters_reference.ooi_id = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"   #anonymous identity
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -844,6 +860,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F2"  #data source
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
@@ -854,6 +871,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
@@ -878,4 +896,55 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_createDataResource_failScheduling(self):
         raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
+        
+    def __validateDataResourceSummary(self, dataResourceSummary):
+        log.debug('__validateDataResourceSummary()')
+        
+        i = 0
+        while i < len(dataResourceSummary):
+            if not dataResourceSummary[i].IsFieldSet('user_ooi_id'):
+                self.fail('response to findDataResources has no user_ooi_id field')
+            if not dataResourceSummary[i].IsFieldSet('data_resource_id'):
+                self.fail('response to findDataResources has no resource_id field')
+            if not dataResourceSummary[i].IsFieldSet('title'):
+                #self.fail('response to findDataResources has no title field')
+                log.error('response to findDataResources has no title field')
+            if not dataResourceSummary[i].IsFieldSet('institution'):
+                #self.fail('response to findDataResources has no institution field')
+                log.error('response to findDataResources has no institution field')
+            if not dataResourceSummary[i].IsFieldSet('source'):
+                #self.fail('response to findDataResources has no source field')
+                log.error('response to findDataResources has no source field')
+            if not dataResourceSummary[i].IsFieldSet('references'):
+                #self.fail('response to findDataResources has no references field')
+                log.error('response to findDataResources has no references field')
+            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
+                self.fail('response to findDataResources has no ion_time_coverage_start field')
+            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
+                self.fail('response to findDataResources has no ion_time_coverage_end field')
+            if not dataResourceSummary[i].IsFieldSet('summary'):
+                #self.fail('response to findDataResources has no summary field')
+                log.error('response to findDataResources has no summary field')
+            if not dataResourceSummary[i].IsFieldSet('comment'):
+                #self.fail('response to findDataResources has no comment field')
+                log.error('response to findDataResources has no comment field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
+                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
+                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
+                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
+                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
+            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
+                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
+            if not dataResourceSummary[i].IsFieldSet('download_url'):
+                self.fail('response to findDataResources has no download_url field')
+            i = i + 1                
+
+
 

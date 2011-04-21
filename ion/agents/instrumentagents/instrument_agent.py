@@ -152,7 +152,7 @@ class InstrumentDriverClient(ProcessClient):
 
         assert(isinstance(params, dict)), 'Expected a params dict.'
         timeout = params.get('timeout',None)
-        if not timeout:
+        if timeout == None:
             timeout = 15
             params['timeout'] = timeout
         rpc_timeout = timeout + 5
