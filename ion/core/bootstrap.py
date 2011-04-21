@@ -18,10 +18,7 @@ from ion.core.cc.modloader import ModuleLoader
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
-from ion.data.datastore import registry
-from ion.data.store import Store
 from ion.resources import description_utility
-from ion.services.coi import service_registry
 from ion.util.config import Config
 import ion.util.procutils as pu
 
