@@ -15,6 +15,7 @@ Sample Dataset are configure and loaded like so:
 
 """
 import tarfile
+import random
 from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -41,6 +42,8 @@ stringArray_type = object_utils.create_type_identifier(object_id=10015, version=
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     """
@@ -189,12 +192,13 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     Pass in a link from the resource object which is created in the intialization of the datastore
 
     """
-    
     # Attach the root group
     group = dataset.CreateObject(group_type)
     group.name = 'junk data'
     dataset.root_group = group
-
+    
+    random_initialization = CONF.getValue('Initialize_random_data', False)
+    log.info("Random initialization of datasets is set to %s" % (random_initialization,))
     # Create all dimension and variable objects
     # Note: CDM variables such as scalars, coordinate variables and data are all represented by
     #       the variable object type.  Signifying the difference between these types is done
@@ -366,7 +370,10 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
     variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
     variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
-    variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+    if random_initialization:
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend( round(random.random()*2 +29,2) for i in range(6))
+    else:
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
 
 
     # Attach variable and dimension objects to the root group
