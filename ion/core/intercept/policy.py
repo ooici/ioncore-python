@@ -43,9 +43,9 @@ def construct_policy_lists(policydb):
             elif role == 'OWNER':
                 role_set = set(['OWNER', 'ADMIN'])
             elif role == 'AUTHENTICATED':
-                role_set = set(['AUTHENTICATED', 'OWNER', 'ADMIN'])
+                role_set = set(['AUTHENTICATED', 'ADMIN'])
             else:
-                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN'])
+                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'ADMIN'])
 
             service_dict = thedict.setdefault(service, {})
             op_dict = service_dict.setdefault(opname, {})
@@ -76,6 +76,13 @@ def construct_user_role_lists(userroledict):
         role_dict = {'subject': subject, 'ooi_id': None}
         dataproviderlist.append(role_dict);
     roledict['DATA_PROVIDER'] = dataproviderlist
+
+    marineoperatorlist = []
+    for role_entry in userroledict['roles']['MARINE_OPERATOR']:
+        subject = role_entry
+        role_dict = {'subject': subject, 'ooi_id': None}
+        marineoperatorlist.append(role_dict);
+    roledict['MARINE_OPERATOR'] = marineoperatorlist
 
     attriblist = []
     for attrib_entry_key in userroledict['user-attributes'].keys():
@@ -124,6 +131,15 @@ def subject_has_data_provider_role(subject):
 
 def user_has_data_provider_role(ooi_id):
     return user_has_role(ooi_id, 'DATA_PROVIDER')
+
+def map_ooi_id_to_subject_marine_operator_role(subject,ooi_id):
+    map_ooi_id_to_subject_role(subject,ooi_id,'MARINE_OPERATOR')
+
+def subject_has_marine_operator_role(subject):
+    return subject_has_role(subject, 'MARINE_OPERATOR')
+
+def user_has_marine_operator_role(ooi_id):
+    return user_has_role(ooi_id, 'MARINE_OPERATOR')
 
 # Attribute methods
 def get_attribute_value_for_subject(subject,attrib):
@@ -175,9 +191,8 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
     def after(self, invocation):
         return invocation
-        # msg = invocation.message
-        # return self.is_authorized(msg, invocation)
 
+    @defer.inlineCallbacks
     def is_authorized(self, msg, invocation):
         """
         @brief Policy enforcement method which implements the functionality
@@ -203,25 +218,25 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
         # Ignore messages that are not of performative 'request'
         if msg.get('performative', None) != 'request':
-            return invocation
+            defer.returnValue(invocation)
 
         # Reject improperly defined messages
         if not 'user-id' in msg:
             log.error("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
             invocation.drop(note='Error: no user-id defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
         if not 'expiry' in msg:
             log.error("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(msg))
             invocation.drop(note='Error: no expiry defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
         if not 'receiver' in msg:
             log.error("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
             invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
         if not 'op'in msg:
             log.error("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
             invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         user_id = msg['user-id']
         expirystr = msg['expiry']
@@ -229,21 +244,21 @@ class PolicyInterceptor(EnvelopeInterceptor):
         if not type(expirystr) is str:
             log.error("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         try:
             expiry = int(expirystr)
         except ValueError, ex:
             log.error("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         rcvr = msg['receiver']
         service = rcvr.rsplit('.',1)[-1]
 
         operation = msg['op']
 
-        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s]' % (service, operation, '*', user_id, expiry))
+        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
         if service in policy_dictionary:
             role = 'ANONYMOUS'
             # TODO figure out mechanism to map user id to role
@@ -263,20 +278,26 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 role_entry = service_list[operation]['roles']
                 log.info('Policy Interceptor: Policy tuple [%s]' % str(role_entry))
                 if role in role_entry:
-                    log.info('Policy Interceptor: Authentication matches')
+                    log.info('Policy Interceptor: Role <%s> authentication matches' % role)
                 else:
                     # See if ownership level entry
                     if 'OWNER' in role_entry:
-                        self.check_resource_ownership(invocation, msg, user_id, service_list[operation]['resources'])
-                        if invocation.status == Invocation.STATUS_PROCESS:
-                            log.info('Policy Interceptor: Authentication matches')
-                        else:
+                        return_uuid_list = self.find_uuids(invocation, msg, user_id, service_list[operation]['resources'])
+                        if invocation.status != Invocation.STATUS_PROCESS:
                             log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
-                            return invocation
+                            defer.returnValue(invocation)
+                            
+                        yield self.check_owner(user_id, return_uuid_list, invocation)
+                        if invocation.status != Invocation.STATUS_PROCESS:
+                            log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
+                            defer.returnValue(invocation)
+                        else:
+                            log.info('Policy Interceptor: Role <OWNER> authentication matches')
+
                     else:
                         log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [%s]. Returning Not Authorized.' % (service, operation, '*', user_id, expiry, role))
                         invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-                        return invocation
+                        defer.returnValue(invocation)
         else:
             log.info('Policy Interceptor: service not in policy dictionary.')
 
@@ -287,12 +308,41 @@ class PolicyInterceptor(EnvelopeInterceptor):
             if current_time > expiry_time:
                 log.warn('Policy Interceptor: Current time [%s] exceeds expiry [%s] for service [%s] operation [%s] resource [%s] user_id [%s] . Returning Not Authorized.' % (str(current_time), expiry, service, operation, '*', user_id))
                 invocation.drop(note='Authentication expired', code=Invocation.CODE_UNAUTHORIZED)
-                return invocation
+                defer.returnValue(invocation)
 
         log.info('Policy Interceptor: Returning Authorized.')
-        return invocation
+        defer.returnValue(invocation)
 
-    def check_resource_ownership(self, invocation, msg, user_id, resources):
+    @defer.inlineCallbacks
+    def check_owner(self, user_id, uuid_list, invocation):
+        self.checking_owner = True
+        self.mc = MessageClient(proc=invocation.process)
+        self.asc = AssociationServiceClient()
+
+        for uuid in uuid_list:        
+            request = yield self.mc.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+            request.object = request.CreateObject(IDREF_TYPE)
+            request.object.key = user_id
+
+            request.predicate = request.CreateObject(IDREF_TYPE)
+            request.predicate.key = OWNED_BY_ID
+
+            request.subject = request.CreateObject(IDREF_TYPE)
+            request.subject.key = uuid
+
+            # make the request
+            log.warn('Policy Interceptor: BEFORE ++++++++++++++++++++++++')
+            result = yield self.asc.association_exists(request)
+            log.warn('Policy Interceptor: AFTER ++++++++++++++++++++++++')
+            if result.result == False:
+                log.warn('Policy Interceptor: Authentication failed. User <%s> does not own resource <%s>.' % (user_id, uuid))
+                invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+                return
+            else:
+                log.warn('Policy Interceptor: User <%s> owns resource <%s>.' % (user_id, uuid))
+
+    def find_uuids(self, invocation, msg, user_id, resources):
         """
         Traverses message structure looking
         for occurrences of field "resource id".
@@ -300,33 +350,39 @@ class PolicyInterceptor(EnvelopeInterceptor):
         to see if user is an owner of the resource.
         """
 
-        self.mc = MessageClient(proc=invocation.process)
-        self.asc = AssociationServiceClient()
+        log.info('Policy Interceptor: In check_resource_ownership. Resources: <%s>' % str(resources))
         
         content = msg.get('content','')
         if isinstance(content, MessageInstance):
             wrapper = content.Message
             repo = content.Repository
-            self.check_resource_ownership_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+            return self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
         else:
             log.error("Policy Interceptor: Rejecting improperly defined message missing MessageInstance [%s]." % str(msg))
             invocation.drop(note='Error: MessageInstance missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
 
-    @defer.inlineCallbacks       
-    def check_resource_ownership_traverse_gpbs(self, invocation, msg, wrapper, repo, user_id, resources):
+    def find_uuids_traverse_gpbs(self, invocation, msg, wrapper, repo, user_id, resources, uuid_list = None):
+        log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs')
+
+        if uuid_list is None:
+            uuid_list = []
+
         childLinksSet = wrapper.ChildLinks
         
         if len(childLinksSet) == 0:
+            log.info('Policy Interceptor: Returning from check_resource_ownership_traverse_gpbs.  ChildLinksSet zero length.')
             return
             
         for link in wrapper.ChildLinks:
             obj = repo.get_linked_object(link)
             type = obj.ObjectType
             typeId = type.object_id
+            log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Child type: <%s>' % str(typeId))
             if typeId in resources:
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Child type match found in resources')
                 gpbMessage = obj.GPBMessage
                 uuid = getattr(gpbMessage,resources[typeId])
-                print uuid
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  GPB type: %s UUID: %s' % (str(typeId),uuid))
                 if uuid is None:
                     log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
                     invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
@@ -335,23 +391,11 @@ class PolicyInterceptor(EnvelopeInterceptor):
                     log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
                     invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
                     return
+                uuid_list.append(uuid.decode('utf-8'))
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Added UUID: %s to return list' % uuid)
+
+            log.info('Policy Interceptor: Recursing.')
+            self.find_uuids_traverse_gpbs(invocation, msg, obj, repo, user_id, resources, uuid_list)
+        return uuid_list
                 
-                request = yield self.mc.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
-
-                request.object = request.CreateObject(IDREF_TYPE)
-                request.object.key = user_id
-
-                request.predicate = request.CreateObject(IDREF_TYPE)
-                request.predicate.key = OWNED_BY_ID
-
-                request.subject = request.CreateObject(IDREF_TYPE)
-                request.subject.key = uuid
-
-                # make the request
-                result = yield self.asc.association_exists(request)
-                if result.result == False:
-                    invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-                    return
-
-            self.check_resource_ownership_traverse_gpbs(invocation, msg, obj, repo, user_id, resources)
 
