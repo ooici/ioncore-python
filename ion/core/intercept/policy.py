@@ -14,7 +14,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.intercept.interceptor import EnvelopeInterceptor
-import ion.util.procutils as pu
+
+from ion.core.messaging.message_client import MessageInstance
 
 from ion.core.process.cprocess import Invocation
 
@@ -22,13 +23,18 @@ import time
 
 from ion.util.config import Config
 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID
+from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import IDREF_TYPE
+from ion.core.messaging.message_client import MessageClient
+
 CONF = ioninit.config(__name__)
 
 def construct_policy_lists(policydb):
     thedict = {}
     try:
         for policy_entry in policydb:
-            role, action, resource = policy_entry
+            role, action, resources = policy_entry
             service, opname = action.split('.', 1)
             assert role in ('ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN')
 
@@ -37,13 +43,15 @@ def construct_policy_lists(policydb):
             elif role == 'OWNER':
                 role_set = set(['OWNER', 'ADMIN'])
             elif role == 'AUTHENTICATED':
-                role_set = set(['AUTHENTICATED', 'OWNER', 'ADMIN'])
+                role_set = set(['AUTHENTICATED', 'ADMIN'])
             else:
-                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN'])
+                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'ADMIN'])
 
             service_dict = thedict.setdefault(service, {})
-            op_set = service_dict.setdefault(opname, set())
-            op_set.update(role_set)
+            op_dict = service_dict.setdefault(opname, {})
+            set_of_roles = op_dict.setdefault('roles', set())
+            set_of_roles.update(role_set)
+            op_dict['resources'] = resources
 
     except Exception, ex:
         log.exception('----- POLICY INIT ERROR -----')
@@ -53,67 +61,128 @@ def construct_policy_lists(policydb):
 policydb_filename = ioninit.adjust_dir(CONF.getValue('policydecisionpointdb'))
 policy_dictionary = construct_policy_lists(Config(policydb_filename).getObject())
 
-def construct_admin_list(adminrolelist):
-    thelist = []
-    for role_entry in adminrolelist:
+def construct_user_role_lists(userroledict):
+    roledict = {}
+    adminlist = []
+    for role_entry in userroledict['roles']['ADMIN']:
         subject = role_entry
         role_dict = {'subject': subject, 'ooi_id': None}
-        thelist.append(role_dict);
-    return thelist
+        adminlist.append(role_dict);
+    roledict['ADMIN'] = adminlist
 
-adminroledb_filename = ioninit.adjust_dir(CONF.getValue('adminroledb'))
-admin_role_list = construct_admin_list(Config(adminroledb_filename).getObject())
+    dataproviderlist = []
+    for role_entry in userroledict['roles']['DATA_PROVIDER']:
+        subject = role_entry
+        role_dict = {'subject': subject, 'ooi_id': None}
+        dataproviderlist.append(role_dict);
+    roledict['DATA_PROVIDER'] = dataproviderlist
 
-def subject_has_admin_role(subject):
-    for role_entry in admin_role_list:
+    marineoperatorlist = []
+    for role_entry in userroledict['roles']['MARINE_OPERATOR']:
+        subject = role_entry
+        role_dict = {'subject': subject, 'ooi_id': None}
+        marineoperatorlist.append(role_dict);
+    roledict['MARINE_OPERATOR'] = marineoperatorlist
+
+    attriblist = []
+    for attrib_entry_key in userroledict['user-attributes'].keys():
+        attrib_dict = {'subject': attrib_entry_key, 'ooi_id': None, 'attributes': userroledict['user-attributes'][attrib_entry_key]}
+        attriblist.append(attrib_dict);
+
+    return roledict, attriblist
+
+userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
+user_role_dict, user_attrib_list = construct_user_role_lists(Config(userroledb_filename).getObject())
+
+def subject_has_role(subject,role):
+    for role_entry in user_role_dict[role]:
         if role_entry['subject'] == subject:
             return True
     return False
 
-def user_has_admin_role(ooi_id):
-    for role_entry in admin_role_list:
+# Role methods
+def user_has_role(ooi_id,role):
+    for role_entry in user_role_dict[role]:
         if role_entry['ooi_id'] == ooi_id:
             return True
     return False
 
-def map_ooi_id_to_subject_admin_role(subject,ooi_id):
-    for role_entry in admin_role_list:
+def map_ooi_id_to_subject_role(subject,ooi_id,role):
+    for role_entry in user_role_dict[role]:
         if role_entry['subject'] == subject:
             role_entry['ooi_id'] = ooi_id
             return
 
-dispatcheruserdb_filename = ioninit.adjust_dir(CONF.getValue('dispatcheruserdb'))
-dispatcher_user_list = Config(dispatcheruserdb_filename).getObject()
+# Role convenience methods
+def map_ooi_id_to_subject_admin_role(subject,ooi_id):
+    map_ooi_id_to_subject_role(subject,ooi_id,'ADMIN')
+            
+def subject_has_admin_role(subject):
+    return subject_has_role(subject, 'ADMIN')
 
-def subject_has_dispatcher_queue(subject):
-    for dispatcher_user_entry in dispatcher_user_list:
-        if dispatcher_user_entry['subject'] == subject:
-            return True
-    return False
+def user_has_admin_role(ooi_id):
+    return user_has_role(ooi_id, 'ADMIN')
 
-def user_has_dispatcher_queue(ooi_id):
-    for dispatcher_user_entry in dispatcher_user_list:
-        if dispatcher_user_entry['ooi_id'] == ooi_id:
-            return True
-    return False
+def map_ooi_id_to_subject_data_provider_role(subject,ooi_id):
+    map_ooi_id_to_subject_role(subject,ooi_id,'DATA_PROVIDER')
 
-def get_dispatcher_queue_for_subject(subject):
-    for dispatcher_user_entry in dispatcher_user_list:
-        if dispatcher_user_entry['subject'] == subject:
-            return dispatcher_user_entry['dispatcher_queue']
+def subject_has_data_provider_role(subject):
+    return subject_has_role(subject, 'DATA_PROVIDER')
+
+def user_has_data_provider_role(ooi_id):
+    return user_has_role(ooi_id, 'DATA_PROVIDER')
+
+def map_ooi_id_to_subject_marine_operator_role(subject,ooi_id):
+    map_ooi_id_to_subject_role(subject,ooi_id,'MARINE_OPERATOR')
+
+def subject_has_marine_operator_role(subject):
+    return subject_has_role(subject, 'MARINE_OPERATOR')
+
+def user_has_marine_operator_role(ooi_id):
+    return user_has_role(ooi_id, 'MARINE_OPERATOR')
+
+# Attribute methods
+def get_attribute_value_for_subject(subject,attrib):
+    for dict_entry in user_attrib_list:
+        if dict_entry['subject'] == subject:
+            for attrib_entry_key in dict_entry['attributes'].keys():
+                if attrib_entry_key == attrib:
+                    return dict_entry['attributes'][attrib]
     return None
 
-def get_dispatcher_queue_for_user(ooi_id):
-    for dispatcher_user_entry in dispatcher_user_list:
-        if dispatcher_user_entry['ooi_id'] == ooi_id:
-            return dispatcher_user_entry['dispatcher_queue']
+def get_attribute_value_for_user(ooi_id,attrib):
+    for dict_entry in user_attrib_list:
+        if dict_entry['ooi_id'] == ooi_id:
+            for attrib_entry_key in dict_entry['attributes'].keys():
+                if attrib_entry_key == attrib:
+                    return dict_entry['attributes'][attrib]
     return None
 
 def map_ooi_id_to_subject_dispatcher_queue(subject,ooi_id):
-    for dispatcher_user_entry in dispatcher_user_list:
-        if dispatcher_user_entry['subject'] == subject:
-            dispatcher_user_entry['ooi_id'] = ooi_id
+    for dict_entry in user_attrib_list:
+        if dict_entry['subject'] == subject:
+            dict_entry['ooi_id'] = ooi_id
             return
+
+# Attribute convenience methods
+def subject_has_attribute(subject, attrib):
+    if get_attribute_value_for_subject(subject, attrib) is None:
+        return False
+    return True
+
+def user_has_attribute(ooi_id, attrib):
+    if get_attribute_value_for_user(ooi_id, attrib) is None:
+        return False
+    return True
+
+def subject_has_dispatcher_queue(subject):
+    return subject_has_attribute(subject,'dispatcher-id')
+
+def user_has_dispatcher_queue(ooi_id):
+    return user_has_attribute(ooi_id,'dispatcher-id')
+
+def get_dispatcher_queue_for_user(ooi_id):
+    return get_attribute_value_for_user(ooi_id,'dispatcher-id')
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
@@ -122,9 +191,8 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
     def after(self, invocation):
         return invocation
-        # msg = invocation.message
-        # return self.is_authorized(msg, invocation)
 
+    @defer.inlineCallbacks
     def is_authorized(self, msg, invocation):
         """
         @brief Policy enforcement method which implements the functionality
@@ -150,47 +218,47 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
         # Ignore messages that are not of performative 'request'
         if msg.get('performative', None) != 'request':
-            return invocation
+            defer.returnValue(invocation)
 
         # Reject improperly defined messages
         if not 'user-id' in msg:
-            log.info("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
+            log.error("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
             invocation.drop(note='Error: no user-id defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
         if not 'expiry' in msg:
-            log.info("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(msg))
+            log.error("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(msg))
             invocation.drop(note='Error: no expiry defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
         if not 'receiver' in msg:
-            log.info("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
+            log.error("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
             invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
-        if not 'op' in msg:
-            log.info("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
+            defer.returnValue(invocation)
+        if not 'op'in msg:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
             invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         user_id = msg['user-id']
         expirystr = msg['expiry']
 
         if not type(expirystr) is str:
-            log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
+            log.error("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         try:
             expiry = int(expirystr)
         except ValueError, ex:
-            log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
+            log.error("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
-            return invocation
+            defer.returnValue(invocation)
 
         rcvr = msg['receiver']
         service = rcvr.rsplit('.',1)[-1]
 
         operation = msg['op']
 
-        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s]' % (service, operation, '*', user_id, expiry))
+        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
         if service in policy_dictionary:
             role = 'ANONYMOUS'
             # TODO figure out mechanism to map user id to role
@@ -207,14 +275,29 @@ class PolicyInterceptor(EnvelopeInterceptor):
             service_list = policy_dictionary[service]
             # TODO figure out how to handle non-wildcard resource ids
             if operation in service_list:
-                operation_entry = service_list[operation]
-                log.info('Policy Interceptor: Policy tuple [%s]' % str(operation_entry))
-                if role in operation_entry:
-                    log.info('Policy Interceptor: Authentication matches')
+                role_entry = service_list[operation]['roles']
+                log.info('Policy Interceptor: Policy tuple [%s]' % str(role_entry))
+                if role in role_entry:
+                    log.info('Policy Interceptor: Role <%s> authentication matches' % role)
                 else:
-                    log.info('Policy Interceptor: Authentication failed')
-                    invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-                    return invocation
+                    # See if ownership level entry
+                    if 'OWNER' in role_entry:
+                        return_uuid_list = self.find_uuids(invocation, msg, user_id, service_list[operation]['resources'])
+                        if invocation.status != Invocation.STATUS_PROCESS:
+                            log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
+                            defer.returnValue(invocation)
+                            
+                        yield self.check_owner(user_id, return_uuid_list, invocation)
+                        if invocation.status != Invocation.STATUS_PROCESS:
+                            log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
+                            defer.returnValue(invocation)
+                        else:
+                            log.info('Policy Interceptor: Role <OWNER> authentication matches')
+
+                    else:
+                        log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [%s]. Returning Not Authorized.' % (service, operation, '*', user_id, expiry, role))
+                        invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+                        defer.returnValue(invocation)
         else:
             log.info('Policy Interceptor: service not in policy dictionary.')
 
@@ -223,9 +306,96 @@ class PolicyInterceptor(EnvelopeInterceptor):
             current_time = time.time()
 
             if current_time > expiry_time:
-                log.info('Policy Interceptor: Current time [%s] exceeds expiry [%s]. Returning Not Authorized.' % (str(current_time), expiry))
+                log.warn('Policy Interceptor: Current time [%s] exceeds expiry [%s] for service [%s] operation [%s] resource [%s] user_id [%s] . Returning Not Authorized.' % (str(current_time), expiry, service, operation, '*', user_id))
                 invocation.drop(note='Authentication expired', code=Invocation.CODE_UNAUTHORIZED)
-                return invocation
+                defer.returnValue(invocation)
 
         log.info('Policy Interceptor: Returning Authorized.')
-        return invocation
+        defer.returnValue(invocation)
+
+    @defer.inlineCallbacks
+    def check_owner(self, user_id, uuid_list, invocation):
+        self.checking_owner = True
+        self.mc = MessageClient(proc=invocation.process)
+        self.asc = AssociationServiceClient()
+
+        for uuid in uuid_list:        
+            request = yield self.mc.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+
+            request.object = request.CreateObject(IDREF_TYPE)
+            request.object.key = user_id
+
+            request.predicate = request.CreateObject(IDREF_TYPE)
+            request.predicate.key = OWNED_BY_ID
+
+            request.subject = request.CreateObject(IDREF_TYPE)
+            request.subject.key = uuid
+
+            # make the request
+            log.warn('Policy Interceptor: BEFORE ++++++++++++++++++++++++')
+            result = yield self.asc.association_exists(request)
+            log.warn('Policy Interceptor: AFTER ++++++++++++++++++++++++')
+            if result.result == False:
+                log.warn('Policy Interceptor: Authentication failed. User <%s> does not own resource <%s>.' % (user_id, uuid))
+                invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+                return
+            else:
+                log.warn('Policy Interceptor: User <%s> owns resource <%s>.' % (user_id, uuid))
+
+    def find_uuids(self, invocation, msg, user_id, resources):
+        """
+        Traverses message structure looking
+        for occurrences of field "resource id".
+        For each found, association check is made
+        to see if user is an owner of the resource.
+        """
+
+        log.info('Policy Interceptor: In check_resource_ownership. Resources: <%s>' % str(resources))
+        
+        content = msg.get('content','')
+        if isinstance(content, MessageInstance):
+            wrapper = content.Message
+            repo = content.Repository
+            return self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+        else:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing MessageInstance [%s]." % str(msg))
+            invocation.drop(note='Error: MessageInstance missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
+
+    def find_uuids_traverse_gpbs(self, invocation, msg, wrapper, repo, user_id, resources, uuid_list = None):
+        log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs')
+
+        if uuid_list is None:
+            uuid_list = []
+
+        childLinksSet = wrapper.ChildLinks
+        
+        if len(childLinksSet) == 0:
+            log.info('Policy Interceptor: Returning from check_resource_ownership_traverse_gpbs.  ChildLinksSet zero length.')
+            return
+            
+        for link in wrapper.ChildLinks:
+            obj = repo.get_linked_object(link)
+            type = obj.ObjectType
+            typeId = type.object_id
+            log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Child type: <%s>' % str(typeId))
+            if typeId in resources:
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Child type match found in resources')
+                gpbMessage = obj.GPBMessage
+                uuid = getattr(gpbMessage,resources[typeId])
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  GPB type: %s UUID: %s' % (str(typeId),uuid))
+                if uuid is None:
+                    log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
+                    invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
+                    return
+                if uuid == '':
+                    log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
+                    invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
+                    return
+                uuid_list.append(uuid.decode('utf-8'))
+                log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Added UUID: %s to return list' % uuid)
+
+            log.info('Policy Interceptor: Recursing.')
+            self.find_uuids_traverse_gpbs(invocation, msg, obj, repo, user_id, resources, uuid_list)
+        return uuid_list
+                
+
