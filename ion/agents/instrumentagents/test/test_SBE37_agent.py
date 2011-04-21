@@ -8,6 +8,8 @@
 """
 
 import uuid
+import re
+import os
 
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
@@ -21,7 +23,32 @@ import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 
     
-    
+"""
+List of mac addresses for machines which should run these tests. If no
+mac address of a NIC on the machine running the tests matches one in this
+list, the tests are skipped. This is to prevent the trial robot from
+commanding the instrument hardware, forcing these tests to be run
+intentionally. Add the mac address of your development machine as
+returned by ifconfig to cause the tests to run for you locally.
+"""
+
+allowed_mac_addr_list = [
+    '00:26:bb:19:83:33'         # Edward's Macbook
+    ]
+
+mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
+mac_addr_re = re.compile(mac_addr_pattern,re.MULTILINE)
+mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
+RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
+
+
+# It is useful to be able to easily turn tests on and off
+# during development. Also this will ensure tests do not run
+# automatically. 
+SKIP_TESTS = [
+    'test_execute_instrument',
+    'dummy'
+]    
 
 class TestSBE37Agent(IonTestCase):
 
@@ -106,7 +133,11 @@ class TestSBE37Agent(IonTestCase):
         Test cases for exectuing device commands through the instrument
         agent.
         """
-        raise unittest.SkipTest("Do not run this test automatically.")
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_execute_instrument' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
 
         # Begin an explicit transaction.
