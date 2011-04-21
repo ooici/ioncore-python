@@ -18,7 +18,6 @@ from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError
 
-from ion.resources import coi_resource_descriptions
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
@@ -245,8 +244,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.assertEqual(user2.resource_reference.certificate, self.user_certificate + "\nA Small Change")
        
         # Test if we can find the user we have stuffed in.
-        user_description = coi_resource_descriptions.IdentityResource()
-        user_description.subject = 'Roger'
+        #user_description = coi_resource_descriptions.IdentityResource()
+        #user_description.subject = 'Roger'
 
         # Disabled until find is properly implemented
         #users1 = yield self.irc.find_users(user_description,regex=True)

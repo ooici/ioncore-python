@@ -14,7 +14,6 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore import registry
-from ion.resources import sa_resource_descriptions
 
 class DataProductRegistryService(registry.BaseRegistryService):
     """

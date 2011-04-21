@@ -13,7 +13,6 @@ from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
-from ion.resources import coi_resource_descriptions
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
