@@ -350,8 +350,36 @@ class RepositoryTest(unittest.TestCase):
         ab3 = yield repo.checkout(branchname="Arthur")
         
         self.assertEqual(ab3.person[0].name, 'John')
-        
-        
+
+    @defer.inlineCallbacks
+    def test_checkout_excluded(self):
+
+
+        repo = self.wb.create_repository(ADDRESSLINK_TYPE)
+
+        ab = repo.root_object
+
+        ab.title = 'junk'
+        ab.person.add()
+        ab.person[0] = repo.create_object(PERSON_TYPE)
+        ab.person[0].name = 'David'
+
+        cref = repo.commit('first commit')
+
+        del ab
+
+        repo.purge_workspace
+
+
+        yield repo.checkout(branchname='master')
+
+
+
+
+
+
+
+
     def test_branch_no_commit(self):
         repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
         self.assertEqual(len(repo.branches),1)
@@ -419,9 +447,6 @@ class RepositoryTest(unittest.TestCase):
         repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
 
         self.assertRaises(repository.RepositoryError, setattr, ab , 'owner', 'anything but a gpbwrapper')
-
-
-
 
         
     def test_log(self):
@@ -783,14 +808,16 @@ class MergeContainerTest(unittest.TestCase):
 
         repo.commit('Commit to serialize elements')
     
-
+    @defer.inlineCallbacks
     def test_load_element(self):
 
         commit = self.repo._current_branch.commitrefs[0]
 
-        mc = repository.MergeRepository(commit, self.repo.index_hash.cache)
+        mr = repository.MergeRepository(commit, self.repo.index_hash.cache)
 
-        self.assertEqual(mc.root_object, self.ab)
+        yield mr.load_root(excluded_types=[])
+
+        self.assertEqual(mr.root_object, self.ab)
 
     
     
