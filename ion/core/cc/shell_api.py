@@ -40,12 +40,30 @@ def ps():
     """
     _update()
     procs = namespace['pids']
-    print 'name \tid \tsupervisor'
-    print '---------------------------------'
+    len_name = 1
+    len_pid  = 1
+    len_sid  = 1
+    buffer = 2
     for pid in sorted(procs.keys()):
         proc = procs[pid]
         lname = proc.proc_name.replace(ioninit.container_instance.id, "<LOCAL>")
-        print "%s \t%s \t%s" % (lname, proc.id, proc.proc_supid)
+        len_name = max(len_name, len(lname))
+        len_pid = max(len_pid, len(str(proc.id)))
+        len_sid = max(len_sid, len(str(proc.proc_supid)))
+        
+    len_name += buffer
+    len_pid  += buffer
+    len_sid  += buffer
+    
+    fmt_str = "%-" + str(len_name) + "s \t%-" + str(len_pid) + "s \t%-" + str(len_sid) + "s"
+    
+    print fmt_str % ('name', 'id', 'supervisor')
+    print '-' * (len_name + len_pid + len_sid + (buffer*3))
+    for pid in sorted(procs.keys()):
+        proc = procs[pid]
+        lname = proc.proc_name.replace(ioninit.container_instance.id, "<LOCAL>")
+        print fmt_str % (lname, proc.id, proc.proc_supid)
+    print '-' * (len_name + len_pid + len_sid + (buffer*3))
     print 'Running processes: %d' % len(procs)
 
 def svc():

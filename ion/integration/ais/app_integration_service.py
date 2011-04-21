@@ -270,7 +270,7 @@ class AppIntegrationServiceClient(ServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "app_integration"
         ServiceClient.__init__(self, proc, **kwargs)
-        self.mc = MessageClient(proc)
+        self.mc = MessageClient(proc=proc)
         
     @defer.inlineCallbacks
     def findDataResources(self, message):

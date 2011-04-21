@@ -149,11 +149,11 @@ class WrapperMethodsTest(unittest.TestCase):
 
         att = gpb_wrapper.Wrapper._create_object(ATTRIBUTE_TYPE)
 
-        att.data_type = att.DataType.BOOLEAN
+        att.data_type = att.DataType.DOUBLE
 
-        self.assertEqual(att.data_type, att.DataType.BOOLEAN)
+        self.assertEqual(att.data_type, att.DataType.DOUBLE)
 
-        self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
+        self.assertRaises(AttributeError, setattr, att.DataType, 'DOUBLE', 'this is not a double')
 
 
     def test_listsetfields_message_type(self):
@@ -346,12 +346,12 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         
         # Test invalid argument: values
         mixed_vals = ['val1', 'val2', None, 25]
-        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, 25)
+        self.assertRaises(ValueError, self.ds.root_group.AddAttribute, 'atrib1', string_type, 25)
         self.assertEqual(len(self.ds.root_group.attributes), 0)
         # @todo: Ensure entries for "values" of an empty list will fail
 #        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, [])
 #        self.assertEqual(len(self.ds.root_group.attributes), 0)
-        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, None)
+        self.assertRaises(ValueError, self.ds.root_group.AddAttribute, 'atrib1', string_type, None)
         self.assertEqual(len(self.ds.root_group.attributes), 0)
         self.assertRaises(ValueError, self.ds.root_group.AddAttribute, 'atrib1', string_type, mixed_vals)
         self.assertEqual(len(self.ds.root_group.attributes), 0)
@@ -408,12 +408,12 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         
         # Test invalid argument: values
         mixed_vals = ['val1', 'val2', None, 25]
-        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, 25)
+        self.assertRaises(ValueError, variable.AddAttribute, 'atrib1', string_type, 25)
         self.assertEqual(len(variable.attributes), 0)
         # @todo: Ensure entries for "values" of an empty list will fail
 #        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, [])
 #        self.assertEqual(len(variable.attributes), 0)
-        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, None)
+        self.assertRaises(ValueError, variable.AddAttribute, 'atrib1', string_type, None)
         self.assertEqual(len(variable.attributes), 0)
         self.assertRaises(ValueError, variable.AddAttribute, 'atrib1', string_type, mixed_vals)
         self.assertEqual(len(variable.attributes), 0)
@@ -767,13 +767,13 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         
         # Test invalid argument: values
         mixed_vals = ['val1', 'val2', 123, None, 3.2]
-        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', 25)
+        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, 'atrib1', 25)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
         self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         # @todo: Ensure entries for "values" of an empty list will fail
 #        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', [])
 #        self.assertEqual(len(self.ds.root_group.attributes), 0)
-        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', None)
+        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, 'atrib1', None)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
         self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         # @warning: Must Implement...
@@ -782,9 +782,9 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         #           not an atomic action, stage-2 failure may result in placing the
         #           dataset in an invalid state.  This must be prevented before the
         #           following check will succeed
-#        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, 'atrib1', mixed_vals)
-#        self.assertEqual(len(self.ds.root_group.attributes), 1)
-#        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, 'atrib1', mixed_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
         
 #        # Test legitimate arguments
         string_vals2 = ['new1', 'new2', 'new3']

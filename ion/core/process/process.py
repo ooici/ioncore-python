@@ -21,7 +21,6 @@ from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicat
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
-from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.messaging.message_client import MessageClient, MessageInstance
 
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
@@ -62,7 +61,7 @@ class ProcessError(Exception):
     """
 
 # @todo do NOT fill the process namespace with response codes; remove mixin!
-class Process(BasicLifecycleObject, ResponseCodes):
+class Process(BasicLifecycleObject):
     """
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
@@ -72,6 +71,30 @@ class Process(BasicLifecycleObject, ResponseCodes):
     plc-* process life cycle events.
     """
     implements(IProcess)
+
+
+    """
+    Define some constants used in messaging:
+    """
+    MSG_STATUS = 'status'
+    MSG_RESULT = 'result'
+    MSG_RESPONSE = 'response'
+    MSG_EXCEPTION = 'exception'
+
+    """
+    Only used by process.py for uncaught exceptions. Do not catch generic exceptions
+    in an ION service - only those which are expected. The Error status and reply error
+    are intended only to deal with fatal - unexpected errors.
+    """
+    ION_ERROR = 'ERROR'
+    """
+    Generic OK message added
+    """
+    ION_OK = 'OK'
+
+    BAD_REQUEST = 400
+    UNAUTHORIZED = 401
+
 
     def __init__(self, receiver=None, spawnargs=None, **kwargs):
         """
@@ -1061,7 +1084,7 @@ class AppInterceptor(Interceptor):
 # ============================================================================
 
 
-class ProcessClientBase(object,ResponseCodes):
+class ProcessClientBase(object):
     """
     This is the base class for a process client. A process client is code that
     executes in the process space of a calling process. If no calling process

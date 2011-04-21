@@ -17,8 +17,6 @@ from ion.core.id import Id
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
-from ion.core.messaging.ion_reply_codes import ResponseCodes
-
 class IInvocation(Interface):
     pass
 
@@ -54,10 +52,10 @@ class Invocation(object):
     STATUS_ERROR = 'error'
 
     # Malformed message
-    CODE_BAD_REQUEST = ResponseCodes.BAD_REQUEST
+    CODE_BAD_REQUEST = 400
 
     # Authorization error
-    CODE_UNAUTHORIZED = ResponseCodes.UNAUTHORIZED
+    CODE_UNAUTHORIZED = 401
 
     def __init__(self, **kwargs):
         """

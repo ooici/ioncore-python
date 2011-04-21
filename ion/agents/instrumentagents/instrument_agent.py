@@ -146,98 +146,185 @@ class InstrumentDriverClient(ProcessClient):
     """
 
     @defer.inlineCallbacks
-    def execute(self, params):
+    def execute(self,channels,command,timeout=None):
         """
         """
 
-        assert(isinstance(params, dict)), 'Expected a params dict.'
-        timeout = params.get('timeout',None)
-        if not timeout:
-            timeout = 15
-            params['timeout'] = timeout
-        rpc_timeout = timeout + 5
-        (content, headers, message) = yield self.rpc_send('execute',params,timeout=rpc_timeout)            
+        assert(isinstance(channels, (list,tuple))), 'Expected list or tuple channels.'
+        assert(isinstance(command, (list,tuple))), 'Expected list or tuple command.'
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'channels':channels,'command':command,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('execute',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'channels':channels,'command':command,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('execute',content_outgoing)            
+        
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def get(self, params):
+    def get(self, params, timeout=None):
         """
         """
                 
-        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
-        (content, headers, message) = yield self.rpc_send('get',params)        
-        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
+        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'                
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('get',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('get',content_outgoing)            
+        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def set(self, params):
+    def set(self, params,timeout=None):
         """
         """
         
-        assert(isinstance(params, dict)), 'Expected a params dict.'        
-        (content, headers, message) = yield self.rpc_send('set',params)        
-        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
+        
+        assert(isinstance(params, dict)), 'Expected a params dict.'                
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('set',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('set',content_outgoing)
+        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def get_status(self, params):
+    def get_status(self, params, timeout=None):
         """
         """
         assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
-        (content, headers, message) = yield self.rpc_send('get_status',params)        
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('get_status',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('get_status',content_outgoing)            
+                
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def get_state(self):
+    def get_state(self, timeout=None):
         """
         """
-        (content, headers, message) = yield self.rpc_send('get_state',None)        
-        #assert(isinstance(content, dict)), 'Expected a reply content dict.'
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('get_state',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'timeout':None}
+            (content, headers, message) = yield self.rpc_send('get_state',content_outgoing)            
+                
         assert(isinstance(content,str)), 'Expected a state string reply.'
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def configure(self, params):
+    def configure(self, params, timeout=None):
         """
         """
-
         assert(isinstance(params, dict)), 'Expected a params dict.'        
-        (content, headers, message) = yield self.rpc_send('configure',params)        
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('configure',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('configure',content_outgoing)            
+                
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def initialize(self):
+    def initialize(self, timeout=None):
         """
         """
         
-        (content, headers, message) = yield self.rpc_send('initialize',None)        
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('initialize',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'timeout':None}
+            (content, headers, message) = yield self.rpc_send('initialize',content_outgoing)            
+        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def connect(self):
+    def connect(self, timeout=None):
         """
         """
         
-        (content, headers, message) = yield self.rpc_send('connect',None)
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('connect',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'timeout':None}
+            (content, headers, message) = yield self.rpc_send('connect',content_outgoing)            
+        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
-    def disconnect(self):
+    def disconnect(self, timeout=None):
         """
         """
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 5
+            content_outgoing = {'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('disconnect',content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'timeout':None}
+            (content, headers, message) = yield self.rpc_send('disconnect',content_outgoing)            
         
-        (content, headers, message) = yield self.rpc_send('disconnect',None)
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
@@ -353,15 +440,16 @@ class InstrumentAgent(ResourceAgent):
         self.transaction_id = None
         
         """
-        An integer in seconds for how long to wait to acquire a new transaction if
-        a value is not explicitly given.
+        An integer in seconds for how long to wait to acquire a new
+        transaction if a value is not explicitly given.
         """
-        self.default_transaction_timeout = 10   
+        self.default_transaction_timeout = 20   
         
         """
-        An integer in seconds for the maximum allowable timeout to wait for a new transaction.
+        An integer in seconds for the maximum allowable timeout to wait for
+        a new transaction.
         """
-        self.max_transaction_timeout = 120
+        self.max_transaction_timeout = 60
     
         """
         An integer in seconds for the maximum time a transaction may be open.
@@ -369,8 +457,8 @@ class InstrumentAgent(ResourceAgent):
         self.transaction_expire_timeout = 300
     
         """
-        A finite state machine to track and manage agent state according to the general
-        instrument state model.
+        A finite state machine to track and manage agent state according to
+        the general instrument state model.
         """
         self.agent_fsm = None
     
@@ -626,7 +714,69 @@ class InstrumentAgent(ResourceAgent):
             else:
                 # output = self.agent_fsm.state_transition(cmd[1])
                 # TODO FSM and driver integration
-                reply['success'] = ['OK']
+                # The following are stubs for driver integration prior to
+                # state machine integration.
+                if cmd[1] == 'CI_TRANS_INITIALIZE':
+                    reply['success'] = ['OK']
+                
+                elif cmd[1] == 'CI_TRANS_GO_ACTIVE':
+                    driver_config = self.spawn_args.get('driver-config',None)
+                    if driver_config != None:
+                        config_reply = yield self.driver_client.configure(driver_config)
+                        config_success = config_reply['success']
+                        
+                        # Could not configure driver.
+                        if config_success[0] != 'OK':
+                            reply['success'] = config_success
+                        
+                        # Driver correctly configured.
+                        else:
+                            
+                            # Attempt connect.
+                            try:
+                                connect_reply = yield self.driver_client.connect()
+                                
+                            # Could not connect, exception raised.
+                            except:
+                                reply['success'] = errors['INSTRUMENT_UNREACHABLE']
+                                
+                            # Driver responded to connect request.
+                            else:
+                                
+                                # Check driver success.
+                                connect_success = connect_reply['success']
+                                if connect_success[0] != 'OK':
+                                    reply['success'] = connect_success
+                                    
+                                # Driver connection successful.
+                                else:
+                                    reply['success'] = ['OK']
+                                
+                    else:                        
+                        reply['success'] = errors['DRIVER_NOT_CONFIGURED']
+
+                elif cmd[1] == 'CI_TRANS_GO_INACTIVE':
+                    disconnect_reply = yield self.driver_client.disconnect()
+                    disconnect_success = disconnect_reply['success']
+                    if disconnect_success[0] != 'OK':
+                        reply['success'] = errors['DISCONNECT_FAILED']
+                        
+                    else:
+                        reply['success'] = ['OK']
+                    
+                    reply['success'] = ['OK']
+                
+                elif cmd[1] == 'CI_TRANS_CLEAR':
+                    reply['success'] = ['OK']
+                
+                elif cmd[1] == 'CI_TRANS_RUN':
+                    reply['success'] = ['OK']
+
+                else:
+                    reply['success'] = errors['INCORRECT_STATE']
+                               
+                
+                
         elif cmd[0] == 'CI_CMD_TRANSMIT_DATA':
             reply['success'] = errors['NOT_IMPLEMENTED']
         else:
@@ -1363,8 +1513,7 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
-        dvr_content = {'command':command,'channels':channels}
-        dvr_result = yield self.driver_client.rpc_send('execute',dvr_content)
+        dvr_result = yield self.driver_client.execute(channels,command)
         
         reply['success'] = dvr_result['success']
         reply['result'] = dvr_result['result']
@@ -1386,6 +1535,8 @@ class InstrumentAgent(ResourceAgent):
             {'success':success,'result':{(chan_arg,param_arg):(success,val),...,(chan_arg,param_arg):(success,val)},
             'transaction_id':transaction_id}
         """
+        
+        
         assert(isinstance(content,dict)), 'Expected a dict content.'
         assert(content.has_key('params')), 'Expected params.'
         assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
@@ -1422,8 +1573,7 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
-        dvr_content = {'params':params}
-        dvr_result = yield self.driver_client.rpc_send('get',dvr_content)
+        dvr_result = yield self.driver_client.get(params)
         
         reply['success'] = dvr_result['success']
         reply['result'] = dvr_result['result']
@@ -1481,8 +1631,7 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
-        dvr_content = {'params':params}
-        dvr_result = yield self.driver_client.rpc_send('set',dvr_content)
+        dvr_result = yield self.driver_client.set(params)
         
         reply['success'] = dvr_result['success']
         reply['result'] = dvr_result['result']
@@ -1941,7 +2090,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(command,list)), 'Expected a command list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
-        content = {'channels':params,'command':command,'transaction_id':transaction_id}
+        content = {'channels':channels,'command':command,'transaction_id':transaction_id}
         (content,headers,messaage) = yield self.rpc_send('execute_device',content)
         
         assert(isinstance(content,dict))

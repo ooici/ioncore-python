@@ -71,20 +71,18 @@ class GetDataResourceDetail(object):
             defer.returnValue(RspMsg)
 
         #
-        # Currently there is no association for dataset to datasource.
+        # Find the datasource associated with this dataset; for now, instantiate
+        # a FindDataResources worker object. The getAssociatedSource should be
+        # moved into a common worker class; it's currently in the FindDataResources
+        # class, which doesn't use it.
         #
         log.debug('getDataResourceDetail getting datasource resource instance')
         worker = FindDataResources(self.ais)
-        dSourceResults = yield worker.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        log.debug('Found ' + str(len(dSourceResults.idrefs)) + ' datasources.')
+        dSourceResID = None
+        dSourceResID = yield worker.getAssociatedSource(resID)
 
-
-        #
-        # Currently forcing to index 0 to fake association
-        #
-        if len(dSourceResults.idrefs) > 0:
-            dSourceResID = dSourceResults.idrefs[0].key
-            log.debug('Working on dSourceResID: ' + dSourceResID)
+        if not (dSourceResID is None):
+            log.debug('Associated datasourceID: ' + dSourceResID)
             
             dSource = yield self.rc.get_instance(dSourceResID)
         else:            
@@ -102,8 +100,10 @@ class GetDataResourceDetail(object):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE)
 
         rspMsg.message_parameters_reference[0].data_resource_id = resID
-        # Fill in the rest of the message with the CF metadata
 
+        self.__loadGPBMinMetaData(rspMsg.message_parameters_reference[0].dataResourceSummary, ds)
+        self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource)
+        
         i = 0
         for var in ds.root_group.variables:
             print 'Working on variable: %s' % str(var.name)
@@ -111,8 +111,6 @@ class GetDataResourceDetail(object):
             self.__loadGPBVariable(rspMsg.message_parameters_reference[0].variable[i], ds, var)
             i = i + 1
 
-        self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource)
-        
         defer.returnValue(rspMsg)
 
 
@@ -179,6 +177,42 @@ class GetDataResourceDetail(object):
         log.debug('request_type: ' + str(dSource.request_type))
         log.debug('base_url: ' + dSource.base_url)
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
+
         
+    def __loadGPBMinMetaData(self, rootAttributes, dSet):
+        for attrib in dSet.root_group.attributes:
+            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            if attrib.name == 'title':
+                rootAttributes.title = attrib.GetValue()
+            elif attrib.name == 'institution':                
+                rootAttributes.institution = attrib.GetValue()
+            elif attrib.name == 'source':                
+                rootAttributes.source = attrib.GetValue()
+            elif attrib.name == 'references':                
+                rootAttributes.references = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_start':                
+                rootAttributes.ion_time_coverage_start = attrib.GetValue()
+            elif attrib.name == 'ion_time_coverage_end':                
+                rootAttributes.ion_time_coverage_end = attrib.GetValue()
+            elif attrib.name == 'summary':                
+                rootAttributes.summary = attrib.GetValue()
+            elif attrib.name == 'comment':                
+                rootAttributes.comment = attrib.GetValue()
+            elif attrib.name == 'ion_geospatial_lat_min':                
+                rootAttributes.ion_geospatial_lat_min = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lat_max':                
+                rootAttributes.ion_geospatial_lat_max = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lon_min':                
+                rootAttributes.ion_geospatial_lon_min = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_lon_max':                
+                rootAttributes.ion_geospatial_lon_max = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_min':                
+                rootAttributes.ion_geospatial_vertical_min = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_max':                
+                rootAttributes.ion_geospatial_vertical_max = float(attrib.GetValue())
+            elif attrib.name == 'ion_geospatial_vertical_positive':                
+                rootAttributes.ion_geospatial_vertical_positive = attrib.GetValue()
+
+
 
 

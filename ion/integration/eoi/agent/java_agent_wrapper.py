@@ -291,6 +291,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         Terminates the underlying dataset agent by sending it a 'terminate' message and waiting for the OSProcess object's exit callback.  
         '''
+        yield
         log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
         result = None
         if self._get_state() is BasicStates.S_ACTIVE:

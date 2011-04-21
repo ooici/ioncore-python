@@ -399,22 +399,6 @@ message SubscriptionInfoReqMsg {
 }
 """
 
-
-CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE = object_utils.create_type_identifier(object_id=9217, version=1)
-"""
-message DataResourceCreateSimpleRequest {
-    enum _MessageTypeIdentifier {
-        _ID = 9217;
-        _VERSION = 1;
-    }
-
-    optional string user_id               = 1;
-    optional uint64 update_interval_msec  = 2;
-    optional string institution_id        = 3;
-
-}
-"""
-
 CREATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
 """
 message DataResourceCreateRequest {
