@@ -37,6 +37,7 @@ DATASET_MODIFICATION_EVENT_ID = 1111
 NEW_SUBSCRIPTION_EVENT_ID = 1201
 DEL_SUBSCRIPTION_EVENT_ID = 1202
 SCHEDULE_EVENT_ID = 2001
+LOGGING_INFO_EVENT_ID = 3003
 LOGGING_ERROR_EVENT_ID = 3002
 LOGGING_CRITICAL_EVENT_ID = 3001
 
@@ -174,7 +175,6 @@ class EventPublisher(Publisher):
 
         # link them
         event_msg.additional_data = additional_event_msg
-
         defer.returnValue(event_msg)
 
     @defer.inlineCallbacks
@@ -311,6 +311,13 @@ class ErrorLoggingEventPublisher(LoggingEventPublisher):
     """
     event_id = LOGGING_ERROR_EVENT_ID
 
+class InfoLoggingEventPublisher(LoggingEventPublisher):
+    """
+    Event Notification Publisher for informational logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_INFO_EVENT_ID
 #
 #
 # ################################################################################
@@ -455,3 +462,10 @@ class ErrorLoggingEventSubscriber(LoggingEventSubscriber):
     """
     event_id = LOGGING_ERROR_EVENT_ID
 
+class InfoLoggingEventSubscriber(LoggingEventSubscriber):
+    """
+    Event Notification Subscriber for informational logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_INFO_EVENT_ID

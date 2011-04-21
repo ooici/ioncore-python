@@ -29,7 +29,6 @@ class ResourceAgent(Process):
     
     @defer.inlineCallbacks
     def plc_init(self):
-	log.debug("*** init of resource agent")
         """
         The Agent Registry client class to hang onto for all registry manipulations
         """

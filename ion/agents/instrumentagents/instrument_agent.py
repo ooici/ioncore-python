@@ -19,7 +19,7 @@ from ion.data.dataobject import ResourceReference, DataObject
 from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.resources.dm_resource_descriptions import PublisherResource
-from ion.services.dm.distribution.events import LoggingEventPublisher
+from ion.services.dm.distribution.events import InfoLoggingEventPublisher
 from uuid import uuid4
 import ion.util.procutils as pu
 
@@ -267,7 +267,6 @@ class InstrumentAgent(ResourceAgent):
     
     @defer.inlineCallbacks
     def plc_init(self):
-        log.debug("***IA initializing")
         # Initialize base class.
         ResourceAgent.plc_init(self)
                         
@@ -326,10 +325,7 @@ class InstrumentAgent(ResourceAgent):
         """
 	The queue where we publish events, of any sort, for now
 	"""
-	pubproc = Process()
-	yield pubproc.spawn()
-	self.logEventPublisher = LoggingEventPublisher(process=pubproc,
-						       origin=str(self.id)+"-event")
+        self.logEventPublisher = InfoLoggingEventPublisher(process=self, origin=str(self.id))
         
         """
         A dictionary of the topics where data is published, indexed by transducer
@@ -368,7 +364,6 @@ class InstrumentAgent(ResourceAgent):
         An integer in seconds for the maximum allowable timeout to wait for a new transaction.
         """
         self.max_transaction_timeout = 120
-        log.debug("*** Set max_transaction_timeout")
     
         """
         An integer in seconds for the maximum time a transaction may be open.
@@ -514,8 +509,7 @@ class InstrumentAgent(ResourceAgent):
         result = self._end_transaction(content)
             
 	# Publish an end transaction message...mainly as a test for now
-        yield self.logEventPublisher.create_and_publish_event("Transaction ended!")
-        
+        yield self.logEventPublisher.create_and_publish_event(name="Transaction ended!")
         yield self.reply_ok(msg,result)
                 
     
@@ -1801,7 +1795,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content,headers,message) = yield self.rpc_send('end_transaction',tid)
         #yield pu.asleep(1)
         #content = {'success':['OK']}
-        assert(isinstance(content,dict))
+        assert(isinstance(content,dict)), 'Expected dict result'
         defer.returnValue(content)
 
     ############################################################################

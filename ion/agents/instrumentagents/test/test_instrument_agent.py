@@ -18,7 +18,7 @@ from twisted.trial import unittest
 
 from ion.core.process.process import Process
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
-from ion.services.dm.distribution.events import LoggingEventSubscriber
+from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
 from ion.core.exception import ReceivedError
     
 
@@ -26,11 +26,7 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        
-        
         yield self._start_container()
-
-
         processes = [
             {'name':'instrument_agent','module':'ion.agents.instrumentagents.instrument_agent','class':'InstrumentAgent'}
         ]
@@ -39,16 +35,10 @@ class TestInstrumentAgent(IonTestCase):
         self.svc_id = yield self.sup.get_child_id('instrument_agent')
 
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,target=self.svc_id)
-        
-        
 
         
     @defer.inlineCallbacks
     def tearDown(self):
-        
-        
-        
-        pu.asleep(1)
         yield self._stop_container()
         
         
@@ -976,31 +966,32 @@ class TestInstrumentAgent(IonTestCase):
     @defer.inlineCallbacks
     def test_publish(self):
         # Setup a subscriber to an event topic
-        class TestEventSubscriber(LoggingEventSubscriber):
+        class TestEventSubscriber(InfoLoggingEventSubscriber):
             def __init__(self, *args, **kwargs):
                 self.msgs = []
-                LoggingEventSubscriber.__init__(self, *args, **kwargs)
+                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
                 
             def ondata(self, data):
+                log.debug("*** TestEventSubscriber received a message with name: %s",
+                          data['content'].name)
                 self.msgs.append(data)
                 
         subproc = Process()
         yield subproc.spawn()
-        
-        testsub = TestEventSubscriber(queue_name=str(self.svc_id)+"-event",
+        testsub = TestEventSubscriber(origin=str(self.svc_id),
                                       process=subproc)
-        log.debug("Subscriber listening to %s", str(self.svc_id)+"-event")
-
+        yield testsub.initialize()
+        yield testsub.activate()
+        
         # Twiddle the IA
-        tid = yield self.ia_client.start_transaction(5)
-        log.debug("*** TID: %s", tid)
+        result = yield self.ia_client.start_transaction(5)
+        tid = result['transaction_id']
         yield self.ia_client.end_transaction(tid)
         
         # check the event
         yield pu.asleep(1.0)
-        self.failUnlessEqual(len(testsub.msgs), 1)
-        log.debug("Subscriber received message 0: %s", testsub.msgs)
-        self.failUnlessEqual(testsub.msgs[0], "ACTIVE")
+        self.assertEqual(len(testsub.msgs), 1)
+        self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!") 
  
     """
     reply_ = yield self.ia_client.get_observatory(instrument_agent.ci_param_list,'none')
