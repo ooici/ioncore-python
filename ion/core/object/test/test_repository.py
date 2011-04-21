@@ -23,6 +23,8 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 from ion.core.object import repository
 
+
+
 INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -306,8 +308,8 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(len(simple2.ChildLinks),0)
         self.assertEqual(simple2.IsRoot, True)
         self.assertEqual(simple2.Modified, True)
-        
-        
+
+
     def test_inparents(self):
             
         repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)

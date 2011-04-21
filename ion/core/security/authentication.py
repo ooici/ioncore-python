@@ -21,8 +21,6 @@ from M2Crypto import EVP, X509, BIO, SMIME, RSA
 from twisted.internet import defer
 
 import ion.util.ionlog
-#from ion.resources import coi_resource_descriptions 
-
 
 log = ion.util.ionlog.getLogger(__name__)
 

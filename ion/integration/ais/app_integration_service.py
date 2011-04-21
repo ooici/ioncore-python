@@ -19,8 +19,6 @@ from ion.core.messaging.message_client import MessageClient
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import UPDATE_USER_EMAIL_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
 
 # import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
@@ -28,8 +26,9 @@ from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetD
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 from ion.integration.ais.ManageResources.ManageResources import ManageResources
-from ion.integration.ais.createDataResource.createDataResource import CreateDataResource
-from ion.integration.ais.subscribeDataResource.subscribeDataResource import SubscribeDataResource
+from ion.integration.ais.manage_data_resource.manage_data_resource import ManageDataResource
+from ion.integration.ais.manage_data_resource_subscription.manage_data_resource_subscription import ManageDataResourceSubscription
+
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -155,21 +154,13 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
-    def op_updateUserEmail(self, content, headers, msg):
-        log.debug('op_updateUserEmail: \n'+str(content))
+    def op_updateUserProfile(self, content, headers, msg):
+        log.debug('op_updateUserProfile: \n'+str(content))
         worker = RegisterUser(self)
-        log.debug('op_updateUserEmail: calling worker')
-        response = yield worker.updateUserEmail(content);
+        log.debug('op_updateUserProfile: calling worker')
+        response = yield worker.updateUserProfile(content);
         yield self.reply_ok(msg, response)
         
-    @defer.inlineCallbacks
-    def op_updateUserDispatcherQueue(self, content, headers, msg):
-        log.debug('op_updateUserDispatcherQueue: \n'+str(content))
-        worker = RegisterUser(self)
-        log.debug('op_updateUserDispatcherQueue: calling worker')
-        response = yield worker.updateUserDispatcherQueue(content);
-        yield self.reply_ok(msg, response)
-
     def getTestDatasetID(self):
         return self.dsID
                          
@@ -205,9 +196,31 @@ class AppIntegrationService(ServiceProcess):
         @brief create a new data resource
         """
         log.debug('op_createDataResource: \n'+str(content))
-        worker = CreateDataResource(self)
+        worker = ManageDataResource(self)
         log.debug('op_createDataResource: calling worker')
-        response = yield worker.createDataResourceDap(content);
+        response = yield worker.create(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_updateDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_updateDataResource: \n'+str(content))
+        worker = ManageDataResource(self)
+        log.debug('op_updateDataResource: calling worker')
+        response = yield worker.update(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_deleteDataResource(self, content, headers, msg):
+        """
+        @brief create a new data resource
+        """
+        log.debug('op_deleteDataResource: \n'+str(content))
+        worker = ManageDataResource(self)
+        log.debug('op_deleteDataResource: calling worker')
+        response = yield worker.delete(content);
         yield self.reply_ok(msg, response)
 
 
@@ -217,9 +230,9 @@ class AppIntegrationService(ServiceProcess):
         @brief subscribe to a data resource
         """
         log.debug('op_createDataResourceSubscription: \n'+str(content))
-        worker = SubscribeDataResource(self)
+        worker = ManageDataResourceSubscription(self)
         log.debug('op_createDataResourceSubscription: calling worker')
-        response = yield worker.createDataResourceSubscription(content);
+        response = yield worker.create(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -228,9 +241,9 @@ class AppIntegrationService(ServiceProcess):
         @brief delete subscription to a data resource
         """
         log.debug('op_deleteDataResourceSubscription: \n'+str(content))
-        worker = SubscribeDataResource(self)
+        worker = ManageDataResourceSubscription(self)
         log.debug('op_deleteDataResourceSubscription: calling worker')
-        response = yield worker.createDataResourceSubscription(content);
+        response = yield worker.delete(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -239,9 +252,9 @@ class AppIntegrationService(ServiceProcess):
         @brief update subscription to a data resource
         """
         log.debug('op_updateDataResourceSubscription: \n'+str(content))
-        worker = SubscribeDataResource(self)
+        worker = ManageDataResourceSubscription(self)
         log.debug('op_updateDataResourceSubscription: calling worker')
-        response = yield worker.updateDataResourceSubscription(content);
+        response = yield worker.update(content);
         yield self.reply_ok(msg, response)
 
 
@@ -257,7 +270,7 @@ class AppIntegrationServiceClient(ServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "app_integration"
         ServiceClient.__init__(self, proc, **kwargs)
-        self.mc = MessageClient(proc)
+        self.mc = MessageClient(proc=proc)
         
     @defer.inlineCallbacks
     def findDataResources(self, message):
@@ -326,7 +339,7 @@ class AppIntegrationServiceClient(ServiceClient):
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def updateUserEmail(self, message):
+    def updateUserProfile(self, message):
         yield self._check_init()
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
@@ -339,36 +352,14 @@ class AppIntegrationServiceClient(ServiceClient):
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [user_ooi_id] not found in message"
             defer.returnValue(Response)
-        log.debug("AIS_client.updateUserEmail: sending following message to updateUserEmail:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('updateUserEmail',
+        log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send_protected('updateUserProfile',
                                                                     message,
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
-        log.debug('AIS_client.updateUserEmail: IR Service reply:\n' + str(content))
+        log.debug('AIS_client.updateUserProfile: IR Service reply:\n' + str(content))
         defer.returnValue(content)
-        
-    @defer.inlineCallbacks
-    def updateUserDispatcherQueue(self, message):
-        yield self._check_init()
-        # check that the GPB is correct type & has a payload
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            defer.returnValue(result)
-       # check that ooi_id is present in GPB
-        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
-            # build AIS error response
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
-            Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
-            defer.returnValue(Response)
-        log.debug("AIS_client.updateUserDispatcherQueue: sending following message to updateUserDispatcherQueue:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('updateUserDispatcherQueue',
-                                                                    message,
-                                                                    message.message_parameters_reference.user_ooi_id,
-                                                                    "0")
-        log.debug('AIS_client.updateUserDispatcherQueue: IR Service reply:\n' + str(content))
-        defer.returnValue(content)
-        
+              
     @defer.inlineCallbacks
     def getResourceTypes(self, message):
         yield self._check_init()
@@ -399,6 +390,22 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResource', message)
         log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def updateDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
+        log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def deleteDataResource(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
+        log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks

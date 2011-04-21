@@ -14,12 +14,10 @@ from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.process.process import ProcessFactory, ProcessDesc
 from ion.data.dataobject import DataObject, ResourceReference, LCStates
-from ion.resources.coi_resource_descriptions import AgentInstance
 from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-#from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient

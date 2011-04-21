@@ -14,6 +14,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
                                                                     identity_res_type_name, \
@@ -42,6 +43,13 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
+EPU_CONTROLLER_TYPE_ID = 'type_id_for_epu_controllers'
+
+class DictObj(object):
+    def __getattr__(self, attr):
+        return self.__dict__.get(attr)
+
+
 class ManageResources(object):
     
    def __init__(self, ais):
@@ -61,9 +69,15 @@ class ManageResources(object):
                          self.__PrintDatasourceAttributes, \
                          self.__LoadDatasourceColumnHeadrers, \
                          self.__LoadDatasourceAttributes
+      EpucontrollerValues = EPU_CONTROLLER_TYPE_ID, \
+                         self.__LoadEpucontrollerColumnData, \
+                         self.__PrintEpucontrollerAttributes, \
+                         self.__LoadEpucontrollerColumnHeadrers, \
+                         self.__LoadEpucontrollerAttributes
       self.ResourceTypes = {'datasets' : DatasetValues,
                             'identities' : IdentityValues,
-                            'datasources' : DatasourceValues
+                            'datasources' : DatasourceValues,
+                            'epucontrollers' : EpucontrollerValues
                            }
       self.MapGpbTypeToResourceType = {10001 : 'datasets',
                                        1401 : 'identities',
@@ -92,9 +106,24 @@ class ManageResources(object):
       defer.returnValue(Response)
 
 
+   def __findEpuControllers(self):
+      log.debug('__findEpuControllers')
+      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
+      d = DictObj
+      d.idrefs = ['dataservices_epu_controller',
+                  'agentservices_epu_controller',
+                  'associationservices_epu_controller']
+      return d
+
+
    @defer.inlineCallbacks
    def __findResourcesOfType(self, resourceType):
 
+      if resourceType == EPU_CONTROLLER_TYPE_ID:
+         # get the resources from the EPU management
+         defer.returnValue(self.__findEpuControllers())
+      
+      # get the resources out of the Association Service
       request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
       pair = request.pairs.add()
 
@@ -134,6 +163,19 @@ class ManageResources(object):
       log.debug('max_ingest_millis: ' + str(ds.max_ingest_millis))
 
 
+   def __PrintEpucontrollerAttributes(self, ds):
+      log.debug('de_state = '+str(ds['de_state']))
+      log.debug('de_conf_report = '+str(ds['de_conf_report']))
+      log.debug('last_queuelen_size = '+str(ds['last_queuelen_size']))
+      log.debug('last_queuelen_time = '+str(ds['last_queuelen_time']))
+      for instance in ds['instances']:
+         log.debug('Instance Name = '+instance)
+         log.debug('iaas_state = '+ds['instances'][instance]['iaas_state'])
+         log.debug('iaas_state = '+str(ds['instances'][instance]['iaas_state_time']))
+         log.debug('iaas_state = '+str(ds['instances'][instance]['heartbeat_time']))
+         log.debug('iaas_state = '+ds['instances'][instance]['heartbeat_state'])
+    
+
    def __LoadDatasetColumnHeadrers(self, To):
       To.column_names.append('OoiId')
       To.column_names.append('Title')
@@ -147,6 +189,10 @@ class ManageResources(object):
    def __LoadDatasourceColumnHeadrers(self, To):
       To.column_names.append('OoiId')
       To.column_names.append('Station ID')
+
+
+   def __LoadEpucontrollerColumnHeadrers(self, To):
+      To.column_names.append('EPU controller Id')
 
 
    def __LoadDatasetColumnData(self, To, From, Id):
@@ -174,6 +220,16 @@ class ManageResources(object):
       try:
          To.attribute.append(Id)
          To.attribute.append(From.station_id[0])
+      
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   def __LoadEpucontrollerColumnData(self, To, From):
+      
+      try:
+         To.attribute.append(From)
       
       except:
          estr = 'Object ERROR!'
@@ -228,16 +284,18 @@ class ManageResources(object):
       # load the attributes for each resource that was found into response
       i = 0
       while i < len(Result.idrefs):
-         ResID = Result.idrefs[i].key
-         log.debug('Working on ResID: ' + ResID)        
-         Resource = yield self.rc.get_instance(ResID)
-         
-         # debug print for dumping the attributes of the resource
-         PrintFunc(Resource)
-         
          # load the attributes of the resource into response
          Response.message_parameters_reference[0].resources.add()
-         LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
+         if ResourceType == EPU_CONTROLLER_TYPE_ID:
+            LoaderFunc(Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
+         else:
+            # need to get the actual resource from it's ooi_id
+            ResID = Result.idrefs[i].key
+            log.debug('Working on ResID: ' + ResID)        
+            Resource = yield self.rc.get_instance(ResID)
+            # debug print for dumping the attributes of the resource
+            PrintFunc(Resource)           
+            LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
          i = i + 1
 
       log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
@@ -294,17 +352,17 @@ class ManageResources(object):
          To.resource[3].name = 'request_type'
          To.resource[3].value = self.RequestTypes[From.request_type]
          To.resource.add()
-         To.resource[4].name = 'top'
-         To.resource[4].value = str(From.top)
+         To.resource[4].name = 'request_bounds_north'
+         To.resource[4].value = str(From.request_bounds_north)
          To.resource.add()
-         To.resource[5].name = 'bottom'
-         To.resource[5].value = str(From.bottom)
+         To.resource[5].name = 'request_bounds_south'
+         To.resource[5].value = str(From.request_bounds_south)
          To.resource.add()
-         To.resource[6].name = 'left'
-         To.resource[6].value = str(From.left)
+         To.resource[6].name = 'request_bounds_west'
+         To.resource[6].value = str(From.request_bounds_west)
          To.resource.add()
-         To.resource[7].name = 'right'
-         To.resource[7].value = str(From.right)
+         To.resource[7].name = 'request_bounds_east'
+         To.resource[7].value = str(From.request_bounds_east)
          To.resource.add()
          To.resource[8].name = 'base_url'
          To.resource[8].value = From.base_url
@@ -318,18 +376,66 @@ class ManageResources(object):
          To.resource[11].name = 'max_ingest_millis'
          To.resource[11].value = str(From.max_ingest_millis)
          To.resource.add()
-         To.resource[12].name = 'start_time'
-         To.resource[12].value = From.start_time
+         To.resource[12].name = 'ion_title'
+         To.resource[12].value = From.ion_title
          To.resource.add()
-         To.resource[13].name = 'end_time'
-         To.resource[13].value = From.end_time
+         To.resource[13].name = 'ion_institution_id'
+         To.resource[13].value = From.ion_institution_id
          To.resource.add()
-         To.resource[14].name = 'institution_id'
-         To.resource[14].value = From.institution_id
+         To.resource[14].name = 'update_interval_seconds'
+         To.resource[14].value = str(From.update_interval_seconds)
       
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+
+
+   def __LoadEpucontrollerAttributes(self, To, From):
+      try:
+         To.resource.add()
+         To.resource[0].name = 'Decision Engine State'
+         To.resource[0].value = From['de_state']
+         To.resource.add()
+         To.resource[1].name = 'Decision Engine Configuration Report'
+         To.resource[1].value = From['de_conf_report']
+         To.resource.add()
+         To.resource[2].name = 'Last Queue Length Size'
+         To.resource[2].value = str(From['last_queuelen_size'])
+         To.resource.add()
+         To.resource[3].name = 'Last Queue Length Time'
+         To.resource[3].value = str(From['last_queuelen_time'])
+         i = 4
+         for instance in From['instances']:
+            To.resource.add()
+            To.resource[i].name = 'Instance Name'
+            To.resource[i].value = instance
+            i = i + 1
+            To.resource.add()
+            To.resource[i].name = 'Instance State'
+            To.resource[i].value = From['instances'][instance]['iaas_state']
+            i = i + 1
+            To.resource.add()
+            To.resource[i].name = 'Instance State Time'
+            To.resource[i].value = str(From['instances'][instance]['iaas_state_time'])
+            i = i + 1
+            To.resource.add()
+            To.resource[i].name = 'Heartbeat Time'
+            To.resource[i].value = str(From['instances'][instance]['heartbeat_time'])
+            i = i + 1
+            To.resource.add()
+            To.resource[i].name = 'Heartbeat State'
+            To.resource[i].value = From['instances'][instance]['heartbeat_state']
+    
+      except:
+         estr = 'Object ERROR!'
+         log.exception(estr)
+
+
+   @defer.inlineCallbacks
+   def __GetEpuControllerInfo(self, Id):
+      ecc = EPUControllerClient(targetname=Id)
+      Result = yield ecc.whole_state()
+      defer.returnValue(Result)
 
 
    @defer.inlineCallbacks
@@ -349,28 +455,37 @@ class ManageResources(object):
          Response.error_str = "Required field [ooi_id] not found in message"
          defer.returnValue(Response)
          
-      # get resource from resource registry
-      log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
-      try:
-         Result = yield self.rc.get_instance(msg.message_parameters_reference.ooi_id)
-      except ReceivedApplicationError, ex:
-         # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
-         Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
-         defer.returnValue(Response)
+      if 'epu_controller' in msg.message_parameters_reference.ooi_id:
+         Result = yield self.__GetEpuControllerInfo(msg.message_parameters_reference.ooi_id)
+         # debug print for dumping the attributes of the resource
+         log.debug("got back resource \n"+str(Result))
+         ResourceType = 'epucontrollers'
+      else:
+         # get resource from resource registry
+         log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
+         try:
+            Result = yield self.rc.get_instance(msg.message_parameters_reference.ooi_id)
+         except ReceivedApplicationError, ex:
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
+            Response.error_num = ex.msg_content.MessageResponseCode
+            Response.error_str = ex.msg_content.MessageResponseBody
+            defer.returnValue(Response)
+   
+         # debug print for dumping the attributes of the resource
+         log.debug("got back resource \n"+str(Result))
+         log.debug("object GPB id = "+str(Result.ResourceObjectType.object_id))
+         ResourceType = self.MapGpbTypeToResourceType[Result.ResourceObjectType.object_id]
 
-      # debug print for dumping the attributes of the resource
-      log.debug("got back resource \n"+str(Result))
-      log.debug("object GPB id = "+str(Result.ResourceObjectType.object_id))
-      ResourceType = self.MapGpbTypeToResourceType[Result.ResourceObjectType.object_id]
-      self.ResourceTypes[ResourceType][2](Result)
+      PrintFunc = self.ResourceTypes[ResourceType][2]
+      PrintFunc(Result)
       
       # build AIS response
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResource response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCE_RESPONSE_TYPE)
-      self.ResourceTypes[ResourceType][4](Response.message_parameters_reference[0], Result)
+      LoaderFunc = self.ResourceTypes[ResourceType][4]
+      LoaderFunc(Response.message_parameters_reference[0], Result)
       Response.result = Response.ResponseCodes.OK
       log.debug('ManageResources.getResource(): returning\n'+str(Response))
       defer.returnValue(Response)

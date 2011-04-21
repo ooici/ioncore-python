@@ -12,9 +12,7 @@
         'keyspace':None, # Default to sysname!
         'error_if_existing':False}
     ),
-    "registered": [
-       "attributestore"
-    ],
+    "registered": [ ],
     "applications": [
         "ioncore","ccagent"
     ]
