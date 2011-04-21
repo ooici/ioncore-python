@@ -47,8 +47,8 @@ allowed_mac_addr_list = [
 
 mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
 mac_addr_re = re.compile(mac_addr_pattern,re.MULTILINE)
-#mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
-#RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
+mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
+RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 
 
 # It is useful to be able to easily turn tests on and off
@@ -133,11 +133,14 @@ class TestSBE37(IonTestCase):
 
     @defer.inlineCallbacks
     def test_configure(self):
-
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
-
+        """
+        Test driver configure functions.
+        """
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_configure' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -159,10 +162,15 @@ class TestSBE37(IonTestCase):
     
     @defer.inlineCallbacks
     def test_connect(self):
-
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        """
+        Test driver connect to device.
+        """
+        
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_connect' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -211,13 +219,14 @@ class TestSBE37(IonTestCase):
     @defer.inlineCallbacks
     def test_get_set(self):
         """
-        Note that this test changes instrument parameters and can leave
-        them in an altered state if the test fails.
+        Test driver get/set functions. 
         """
 
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_set' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
 
         params = self.sbe_config
@@ -482,11 +491,14 @@ class TestSBE37(IonTestCase):
     @defer.inlineCallbacks
     def test_execute(self):
         """
+        Test driver execute functions.
         """
 
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_execute' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -702,9 +714,6 @@ class TestSBE37(IonTestCase):
             print e.msg_content
         else:
             print reply
-
-
-
 
         
         # Dissolve the connection to the device.
