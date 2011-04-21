@@ -212,6 +212,20 @@ message CreateDownloadURLRspMsg {
 }
 """
 
+# NameValuePairType GPB from ion-object-definitions/net/ooici/integration/ais/common/name_value_pair_type.proto
+NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
+"""
+message NameValuePairType {
+   enum _MessageTypeIdentifier {
+       _ID = 9125;
+       _VERSION = 1;
+   }
+
+   optional string name = 1;
+   optional string value = 2;
+}
+"""
+
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """
@@ -327,19 +341,6 @@ message GetResourceRequest {
 }
 """
 
-NAME_VALUE_PAIR_TYPE = object_utils.create_type_identifier(object_id=9125, version=1)
-"""
-message NameValuePair {
-   enum _MessageTypeIdentifier {
-       _ID = 9125;
-       _VERSION = 1;
-   }
-
-   optional string name = 1;
-   optional string value = 2;
-}
-"""
-
 GET_RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9126, version=1)
 """
 
@@ -349,7 +350,7 @@ message GetResourceResponse {
        _VERSION = 1;
    }
 
-   repeated net.ooici.integration.ais.manageResources.NameValuePair resource = 1;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType resource = 1;
 }
 """
 
