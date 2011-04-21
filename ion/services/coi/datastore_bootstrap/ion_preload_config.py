@@ -16,8 +16,8 @@ in the ION_DATASETS section...
 'ion.services.coi.datastore_bootstrap.ion_preload_config':{
     # Path to files relative to ioncore-python directory!
     # Get files from:  http://ooici.net/ion_data/
-	'sample_traj_dataset' : '../../ion_data/SOS_Test.tar.gz',
-	'sample_station_dataset' : '../../ion_data/USGS_Test.tar.gz'
+    'sample_traj_dataset' : '../../ion_data/SOS_Test.tar.gz',
+    'sample_station_dataset' : '../../ion_data/USGS_Test.tar.gz'
 },
 
 
@@ -302,10 +302,25 @@ traj_data_source_name = 'sample_traj_datasource'
 station_dataset_name = 'sample_station_dataset'
 station_data_source_name = 'sample_station_datasource'
 grid_dataset_name = 'grid_dataset'
+rvrs_dailyd_dataset_name = 'sample_rivers_daily_discharge_dataset'
+rvrs_dailyd_data_source_name = 'sample_rivers_daily_discharge_datasource'
+ntas1_dataset_name = 'samples_ntas_rt_mooring1_dataset'
+ntas1_data_source_name = 'samples_ntas_rt_mooring1_datasource'
+ntas2_dataset_name = 'samples_ntas_rt_mooring2_dataset'
+ntas2_data_source_name = 'samples_ntas_rt_mooring2_datasource'
+whots1_dataset_name = 'samples_whots_nrt_mooring1_dataset'
+whots1_data_source_name = 'samples_whots_nrt_mooring1_datasource'
+whots2_dataset_name = 'samples_whots_nrt_mooring2_dataset'
+whots2_data_source_name = 'samples_whots_nrt_mooring2_datasource'
 
 # Resource Byte Array locations
 trj_dataset_loc = CONF.getValue(traj_dataset_name, None)
 stn_dataset_loc = CONF.getValue(station_dataset_name, None)
+rvrs_dailyd_loc = CONF.getValue(rvrs_dailyd_dataset_name, None)
+ntas1_dataset_loc = CONF.getValue(ntas1_dataset_name, None)
+ntas2_dataset_loc = CONF.getValue(ntas2_dataset_name, None)
+whots1_dataset_loc = CONF.getValue(whots1_dataset_name, None)
+whots2_dataset_loc = CONF.getValue(whots2_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -335,11 +350,56 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                       },
+
+rvrs_dailyd_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04801',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:rvrs_dailyd_dataset_name,
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':rvrs_dailyd_loc},
+                      },
+
+ntas1_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04802',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:ntas1_dataset_name,
+                      DESCRIPTION_CFG:'An example of an NTAS Real Time Mooring Data System Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':ntas1_dataset_loc},
+                      },
+
+ntas2_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04803',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:ntas2_dataset_name,
+                      DESCRIPTION_CFG:'An example of an NTAS Real Time Mooring Data System Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':ntas2_dataset_loc},
+                      },
+
+whots1_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04804',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:whots1_dataset_name,
+                      DESCRIPTION_CFG:'An example of a WHOTS Near Real Time Mooring Data System Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':whots1_dataset_loc},
+                      },
+
+whots2_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04805',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:whots2_dataset_name,
+                      DESCRIPTION_CFG:'An example of a WHOTS Near Real Time Mooring Data System Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':whots2_dataset_loc},
+                      },
 }
 
 ION_DATA_SOURCES ={
 
-profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F2',
+profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F2',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',
@@ -347,7 +407,7 @@ profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]}
                       },
 
-traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F5',
+traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:traj_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
@@ -355,13 +415,45 @@ traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F5'
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]}
                       },
 
-station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F6',
+station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F6',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:station_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
                       },
+
+#ntas1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04802',
+#                      TYPE_CFG:DATASOURCE_TYPE,
+#                      NAME_CFG:ntas1_data_source_name,
+#                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas1_data_source,
+#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
+#                      },
+#
+#ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803',
+#                      TYPE_CFG:DATASOURCE_TYPE,
+#                      NAME_CFG:ntas2_data_source_name,
+#                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
+#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
+#                      },
+#
+#whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
+#                      TYPE_CFG:DATASOURCE_TYPE,
+#                      NAME_CFG:whots1_data_source_name,
+#                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots1_data_source,
+#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
+#                      },
+#
+#whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04805',
+#                      TYPE_CFG:DATASOURCE_TYPE,
+#                      NAME_CFG:station_data_source_name,
+#                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
+#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
+#                      },
 
 }
 
@@ -376,7 +468,11 @@ SAMPLE_TRAJ_DATA_SOURCE_ID = ION_DATA_SOURCES[traj_data_source_name][ID_CFG]
 SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
 SAMPLE_STATION_DATA_SOURCE_ID = ION_DATA_SOURCES[station_data_source_name][ID_CFG]
 #SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
-
+#SAMPLE_DLY_DISCHARGE_DATASET_ID = ION_DATASETS[rvrs_dailyd_dataset_name][ID_CFG]
+SAMPLE_NTAS1_DATASET_ID = ION_DATASETS[ntas1_dataset_name][ID_CFG]
+SAMPLE_NTAS2_DATASET_ID = ION_DATASETS[ntas2_dataset_name][ID_CFG]
+SAMPLE_WHOTS1_DATASET_ID = ION_DATASETS[whots1_dataset_name][ID_CFG]
+SAMPLE_WHOTS2_DATASET_ID = ION_DATASETS[whots2_dataset_name][ID_CFG]
 
 
 
