@@ -27,6 +27,7 @@ RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifie
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
 NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2327, version=1)
 DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2328, version=1)
+DATA_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2329, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
@@ -34,12 +35,15 @@ CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
 DATASOURCE_UPDATE_EVENT_ID = 1101
 DATASET_MODIFICATION_EVENT_ID = 1111
+BUSINESS_STATE_MODIFICATION_EVENT_ID = 1112
 NEW_SUBSCRIPTION_EVENT_ID = 1201
 DEL_SUBSCRIPTION_EVENT_ID = 1202
 SCHEDULE_EVENT_ID = 2001
 LOGGING_INFO_EVENT_ID = 3003
 LOGGING_ERROR_EVENT_ID = 3002
 LOGGING_CRITICAL_EVENT_ID = 3001
+DATABLOCK_EVENT_ID = 4001
+
 
 class EventPublisher(Publisher):
     """
@@ -266,6 +270,14 @@ class DatasetModificationEventPublisher(ResourceModifiedEventPublisher):
     """
     event_id = DATASET_MODIFICATION_EVENT_ID
 
+class BusinessStateModificationEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = BUSINESS_STATE_MODIFICATION_EVENT_ID
+    
 class NewSubscriptionEventPublisher(EventPublisher):
     """
     Event Notification Publisher for Subscription Modifications.
@@ -319,6 +331,22 @@ class InfoLoggingEventPublisher(LoggingEventPublisher):
     The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
     """
     event_id = LOGGING_INFO_EVENT_ID
+
+class DataEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    msg_type = DATA_EVENT_MESSAGE_TYPE
+
+class DataBlockEventPublisher(DataEventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = DATABLOCK_EVENT_ID
 #
 #
 # ################################################################################
@@ -419,6 +447,14 @@ class DatasetModificationEventSubscriber(ResourceModifiedEventSubscriber):
     """
     event_id = DATASET_MODIFICATION_EVENT_ID
 
+class BusinessStateChangeSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_id = BUSINESS_STATE_MODIFICATION_EVENT_ID
+    
 class NewSubscriptionEventSubscriber(EventSubscriber):
     """
     Event Notification Subscriber for Subscription Modifications.
@@ -470,3 +506,20 @@ class InfoLoggingEventSubscriber(LoggingEventSubscriber):
     The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
     """
     event_id = LOGGING_INFO_EVENT_ID
+    
+class DataEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    pass
+
+class DataBlockEventSubscriber(DataEventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_id = DATABLOCK_EVENT_ID
+
