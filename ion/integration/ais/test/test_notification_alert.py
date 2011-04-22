@@ -83,12 +83,17 @@ class NotificationAlertTest(IonTestCase):
                 'class':'StoreService'
             },
             {
+                'name':'app_integration',
+                'module':'ion.integration.ais.app_integration_service',
+                'class':'AppIntegrationService'
+            },
+            {
                 'name':'notification_alert',
                 'module':'ion.integration.ais.notification_alert_service',
                 'class':'NotificationAlertService'
             },
 
-            ]        
+            ]
 
         sup = yield self._spawn_processes(services)
         self.sup = sup
@@ -103,74 +108,145 @@ class NotificationAlertTest(IonTestCase):
     @defer.inlineCallbacks
     def test_addSubscription(self):
 
-        log.info('NotificationAlertTest: test_addSubscription.\n')
+        log.info('NotificationAlertTest:NotificationAlertTest: test_addSubscription.\n')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
-        # create the register_user request GPBs
+        # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
-        log.info("test_addSubscription: call the service")
-        # try to register this user for the first time
+        log.info("NotificationAlertTest:test_addSubscription: call the service")
         reply = yield self.nac.addSubscription(reqMsg)
-
-        log.info('addSubscription returned:\n'+str(reply))
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        log.info('addSubscription complete')
+        # Call the Alert service to retrieve the list of subscriptions for a user
+        log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+
+        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
+        reply = yield self.nac.getSubscriptionList(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+
+        numResReturned = len(reply.message_parameters_reference[0].subscription)
+        log.info('NotificationAlertTest:addSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
+        log.info('NotificationAlertTest:addSubscription complete')
 
 
     @defer.inlineCallbacks
     def test_removeSubscription(self):
 
+        log.info('NotificationAlertTest:test_removeSubscription.\n')
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
-        # Use the message client to create a message object
-        log.debug('test_removeSubscription! instantiating FindResourcesMsg.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
+        # Add a subscription for this user to this data resource
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
 
-        log.info('Calling removeSubscription!!...')
-        reply = yield self.nac.removeSubscription(reqMsg)
-        log.info('removeSubscription returned:\n'+str(reply))
+        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('rResponse is not an AIS_RESPONSE_MSG_TYPE GPB')
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        log.info('test_removeSubscription complete')
+        # Call the Alert service to remove this specific subscription based on user id and resource id
+        log.info('NotificationAlertTest:test_removeSubscription call remove subscription service.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
+
+        log.info('Calling removeSubscription service')
+        reply = yield self.nac.removeSubscription(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        # Call the Alert service to retrieve the list of subscriptions for a user
+        log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+
+        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
+        reply = yield self.nac.getSubscriptionList(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        numResReturned = len(reply.message_parameters_reference[0].subscription)
+        log.info('NotificationAlertTest:test_removeSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
+        log.info('NotificationAlertTest:test_removeSubscription complete.\n')
 
 
     @defer.inlineCallbacks
     def test_getSubscriptionList(self):
 
+        log.info('NotificationAlertTest: test_getSubscriptionList.\n')
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
-        # Use the message client to create a message object
-        log.debug('test_getSubscriptionList! instantiating FindResourcesMsg.\n')
+
+        # Add a subscription for this user to this data resource
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
+
+        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reply = yield self.nac.addSubscription(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        # Add a subscription for this user to this data resource
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.data_src_id = 'dataset456'
+        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
+
+        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reply = yield self.nac.addSubscription(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        # Call the Alert service to retrieve the list of subscriptions for a user
+        log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
 
-
-        log.info('Calling getSubscriptionList!!...')
+        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
-        log.info('getSubscriptionList returned:\n'+str(reply))
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        log.info('test_getSubscriptionList complete')        
+        numResReturned = len(reply.message_parameters_reference[0].subscription)
+        log.info('NotificationAlertTest:test_getSubscriptionList Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
+
+        log.info('NotificationAlertTest: test_getSubscriptionList complete.\n')
