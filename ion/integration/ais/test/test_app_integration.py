@@ -84,7 +84,7 @@ class AppIntegrationTest(IonTestCase):
                           COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
             {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
             {'name':'dataset_controller', 'module':'ion.services.dm.inventory.dataset_controller', 'class':'DatasetControllerClient'},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
         ]

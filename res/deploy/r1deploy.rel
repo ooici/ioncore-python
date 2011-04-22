@@ -34,9 +34,9 @@
         },
 
         {'name':'resource_registry',    'version':'0.1',
-                                        'processapp':('resource_registry','ion.services.coi.resource_registry_beta.resource_registry','ResourceRegistryService'),
+                                        'processapp':('resource_registry','ion.services.coi.resource_registry.resource_registry','ResourceRegistryService'),
                                         'config':{
-                                            'ion.services.coi.resource_registry_beta.resource_registry':{
+                                            'ion.services.coi.resource_registry.resource_registry':{
                                                 'datastore_service':'datastore'
                                             }
                                         },

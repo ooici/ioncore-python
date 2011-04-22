@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 # Not required but used for inspection... The resource client is in the service!
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.play.hello_resource import HelloResourceClient
 from ion.test.iontest import IonTestCase
@@ -122,7 +122,7 @@ class HelloResourceTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'hello1','module':'ion.play.hello_resource','class':'HelloResource'},
         ]

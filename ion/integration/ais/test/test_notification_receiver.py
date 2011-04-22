@@ -46,7 +46,7 @@ class NotificationReceiverTest(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {
@@ -73,6 +73,11 @@ class NotificationReceiverTest(IonTestCase):
                 'name':'store_service',
                 'module':'ion.core.data.store_service',
                 'class':'StoreService'
+            },
+            {
+                'name':'app_integration',
+                'module':'ion.integration.ais.app_integration_service',
+                'class':'AppIntegrationService'
             },
             {
                 'name':'notification_alert',
@@ -106,7 +111,7 @@ class NotificationReceiverTest(IonTestCase):
         # create the register_user request GPBs
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'test'
+        reqMsg.message_parameters_reference.user_ooi_id = 'Anonymous'
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry_beta/test/test_resource_client.py
+@file ion/services/coi/resource_registry/test/test_resource_client.py
 @author David Stuebe
 @brief test service for registering resources and client classes
 """
@@ -20,9 +20,9 @@ from ion.core.object import object_utils
 
 from ion.core.exception import ReceivedError
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient, ResourceRegistryError
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient, ResourceRegistryError
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
+from ion.services.coi.resource_registry.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, ANONYMOUS_USER_ID
@@ -46,7 +46,7 @@ class ResourceClientTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}}]
         sup = yield self._spawn_processes(services)
 

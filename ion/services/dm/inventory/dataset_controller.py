@@ -15,7 +15,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.exception import ApplicationError
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.core.object import object_utils
 

@@ -13,14 +13,14 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.services.coi.resource_registry_beta.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, \
+from ion.services.coi.resource_registry.resource_client import ResourceClient, \
                                                                     ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, \
+from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
                                                                     ResourceInstanceError
 
 from ion.core.intercept.policy import get_dispatcher_queue_for_user

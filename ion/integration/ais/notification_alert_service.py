@@ -22,25 +22,25 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
+from ion.services.coi.identity_registry import IdentityRegistryClient
+from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 
 from ion.services.dm.distribution.events import ResourceLifecycleEventSubscriber
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.core.data import store
-from ion.core.data import index_store_service
 from ion.core.data.store import Query
-
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import  GET_SUBSCRIPTION_LIST_REQ_TYPE, GET_SUBSCRIPTION_LIST_RESP_TYPE
-from ion.integration.ais.ais_object_identifiers import SUBSCRIPTION_INFO_TYPE
-#from ion.integration.ais.ais_object_identifiers import RESOURCE_CFG_REQUEST_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE, \
+                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
+                                                       GET_SUBSCRIPTION_LIST_RESP_TYPE
+
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 
 
 class NotificationAlertService(ServiceProcess):
@@ -56,9 +56,11 @@ class NotificationAlertService(ServiceProcess):
         log.debug('NotificationAlertService.__init__()')
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.rc =    ResourceClient(proc = self)
+        #self.rc =    ResourceClient(proc = self)
         self.mc =    MessageClient(proc = self)
+        self.irc =   IdentityRegistryClient(proc = self)
         self.store = AttributeStoreClient(proc = self)
+        self.aisc =  AppIntegrationServiceClient(proc = self)
 
         #initialize index store for subscription information
         SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path']
@@ -114,7 +116,7 @@ class NotificationAlertService(ServiceProcess):
              defer.returnValue(Response)
 
 
-        """    
+        """
         def handle_event(content):
             log.info('NotificationAlertService.handle_event notification event received ')
 
@@ -149,6 +151,14 @@ class NotificationAlertService(ServiceProcess):
 
         #Check if value already exists
 
+        attributes = {}
+        # get the user information from the Identity Registry
+        #yield self.GetUserInformation(content.message_parameters_reference.user_ooi_id, attributes)
+
+        # get the data resource metadata information
+        #yield self.GetDatasetInformation(content.message_parameters_reference.data_src_id, attributes)
+
+
         #add the subscription to the index store
         self.attributes = {'user_ooi_id':content.message_parameters_reference.user_ooi_id,
                    'data_src_id': content.message_parameters_reference.data_src_id,
@@ -163,12 +173,6 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.op_addSubscription attributes keyval id: %s', self.keyval )
         yield self.index_store.put(self.keyval , self.keyval, self.attributes)
 
-        #Check that the item is in the store
-        query = Query()
-        query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.user_ooi_id)
-        query.add_predicate_eq('data_src_id', content.message_parameters_reference.data_src_id)
-        rows = yield self.index_store.query(query)
-        log.info("NotificationAlertService.op_addSubscription  Rows returned %s " % (rows,))
 
         """
         # listen for resource updates on resource UUID
@@ -228,21 +232,13 @@ class NotificationAlertService(ServiceProcess):
              Response.error_str = "Required field [subscription_type] not found in message"
              defer.returnValue(Response)
 
-
-
         log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.data_src_id)
-        query = Query()
-        query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.user_ooi_id)
-        query.add_predicate_eq('data_src_id', content.message_parameters_reference.data_src_id)
-        rows = yield self.index_store.query(query)
-        log.info("NotificationAlertService.op_removeSubscription  Rows returned %s " % (rows,))
 
         self.keyval = content.message_parameters_reference.data_src_id + content.message_parameters_reference.user_ooi_id
-        rc = yield self.index_store.get(self.keyval)
-        log.info("NotificationAlertService.op_removeSubscription get by key: %s ", rc)
+        log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
+        #rc = yield self.index_store.get(self.keyval)
+        yield self.index_store.remove(self.keyval)
 
-        #self.assertEqual(len(rows),1)
-        #self.index_store.remove(rows[0])
         log.info('NotificationAlertService.op_removeSubscription  Removal completed')
 
         # create the register_user request GPBs
@@ -275,11 +271,29 @@ class NotificationAlertService(ServiceProcess):
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
 
+        #Check that the item is in the store
+        query = Query()
+        query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.user_ooi_id)
+        rows = yield self.index_store.query(query)
+        log.info("NotificationAlertService.op_getSubscriptionList  Rows returned %s " % (rows,))
 
         # create the register_user request GPBs
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
         respMsg.message_parameters_reference.add()
         respMsg.message_parameters_reference[0] = respMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
+
+        #add each result row into the response message
+        i = 0
+        for key, row in rows.iteritems ( ) :
+            log.info("NotificationAlertService.op_getSubscriptionList  First row data set id %s", rows[key]['data_src_id'] )
+            respMsg.message_parameters_reference[0].subscription.add()
+            respMsg.message_parameters_reference[0].subscription[i].user_ooi_id = rows[key]['user_ooi_id']
+            respMsg.message_parameters_reference[0].subscription[i].data_src_id = rows[key]['data_src_id']
+            respMsg.message_parameters_reference[0].subscription[i].subscription_type = rows[key]['subscription_type']
+            respMsg.message_parameters_reference[0].subscription[i].email_alerts_filter = rows[key]['email_alerts_filter']
+            respMsg.message_parameters_reference[0].subscription[i].dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
+            respMsg.message_parameters_reference[0].subscription[i].dispatcher_script_path = rows[key]['dispatcher_script_path']
+
         respMsg.result = respMsg.ResponseCodes.OK
 
         log.info('NotificationAlertService.op_getSubscriptionList complete')
@@ -305,6 +319,63 @@ class NotificationAlertService(ServiceProcess):
          defer.returnValue(Response)
 
       defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def GetUserInformation(self, user_ooi_id, attributes):
+
+        log.info('NotificationAlertService.GetUserInformation user:  %s  attributes: %s', user_ooi_id, attributes)
+        #Check that the user exists in the Identity Registry and save email address
+        # build the Identity Registry request for get_user message
+        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        Request.configuration = Request.CreateObject(USER_OOIID_TYPE)
+        Request.configuration.ooi_id = user_ooi_id
+
+        # get the user information from the Identity Registry
+        try:
+            user_info = yield self.irc.get_user(Request)
+        except ReceivedApplicationError, ex:
+             # build AIS error response
+             log.info('NotificationAlertService.GetUserInformation Send Error: %s ', ex.msg_content.MessageResponseBody)
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS Notification Alert Service: Add Subscription error response')
+             Response.error_num = ex.msg_content.MessageResponseCode
+             Response.error_str = ex.msg_content.MessageResponseBody
+             defer.returnValue(Response)
+
+        log.info('NotificationAlertService.GetUserInformation IR response: %s', user_info)
+
+        attributes['user_email'] = user_info.resource_reference.email
+        log.info('NotificationAlertService.op_addSubscription user email: %s', UserEmail)
+
+        defer.returnValue(None)
+
+    def __printSubscription(self, attributes):
+        subAttrs = list(attributes)
+        log.info('Subscription Attributes: ')
+        for attr in subAttrs:
+            log.debug('   %s = %s'  % (attr, attributes[attr]))
+
+    @defer.inlineCallbacks
+    def GetDatasetInformation(self, data_src_id, attributes):
+        #
+        # Create a request message to get the metadata details about the
+        # source (i.e., where the dataset came from) of a particular dataset
+        # resource ID.
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.data_resource_id = data_src_id
+
+        log.debug('NotificationAlertService.op_addSubscription Calling getDataResourceDetail.')
+        rspMsg = yield self.aisc.getDataResourceDetail(reqMsg)
+        log.debug('NotificationAlertService.op_addSubscription getDataResourceDetail returned:\n' + \
+            str('resource_id: ') + \
+            str(rspMsg.message_parameters_reference[0].data_resource_id) + \
+            str('\n'))
+
+        dSource = rspMsg.message_parameters_reference[0]
+        attributes['data_resource_id'] = dSource.data_resource_id
+
+        defer.returnValue(None)
 
 
 
@@ -346,6 +417,3 @@ class NotificationAlertServiceClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(NotificationAlertService)
-
-
-

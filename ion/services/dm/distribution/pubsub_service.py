@@ -22,7 +22,7 @@ from ion.core import ioninit
 import ion.util.ionlog
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE

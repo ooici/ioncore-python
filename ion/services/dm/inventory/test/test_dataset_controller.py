@@ -14,7 +14,7 @@ from ion.core.process import process
 
 from ion.test.iontest import IonTestCase
 
-from ion.services.coi.resource_registry_beta import resource_client
+from ion.services.coi.resource_registry import resource_client
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
@@ -46,7 +46,7 @@ class DateSetControllerTest(IonTestCase):
              'class':'AssociationService'
               },
 
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
 
             {'name':'dataset_controller','module':'ion.services.dm.inventory.dataset_controller','class':'DataSetController'},
