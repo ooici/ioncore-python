@@ -96,30 +96,23 @@ class EventPublisher(Publisher):
         ERROR       = 'ERROR'
         NO_CACHE    = 'NO_CACHE'
 
-    def topic(self, origin, topic_extension=None):
+    def topic(self, origin):
         """
         Builds the topic that this event should be published to.
         """
         assert self.event_id and origin
         
-        if topic_extension:
-            return "%s.%s.%s" % (str(self.event_id), topic_extension, str(origin))
-        else:
-            return "%s.%s" % (str(self.event_id), str(origin))
+        return "%s.%s" % (str(self.event_id), str(origin))
         
-    def __init__(self, xp_name=None, routing_key=None, process=None, origin="unknown", topic_extension=None, *args, **kwargs):
+    def __init__(self, xp_name=None, routing_key=None, process=None, origin="unknown", *args, **kwargs):
         """
         Initializer override.
         Sets defaults for the EventPublisher.
 
         @param origin   Sets the origin used in the topic when publishing the event.
                         This can be overridden when calling publish.
-        @param topic_extension  Optional extension string to the routing key to
-                                facilitate additional topic routing. Makes the
-                                routing key something like event_id.extension.origin
         """
         self._origin = origin
-        self._topic_extension = topic_extension
         self._mc = MessageClient(proc=process)
 
         xp_name = xp_name or get_events_exchange_point()
@@ -186,20 +179,17 @@ class EventPublisher(Publisher):
         defer.returnValue(event_msg)
 
     @defer.inlineCallbacks
-    def publish_event(self, event_msg, origin=None, topic_extension=None, **kwargs):
+    def publish_event(self, event_msg, origin=None, **kwargs):
         """
         Publishes an event notification.
 
         @param event_msg    The event message to publish.
         @param origin       The origin to use in the topic. If not set, uses the origin set in the initializer.
-        @param topic_extension  The additional and optional routing tag to insert
-                                between event and origin.
         """
         origin = origin or self._origin
         assert origin and origin != "unknown"
-        topic_extension = topic_extension or self._topic_extension
 
-        routing_key=self.topic(origin, topic_extension)
+        routing_key=self.topic(origin)
         log.debug("Publishing message to %s" % routing_key)
 
         yield self.publish(event_msg, routing_key=routing_key)
@@ -210,9 +200,8 @@ class EventPublisher(Publisher):
         Convenience method which calls both create_event and publish_event in one shot.
         """
         msg = yield self.create_event(**kwargs)
-        yield self.publish_event(msg, origin=kwargs.get('origin', None),
-                                 topic_extension=kwargs.get('topic_extension', None))
-
+        yield self.publish_event(msg, origin=kwargs.get('origin', None))
+        
 class ResourceLifecycleEventPublisher(EventPublisher):
     """
     Event Notification Publisher for Resource lifecycle events. Used as a concrete derived class, and as a base for
@@ -347,20 +336,17 @@ class EventSubscriber(Subscriber):
 
     event_id = None
 
-    def topic(self, origin, topic_extension=None):
+    def topic(self, origin):
         """
         Builds the topic that this event should be published to.
         If either side of the event_id.origin pair are missing, will subscribe to anything.
         """
         event_id = self._event_id or "*"
-        origin = origin or "*"
+        origin = origin or "#"
         
-        if topic_extension:
-            return "%s.%s.%s" % (str(event_id), topic_extension, str(origin))
-        else:
-            return "%s.%s" % (str(event_id), str(origin))
+        return "%s.%s" % (str(event_id), str(origin))
 
-    def __init__(self, xp_name=None, binding_key=None, event_id=None, origin=None, topic_extension=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, event_id=None, origin=None, *args, **kwargs):
         """
         Initializer.
 
@@ -371,7 +357,7 @@ class EventSubscriber(Subscriber):
         self._event_id = event_id or self.event_id
 
         xp_name = xp_name or get_events_exchange_point()
-        binding_key = binding_key or self.topic(origin, topic_extension)
+        binding_key = binding_key or self.topic(origin)
 
         Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, *args, **kwargs)
 

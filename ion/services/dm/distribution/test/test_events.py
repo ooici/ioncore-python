@@ -208,45 +208,39 @@ class TestEventPublisher(IonTestCase):
                 self.msgs.append(data)
         subproc = Process()
         yield subproc.spawn()
-        testsub = TestEventSubscriber(origin=str(subproc.id),
-                                      topic_extension="foo",
+        test_origin = "%s.%s" % ("chan1", str(subproc.id))
+        testsub = TestEventSubscriber(origin=test_origin,
                                       process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
 
         pub1 = InfoLoggingEventPublisher(process=self._proc,
-                                         origin=str(subproc.id),
-                                         topic_extension="foo")
+                                         origin=test_origin)
         yield pub1.initialize()
         yield pub1.activate()        
         
-        # Toss something out with topic extension "foo" with create_and_publish
+        # Toss something out with topic extension with create_and_publish
         yield pub1.create_and_publish_event(name="TestEvent")
         # Pause to make sure we catch the message
         yield pu.asleep(1.0)
         self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent")
         
-        # Toss something out with topic extension "foo" with create_event and publish_event
+        # Toss something out with topic extension with create_event and publish_event
         msg = yield pub1.create_event(name="TestEvent2")
         yield pub1.publish_event(msg)
         # Pause to make sure we catch the message
         yield pu.asleep(1.0)
         self.assertEqual(testsub.msgs[1]['content'].name, u"TestEvent2")
 
-        # Toss something out with topic extension "foo" with different publish_event
-        msg = yield pub1.create_event(name="TestEvent3")
-        testsub = TestEventSubscriber(origin=str(subproc.id),
-                                      topic_extension="bar",
-                                      process=subproc)
+        # Toss something out with topic extension wildcard on the sub side
+        testsub = TestEventSubscriber(process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
-        yield pu.asleep(1.0)
-
-        yield pub1.publish_event(msg, topic_extension="bar")
+        yield pu.asleep(2.0)
+        yield pub1.create_and_publish_event(name="TestEvent3")
         # Pause to make sure we catch the message
         yield pu.asleep(1.0)
         self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent3")
-        
 
 
 class TestEventSubscriber(IonTestCase):
