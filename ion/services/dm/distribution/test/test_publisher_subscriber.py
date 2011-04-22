@@ -101,6 +101,7 @@ class TestPublisher(IonTestCase):
 
         self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
 
+    #noinspection PyUnreachableCode
     @defer.inlineCallbacks
     def test_psc_plus_factory(self):
         raise SkipTest('Broker bug, no current workaround')
