@@ -43,7 +43,7 @@ class PST(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {

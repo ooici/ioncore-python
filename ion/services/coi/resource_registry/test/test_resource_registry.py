@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry_beta/test/test_resource_registry.py
+@file ion/services/coi/resource_registry/test/test_resource_registry.py
 @author Michael Meisinger
 @author David Stuebe
 @brief test service for registering resources and client classes
@@ -12,7 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
@@ -33,7 +33,7 @@ class ResourceRegistryTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}}]
         sup = yield self._spawn_processes(services)
 

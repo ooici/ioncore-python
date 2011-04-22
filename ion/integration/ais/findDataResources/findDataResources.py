@@ -14,9 +14,9 @@ from twisted.internet import defer
 
 from decimal import Decimal
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-from ion.services.coi.resource_registry_beta.association_client import AssociationClient, AssociationInstance, AssociationManager
-from ion.services.coi.resource_registry_beta.association_client import AssociationClientError
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationInstance, AssociationManager
+from ion.services.coi.resource_registry.association_client import AssociationClientError
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient

@@ -17,7 +17,7 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError, ApplicationError
 
-from ion.services.coi.resource_registry_beta import resource_client
+from ion.services.coi.resource_registry import resource_client
 
 from types import FunctionType
 
@@ -581,7 +581,7 @@ class DataStoreWorkbench(WorkBench):
 
         def_list = []
         for blob in request.blob_elements:
-            def_list.append(self._blob_store.put(blob.key, blob))
+            def_list.append(self._blob_store.put(blob.key, blob.SerializeToString() ))
 
         yield defer.DeferredList(def_list)
 
