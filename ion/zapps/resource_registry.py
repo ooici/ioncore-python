@@ -17,7 +17,7 @@ from ion.core.pack import app_supervisor
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
     as_services =[{ 'name':'resource_registry',
-                     'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                     'module':'ion.services.coi.resource_registry.resource_registry',
                      'class':'ResourceRegistryService'}]
 
     app_sup_desc = ProcessDesc(name="app-supervisor-" + app_definition.name,

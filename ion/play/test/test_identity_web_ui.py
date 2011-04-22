@@ -60,7 +60,7 @@ class IdentityRegistryUITest(IonTestCase):
 
         #[ { 'name':'identity', 'module':'ion.services.coi.identity_registry' } ]
         services = [{'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService', 'spawnargs':{'servicename':'datastore'}},
-                    {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService', 'spawnargs':{'datastore_service':'datastore'}},
+                    {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService', 'spawnargs':{'datastore_service':'datastore'}},
                     {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}]
         supervisor = yield self._spawn_processes(services)
 

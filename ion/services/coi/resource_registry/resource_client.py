@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry_beta/resource_client.py
+@file ion/services/coi/resource_registry/resource_client.py
 @author David Stuebe
 @brief Resource Client and and Resource Instance classes are used to manage
 resource objects in services and processes. They provide a simple interface to
@@ -25,7 +25,7 @@ from ion.core.object import repository
 from ion.core.object import association_manager
 
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
 from ion.services.coi.datastore_bootstrap import ion_preload_config
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID

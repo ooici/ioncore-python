@@ -47,7 +47,7 @@ class ResourceRegistryService(ServiceProcess):
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
 
 
     def __init__(self, *args, **kwargs):
@@ -211,7 +211,7 @@ class ResourceRegistryClient(ServiceClient):
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "resource_registry_2"
+            kwargs['targetname'] = "resource_registry"
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks

@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \

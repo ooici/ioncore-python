@@ -16,12 +16,12 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.services.coi.resource_registry_beta.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, \
+from ion.services.coi.resource_registry.resource_client import ResourceClient, \
                                                                     ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, \
+from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
                                                                     ResourceInstanceError
 
 from ion.core.object import object_utils

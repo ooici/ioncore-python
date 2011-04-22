@@ -19,8 +19,8 @@ from ion.core.process import process
 from ion.core.object import workbench
 from ion.core.object import repository
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry.resource_client import ResourceInstance
 
 
 from ion.core.object import gpb_wrapper

@@ -9,7 +9,7 @@
 Based on Porter - Duff Alpha Composite rules
 """
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 def GetValue(self, *args):
     """
@@ -92,7 +92,7 @@ def _flatten_index(indices, shape):
 """
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_DLY_DISCHARGE_DATASET_ID
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 rc = ResourceClient()
 ds_d = rc.get_instance(SAMPLE_DLY_DISCHARGE_DATASET_ID)
 
