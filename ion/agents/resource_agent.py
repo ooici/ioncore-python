@@ -27,7 +27,6 @@ class ResourceAgent(Process):
     setup a ResourceRegistryClient
     """
     
-    @defer.inlineCallbacks
     def plc_init(self):
         """
         The Agent Registry client class to hang onto for all registry manipulations

@@ -35,7 +35,6 @@ class TestInstrumentAgent(IonTestCase):
         self.svc_id = yield self.sup.get_child_id('instrument_agent')
 
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,target=self.svc_id)
-
         
     @defer.inlineCallbacks
     def tearDown(self):
@@ -972,7 +971,7 @@ class TestInstrumentAgent(IonTestCase):
                 InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
                 
             def ondata(self, data):
-                log.debug("*** TestEventSubscriber received a message with name: %s",
+                log.debug("TestEventSubscriber received a message with name: %s",
                           data['content'].name)
                 self.msgs.append(data)
                 
@@ -989,7 +988,7 @@ class TestInstrumentAgent(IonTestCase):
         yield self.ia_client.end_transaction(tid)
         
         # check the event
-        yield pu.asleep(1.0)
+        #yield pu.asleep(1.0)
         self.assertEqual(len(testsub.msgs), 1)
         self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!") 
  
@@ -1013,14 +1012,12 @@ class TestInstrumentAgent(IonTestCase):
     
     """
  
- 
     """
-    @defer.inlineCallbacks
     def test_something(self):
+        pass
         
-        
-        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
-    """        
+        #raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+    """     
     
     
 

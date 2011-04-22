@@ -325,7 +325,8 @@ class InstrumentAgent(ResourceAgent):
         """
 	The queue where we publish events, of any sort, for now
 	"""
-        self.logEventPublisher = InfoLoggingEventPublisher(process=self, origin=str(self.id))
+        self.logEventPublisher = InfoLoggingEventPublisher(process=self,
+                                                           origin=str(self.id))
         
         """
         A dictionary of the topics where data is published, indexed by transducer
