@@ -117,10 +117,10 @@ class IdentityRegistryClient(ServiceClient):
 
         
     @defer.inlineCallbacks
-    def update_user(self, Identity):
-        log.debug("in update_user client")
+    def update_user_profile(self, Identity):
+        log.debug("in update_user_profile client")
         yield self._check_init()       
-        (content, headers, msg) = yield self.rpc_send('update_user', Identity)
+        (content, headers, msg) = yield self.rpc_send('update_user_profile', Identity)
         defer.returnValue(content)
 
 
@@ -135,7 +135,8 @@ class IdentityRegistryClient(ServiceClient):
     @defer.inlineCallbacks
     def authenticate_user(self, Identity):
         """
-        This authenticates that the user exists. If so, the credentials are replaced with the current ones, and a ooi_id is returned. If not, None is returned.
+        This authenticates that the user exists. If so, the credentials are replaced with the current ones, and a ooi_id is returned.
+        If not, None is returned.
         """
         log.debug('in authenticate_user client')
         yield self._check_init()       
@@ -456,7 +457,6 @@ class IdentityRegistryService(ServiceProcess):
             Response.resource_reference.subject = identity.subject
             Response.resource_reference.certificate = identity.certificate
             Response.resource_reference.rsa_private_key = identity.rsa_private_key
-            Response.resource_reference.dispatcher_queue = identity.dispatcher_queue
             Response.resource_reference.email = identity.email
             Response.resource_reference.life_cycle_state = identity.ResourceLifeCycleState
             Response.result = "OK"
@@ -471,7 +471,8 @@ class IdentityRegistryService(ServiceProcess):
     @defer.inlineCallbacks
     def op_authenticate_user_credentials(self, request, headers, msg):
         """
-        This authenticates that the user exists. If so, the credentials are replaced with the current ones, and a ooi_id is returned. If not, None is returned.
+        This authenticates that the user exists. If so, the credentials are replaced with the current ones,
+        and a ooi_id is returned. If not, None is returned.
         """
         # Check for correct protocol buffer type
         self.CheckRequest(request)
@@ -519,54 +520,42 @@ class IdentityRegistryService(ServiceProcess):
   
  
     @defer.inlineCallbacks
-    def op_update_user(self, request, headers, msg):
+    def op_update_user_profile(self, request, headers, msg):
         """
-        This updates that the user record. 
+        This updates that the user profile. 
         """
-        log.info('in op_update_user')
+        log.info('in op_update_user_profile')
         
         # Check for correct protocol buffer type
         self.CheckRequest(request)
         
-        log.debug('in op_update_user:\n'+str(request))
-        log.debug('in op_update_user: request.configuration\n'+str(request.configuration))
+        log.debug('in op_update_user_profile:\n'+str(request))
+        log.debug('in op_update_user_profile: request.configuration\n'+str(request.configuration))
 
-        response = yield self.update_user(request)
+        response = yield self.update_user_profile(request)
 
         yield self.reply_ok(msg, response)
         
         
 
     @defer.inlineCallbacks
-    def update_user(self, request):
-        log.info('in update_user')
+    def update_user_profile(self, request):
+        log.info('in update_user_profile')
         
         if request.configuration.subject in self._user_dict.keys():
-           log.info('update_user: Found match')
+           log.info('update_user_profile: Found match')
            identity = yield self.rc.get_instance(self._user_dict[request.configuration.subject])
-           
-           if request.configuration.IsFieldSet('certificate'):
-              log.debug('update_user: setting certificate to %s'%request.configuration.certificate)
-              identity.certificate = request.configuration.certificate
-              
-           if request.configuration.IsFieldSet('rsa_private_key'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.rsa_private_key)
-              identity.rsa_private_key = request.configuration.rsa_private_key
-              
-           if request.configuration.IsFieldSet('dispatcher_queue'):
-              log.debug('update_user: setting dispatcher queue to %s'%request.configuration.dispatcher_queue)
-              identity.dispatcher_queue = request.configuration.dispatcher_queue
-              
+                       
            if request.configuration.IsFieldSet('email'):
-              log.debug('update_user: setting email to %s'%request.configuration.email)
+              log.debug('update_user_profile: setting email to %s'%request.configuration.email)
               identity.email = request.configuration.email
               
-           yield self.rc.put_instance(identity, 'Updated user information')
+           yield self.rc.put_instance(identity, 'Updated user profile information')
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
            Response.result = "OK"
         else:
-           log.debug('update_user: no match')
+           log.debug('update_user_profile: no match')
            raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
                                            request.ResponseCodes.NOT_FOUND)
 

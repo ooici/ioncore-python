@@ -237,7 +237,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         IdentityRequest.configuration.certificate = self.user_certificate + "\nA Small Change"
         IdentityRequest.configuration.subject = user1.resource_reference.subject
         try:
-            response = yield self.irc.update_user(IdentityRequest)
+            response = yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
