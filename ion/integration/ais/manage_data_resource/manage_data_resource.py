@@ -55,6 +55,8 @@ class ManageDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
 
+    def default_max_ingest_millis(self):
+        return 30000
 
     @defer.inlineCallbacks
     def update(self, msg):
@@ -252,7 +254,7 @@ class ManageDataResource(object):
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.  
             if not msg.IsFieldSet("max_ingest_millis"):
-                msg.max_ingest_millis = 30000
+                msg.max_ingest_millis = self.default_max_ingest_millis()
 
 
             # get user resource so we can associate it later
