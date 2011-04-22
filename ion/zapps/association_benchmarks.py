@@ -46,36 +46,35 @@ PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, ver
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 @defer.inlineCallbacks
-def find_by_owner():
-        
-        association_client = AssociationServiceClient()
-        
-        request = yield association_client.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-        
-        pair = request.pairs.add()
-        
-        # Set the predicate search term
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
+def find_by_owner():   
+    association_client = AssociationServiceClient()
+    
+    request = yield association_client.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+    
+    pair = request.pairs.add()
+    
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = OWNED_BY_ID
 
-        pair.predicate = pref
+    pair.predicate = pref
 
-        # Set the Object search term
+    # Set the Object search term
 
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = ANONYMOUS_USER_ID
+    type_ref = request.CreateObject(IDREF_TYPE)
+    type_ref.key = ANONYMOUS_USER_ID
 
-        pair.object = type_ref
-        #Uncomment for FAIL
-        result = yield association_client.get_subjects(request)
-        
-        #print len(result)
-        
-        key_list = []
-        for idref in result.idrefs:
-            key_list.append(idref.key)
-          
-        defer.returnValue(len(key_list))
+    pair.object = type_ref
+    #Uncomment for FAIL
+    result = yield association_client.get_subjects(request)
+    
+    #print len(result)
+    
+    key_list = []
+    for idref in result.idrefs:
+        key_list.append(idref.key)
+      
+    defer.returnValue(len(key_list))
         
 @defer.inlineCallbacks
 def find_by_lcs():
@@ -174,7 +173,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'module':'ion.services.coi.datastore',
          'class':'DataStoreService',
          'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
-        },
+        },  
         {'name':'workbench_test1',
          'module':'ion.core.object.test.test_workbench',
          'class':'WorkBenchProcess',
@@ -195,7 +194,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
                                  TYPE_CFG:DATASET_TYPE,
                                  NAME_CFG:station_dataset_name,
                                  DESCRIPTION_CFG:'An example of a station dataset',
-                                 CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                                 CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset,
                                  CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                                  }
     log.info("stn_dataset_loc: %s " % (stn_dataset_loc))
@@ -206,7 +205,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
             ds[NAME_CFG] = "".join((station_dataset_name, str(i)))
             yield ds[NAME_CFG],ds
      
-    num_datasets = 15 
+    num_datasets = 100
     datasets = dict([ds for ds in make_datasets(num_datasets)])
     ION_DATASETS.update(datasets)
     

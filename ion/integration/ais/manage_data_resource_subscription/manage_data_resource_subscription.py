@@ -82,6 +82,7 @@ class ManageDataResourceSubscription(object):
         self.rc  = ais.rc
         self.ac  = AssociationClient(proc=ais)
         self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
+        self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
 
     def update(self, msg):
         """
@@ -101,7 +102,7 @@ class ManageDataResourceSubscription(object):
                 errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "Expected SubscriptionCreateReqMsg type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
@@ -114,7 +115,7 @@ class ManageDataResourceSubscription(object):
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
@@ -123,7 +124,7 @@ class ManageDataResourceSubscription(object):
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         #Response.message_parameters_reference.add()
         #Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
         #Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
@@ -153,7 +154,7 @@ class ManageDataResourceSubscription(object):
                 errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "Expected SubscriptionCreateReqMsg type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
@@ -161,18 +162,20 @@ class ManageDataResourceSubscription(object):
 
 
 
+        
             #check that we have GPB for subscription_modify_type
             #get msg. dispatcher_id, script_path, data_source_resource_id
             #check that dispatcher_id exists -- look up the resource gpb #7002
-            #get dispatcher id, name queue
 
-            #FIXME, other stuff
+            # uncomment when ready
+            #yield self._dispatcherUnSubscribe(user_ooi_id, data_set_id, dispatcher_script_path)
 
+            #fixme: interact with mauice's code
 
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
@@ -180,7 +183,7 @@ class ManageDataResourceSubscription(object):
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         #Response.message_parameters_reference.add()
         #Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
         #Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
@@ -209,7 +212,7 @@ class ManageDataResourceSubscription(object):
                 errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "Expected SubscriptionCreateReqMsg type, got " + str(msg)
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
@@ -222,7 +225,7 @@ class ManageDataResourceSubscription(object):
                 errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
                     "required fields not provided (user_ooi_id, data_ource_id, subscription_type)"
                 log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
                 Response.error_num =  msg.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
@@ -238,7 +241,7 @@ class ManageDataResourceSubscription(object):
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
 
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, 1)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
@@ -246,7 +249,7 @@ class ManageDataResourceSubscription(object):
 
 
 
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, 1)
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.SubscribeObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
@@ -255,12 +258,12 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
-    def _dispatcherSubscribe(self, user_ooi_id, data_set_id, dispatcher_script_path):
+    def _dispatcherSubscribe(self, user_ooi_id, data_source_id, dispatcher_script_path):
  
-        dispatcher_id = get_dispatcher_queue_for_user(msg.user_ooi_id)
+        dispatcher_id = get_dispatcher_queue_for_user(user_ooi_id)
 
         #get datasource/set association and resources
-        tmp = yield self._getExistingResources(msg.resource_id, dispatcher_id)
+        tmp = yield self._getExistingResources(data_source_id, dispatcher_id)
         (dispatcher_resource, datasource_resource, dataset_resource) = tmp
 
         #associate: dispatcherresource has a dispatcherworkflowresource
@@ -268,13 +271,12 @@ class ManageDataResourceSubscription(object):
 
 
         #publish event: new subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
-        publisher = yield pfn.build(origin=dispatcher_id)
+        publisher = yield self.pfn.build(origin=dispatcher_id)
 
         #Create the dispatcher workflow resource
-        dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, \
-                                                ResourceName='Dispatcher Workflow', \
-                                                ResourceDescription='Dispatcher Workflow Resource')
-        dwr.dataset_id = data_set_id
+        dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE)
+
+        dwr.dataset_id = dataset_resource.key
         dwr.workflow_path = dispatcher_script_path
         dwr.ResourcesLifecycleState = dwr.ACTIVE
         yield self.rc.put_instance(dwr)
@@ -299,6 +301,32 @@ class ManageDataResourceSubscription(object):
         defer.returnValue(None)
 
 
+    @defer.inlineCallbacks
+    def _dispatcherUnSubscribe(self, user_ooi_id, data_source_id, dispatcher_script_path):
+ 
+        dispatcher_id = get_dispatcher_queue_for_user(user_ooi_id)
+
+        #get datasource/set association and resources
+        tmp = yield self._getExistingResources(data_source_id, dispatcher_id)
+        (dispatcher_resource, datasource_resource, dataset_resource) = tmp
+
+
+        #publish event: delete subscription, origin = dispatcher_id: content = dispatcherworkflowresource_id
+        publisher = yield pfd.build(origin=dispatcher_id)
+
+        #Create the dispatcher workflow resource
+        dwr = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE)
+
+        dwr.dataset_id = dataset_resource.key
+        dwr.workflow_path = dispatcher_script_path
+        
+                
+        # Publish the delete subscription notification
+        yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
+
+        defer.returnValue(None)
+
+
 
     @defer.inlineCallbacks
     def _getExistingResources(self, ds_resource_id, dispatcher_id):
@@ -316,9 +344,33 @@ class ManageDataResourceSubscription(object):
         
         datasource_resource = yield self.rc.get_instance(ds_resource_id)
         
-        dataset_resource    = yield self._getOneAssociationSubject(HAS_A_ID, datasource_resource)
+        dataset_resource    = yield self._getOneAssociationObject(datasource_resource, HAS_A_ID)
         
         defer.returnValue(dispatcher_resource, datasource_resource, dataset_resource)
+
+
+    @defer.inlineCallbacks
+    def _getOneAssociationObject(self, the_subject, the_predicate):
+        """
+        @brief get the subject side of an association when you only expect one
+        @return id of what you're after
+        """
+
+        #can also do obj=
+        found = yield self.ac.find_associations(subject=datasource_resource, \
+                                                predicate_or_predicates=HAS_A_ID)
+
+        association = None
+        for a in found:
+            exists = yield self.ac.association_exists(a.ObjectReference.key, TYPE_OF_ID, DATASOURCE_RESOURCE_TYPE_ID)
+            if exists:
+                #FIXME: if not association is None then we have data inconsistency!
+                association = a
+
+        #FIXME: if association is None: ERRORZ
+
+        the_resource = yield self.rc.get_associated_resource_object(association)
+        defer.returnValue(the_resource)
 
 
 

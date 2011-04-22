@@ -26,8 +26,8 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-#DEBUG_PRINT = True
-DEBUG_PRINT = False
+DEBUG_PRINT = True
+#DEBUG_PRINT = False
 #IO_LOG = True
 IO_LOG = False
 IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
@@ -188,7 +188,8 @@ class DeviceCommandSpecification:
         with each device command response prompt, use this function to
         build up the composite result.
         """
-        self.reply['result'][self.previous_key] = prev_result
+        if self.previous_key != None:
+            self.reply['result'][self.previous_key] = prev_result
     
 ###############################################################################
 # Seabird Electronics 37-SMP MicroCAT driver.
@@ -1363,8 +1364,10 @@ class SBE37Driver(InstrumentDriver):
         assert(all(map(lambda x:isinstance(x,str),command)))
         assert(isinstance(channels,(list,tuple)))        
         assert(all(map(lambda x:isinstance(x,str),channels)))
-        assert(isinstance(timeout,int))
-        assert(timeout>=0)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
         
         # Fail if command or channels not valid for sbe37.
         if command[0] not in sbe37_command_list:
@@ -1549,11 +1552,21 @@ class SBE37Driver(InstrumentDriver):
                 ,(chan_arg,param_arg):(success,val)}}        
         """
         
-        assert(isinstance(content,(list,tuple))),'Expected list or tuple content.'
+        assert(isinstance(content,dict)),'Expected dict content.'
+        params = content.get('params',None)
+        assert(isinstance(params,(list,tuple))),'Expected list or tuple params.'
+
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
         
         # Retrieve the requested parameters from the driver parameter
         # variables and send the reply. 
-        reply = self._get_parameters(content)
+        reply = self._get_parameters(params)
+        
         yield self.reply_ok(msg,reply)
 
 
@@ -1569,12 +1582,20 @@ class SBE37Driver(InstrumentDriver):
         """
         
         assert(isinstance(content,dict)), 'Expected dict content.'
+        params = content.get('params',None)
+        assert(isinstance(content,dict)), 'Expected dict params.'
+
         assert(all(map(lambda x: isinstance(x,(list,tuple)),
-                       content.keys())),True), 'Expected list or tuple dict keys.'
+                       params.keys())),True), 'Expected list or tuple dict keys.'
         assert(all(map(lambda x: isinstance(x,str),
-                       content.values())),True), 'Expected string dict values.'
+                       params.values())),True), 'Expected string dict values.'
         
-        params = content
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
         
         # Create the command spec and set the event to fire.
         command_spec = DeviceCommandSpecification(['DRIVER_CMD_SET'])        
@@ -1606,7 +1627,7 @@ class SBE37Driver(InstrumentDriver):
         else:
             command_spec.device_command_buffer = device_command_buffer
             reply = yield self._process_command(command_spec,event)
-        
+
         yield self.reply_ok(msg,reply)
 
 
@@ -1620,6 +1641,19 @@ class SBE37Driver(InstrumentDriver):
                 {(chan_arg,param_arg,meta_arg):(success,val),...,
                 chan_arg,param_arg,meta_arg):(success,val)}}.        
         """
+        
+        assert(isinstance(content,dict)), 'Expected dict content.'
+        params = content.get('params',None)
+        assert(isinstance(params,list)), 'Expected list params.'
+        assert(all(map(lambda x:isinstance(tuple),params))), 'Expected tuple arguments'
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+        
         
         # The method is not implemented.
         reply = {'success':errors['NOT_IMPLEMENTED'],'result':None}
@@ -1637,6 +1671,18 @@ class SBE37Driver(InstrumentDriver):
             {'success':success,'result':{(chan_arg,status_arg):(success,val),
                 ...,chan_arg,status_arg):(success,val)}}.
         """
+
+        assert(isinstance(content,dict)), 'Expected dict content.'
+        params = content.get('params',None)
+        assert(isinstance(params,dict)), 'Expected dict params.'
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+
         
         # The method is not implemented.
         reply = {'success':errors['NOT_IMPLEMENTED'],'result':None}
@@ -1650,9 +1696,16 @@ class SBE37Driver(InstrumentDriver):
         @retval A reply message with a dict {'success':success,'result':None}.
         """
         
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success':None,'result':None}         
-        success = self.fsm.on_event('EVENT_INITIALIZE',content)
+        success = self.fsm.on_event('EVENT_INITIALIZE')
         
         # Set success and send reply. Unsuccessful initialize means the
         # event is not handled in the current state.
@@ -1674,11 +1727,20 @@ class SBE37Driver(InstrumentDriver):
         """
         
         assert(isinstance(content,dict)), 'Expected dict content.'
-
+        params = content.get('params',None)
+        assert(isinstance(params,dict)), 'Expected dict params.'
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+        
         # Set up the reply message and validate the configuration parameters.
         # Reply with the error message if the parameters not valid.
-        reply = {'success':None,'result':content}
-        reply['success'] = self._validate_configuration(content)
+        reply = {'success':None,'result':params}
+        reply['success'] = self._validate_configuration(params)
         if reply['success'][0] != 'OK':
             yield self.reply_ok(msg,reply)
             return
@@ -1686,7 +1748,7 @@ class SBE37Driver(InstrumentDriver):
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if the event is not handled in the current
         # state.
-        success = self.fsm.on_event('EVENT_CONFIGURE',content)
+        success = self.fsm.on_event('EVENT_CONFIGURE',params)
         if not success:
             reply['success'] = errors['INCORRECT_STATE']
             
@@ -1700,11 +1762,17 @@ class SBE37Driver(InstrumentDriver):
         @retval A dict {'success':success,'result':None} giving the success
             status of the connect operation.
         """
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
 
         # Open the logfile if configured.
         if IO_LOG:
             self._logfile = open(self._logfile_path,'w',0)
-
 
         # Create the connection complete deferred and fire EVENT_CONNECT.
         reply = yield self._process_connect() 
@@ -1718,6 +1786,13 @@ class SBE37Driver(InstrumentDriver):
         @retval A dict {'success':success,'result':None} giving the success
             status of the disconnect operation.
         """
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
 
         # Create the connection complete deferred and fire EVENT_DISCONNECT.
         reply = yield self._process_disconnect()
