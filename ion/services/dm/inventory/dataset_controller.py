@@ -107,7 +107,8 @@ class DatasetController(ServiceProcess):
     @defer.inlineCallbacks
     def op_create_dataset_resource(self, request, headers, msg):
         """
-        @Brief This method assumes that the caller provides an Instrument Info Object
+        @Brief This method creates an empty dataset resource and returns its ID.  
+        It assumes that the caller provides an Instrument Info Object
         in a Resource Configuration Request message which should be made into a
         resource.
 
