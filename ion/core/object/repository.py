@@ -406,6 +406,9 @@ class ObjectContainer(object):
         if not hasattr(excluded_types, '__contains__' ):
             raise RepositoryError('Invalid argument excluded_types in checkout_commit: must be a list of object types')
 
+        link = commit.GetLink('objectroot')
+        if link.type.GPBMessage in excluded_types:
+            raise RepositoryError('Can not exclude the type of the root object!')
 
         root_obj = None
 
@@ -422,8 +425,6 @@ class ObjectContainer(object):
 
 
         return root_obj
-
-
 
 
     def _load_element(self, element):

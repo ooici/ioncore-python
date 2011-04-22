@@ -366,17 +366,30 @@ class RepositoryTest(unittest.TestCase):
 
         cref = repo.commit('first commit')
 
+        ab_id = ab.MyId
+
+        p_id = ab.person[0].MyId
+
         del ab
 
         repo.purge_workspace
-
-
         yield repo.checkout(branchname='master')
 
+        self.assertEqual(len(repo._workspace),2)
+        self.assertIn(ab_id, repo._workspace)
+        self.assertIn(p_id, repo._workspace)
 
 
+        repo.purge_workspace
+        yield repo.checkout(branchname='master', excluded_types=[PERSON_TYPE])
 
+        self.assertEqual(len(repo._workspace),1)
+        self.assertIn(ab_id, repo._workspace)
+        self.assertNotIn(p_id, repo._workspace)
 
+        # Can not exclude the type of the root object!
+        repo.purge_workspace
+        yield self.failUnlessFailure(repo.checkout(branchname='master', excluded_types=[ADDRESSLINK_TYPE, PERSON_TYPE]), repository.RepositoryError)
 
 
 
