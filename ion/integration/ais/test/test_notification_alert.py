@@ -164,10 +164,12 @@ class NotificationAlertTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
+        yield self.createUser()
+
         # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
@@ -182,7 +184,7 @@ class NotificationAlertTest(IonTestCase):
         log.info('NotificationAlertTest:test_removeSubscription call remove subscription service.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
@@ -197,7 +199,7 @@ class NotificationAlertTest(IonTestCase):
         log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
 
         log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
@@ -217,11 +219,13 @@ class NotificationAlertTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
+        yield self.createUser()
+
 
         # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
@@ -235,7 +239,7 @@ class NotificationAlertTest(IonTestCase):
         # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.data_src_id = 'dataset456'
         reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
@@ -250,7 +254,7 @@ class NotificationAlertTest(IonTestCase):
         log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'ANONYMOUS'
+        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
 
         log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
