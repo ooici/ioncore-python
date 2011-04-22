@@ -13,6 +13,7 @@ To test this with the Java CC!
 """
 
 import time
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
@@ -32,7 +33,7 @@ import ion.util.procutils as pu
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import \
     ResourceClient
-from ion.services.dm.distribution.publisher_subscriber import Subscriber
+from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
 from ion.core.exception import ApplicationError
 
@@ -88,6 +89,7 @@ class IngestionService(ServiceProcess):
         self.mc = MessageClient(proc=self)
 
         self._pscclient = PubSubClient(proc=self)
+        self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self)
 
         log.info('IngestionService.__init__()')
 
@@ -235,8 +237,7 @@ class IngestionService(ServiceProcess):
             timeoutcb.cancel()
 
             # send notification we performed an ingest
-            # @todo: This causes an AssertionError, please fix
-            #yield self._notify_ingest(content)
+            yield self._notify_ingest(content)
 
             # now reply ok to the original message
             yield self.reply_ok(msg, content={})
@@ -248,12 +249,16 @@ class IngestionService(ServiceProcess):
     def _notify_ingest(self, content):
         """
         Generate a notification/event that an ingest succeeded.
-        @TODO: this is temporary, to be replaced
         """
-        pub = Publisher(xp_name="event.topic", routing_key="_not.ingestion.ingest", process=self)
-        yield pub.initialize()
-        yield pub.activate()
-        yield pub.publish(True)
+        pub = yield self._notify_ingest_factory.build()
+
+        # creates the event notification for us and sends it
+        # @TODO: fields below
+        yield pub.create_and_publish_event(origin=content.dataset_id,
+                                           dataset_id=content.dataset_id,
+                                           datasource_id="TODO",
+                                           title="TODO",
+                                           url="TODO")
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):
