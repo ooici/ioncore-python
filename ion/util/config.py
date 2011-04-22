@@ -7,6 +7,7 @@
 """
 
 import os.path
+import weakref
 
 class Config(object):
     """
@@ -21,16 +22,19 @@ class Config(object):
             by cfgFile will be extracted
         """
         self.filename = cfgFile
+        self.config = None
+
         if config != None:
-            # Get a value out of existing Config
-            self.obj = config.getValue(cfgFile,{})
+            # Save config to look up later
+            self.config = weakref.ref(config)
+            self.obj = None
         else:
             # Load config from filename
             filecontent = open(cfgFile,).read()
             self.obj = eval(filecontent)
 
     def __getitem__(self, key):
-        return self.obj[key]
+        return self._getValue(self.obj, key)
 
     def __str__(self):
         result = ''
@@ -43,6 +47,12 @@ class Config(object):
 
     def _getValue(self, dic, key, default=None):
         if dic == None:
+
+            # lookup in live configuration
+            if self.config() is not None:
+                obj = self.config().getValue(self.filename, {})
+                return obj.get(key, default)
+
             return None
         return dic.get(key,default)
 

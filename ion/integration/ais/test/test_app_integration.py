@@ -231,11 +231,11 @@ class AppIntegrationTest(IonTestCase):
         
 
         #
-        # Send a good request 
+        # Send a request with a temporal bounds covered by data time 
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -243,57 +243,97 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2008-08-1T10:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        if numResReturned == 0:
+            self.fail('findDataResourcesByUser returned zero resources.')
+        
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
-        i = 0
-        while i < len(rspMsg.message_parameters_reference[0].dataResourceSummary):
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('user_ooi_id'):
-                self.fail('response to findDataResources has no user_ooi_id field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('data_resource_id'):
-                self.fail('response to findDataResources has no resource_id field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('title'):
-                #self.fail('response to findDataResources has no title field')
-                log.error('response to findDataResources has no title field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('institution'):
-                #self.fail('response to findDataResources has no institution field')
-                log.error('response to findDataResources has no institution field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('source'):
-                #self.fail('response to findDataResources has no source field')
-                log.error('response to findDataResources has no source field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('references'):
-                #self.fail('response to findDataResources has no references field')
-                log.error('response to findDataResources has no references field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
-                self.fail('response to findDataResources has no ion_time_coverage_start field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
-                self.fail('response to findDataResources has no ion_time_coverage_end field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('summary'):
-                #self.fail('response to findDataResources has no summary field')
-                log.error('response to findDataResources has no summary field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('comment'):
-                #self.fail('response to findDataResources has no comment field')
-                log.error('response to findDataResources has no comment field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
-            if not rspMsg.message_parameters_reference[0].dataResourceSummary[i].IsFieldSet('download_url'):
-                self.fail('response to findDataResources has no download_url field')
-            i = i + 1                
+        #
+        # Send a request with temporal bounds that covers data time
+        # Data Start Time: 2008-08-01T00:50:00Z
+        # Data End Time:   2008-08-01T23:50:00Z
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.minLatitude  = -50
+        reqMsg.message_parameters_reference.maxLatitude  = -40
+        reqMsg.message_parameters_reference.minLongitude = 20
+        reqMsg.message_parameters_reference.maxLongitude = 30
+        reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2009-08-1T00:02:00Z'
+
+        log.debug('Calling findDataResourcesByUser to get list of resources.')
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        if numResReturned == 0:
+            self.fail('findDataResourcesByUser returned zero resources.')
+        
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        #
+        # Send a request with a temporal bounds minTime covered by data time, but
+        # temporal bounds maxTime > dataTime (should still return data)
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.minLatitude  = -50
+        reqMsg.message_parameters_reference.maxLatitude  = -40
+        reqMsg.message_parameters_reference.minLongitude = 20
+        reqMsg.message_parameters_reference.maxLongitude = 30
+        reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2008-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-01-1T11:00:00Z'
+
+        log.debug('Calling findDataResourcesByUser to get list of resources.')
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        if numResReturned == 0:
+            self.fail('findDataResourcesByUser returned zero resources.')
+        
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        #
+        # Send a request with a temporal bounds maxTime covered by data time, but
+        # temporal bounds minTime < dataTime (should still return data)
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.minLatitude  = -50
+        reqMsg.message_parameters_reference.maxLatitude  = -40
+        reqMsg.message_parameters_reference.minLongitude = 20
+        reqMsg.message_parameters_reference.maxLongitude = 30
+        reqMsg.message_parameters_reference.minVertical  = 20
+        reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2007-01-1T10:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
+
+        log.debug('Calling findDataResourcesByUser to get list of resources.')
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        if numResReturned == 0:
+            self.fail('findDataResourcesByUser returned zero resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
 
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):

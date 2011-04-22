@@ -167,8 +167,8 @@ class ManageDataResource(object):
                 dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
 
                 #lifecycle states...GO
-                datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
-                dataset_resource.ResourcesLifeCycleState = dataset_resource.RETIRED
+                datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
+                dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
 
                 delete_resources.append(datasrc_resource)
                 delete_resources.append(dataset_resource)
@@ -234,8 +234,9 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            # at least PRETEND to make an effort
+            # make user at least PRETEND to make an effort in filling out fields
             missing = self._missingResourceRequestFields(msg)
+            # unless nothing is missing, error.
             if "" != missing:
                 errtext = "ManageDataResource.create(): " + \
                     "Missing/incorrect required fields in DataResourceCreateRequest: " + missing
@@ -261,18 +262,20 @@ class ManageDataResource(object):
             datasrc_resource = yield self._createDataSourceResource(msg)
             my_datasrc_id = datasrc_resource.ResourceIdentity
 
-            # create the dataset
+            # create the dataset by sending a blank message to the dscc
+            log.info("manage_data_resource calling create dataset")
             dataset_req = yield self.mc.create_instance(None)
-            dataset_resource = yield self.dscc.create_dataset_resource(dataset_req)
-            log.info("created data set " + str(dataset_resrource))
+            # we get back the ID, so look up resource from that
+            tmp = yield self.dscc.create_dataset_resource(dataset_req)
+            my_dataset_id = tmp.key
+            dataset_resource = yield self.rc.get_instance(my_dataset_id)
+            log.info("created data set " + str(dataset_resource))
 
-            # next line could also be self.rc.reference_instance(datasrc_resource).key
-            my_dataset_id = dataset_resource.key
 
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
-            self.ing.create_dataset_topics()
+            self.ing.create_dataset_topics(topics_msg)
 
             # FIXME call the scheduler service client
             #  it returns the scheduler task id, which i'll associate with the data source
@@ -290,8 +293,8 @@ class ManageDataResource(object):
 
 
             #mark lifecycle states
-            datasrc_resource.ResourcesLifeCycleState = datasrc_resource.ACTIVE
-            dataset_resource.ResourcesLifeCycleState = dataset_resource.ACTIVE
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
+            dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
 
@@ -299,8 +302,8 @@ class ManageDataResource(object):
             log.info('ManageDataResource.create(): Error attempting to FIXME: %s' %ex)
 
             #mark lifecycle states
-            datasrc_resource.ResourcesLifeCycleState = datasrc_resource.RETIRED
-            dataset_resource.ResourcesLifeCycleState = dataset_resource.RETIRED
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
+            dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -338,7 +341,8 @@ class ManageDataResource(object):
         @retval data source resource
         """
         log.info('ManageDataResource._createDataSourceResource()\n')
-        datasrc_resource = yield self.mc.create_instance(SA_DATASOURCE_RESOURCE_MSG)
+        datasrc_resource = yield self.rc.create_instance(SA_DATASOURCE_RESOURCE_MSG,
+                                                         ResourceName='Data Source Resource')
 
         #FILL UP FIELDS, lists followed by scalars
         datasrc_resource.property.extend(msg.property)
@@ -357,12 +361,12 @@ class ManageDataResource(object):
         datasrc_resource.ion_title                     = msg.ion_title
         datasrc_resource.ion_description               = msg.ion_description
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
-        datasrc_resource.update_start_datetime_millis  = msg.start_time
+        datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
 
 
         #fixme, put it with the others
         yield self.rc.put_instance(datasrc_resource)
-        log.info("created data source " + str(datasrc_resrource))
+        log.info("created data source " + str(datasrc_resource))
 
         defer.returnValue(datasrc_resource)
 
