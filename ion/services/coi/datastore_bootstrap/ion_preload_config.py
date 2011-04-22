@@ -42,7 +42,7 @@ DESCRIPTION_CFG = 'description'
 CONTENT_CFG = 'content'
 CONTENT_ARGS_CFG = 'content_args'
 PRELOAD_CFG = 'preload'
-
+OWNER_ID = 'owner'
 
 # Set some constants used system wide!:
 
@@ -338,30 +338,55 @@ MYOOICI_USER_ID = ION_IDENTITIES[myooici_name][ID_CFG]
 # Dataset names
 profile_dataset_name = 'sample_profile_dataset'
 profile_data_source_name = 'sample_profile_datasource'
+
 traj_dataset_name = 'sample_traj_dataset'
 traj_data_source_name = 'sample_traj_datasource'
+
 station_dataset_name = 'sample_station_dataset'
 station_data_source_name = 'sample_station_datasource'
-grid_dataset_name = 'grid_dataset'
-rvrs_dailyd_dataset_name = 'sample_rivers_daily_discharge_dataset'
-rvrs_dailyd_data_source_name = 'sample_rivers_daily_discharge_datasource'
+
+### BIG DATASET - A 3D Grid!
+hycom_dataset_name = 'sample_hycom_dataset'
+hycom_data_source_name = 'sample_hycom_datasource'
+
 ntas1_dataset_name = 'samples_ntas_rt_mooring1_dataset'
 ntas1_data_source_name = 'samples_ntas_rt_mooring1_datasource'
+
 ntas2_dataset_name = 'samples_ntas_rt_mooring2_dataset'
 ntas2_data_source_name = 'samples_ntas_rt_mooring2_datasource'
+
 whots1_dataset_name = 'samples_whots_nrt_mooring1_dataset'
 whots1_data_source_name = 'samples_whots_nrt_mooring1_datasource'
+
 whots2_dataset_name = 'samples_whots_nrt_mooring2_dataset'
 whots2_data_source_name = 'samples_whots_nrt_mooring2_datasource'
 
-# Resource Byte Array locations
+moanalua_rain_dataset_name = 'sample_rain_gauge_dataset'
+moanalua_rain_data_source_name = 'sample_rain_gauge_datasource'
+
+choptank_river_dataset_name = 'sample_choptank_river_dataset'
+choptank_river_data_source_name = 'sample_choptank_river_datasource'
+
+connecticut_river_dataset_name = 'sample_connecticut_river_dataset'
+connecticut_river_data_source_name = 'sample_connecticut_river_datasource'
+
+
+# Resource Byte Array file locations
+### profile dataset is generated from code!
 trj_dataset_loc = CONF.getValue(traj_dataset_name, None)
 stn_dataset_loc = CONF.getValue(station_dataset_name, None)
-rvrs_dailyd_loc = CONF.getValue(rvrs_dailyd_dataset_name, None)
+
+moanalua_rain_dataset_loc = CONF.getValue(moanalua_rain_dataset_name, None)
+choptank_river_dataset_loc = CONF.getValue(choptank_river_dataset_name, None)
+connecticut_river_dataset_loc = CONF.getValue(connecticut_river_dataset_name, None)
+
 ntas1_dataset_loc = CONF.getValue(ntas1_dataset_name, None)
 ntas2_dataset_loc = CONF.getValue(ntas2_dataset_name, None)
+
 whots1_dataset_loc = CONF.getValue(whots1_dataset_name, None)
 whots2_dataset_loc = CONF.getValue(whots2_dataset_name, None)
+
+hycom_dataset_loc = CONF.getValue(hycom_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -392,13 +417,14 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                       },
 
-rvrs_dailyd_dataset_name:{
+hycom_dataset_name:{
                       ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04801',
                       TYPE_CFG:DATASET_TYPE,
-                      NAME_CFG:rvrs_dailyd_dataset_name,
-                      DESCRIPTION_CFG:'An example of a station dataset',
+                      NAME_CFG:hycom_dataset_name,
+                      DESCRIPTION_CFG:'An example of a HYCOM 3d grid model dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
-                      CONTENT_ARGS_CFG:{'filename':rvrs_dailyd_loc},
+                      CONTENT_ARGS_CFG:{'filename':hycom_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
 
 ntas1_dataset_name:{
@@ -408,6 +434,7 @@ ntas1_dataset_name:{
                       DESCRIPTION_CFG:'An example of an NTAS Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':ntas1_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
 
 ntas2_dataset_name:{
@@ -417,6 +444,7 @@ ntas2_dataset_name:{
                       DESCRIPTION_CFG:'An example of an NTAS Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':ntas2_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
 
 whots1_dataset_name:{
@@ -426,6 +454,7 @@ whots1_dataset_name:{
                       DESCRIPTION_CFG:'An example of a WHOTS Near Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':whots1_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
 
 whots2_dataset_name:{
@@ -435,8 +464,42 @@ whots2_dataset_name:{
                       DESCRIPTION_CFG:'An example of a WHOTS Near Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':whots2_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
+
+moanalua_rain_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04806',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:moanalua_rain_dataset_name,
+                      DESCRIPTION_CFG:'An example of a rain gauge dataset from moanalua',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':moanalua_rain_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+choptank_river_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04807',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:choptank_river_dataset_name,
+                      DESCRIPTION_CFG:'An example of a usgs stream gauge Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':choptank_river_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+connecticut_river_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04808',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:connecticut_river_dataset_name,
+                      DESCRIPTION_CFG:'An example of a usgs stream gauge Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':connecticut_river_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
 }
+
+
 
 ION_DATA_SOURCES ={
 
@@ -444,7 +507,7 @@ profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',
-                      CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource,
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_profile_data_source_resource,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]}
                       },
 
@@ -464,56 +527,115 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
                       },
 
-#ntas1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04802',
-#                      TYPE_CFG:DATASOURCE_TYPE,
-#                      NAME_CFG:ntas1_data_source_name,
-#                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas1_data_source,
-#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
-#                      },
-#
-#ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803',
-#                      TYPE_CFG:DATASOURCE_TYPE,
-#                      NAME_CFG:ntas2_data_source_name,
-#                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
-#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
-#                      },
-#
-#whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
-#                      TYPE_CFG:DATASOURCE_TYPE,
-#                      NAME_CFG:whots1_data_source_name,
-#                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots1_data_source,
-#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
-#                      },
-#
-#whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04805',
-#                      TYPE_CFG:DATASOURCE_TYPE,
-#                      NAME_CFG:station_data_source_name,
-#                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
-#                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
-#                      },
+hycom_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04801',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:hycom_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_hycom_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[hycom_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+ntas1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04802',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:ntas1_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas1_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[ntas1_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:ntas2_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[ntas2_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:whots1_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots1_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[whots1_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04805',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:whots2_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[whots2_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04806',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:moanalua_rain_data_source_name,
+                      DESCRIPTION_CFG:'An example of a rain gauge data source from moanalua',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_moanalua_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[moanalua_rain_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+choptank_river_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04807',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:choptank_river_data_source_name,
+                      DESCRIPTION_CFG:'An example of a usgs stream gauge Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_choptank_river_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[choptank_river_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+connecticut_river_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04808',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:connecticut_river_data_source_name,
+                      DESCRIPTION_CFG:'An example of a usgs stream gauge Dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_connecticut_river_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[connecticut_river_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
 
 }
-
-
 
 
 # Extract Resource ID_CFGs for use in services and tests
 SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID_CFG]
 SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATA_SOURCES[profile_data_source_name][ID_CFG]
+
 SAMPLE_TRAJ_DATASET_ID = ION_DATASETS[traj_dataset_name][ID_CFG]
 SAMPLE_TRAJ_DATA_SOURCE_ID = ION_DATA_SOURCES[traj_data_source_name][ID_CFG]
+
 SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
 SAMPLE_STATION_DATA_SOURCE_ID = ION_DATA_SOURCES[station_data_source_name][ID_CFG]
-#SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
-#SAMPLE_DLY_DISCHARGE_DATASET_ID = ION_DATASETS[rvrs_dailyd_dataset_name][ID_CFG]
+
+SAMPLE_HYCOM_DATASET_ID = ION_DATASETS[hycom_dataset_name][ID_CFG]
+SAMPLE_HYCOM_DATA_SOURCE_ID = ION_DATA_SOURCES[hycom_data_source_name][ID_CFG]
+
 SAMPLE_NTAS1_DATASET_ID = ION_DATASETS[ntas1_dataset_name][ID_CFG]
+SAMPLE_NTAS1_DATA_SOURCE_ID = ION_DATA_SOURCES[ntas1_data_source_name][ID_CFG]
+
 SAMPLE_NTAS2_DATASET_ID = ION_DATASETS[ntas2_dataset_name][ID_CFG]
+SAMPLE_NTAS2_DATA_SOURCE_ID = ION_DATA_SOURCES[ntas2_data_source_name][ID_CFG]
+
 SAMPLE_WHOTS1_DATASET_ID = ION_DATASETS[whots1_dataset_name][ID_CFG]
+SAMPLE_WHOTS1_DATA_SOURCE_ID = ION_DATA_SOURCES[whots1_data_source_name][ID_CFG]
+
 SAMPLE_WHOTS2_DATASET_ID = ION_DATASETS[whots2_dataset_name][ID_CFG]
+SAMPLE_WHOTS2_DATA_SOURCE_ID = ION_DATA_SOURCES[whots2_data_source_name][ID_CFG]
+
+SAMPLE_MOANALUA_RAIN_GAUGE_DATASET_ID = ION_DATASETS[moanalua_rain_dataset_name][ID_CFG]
+SAMPLE_MOANALUA_RAIN_GAUGE_DATA_SOURCE_ID = ION_DATA_SOURCES[moanalua_rain_data_source_name][ID_CFG]
+
+SAMPLE_CHOPTANK_RIVER_GAUGE_DATASET_ID = ION_DATASETS[choptank_river_dataset_name][ID_CFG]
+SAMPLE_CHOPTANK_RIVER_GAUGE_DATA_SOURCE_ID = ION_DATA_SOURCES[choptank_river_data_source_name][ID_CFG]
+
+SAMPLE_CONNECTICUT_RIVER_GAUGE_DATASET_ID = ION_DATASETS[connecticut_river_dataset_name][ID_CFG]
+SAMPLE_CONNECTICUT_RIVER_GAUGE_DATA_SOURCE_ID = ION_DATA_SOURCES[connecticut_river_data_source_name][ID_CFG]
 
 
 
