@@ -130,9 +130,7 @@ ci_command_list = [
 Parameter names for instrument agents.
 """
 ci_param_list = [
-    'CI_PARAM_DATA_TOPICS',
-    'CI_PARAM_EVENT_TOPICS',
-    'CI_PARAM_STATE_TOPICS',
+    'CI_PARAM_EVENT_PUBLISHER_ORIGIN',
     'CI_PARAM_DRIVER_ADDRESS',
     'CI_PARAM_RESOURCE_ID',
     'CI_PARAM_TIME_SOURCE',
@@ -197,6 +195,7 @@ publish_msg_types = [
     'PUBLISH_MSG_DATA',
     'PUBLISH_MSG_EVENT'    
 ]
+
 
 """
 Time source of device fronted by agent.

@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.exception import ReceivedApplicationError
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 #from ion.integration.ais.getDataResourceDetail.cfdata import cfData
 

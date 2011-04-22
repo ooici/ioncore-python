@@ -18,7 +18,7 @@ from ion.core.object import object_utils
 from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResource
 
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.core.messaging.message_client import MessageClient
 
