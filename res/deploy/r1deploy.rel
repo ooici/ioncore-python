@@ -50,13 +50,17 @@
         },
 
         # Add persistent archive service
+        
 
 #-------------#
 # Bootlevel 6 #
 #-------------#
-
         # Add attribute store service
-
+        {'name': 'attribute_store', 'version':'0.1.0',
+                                  'processapp' : 
+        ('attribute_store','ion.services.coi.attribute_store','AttributeStoreService'),
+        },
+                        
 #-------------#
 # Bootlevel 7 #
 #-------------#
@@ -76,6 +80,9 @@
         },
 
         # Add scheduler service
+        {'name':'scheduler', 'version':'0.1',
+        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
+        },
 
         # Add Dataset Controller Service
         {'name':'dataset_controller',   'version':'0.1',
@@ -87,7 +94,6 @@
 #-------------#
 
         # Add Ingestion Service
-
         # Add Notification Email Service
 
         {'name':'app_integration',      'version':'0.1',
