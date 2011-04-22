@@ -988,7 +988,7 @@ class TestInstrumentAgent(IonTestCase):
         yield self.ia_client.end_transaction(tid)
         
         # check the event
-        #yield pu.asleep(1.0)
+        yield pu.asleep(1.0)
         self.assertEqual(len(testsub.msgs), 1)
         self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!") 
  

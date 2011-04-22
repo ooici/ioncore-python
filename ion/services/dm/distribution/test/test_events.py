@@ -14,6 +14,7 @@ from ion.services.dm.distribution.publisher_subscriber import PublisherFactory, 
 # just a subset of the available publishers/subscribers
 from ion.services.dm.distribution.events import EventPublisher, ResourceLifecycleEventPublisher, ProcessLifecycleEventPublisher, \
                                                 EventSubscriber, ResourceLifecycleEventSubscriber, ProcessLifecycleEventSubscriber, \
+                                                InfoLoggingEventPublisher, InfoLoggingEventSubscriber, \
                                                 RESOURCE_LIFECYCLE_EVENT_ID
 
 from ion.test.iontest import IonTestCase
@@ -188,6 +189,66 @@ class TestEventPublisher(IonTestCase):
         self.failUnlessEquals(self.lastmsg.name, "bram")
         self.failUnlessEquals(self.lastmsg.origin, "zxy-402")   # both set in the msg field named "origin" and used for routing key. interesting quirk. 
 
+    @defer.inlineCallbacks
+    def test_topic_extension(self):
+        """
+        Create a publisher that use an extension to the topic for the purposes
+        of further routing. Push a message through an event topic to make sure
+        both ends can get the message at the right place.
+        """
+        # Setup a subscriber to an event topic
+        class TestEventSubscriber(InfoLoggingEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+                
+            def ondata(self, data):
+                log.debug("TestEventSubscriber received a message with name: %s",
+                          data['content'].name)
+                self.msgs.append(data)
+        subproc = Process()
+        yield subproc.spawn()
+        testsub = TestEventSubscriber(origin=str(subproc.id),
+                                      topic_extension="foo",
+                                      process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+
+        pub1 = InfoLoggingEventPublisher(process=self._proc,
+                                         origin=str(subproc.id),
+                                         topic_extension="foo")
+        yield pub1.initialize()
+        yield pub1.activate()        
+        
+        # Toss something out with topic extension "foo" with create_and_publish
+        yield pub1.create_and_publish_event(name="TestEvent")
+        # Pause to make sure we catch the message
+        yield pu.asleep(1.0)
+        self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent")
+        
+        # Toss something out with topic extension "foo" with create_event and publish_event
+        msg = yield pub1.create_event(name="TestEvent2")
+        yield pub1.publish_event(msg)
+        # Pause to make sure we catch the message
+        yield pu.asleep(1.0)
+        self.assertEqual(testsub.msgs[1]['content'].name, u"TestEvent2")
+
+        # Toss something out with topic extension "foo" with different publish_event
+        msg = yield pub1.create_event(name="TestEvent3")
+        testsub = TestEventSubscriber(origin=str(subproc.id),
+                                      topic_extension="bar",
+                                      process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+        yield pu.asleep(1.0)
+
+        yield pub1.publish_event(msg, topic_extension="bar")
+        # Pause to make sure we catch the message
+        yield pu.asleep(1.0)
+        self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent3")
+        
+
+
 class TestEventSubscriber(IonTestCase):
     """
     Tests the EventSubscriber and derived classes.
@@ -220,3 +281,4 @@ class TestEventSubscriber(IonTestCase):
         sub3 = ResourceLifecycleEventSubscriber(process=self._proc, origin="ucsd")
         self.failUnlessEqual(sub3._binding_key, "%s.ucsd" % str(RESOURCE_LIFECYCLE_EVENT_ID))
 
+            
