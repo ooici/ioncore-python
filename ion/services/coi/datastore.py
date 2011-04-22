@@ -670,7 +670,8 @@ class DataStoreWorkbench(WorkBench):
         # This is simpler than a push - all of these are guaranteed to be new objects!
         # now put any new commits that are not at the head
         def_list = []
-
+        
+        
 
         for repo_key, repo in self._repos.items():
 
@@ -758,7 +759,11 @@ class DataStoreWorkbench(WorkBench):
         #import pprint
         #print 'After update to heads'
         #pprint.pprint(self._commit_store.kvs)
-
+        log.info("Number of repositories:  %s" % len(self._repos))
+        log.info("Number of blobs: %s " % len(self._workbench_cache))
+        
+        num_commit_keys = map(lambda repo: len(repo._commit_index.keys()), self._repos.values())
+        log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
         self.clear_non_persistent()

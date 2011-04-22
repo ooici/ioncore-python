@@ -352,17 +352,17 @@ class ManageResources(object):
          To.resource[3].name = 'request_type'
          To.resource[3].value = self.RequestTypes[From.request_type]
          To.resource.add()
-         To.resource[4].name = 'top'
-         To.resource[4].value = str(From.top)
+         To.resource[4].name = 'request_bounds_north'
+         To.resource[4].value = str(From.request_bounds_north)
          To.resource.add()
-         To.resource[5].name = 'bottom'
-         To.resource[5].value = str(From.bottom)
+         To.resource[5].name = 'request_bounds_south'
+         To.resource[5].value = str(From.request_bounds_south)
          To.resource.add()
-         To.resource[6].name = 'left'
-         To.resource[6].value = str(From.left)
+         To.resource[6].name = 'request_bounds_west'
+         To.resource[6].value = str(From.request_bounds_west)
          To.resource.add()
-         To.resource[7].name = 'right'
-         To.resource[7].value = str(From.right)
+         To.resource[7].name = 'request_bounds_east'
+         To.resource[7].value = str(From.request_bounds_east)
          To.resource.add()
          To.resource[8].name = 'base_url'
          To.resource[8].value = From.base_url
@@ -376,14 +376,14 @@ class ManageResources(object):
          To.resource[11].name = 'max_ingest_millis'
          To.resource[11].value = str(From.max_ingest_millis)
          To.resource.add()
-         To.resource[12].name = 'start_time'
-         To.resource[12].value = From.start_time
+         To.resource[12].name = 'ion_title'
+         To.resource[12].value = From.ion_title
          To.resource.add()
-         To.resource[13].name = 'end_time'
-         To.resource[13].value = From.end_time
+         To.resource[13].name = 'ion_institution_id'
+         To.resource[13].value = From.ion_institution_id
          To.resource.add()
-         To.resource[14].name = 'institution_id'
-         To.resource[14].value = From.institution_id
+         To.resource[14].name = 'update_interval_seconds'
+         To.resource[14].value = str(From.update_interval_seconds)
       
       except:
          estr = 'Object ERROR!'
@@ -460,8 +460,6 @@ class ManageResources(object):
          # debug print for dumping the attributes of the resource
          log.debug("got back resource \n"+str(Result))
          ResourceType = 'epucontrollers'
-         PrintFunc = self.ResourceTypes['epucontrollers'][2]
-         PrintFunc(Result)
       else:
          # get resource from resource registry
          log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
@@ -478,8 +476,9 @@ class ManageResources(object):
          log.debug("got back resource \n"+str(Result))
          log.debug("object GPB id = "+str(Result.ResourceObjectType.object_id))
          ResourceType = self.MapGpbTypeToResourceType[Result.ResourceObjectType.object_id]
-         PrintFunc = self.ResourceTypes[ResourceType][2]
-         PrintFunc(Result)
+
+      PrintFunc = self.ResourceTypes[ResourceType][2]
+      PrintFunc(Result)
       
       # build AIS response
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResource response')

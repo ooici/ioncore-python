@@ -222,6 +222,7 @@ class Receiver(BasicLifecycleObject):
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
                              content=data,
+                             process=self.process,
                              )
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
