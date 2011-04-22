@@ -56,9 +56,9 @@
 # Bootlevel 6 #
 #-------------#
         # Add attribute store service
-        {'name': 'attribute_store', 'version':'0.1.0',
+        {'name': 'attribute_store', 'version':'0.1',
                                   'processapp' : 
-        ('attribute_store','ion.services.coi.attribute_store','AttributeStoreService'),
+        ('attribute_store','ion.services.coi.attributestore','AttributeStoreService'),
         },
                         
 #-------------#
