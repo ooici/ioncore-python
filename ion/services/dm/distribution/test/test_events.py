@@ -32,6 +32,16 @@ from ion.util.itv_decorator import itv
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
+class QuickEventSubscriber(InfoLoggingEventSubscriber):
+    def __init__(self, *args, **kwargs):
+        self.msgs = []
+        InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+                
+    def ondata(self, data):
+        log.debug("TestEventSubscriber received a message with name: %s",
+                  data['content'].name)
+        self.msgs.append(data)
+                
 class TestEventPublisher(IonTestCase):
     """
     Tests the EventPublisher and derived classes.
@@ -197,27 +207,20 @@ class TestEventPublisher(IonTestCase):
         both ends can get the message at the right place.
         """
         # Setup a subscriber to an event topic
-        class TestEventSubscriber(InfoLoggingEventSubscriber):
-            def __init__(self, *args, **kwargs):
-                self.msgs = []
-                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
-                
-            def ondata(self, data):
-                log.debug("TestEventSubscriber received a message with name: %s",
-                          data['content'].name)
-                self.msgs.append(data)
         subproc = Process()
         yield subproc.spawn()
         test_origin = "%s.%s" % ("chan1", str(subproc.id))
-        testsub = TestEventSubscriber(origin=test_origin,
-                                      process=subproc)
+        testsub = QuickEventSubscriber(origin=test_origin,
+                                       process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
+        yield pu.asleep(1.0)
 
         pub1 = InfoLoggingEventPublisher(process=self._proc,
                                          origin=test_origin)
         yield pub1.initialize()
         yield pub1.activate()        
+        yield pu.asleep(1.0)
         
         # Toss something out with topic extension with create_and_publish
         yield pub1.create_and_publish_event(name="TestEvent")
@@ -225,23 +228,6 @@ class TestEventPublisher(IonTestCase):
         yield pu.asleep(1.0)
         self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent")
         
-        # Toss something out with topic extension with create_event and publish_event
-        msg = yield pub1.create_event(name="TestEvent2")
-        yield pub1.publish_event(msg)
-        # Pause to make sure we catch the message
-        yield pu.asleep(1.0)
-        self.assertEqual(testsub.msgs[1]['content'].name, u"TestEvent2")
-
-        # Toss something out with topic extension wildcard on the sub side
-        testsub = TestEventSubscriber(process=subproc)
-        yield testsub.initialize()
-        yield testsub.activate()
-        yield pu.asleep(2.0)
-        yield pub1.create_and_publish_event(name="TestEvent3")
-        # Pause to make sure we catch the message
-        yield pu.asleep(1.0)
-        self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent3")
-
 
 class TestEventSubscriber(IonTestCase):
     """
@@ -266,13 +252,37 @@ class TestEventSubscriber(IonTestCase):
         """
         sub1 = EventSubscriber(process=self._proc)
         self.failUnless(sub1.event_id is None)
-        self.failUnlessEqual(sub1._binding_key, "*.*")
+        self.failUnlessEqual(sub1._binding_key, "*.#")
 
         sub2 = ResourceLifecycleEventSubscriber(process=self._proc)
         self.failUnlessEqual(sub2.event_id, RESOURCE_LIFECYCLE_EVENT_ID)
-        self.failUnlessEqual(sub2._binding_key, "%s.*" % str(RESOURCE_LIFECYCLE_EVENT_ID))
+        self.failUnlessEqual(sub2._binding_key, "%s.#" % str(RESOURCE_LIFECYCLE_EVENT_ID))
 
         sub3 = ResourceLifecycleEventSubscriber(process=self._proc, origin="ucsd")
         self.failUnlessEqual(sub3._binding_key, "%s.ucsd" % str(RESOURCE_LIFECYCLE_EVENT_ID))
 
-            
+    @defer.inlineCallbacks
+    def test_wildcards(self):
+        """
+        Test to see if wildcards match for subscribers
+        """
+        subproc = Process()
+        yield subproc.spawn()
+        test_origin = "%s.%s" % ("chan1", str(subproc.id))
+        testsub = QuickEventSubscriber(origin=test_origin,
+                                      process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+        
+        # Setup the publisher
+        pub1 = InfoLoggingEventPublisher(process=self._proc,
+                                         origin=test_origin)
+        yield pub1.initialize()
+        yield pub1.activate()
+        
+        # Toss something out with topic extension wildcard on the sub side
+        yield pu.asleep(1.0)
+        yield pub1.create_and_publish_event(name="TestEvent")
+        # Pause to make sure we catch the message
+        yield pu.asleep(1.0)
+        self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent")
