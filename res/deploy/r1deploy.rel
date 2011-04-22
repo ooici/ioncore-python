@@ -78,7 +78,9 @@
         # Add scheduler service
 
         # Add Dataset Controller Service
-
+        {'name':'dataset_controller',   'version':'0.1',
+                                        'processapp':('dataset_controller','ion.services.dm.inventory.dataset_controller','DatasetController'),
+        },
 
 #-------------#
 # Bootlevel 9 #

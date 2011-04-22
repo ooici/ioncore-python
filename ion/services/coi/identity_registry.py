@@ -21,7 +21,8 @@ from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
-from ion.core.intercept.policy import subject_has_admin_role, map_ooi_id_to_subject_admin_role, subject_has_dispatcher_queue, map_ooi_id_to_subject_dispatcher_queue
+from ion.core.intercept.policy import subject_has_admin_role, map_ooi_id_to_subject_admin_role, subject_has_dispatcher_queue, map_ooi_id_to_subject_dispatcher_queue, \
+ subject_has_data_provider_role, map_ooi_id_to_subject_data_provider_role, subject_has_marine_operator_role, map_ooi_id_to_subject_marine_operator_role
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
@@ -411,6 +412,14 @@ class IdentityRegistryService(ServiceProcess):
         # Optionally map OOI ID to subject in admin role dictionary
         if subject_has_admin_role(identity.subject):
             map_ooi_id_to_subject_admin_role(identity.subject, identity.ResourceIdentity)
+
+        # Optionally map OOI ID to subject in data provider role dictionary
+        if subject_has_data_provider_role(identity.subject):
+            map_ooi_id_to_subject_data_provider_role(identity.subject, identity.ResourceIdentity)
+
+        # Optionally map OOI ID to subject in marine operator role dictionary
+        if subject_has_marine_operator_role(identity.subject):
+            map_ooi_id_to_subject_marine_operator_role(identity.subject, identity.ResourceIdentity)
 
         # Optionally map OOI ID to subject in dispatcher queue user dictionary
         if subject_has_dispatcher_queue(identity.subject):

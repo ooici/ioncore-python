@@ -150,30 +150,6 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(blobs)
 
     @defer.inlineCallbacks
-    def op_checkout(self, content, headers, msg):
-
-        if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
-             raise DataStoreWorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
-
-        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
-
-        def filtermethod(x):
-            """
-            Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
-            """
-            return (x.type not in content.excluded_types)
-
-        blobs = yield self._get_blobs(response.Repository, [content.commit_root_object], filtermethod)
-
-        for element in blobs.values():
-            link = response.blob_elements.add()
-            obj = response.Repository._wrap_message_object(element._element)
-
-            link.SetLink(obj)
-
-        yield self._process.reply_ok(msg, content=response)
-
-    @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
         """
         The operation which responds to a pull request
@@ -277,7 +253,15 @@ class DataStoreWorkbench(WorkBench):
         if request.get_head_content:
 
             keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
-            blobs = yield self._get_blobs(response.Repository, keys)
+
+
+            def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in request.excluded_types)
+
+            blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.values():
                 link = response.blob_elements.add()
@@ -920,6 +904,7 @@ class DataStoreService(ServiceProcess):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
+        self.op_put_blobs = self.workbench.op_put_blobs
 
 
     @defer.inlineCallbacks
