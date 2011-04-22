@@ -115,16 +115,16 @@ class TestSBE37Agent(IonTestCase):
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('instrument_agent')
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,
-                                                                target=self.svc_id)
+                                                                target=self.svc_id)        
         
         
 
-        
     @defer.inlineCallbacks
     def tearDown(self):
         
         pu.asleep(1)
         yield self._stop_container()
+        
         
         
     @defer.inlineCallbacks
@@ -157,8 +157,8 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']
         
-        print 'init reply:'
-        print reply
+        #print 'init reply:'
+        #print reply
         
         self.assertEqual(success[0],'OK')
         
@@ -168,8 +168,8 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        print 'go active reply:'
-        print reply
+        #print 'go active reply:'
+        #print reply
 
         self.assertEqual(success[0],'OK')
         
@@ -179,8 +179,8 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        print 'clear reply:'
-        print reply
+        #print 'clear reply:'
+        #print reply
 
         self.assertEqual(success[0],'OK')
 
@@ -190,8 +190,8 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        print 'run reply:'
-        print reply
+        #print 'run reply:'
+        #print reply
 
         self.assertEqual(success[0],'OK')
         
@@ -205,9 +205,9 @@ class TestSBE37Agent(IonTestCase):
         # restore original config later.
         orig_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
 
-        print 'get device reply:'
-        print reply
-        print orig_config
+        #print 'get device reply:'
+        #print reply
+        #print orig_config
 
         self.assertEqual(success[0],'OK')
 
@@ -226,8 +226,8 @@ class TestSBE37Agent(IonTestCase):
         result = reply['result']
         setparams = params
         
-        print 'set device reply:'
-        print reply
+        #print 'set device reply:'
+        #print reply
 
         self.assertEqual(success[0],'OK')
 
@@ -252,7 +252,7 @@ class TestSBE37Agent(IonTestCase):
         self.assertEqual(setparams[('CHAN_INSTRUMENT','STORETIME')],
                          result[('CHAN_INSTRUMENT','STORETIME')][1])
         
-        print 'acquisition parameters successfully set'
+        #print 'acquisition parameters successfully set'
         
         # Acquire sample.
         chans = ['CHAN_INSTRUMENT']
@@ -261,8 +261,8 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']        
 
-        print 'acquisition result'
-        print result
+        #print 'acquisition result'
+        #print result
 
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
@@ -273,7 +273,7 @@ class TestSBE37Agent(IonTestCase):
         self.assertIsInstance(result.get('time',None),tuple)
         self.assertIsInstance(result.get('date',None),tuple)
                 
-                
+        
         # Start autosampling.
         chans = ['CHAN_INSTRUMENT']
         cmd = ['DRIVER_CMD_START_AUTO_SAMPLING']
@@ -283,7 +283,7 @@ class TestSBE37Agent(IonTestCase):
         
         self.assertEqual(success[0],'OK')
 
-        print 'autosampling started'
+        #print 'autosampling started'
         
         # Wait for a few samples to arrive.
         yield pu.asleep(30)
@@ -307,8 +307,8 @@ class TestSBE37Agent(IonTestCase):
                 self.fail('Stop autosample failed with error: '+str(success))
             
 
-        print 'autosample result'
-        print result
+        #print 'autosample result'
+        #print result
         
         self.assertEqual(success[0],'OK')
         for sample in result:
@@ -319,7 +319,7 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('conductivity',None),float)
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)
-
+        
         
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,transaction_id)
@@ -346,17 +346,17 @@ class TestSBE37Agent(IonTestCase):
             else:
                 self.assertEqual(val,final_config[key])
 
-        print 'original configuration restored'
+        #print 'original configuration restored'
                 
         # Disconnect from device.
         cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_GO_INACTIVE']
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
-        #self.assertEqual(success_5[0],'OK')
+        self.assertEqual(success[0],'OK')
 
-        print 'go inactive reply:'
-        print reply
+        #print 'go inactive reply:'
+        #print reply
                 
         # Close the transaction.
         reply = yield self.ia_client.end_transaction(transaction_id)

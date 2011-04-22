@@ -30,6 +30,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID , TYPE_OF_ID, SAMPLE_PROFILE_DATASET_ID
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 
@@ -45,8 +46,11 @@ from ion.core.cc.shell import control
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
+
+    
 @defer.inlineCallbacks
-def find_by_owner():   
+def find_by_owner():
+    t1 = time.time()   
     association_client = AssociationServiceClient()
     
     request = yield association_client.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
@@ -73,8 +77,25 @@ def find_by_owner():
     key_list = []
     for idref in result.idrefs:
         key_list.append(idref.key)
-      
-    defer.returnValue(len(key_list))
+    
+    #print key_list  
+    #defer.returnValue(key_list)
+    
+    resource_client = ResourceClient()
+    resources = []
+    #deferred_list = []
+    for key in key_list:
+        #d = resource_client.get_instance(key)
+        #deferred_list.append(d)
+        resource = yield resource_client.get_instance(key)
+        resources.append(resource)
+    #resources =  yield defer.DeferredList(deferred_list) 
+    t2 = time.time()
+    diff = t2 - t1
+    print "Time to retrieve %s resources: %s" % (len(resources), diff)
+    defer.returnValue(resources)
+
+    
         
 @defer.inlineCallbacks
 def find_by_lcs():
@@ -116,7 +137,7 @@ def find_by_lcs():
     for idref in result.idrefs:
         key_list.append(idref.key)
         
-    defer.returnValue(len(key_list))    
+    defer.returnValue(key_list)    
 
 @defer.inlineCallbacks
 def find_by_predicate():
@@ -147,6 +168,7 @@ def find_by_predicate():
     for idref in result.idrefs:
         key_list.append(idref.key)
 
+    defer.returnValue(key_list)
          
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
@@ -183,7 +205,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
         {'name':'association_service',
          'module':'ion.services.dm.inventory.association_service',
          'class':'AssociationService'
-          }
+          },
+        
     ]
         
     
@@ -205,7 +228,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
             ds[NAME_CFG] = "".join((station_dataset_name, str(i)))
             yield ds[NAME_CFG],ds
      
-    num_datasets = 100
+    num_datasets = 5
     datasets = dict([ds for ds in make_datasets(num_datasets)])
     ION_DATASETS.update(datasets)
     
@@ -222,7 +245,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     
     control.add_term_name('find_by_owner',find_by_owner)
     control.add_term_name('find_by_lcs',find_by_lcs)
-    control.add_term_name('find_by_predicate',find_by_lcs)
+    control.add_term_name('find_by_predicate',find_by_predicate)
     defer.returnValue(res)
 
 @defer.inlineCallbacks

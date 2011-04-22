@@ -27,8 +27,8 @@ from ion.services.dm.distribution.events import NewSubscriptionEventPublisher,  
 
 # Imports: Associations
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-from ion.services.coi.resource_registry_beta.association_client import AssociationClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient#, ASSOCIATION_QUERY_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
