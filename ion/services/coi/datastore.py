@@ -581,7 +581,7 @@ class DataStoreWorkbench(WorkBench):
 
         def_list = []
         for blob in request.blob_elements:
-            def_list.append(self._blob_store.put(blob.key, blob))
+            def_list.append(self._blob_store.put(blob.key, blob.SerializeToString() ))
 
         yield defer.DeferredList(def_list)
 
