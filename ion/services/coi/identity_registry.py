@@ -467,6 +467,14 @@ class IdentityRegistryService(ServiceProcess):
             Response.resource_reference.certificate = identity.certificate
             Response.resource_reference.rsa_private_key = identity.rsa_private_key
             Response.resource_reference.email = identity.email
+            if identity.IsFieldSet('profile'):
+               i = 0
+               for item in identity.profile:
+                  log.debug('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% get_user: setting profile to '+str(item))
+                  Response.resource_reference.profile.add()
+                  Response.resource_reference.profile[i].name = item.name
+                  Response.resource_reference.profile[i].value = item.value
+                  i = i + 1
             Response.resource_reference.life_cycle_state = identity.ResourceLifeCycleState
             Response.result = "OK"
             defer.returnValue(Response)
@@ -553,12 +561,24 @@ class IdentityRegistryService(ServiceProcess):
         
         if request.configuration.subject in self._user_dict.keys():
            log.info('update_user_profile: Found match')
+           # first get user's info
            identity = yield self.rc.get_instance(self._user_dict[request.configuration.subject])
+           log.info('update_user_profile: identity = '+str(identity))
                        
            if request.configuration.IsFieldSet('email'):
               log.debug('update_user_profile: setting email to %s'%request.configuration.email)
               identity.email = request.configuration.email
+
+           if request.configuration.IsFieldSet('profile'):
+              i = 0
+              for item in request.configuration.profile:
+                  log.debug('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% update_user_profile: setting profile to '+str(item))
+                  identity.profile.add()
+                  identity.profile[i].name = item.name
+                  identity.profile[i].value = item.value
+                  i = i + 1
               
+           # now save user's info
            yield self.rc.put_instance(identity, 'Updated user profile information')
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')

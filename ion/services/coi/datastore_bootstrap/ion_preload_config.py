@@ -253,7 +253,6 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                           CONTENT_CFG:{'subject':'ss',
                                        'certificate':'',
                                        'rsa_private_key':'',
-                                       'dispatcher_queue':'',
                                        'email':'',
                                        'life_cycle_state':''}
                         },
@@ -306,7 +305,6 @@ JwrrGzIQ+Mne1Q7OADjjOokCgYABgHbOJ9XcMFM+/KGjlzlmqqcRZa9k3zqcZB+xSzZevR6Ka24/
 6TpHi8QS2mqu2A5tZmFNbYDzv3i4rc05l0HnvJKZP6yLBQKBgERpUxpX4r5Obi8PNIECZ4ucTlhT
 KJpn8B+9GrIjTqs+ae0oRfbSo1Jt/SDts/c6DYaT2RZma7JVosWd2aOAw9k69zMObHlJrcHGmb3l
 eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL''',
-                                       'dispatcher_queue':'',
                                        'email':'myooici@gmail.com',
                                        'life_cycle_state':''}
                         },
@@ -319,7 +317,6 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           CONTENT_CFG:{'subject':'aa',
                                        'certificate':'',
                                        'rsa_private_key':'',
-                                       'dispatcher_queue':'',
                                        'email':'',
                                        'life_cycle_state':''}
                         },

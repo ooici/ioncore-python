@@ -39,9 +39,9 @@ message UserIdentity {
    optional string subject=1;
    optional string certificate=2;
    optional string rsa_private_key=3;
-   optional string dispatcher_queue=4;
-   optional string email=5;
-   //optional string life_cycle_state=6;
+   optional string email=4;
+   repeated net.ooici.services.coi.identity.NameValuePairType profile=5;
+   optional string life_cycle_state=6;
 }
 """""
 
@@ -232,17 +232,47 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.info("testing subject is correct")
         self.assertEqual(user1.resource_reference.subject, "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
       
-        # Test that update work
-        log.info("testing update")
-        IdentityRequest.configuration.certificate = self.user_certificate + "\nA Small Change"
+        # set the user's email
+        log.info('setting email')
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user email request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.email = "someone@somplace.somedomain"
         IdentityRequest.configuration.subject = user1.resource_reference.subject
         try:
             response = yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
-            self.fail("update_user failed for user %s"%IdentityRequest.configuration.subject)
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
-        self.assertEqual(user2.resource_reference.certificate, self.user_certificate + "\nA Small Change")
+        self.assertEqual(user2.resource_reference.email, "someone@somplace.somedomain")
+        
+        # Test that update works 
+        log.info("testing update")
+        IdentityRequest.configuration.email = "someone-else@somplace-else.some-other-domain"
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        try:
+            response = yield self.irc.update_user_profile(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        self.assertEqual(user2.resource_reference.email, "someone-else@somplace-else.some-other-domain")
        
+        # set the user's profile
+        log.info('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ setting profile')
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user profile request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        IdentityRequest.configuration.profile.add()
+        IdentityRequest.configuration.profile[0].name = "profile item 1 name"
+        IdentityRequest.configuration.profile[0].value = "profile item 1 value"
+        log.info('IR.C = '+str(IdentityRequest.configuration))
+        try:
+            response = yield self.irc.update_user_profile(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        log.info('################################################ user2 = '+str(user2.resource_reference))
+        self.assertEqual(user2.resource_reference.email, "someone@somplace.somedomain")
+
         # Test if we can find the user we have stuffed in.
         #user_description = coi_resource_descriptions.IdentityResource()
         #user_description.subject = 'Roger'
