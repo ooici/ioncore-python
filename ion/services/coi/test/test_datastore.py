@@ -177,9 +177,10 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_checkout(self):
-        result = yield self.wb1.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID)
+        result = yield self.wb1.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID,excluded_types=[])
         repo = self.wb1.workbench.get_repository(SAMPLE_PROFILE_DATASET_ID)
-        yield repo.checkout('master')
+
+        yield repo.checkout('master',excluded_types=[])
 
         commit = repo._current_branch.commitrefs[0]
         key = commit.GetLink('objectroot').key
@@ -597,51 +598,6 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         self.test_harness.disconnect()
 
         yield DataStoreTest.tearDown(self)
-
-
-
-'''
-    @defer.inlineCallbacks
-    def test_push_associated(self):
-
-
-        child_ds1 = yield self.sup.get_child_id('ds1')
-        log.debug('Process ID:' + str(child_ds1))
-        proc_ds1 = self._get_procinstance(child_ds1)
-        
-        child_ds2 = yield self.sup.get_child_id('ds2')
-        log.debug('Process ID:' + str(child_ds2))
-        proc_ds2 = self._get_procinstance(child_ds2)
-        
-        ab1 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook1')
-        ab2 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook2')
-        ab3 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook3')
-        assoc = proc_ds1.workbench.create_repository(association_type,'association')
-        
-        ab1.root_object.title = 'Junk'
-        ab1.commit('test1')
-        
-        ab2.root_object.title = 'Predicate Junk'
-        ab2.commit('test2')
-        
-        ab3.root_object.title = 'Associated Junk'
-        ab3.commit('test3')
-        
-        assoc.root_object.subject = proc_ds1.workbench.reference_repository('addressbook1', current_state=True)
-        assoc.root_object.predicate = proc_ds1.workbench.reference_repository('addressbook2', current_state=True)
-        assoc.root_object.object = proc_ds1.workbench.reference_repository('addressbook3', current_state=True)
-        assoc.commit('associated!')
-        
-        print 'ASSOC:', assoc.root_object
-        print 'assoc subject:', assoc.root_object.subject
-        
-        
-        obj_list = ['addressbook1','addressbook2','addressbook3','association']
-        
-        result = yield proc_ds1.push('ps2',obj_list)
-            
-        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
-    '''
 
 
 

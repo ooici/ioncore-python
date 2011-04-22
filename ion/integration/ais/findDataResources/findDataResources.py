@@ -51,12 +51,6 @@ class FindDataResources(object):
         self.asc = AssociationServiceClient()
         self.ac = AssociationClient()
 
-
-        self.dsID = None
-
-    def setTestDatasetID(self, dsID):
-        self.dsID = dsID
-
     @defer.inlineCallbacks
     def findDataResources(self, msg):
         """
@@ -72,10 +66,11 @@ class FindDataResources(object):
         #
         userID = msg.message_parameters_reference.user_ooi_id
 
-        self.downloadURL      = 'Uninitialized'
-        self.filterByArea     = True
-        self.filterByVertical = True
-        self.filterByTime     = True
+        self.downloadURL       = 'Uninitialized'
+        self.filterByLatitude  = True
+        self.filterByLongitude = True
+        self.filterByVertical  = True
+        self.filterByTime      = True
         self.bIsInAreaBounds      = True
         self.bIsInVerticalBounds  = True
         self.bIsInTimeBounds      = True
@@ -121,18 +116,25 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.filterByArea:
-                self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
+            if self.filterByLatitude:
+                log.debug("----------------------------- 1 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLatitudeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.filterByLongitude:
+                log.debug("----------------------------- 2 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLongitudeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.filterByVertical:
+                log.debug("----------------------------- 3 ------------------------------")
                 self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
                                     
             if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
+                log.debug("----------------------------- 4 ------------------------------")
                 self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
 
-                dSourceResID = yield self.__getAssociatedSource(dSetResID)
+                dSourceResID = yield self.getAssociatedSource(dSetResID)
                 dSource = yield self.rc.get_instance(dSourceResID)
                 
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
@@ -178,7 +180,8 @@ class FindDataResources(object):
             
 
         self.downloadURL       = 'Uninitialized'
-        self.filterByArea     = True
+        self.filterByLatitude  = True
+        self.filterByLongitude = True
         self.filterByVertical = True
         self.filterByTime     = True
         self.bIsInAreaBounds      = True
@@ -226,18 +229,26 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if self.filterByArea:
-                self.bIsInAreaBounds = self.__isInAreaBounds(minMetaData, bounds)
+            if self.filterByLatitude:
+                log.debug("----------------------------- 1 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLatitudeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.filterByLongitude:
+                log.debug("----------------------------- 2 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLongitudeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.filterByVertical:
+                log.debug("----------------------------- 3 ------------------------------")
                 self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
                                     
             if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
+                log.debug("----------------------------- 4 ------------------------------")
                 self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
 
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+                log.debug("----------------------------- 5 ------------------------------")
 
-                dSourceResID = yield self.__getAssociatedSource(dSetResID)
+                dSourceResID = yield self.getAssociatedSource(dSetResID)
                 dSource = yield self.rc.get_instance(dSourceResID)
                 
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
@@ -259,6 +270,27 @@ class FindDataResources(object):
 
 
         defer.returnValue(rspMsg)
+
+
+    @defer.inlineCallbacks
+    def getAssociatedSource(self, dSetResID):
+        """
+        Worker class method to get the data source that associated with a given
+        data set.  This is a public method because it can be called from the
+        findDataResourceDetail service.
+        """
+        log.debug('getAssociatedSource()')
+
+        ds = yield self.rc.get_instance(dSetResID)
+
+        results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
+        for association in results:
+            log.debug('Associated Source for Dataset: ' + \
+                      association.ObjectReference.key + \
+                      ' is: ' + association.SubjectReference.key)
+
+        defer.returnValue(association.SubjectReference.key)
+                      
 
 
     @defer.inlineCallbacks
@@ -401,42 +433,92 @@ class FindDataResources(object):
         """
         log.debug('__loadBounds')
         
-        if msg.message_parameters_reference.IsFieldSet('minLatitude'):
+        #
+        # Determine if only one of the latitude bounds have been set; if so,
+        # use the other to determine whether which hemisphere.  If no latitude
+        # bounds have been given, set filterByLatitude to False.
+        #
+        
+        self.bIsMinLatitudeSet =  msg.message_parameters_reference.IsFieldSet('minLatitude')
+        self.bIsMaxLatitudeSet =  msg.message_parameters_reference.IsFieldSet('maxLatitude')
+        self.bIsMinLongitudeSet =  msg.message_parameters_reference.IsFieldSet('minLongitude')
+        self.bIsMaxLongitudeSet =  msg.message_parameters_reference.IsFieldSet('maxLongitude')
+        self.bIsMinVerticalSet  =   msg.message_parameters_reference.IsFieldSet('minVertical')
+        self.bIsMaxVerticalSet  =   msg.message_parameters_reference.IsFieldSet('maxVertical')
+        self.bIsVerticalPositiveSet =   msg.message_parameters_reference.IsFieldSet('posVertical')        
+
+        if self.bIsMinLatitudeSet:
             bounds['minLat'] = Decimal(str(msg.message_parameters_reference.minLatitude))
-        else:
-            self.filterByArea = False
-
-        if msg.message_parameters_reference.IsFieldSet('maxLatitude'):
+        if self.bIsMaxLatitudeSet:
             bounds['maxLat'] = Decimal(str(msg.message_parameters_reference.maxLatitude))
-        else:
-            self.filterByArea = False
-
-        if msg.message_parameters_reference.IsFieldSet('minLongitude'):
+        if self.bIsMinLongitudeSet:
             bounds['minLon'] = Decimal(str(msg.message_parameters_reference.minLongitude))
-        else:
-            self.filterByArea = False
-
-        if msg.message_parameters_reference.IsFieldSet('maxLatitude'):
+        if self.bIsMaxLongitudeSet:
             bounds['maxLon'] = Decimal(str(msg.message_parameters_reference.maxLongitude))
-        else:
-            self.filterByArea = False
-
-        if msg.message_parameters_reference.IsFieldSet('minVertical'):
+        if self.bIsMinVerticalSet:
             bounds['minVert'] = Decimal(str(msg.message_parameters_reference.minVertical))
-        else:
-            self.filterByVertical = False
-
-        if msg.message_parameters_reference.IsFieldSet('maxVertical'):
+        if self.bIsMaxVerticalSet:
             bounds['maxVert'] = Decimal(str(msg.message_parameters_reference.maxVertical))
-        else:
-            self.filterByVertical = False
 
-        if msg.message_parameters_reference.IsFieldSet('posVertical'):
-            bounds['posVert'] = msg.message_parameters_reference.posVertical
+
+        #
+        # If both minLat and maxLat are not set, we need to determine which
+        # hemisphere the other is in (if it's set), so that we can know how
+        # to default the one that isn't set.  If none are set we won't filter
+        # by area.  Same with minLon and maxLon.
+        #
+        if not (self.bIsMinLatitudeSet and self.bIsMaxLatitudeSet): 
+            if self.bIsMinLatitudeSet:
+                #
+                # Determine whether northern or southern hemisphere
+                #
+                # Don't have to check which hemisphere anymore; set to
+                # maximum latitude possible
+                #
+                bounds['maxLat'] = Decimal('90')
+            elif self.bIsMaxLatitudeSet:
+                #
+                # Determine whether northern or southern hemisphere
+                #
+                # Don't have to check which hemisphere anymore; set to
+                # minimum latitude possible
+                #
+                bounds['minLat'] = Decimal('-90')
+            else:
+                self.filterByLatitude = False
+
+        if not (self.bIsMinLongitudeSet and self.bIsMaxLongitudeSet): 
+            if self.bIsMinLongitudeSet:
+                #
+                # Determine whether northern or southern hemisphere
+                #
+                # Don't have to check which hemisphere anymore; set to
+                # maximum longitude possible
+                #
+                if bounds['minLon'] >= 0:
+                    bounds['maxLon'] = Decimal('180')
+            elif self.bIsMaxLongitudeSet:
+                #
+                # Determine whether northern or southern hemisphere
+                #
+                # Don't have to check which hemisphere anymore; set to
+                # minimum longitude possible
+                #
+                if bounds['maxLon'] >= 0:
+                    bounds['minLon'] = Decimal('-180')
+            else:
+                self.filterByLongitude = False
+
+        #
+        # If posVertical has not been set, don't filter vertically
+        #
+        if self.bIsVerticalPositiveSet:
+            bounds['vertPos'] = msg.message_parameters_reference.posVertical
         else:
             self.filterByVertical = False
 
         if msg.message_parameters_reference.IsFieldSet('minTime'):
+            self.minTimeBound = msg.message_parameters_reference.minTime
             tmpTime = datetime.datetime.strptime(msg.message_parameters_reference.minTime, \
                                                            '%Y-%m-%dT%H:%M:%SZ')
             bounds['minTime'] = time.mktime(tmpTime.timetuple())
@@ -444,6 +526,7 @@ class FindDataResources(object):
             self.filterByTime = False
 
         if msg.message_parameters_reference.IsFieldSet('maxTime'):
+            self.maxTimeBound = msg.message_parameters_reference.maxTime
             tmpTime = datetime.datetime.strptime(msg.message_parameters_reference.maxTime, \
                                                            '%Y-%m-%dT%H:%M:%SZ')
             bounds['maxTime'] = time.mktime(tmpTime.timetuple())
@@ -451,30 +534,46 @@ class FindDataResources(object):
             self.filterByTime = False
 
 
-    def __isInAreaBounds(self, minMetaData, bounds):
+    def __isInLatitudeBounds(self, minMetaData, bounds):
         """
-        Determine if dataset resource is in area bounds.
+        Determine if dataset resource is in latitude bounds.
         Input:
           - bounds
           - dSet
         """
-        log.debug('__isInAreaBounds()')
+        log.debug('__isInLatitudeBounds()')
 
-        if minMetaData['ion_geospatial_lat_min'] < bounds['minLat']:
-            log.debug(' %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
-            return False
+        if self.bIsMinLatitudeSet:
+            if minMetaData['ion_geospatial_lat_min'] < bounds['minLat']:
+                log.debug(' %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
+                return False
             
-        if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
-            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
-            return False
+        if self.bIsMaxLatitudeSet:
+            if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
+                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
+                return False
             
-        if minMetaData['ion_geospatial_lon_min'] < bounds['minLon']:
-            log.debug('%s is < bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
-            return False
+        return True
+
+
+    def __isInLongitudeBounds(self, minMetaData, bounds):
+        """
+        Determine if dataset resource is in longitude bounds.
+        Input:
+          - bounds
+          - dSet
+        """
+        log.debug('__isInLongitudeBounds()')
+
+        if self.bIsMinLongitudeSet:
+            if minMetaData['ion_geospatial_lon_min'] < bounds['minLon']:
+                log.debug('%s is < bounds %s' % (minMetaData['ion_geospatial_lon_min'], bounds['minLon']))
+                return False
             
-        if minMetaData['ion_geospatial_lon_max'] > bounds['maxLon']:
-            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
-            return False
+        if self.bIsMaxLongitudeSet:
+            if minMetaData['ion_geospatial_lon_max'] > bounds['maxLon']:
+                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_lon_max'], bounds['maxLon']))
+                return False
         
         return True
 
@@ -488,13 +587,18 @@ class FindDataResources(object):
         """
         log.debug('__isInVerticalBounds()')
 
-        if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
-            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
-            return False
+        #
+        # This needs to adjust for the verical positive parameter
+        #
+        if self.bIsMinVerticalSet:
+            if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
+                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
+                return False
             
-        if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
-            log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
-            return False
+        if self.bIsMaxVerticalSet:
+            if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
+                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
+                return False
         
         return True
 
@@ -508,28 +612,55 @@ class FindDataResources(object):
         """
         log.debug('__isInTimeBounds()')
         
-        """
         try:
-            boundMinTime = time.mktime(bounds['minTime'].timetuple())
-            print boundMinTime
-            
+            tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_start'], '%Y-%m-%dT%H:%M:%SZ')
+            dataMinTime = time.mktime(tmpTime.timetuple())
+    
+            tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_end'], '%Y-%m-%dT%H:%M:%SZ')
+            dataMaxTime = time.mktime(tmpTime.timetuple())
         except ValueError:
-            log.error('datetime.strptime did not work!!!!!')
-        """
+            log.error('Error converting bounds time to datatime format')
+            #
+            # Currently returning true in the spirit of returning more data than
+            # less
+            #
+            return True
+
+        #
+        # If data start time is < bounds min time and data max time > bounds min time, return true
+        #
+        if dataMinTime < bounds['minTime'] and dataMaxTime > bounds['minTime']:
+            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
+            log.debug('DATA TIME COVERS BOUNDS MIN TIME')
+            log.debug(' %s is < bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.minTimeBound))
+            log.debug(' %s is > bounds %s' % (minMetaData['ion_time_coverage_end'], self.minTimeBound))
+            return True
             
-        tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_start'], '%Y-%m-%dT%H:%M:%SZ')
-        dataMinTime = time.mktime(tmpTime.timetuple())
-        if dataMinTime < bounds['minTime']:
-            log.debug(' %s is < bounds %s' % (dataMinTime, bounds['minTime']))
-            return False
-            
-        tmpTime = datetime.datetime.strptime(minMetaData['ion_time_coverage_end'], '%Y-%m-%dT%H:%M:%SZ')
-        dataMaxTime = time.mktime(tmpTime.timetuple())
-        if dataMaxTime > bounds['maxTime']:
-            log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
-            return False
-            
-        return True
+        #
+        # If data start time is < bounds max time and < data max time > bounds max time, return true
+        #
+        if dataMinTime < bounds['maxTime'] and dataMaxTime > bounds['maxTime']:
+            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
+            log.debug('DATA TIME COVERS BOUNDS MAX TIME')
+            log.debug(' %s is < bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.maxTimeBound))
+            log.debug(' %s is > bounds %s' % (minMetaData['ion_time_coverage_end'], self.maxTimeBound))
+            return True
+
+        #
+        # If data min time > bounds min time and data max time < bounds max time
+        #
+        if dataMinTime > bounds['minTime'] and dataMaxTime < bounds['maxTime']:
+            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
+            log.debug('BOUNDS TIME COVERS DATA')
+            log.debug(' %s is > bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.minTimeBound))
+            log.debug(' %s is < bounds %s' % (minMetaData['ion_time_coverage_end'], self.maxTimeBound))
+            return True
+
+        log.debug('DATA OUTSIDE TEMPORAL BOUNDS')
+        log.debug(' %s , %s' % (self.minTimeBound, self.maxTimeBound))
+        log.debug(' %s , %s' % (minMetaData['ion_time_coverage_start'],  minMetaData['ion_time_coverage_end']))
+
+        return False
 
         
     def __printBounds(self, bounds):
@@ -623,19 +754,5 @@ class FindDataResources(object):
         return self.downloadURL
 
 
-    @defer.inlineCallbacks
-    def __getAssociatedSource(self, dSetResID):
-        log.debug('__getAssociatedSource()')
-
-        ds = yield self.rc.get_instance(dSetResID)
-
-        results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
-        for association in results:
-            log.debug('Associated Source for Dataset: ' + \
-                      association.ObjectReference.key + \
-                      ' is: ' + association.SubjectReference.key)
-
-        defer.returnValue(association.SubjectReference.key)
-                      
 
 

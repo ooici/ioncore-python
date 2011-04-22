@@ -15,6 +15,7 @@ Sample Dataset are configure and loaded like so:
 
 """
 import tarfile
+import random
 from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -41,10 +42,13 @@ stringArray_type = object_utils.create_type_identifier(object_id=10015, version=
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     """
     Example file: ion/services/coi/SOS_Test.arr
+    This method loads data from byte array files on disk - structure container GPB's or tgz of the same...
     """
     ds_svc = args[0]
     filename = kwargs['filename']
@@ -101,100 +105,19 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
 
     return result
 
-
-def bootstrap_traj_data_source(datasource, *args, **kwargs):
-
-    #-------------------------------------------#
-    # Create the coresponding datasource object #
-    #-------------------------------------------#
-    # Datasource: NDBC SOS Glider data
-
-    ds_svc = args[0]
-
-    dataset_id = kwargs.get('associated_dataset_id')
-    dataset = ds_svc.workbench.get_repository(dataset_id)
-    if not dataset:
-        # Abort if the dataset does not exist
-        return False
-
-    has_a_id = kwargs.get('has_a_id')
-    has_a = ds_svc.workbench.get_repository(has_a_id)
-
-    datasource.Repository.commit('Commit source before creating association')
-
-    # Just create it - the workbench/datastore will take care of the rest!
-    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
-
-    datasource.source_type = datasource.SourceType.SOS
-    datasource.property.append('salinity')
-    datasource.station_id.append('48900')
-    datasource.request_type = datasource.RequestType.NONE
-    # datasource.top = *not used*
-    # datasource.bottom = *not used*
-    # datasource.left = *not used*
-    # datasource.right = *not used*
-    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-    # datasource.dataset_url = *not used*
-    # datasource.ncml_mask = *not used*
-    datasource.max_ingest_millis = 10000
-    
-    return True
-    
-    
-def bootstrap_station_data_source(datasource, *args, **kwargs):
-
-    #-------------------------------------------#
-    # Create the coresponding datasource object #
-    #-------------------------------------------#
-    # Datasource: USGS waterservices
-
-
-    ds_svc = args[0]
-
-    dataset_id = kwargs.get('associated_dataset_id')
-    dataset = ds_svc.workbench.get_repository(dataset_id)
-
-    if not dataset:
-        # Abort if the dataset does not exist
-        return False
-
-    has_a_id = kwargs.get('has_a_id')
-    has_a = ds_svc.workbench.get_repository(has_a_id)
-
-    datasource.Repository.commit('Commit source before creating association')
-
-    # Just create it - the workbench/datastore will take care of the rest!
-    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
-
-
-    datasource.source_type = datasource.SourceType.USGS
-    datasource.property.append('00010')
-    datasource.property.append('00060')
-    datasource.station_id.append('01463500')
-    datasource.request_type = datasource.RequestType.NONE # *not used*
-    # datasource.top = *not used*
-    # datasource.bottom = *not used*
-    # datasource.left = *not used*
-    # datasource.right = *not used*
-#    datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
-    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
-    # datasource.dataset_url = *not used*
-    # datasource.ncml_mask = *not used*
-    datasource.max_ingest_millis = 6000
-    
-    return True
     
 def bootstrap_profile_dataset(dataset, *args, **kwargs):
     """
-    Pass in a link from the resource object which is created in the intialization of the datastore
-
+    Pass in a link from the resource object which is created in the initialization of the datastore
+    This method constructs a dataset manually!
     """
-    
     # Attach the root group
     group = dataset.CreateObject(group_type)
     group.name = 'junk data'
     dataset.root_group = group
-
+    
+    random_initialization = CONF.getValue('Initialize_random_data', False)
+    log.info("Random initialization of datasets is set to %s" % (random_initialization,))
     # Create all dimension and variable objects
     # Note: CDM variables such as scalars, coordinate variables and data are all represented by
     #       the variable object type.  Signifying the difference between these types is done
@@ -282,7 +205,14 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     variable_t.content.bounded_arrays[0].bounds[0].origin = 0
     variable_t.content.bounded_arrays[0].bounds[0].size = 2
     variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
-    variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
+    
+    if random_initialization:
+        start_time = 1280102000 + int(round(random.random()* 360000))
+        end_time = start_time + 3600
+        variable_t.content.bounded_arrays[0].ndarray.value.extend([start_time, end_time])
+        log.info("start_time %s end_time %s " % (start_time, end_time))
+    else:
+        variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
 
     variable_z.content = dataset.CreateObject(array_structure_type)
     variable_z.content.bounded_arrays.add()
@@ -313,11 +243,22 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     scalar_lat.content.bounded_arrays.add()
     scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
 
+    if random_initialization:
+        sign = 1
+        if int(random.random() * 10) % 2 == 1:
+            sign = -1 
+        lat = round(sign * random.random() * 90,3)
+        long = round(random.random() * 180,3)
+        log.info("Using lat %s long %s" % (lat,long))
+    else:
+        lat = -41.431
+        long = 25.909    
+
     scalar_lat.content.bounded_arrays[0].bounds.add()
     scalar_lat.content.bounded_arrays[0].bounds[0].origin = 0
     scalar_lat.content.bounded_arrays[0].bounds[0].size = 1
     scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
-    scalar_lat.content.bounded_arrays[0].ndarray.value.extend([-45.431])
+    scalar_lat.content.bounded_arrays[0].ndarray.value.extend([lat])
 
 
     scalar_lon.content= dataset.CreateObject(array_structure_type)
@@ -328,7 +269,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     scalar_lon.content.bounded_arrays[0].bounds[0].origin = 0
     scalar_lon.content.bounded_arrays[0].bounds[0].size = 1
     scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
-    scalar_lon.content.bounded_arrays[0].ndarray.value.extend([25.909])
+    scalar_lon.content.bounded_arrays[0].ndarray.value.extend([long])
 
 
     scalar_sid.content= dataset.CreateObject(array_structure_type)
@@ -366,7 +307,13 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
     variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
     variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
-    variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+    
+    if random_initialization:
+        l = [round(random.random()*2 +29,2) for i in range(6)]
+        log.info("Adding random data %s" % (l,))
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend(l)
+    else:
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
 
 
     # Attach variable and dimension objects to the root group
@@ -401,10 +348,10 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
     attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', ['2008-08-01T00:50:00Z'])
     attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', ['2008-08-01T23:50:00Z'])
-    attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', ['-45.431'])
-    attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', ['-45.431'])
-    attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', ['25.909'])
-    attrib_lon_min = _create_string_attribute(dataset, 'ion_geospatial_lon_min', ['25.909'])
+    attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', [str(lat)])
+    attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', [str(lat)])
+    attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', [str(long)])
+    attrib_lon_min = _create_string_attribute(dataset, 'ion_geospatial_lon_min', [str(long)])
     attrib_vert_max = _create_string_attribute(dataset, 'ion_geospatial_vertical_max', ['0.0'])
     attrib_vert_min = _create_string_attribute(dataset, 'ion_geospatial_vertical_min', ['0.2'])
     attrib_vert_pos = _create_string_attribute(dataset, 'ion_geospatial_vertical_positive', ['down'])
@@ -446,42 +393,6 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     return True
 
 
-def bootstrap_data_source_resource(datasource, *args, **kwargs):
-
-
-    #-------------------------------------------#
-    # Create the coresponding datasource object #
-    #-------------------------------------------#
-    ds_svc = args[0]
-
-    dataset_id = kwargs.get('associated_dataset_id')
-    dataset = ds_svc.workbench.get_repository(dataset_id)
-
-    has_a_id = kwargs.get('has_a_id')
-    has_a = ds_svc.workbench.get_repository(has_a_id)
-
-    datasource.Repository.commit('Commit source before creating association')
-    
-     # Just create it - the workbench/datastore will take care of the rest!
-    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
-
-    datasource.source_type = datasource.SourceType.SOS
-    datasource.property.append('sea_water_temperature')
-    datasource.station_id.append('41012')
-    datasource.request_type = datasource.RequestType.NONE
-    # datasource.top = *not used*
-    # datasource.bottom = *not used*
-    # datasource.left = *not used*
-    # datasource.right = *not used*
-#    datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
-    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-    # datasource.dataset_url = *not used*
-    # datasource.ncml_mask = *not used*
-    datasource.max_ingest_millis = 6000
-
-    return True
-
-
 def _create_string_attribute(dataset, name, values):
     '''
     Helper method to create string attributes for variables and dataset groups
@@ -501,3 +412,405 @@ def _add_string_attribute(dataset, variable, name, values):
 
     atrib_ref = variable.attributes.add()
     atrib_ref.SetLink(atrib)
+
+
+#---------------------------------------------#
+# Create the corresponding datasource objects #
+#---------------------------------------------#
+
+def bootstrap_profile_data_source_resource(datasource, *args, **kwargs):
+
+
+    #--------------------------------------------#
+    # Create the corresponding datasource object #
+    #--------------------------------------------#
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+     # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+    datasource.source_type = datasource.SourceType.SOS
+    datasource.property.append('sea_water_temperature')
+    datasource.station_id.append('41012')
+    datasource.request_type = datasource.RequestType.NONE
+
+    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+def bootstrap_traj_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: NDBC SOS Glider data
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+    datasource.source_type = datasource.SourceType.SOS
+    datasource.property.append('salinity')
+    datasource.station_id.append('48900')
+    datasource.request_type = datasource.RequestType.NONE
+
+    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+
+    datasource.max_ingest_millis = 10000
+
+    return True
+
+
+def bootstrap_station_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.USGS
+    datasource.property.append('00010')
+    datasource.property.append('00060')
+    datasource.station_id.append('01463500')
+    datasource.request_type = datasource.RequestType.NONE # *not used*
+
+    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_hycom_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.NETCDF_S
+    datasource.request_type = datasource.RequestType.FTP
+    datasource.base_url = "ftp://ftp7300.nrlssc.navy.mil/pub/smedstad/ROMS/"
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_ntas1_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.NETCDF_S
+    datasource.request_type = datasource.RequestType.DAP
+
+    datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_ntas2_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.NETCDF_S
+    datasource.request_type = datasource.RequestType.DAP
+
+
+    datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-2.nc"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_whots1_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.NETCDF_S
+    datasource.request_type = datasource.RequestType.DAP
+
+    datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_whots2_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+    datasource.source_type = datasource.SourceType.NETCDF_S
+    datasource.request_type = datasource.RequestType.DAP
+
+    datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+def bootstrap_moanalua_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.USGS
+    datasource.property.extend(['00010', '00060', '00065', '00045', '00095'])
+    datasource.station_id.append('212359157502601')
+    datasource.request_type = datasource.RequestType.NONE # *not used*
+
+    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_choptank_river_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.USGS
+    datasource.property.extend(['00010', '00060', '00065', '00045', '00095'])
+    datasource.station_id.append('01491000')
+    datasource.request_type = datasource.RequestType.NONE # *not used*
+
+    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+def bootstrap_connecticut_river_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the corresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+
+
+    ds_svc = args[0]
+
+    dataset_id = kwargs.get('associated_dataset_id')
+    dataset = ds_svc.workbench.get_repository(dataset_id)
+
+    if not dataset:
+        # Abort if the dataset does not exist
+        return False
+
+    has_a_id = kwargs.get('has_a_id')
+    has_a = ds_svc.workbench.get_repository(has_a_id)
+
+    datasource.Repository.commit('Commit source before creating association')
+
+    # Just create it - the workbench/datastore will take care of the rest!
+    asssociation = ds_svc.workbench.create_association(datasource, has_a,  dataset)
+
+
+    datasource.source_type = datasource.SourceType.USGS
+    datasource.property.extend(['00010', '00060', '00065', '00045', '00095'])
+    datasource.station_id.append('01184000')
+    datasource.request_type = datasource.RequestType.NONE # *not used*
+
+    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
+
+    datasource.max_ingest_millis = 6000
+
+    return True
+
+
+

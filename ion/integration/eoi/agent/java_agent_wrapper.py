@@ -8,6 +8,7 @@
 """
 
 # Imports:
+import os
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.core.process.process import Process, ProcessFactory
@@ -22,6 +23,9 @@ import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
+
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 # Imports: Builtin
 import time, datetime
@@ -287,6 +291,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         Terminates the underlying dataset agent by sending it a 'terminate' message and waiting for the OSProcess object's exit callback.  
         '''
+        yield
         log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
         result = None
         if self._get_state() is BasicStates.S_ACTIVE:
@@ -542,8 +547,11 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = "res/apps/eoi_ds_agent/DatasetAgent.jar"   # STAR #
-        
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'res/apps/eoi_ds_agent/DatasetAgent.jar')
+
+        if not os.path.exists(jar_pathname):
+            log.error("JAR for dataset agent (%s) not found" % jar_pathname)
+            raise Exception("JAR for dataset agent (%s)" % str(CONF))
         
         parent_host_name = self.container.exchange_manager.message_space.hostname
         parent_xp_name = self.container.exchange_manager.exchange_space.name

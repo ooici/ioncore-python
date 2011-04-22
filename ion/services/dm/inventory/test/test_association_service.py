@@ -35,7 +35,7 @@ from ion.services.coi.resource_registry_beta import resource_client
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID , MYOOICI_USER_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, ION_AIS_RESOURCES_CFG
@@ -118,9 +118,10 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
-        self.assertEqual(len(result.idrefs),2)
-        self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
-        self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
+        self.assertEqual(len(result.idrefs),3)
+        self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
+        self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
+        self.assertIn(result.idrefs[2].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
 
 
     @defer.inlineCallbacks
@@ -160,9 +161,10 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
-        self.assertEqual(len(result.idrefs),2)
-        self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
-        self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
+        self.assertEqual(len(result.idrefs),3)
+        self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
+        self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
+        self.assertIn(result.idrefs[2].key, [ANONYMOUS_USER_ID, ROOT_USER_ID, MYOOICI_USER_ID])
 
 
     @defer.inlineCallbacks
@@ -212,8 +214,9 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
-        self.assertEqual(len(result.idrefs),1)
-        self.assertIn(result.idrefs[0].key, ROOT_USER_ID)
+        self.assertEqual(len(result.idrefs),2)
+        self.assertIn(result.idrefs[0].key, [ROOT_USER_ID, MYOOICI_USER_ID])
+        self.assertIn(result.idrefs[1].key, [ROOT_USER_ID, MYOOICI_USER_ID])
 
 
 

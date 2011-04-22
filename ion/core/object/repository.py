@@ -23,6 +23,8 @@ from ion.core.object import object_utils
 
 from ion.core.object import association_manager
 
+from ion.core.exception import ApplicationError, ReceivedApplicationError, ReceivedContainerError
+
 from ion.util import procutils as pu
 
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
@@ -30,10 +32,14 @@ MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
 BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
 LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 
+REQUEST_COMMIT_BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=48, version=1)
+
+
+ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
 from ion.core.object import object_utils
 
-class RepositoryError(Exception):
+class RepositoryError(ApplicationError):
     """
     An exception class for errors in the object management repository 
     """
@@ -153,6 +159,8 @@ class ObjectContainer(object):
     Base class for the repository and merge container
     """
 
+    DefaultExcludedTypes = [ARRAY_STRUCTURE_TYPE,]
+
     def __init__(self):
 
 
@@ -180,6 +188,20 @@ class ObjectContainer(object):
         Required for get_linked_object
         """
 
+        self._process=None
+        """
+        Need for access to sending messages!
+        """
+
+        self.upstream=None
+        """
+        The upstream source of this repository.
+        """
+
+        self.excluded_types = []
+        """
+        The list of currently excluded object types
+        """
 
     @property
     def root_object(self):
@@ -197,6 +219,10 @@ class ObjectContainer(object):
         self._workspace.clear()
         self.index_hash.clear()
         self._workspace_root = None
+
+        self._process = None
+        self.upstream = None
+
 
     def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):
         """
@@ -304,6 +330,103 @@ class ObjectContainer(object):
                 child = self.get_linked_object(link)
                 self.load_links(child, excluded_types)
 
+
+    def _checkout_local_commit(self, commit, excluded_types):
+
+        # Get the link to the root object
+        link = commit.GetLink('objectroot')
+
+        # Catch only KeyErrors!
+        root_obj = self.get_linked_object(link)
+
+        # Load the object structure
+        self.load_links(root_obj, excluded_types)
+
+        return root_obj
+
+    @defer.inlineCallbacks
+    def _checkout_remote_commit(self, commit, excluded_types):
+        """
+        Use the message client from the process to create a message
+        Can not use the datastore client because of import problems...
+        """
+
+        proc = self._process
+        if proc is None:
+            raise RepositoryError('Can not make a non-local checkout without a process!')
+
+        request = yield proc.message_client.create_instance(REQUEST_COMMIT_BLOBS_MESSAGE_TYPE)
+
+        link = commit.GetLink('objectroot')
+        request.commit_root_object = link.key
+        for extype in excluded_types:
+            exobj = request.excluded_types.add()
+            exobj.object_id = extype.object_id
+            exobj.version = extype.version
+
+        try:
+            result, headers, msg = yield proc.rpc_send(self.upstream, 'checkout', request)
+
+        except ReceivedApplicationError, rae:
+            log.error(rae)
+            raise RepositoryError('Received application error during remote checkout operation!', 404)
+        except ReceivedContainerError, rce:
+            log.error(rce)
+            raise RepositoryError('Received container error during remote checkout operation!', 404)
+
+        for blob in result.blob_elements:
+            element = gpb_wrapper.StructureElement(blob.GPBMessage)
+            self.index_hash[element.key] = element
+            #print element
+
+        element = self.index_hash[link.key]
+        root_obj = self._load_element(element)
+
+        self.load_links(root_obj, excluded_types)
+
+
+        defer.returnValue(root_obj)
+
+
+
+    def checkout_commit(self, commit, excluded_types):
+        """
+        @brief Checkout_commit will checkout the content of a commit. It will attempt to get
+        the content from the local repository. Failing that it will attempt to get it from a
+        remote process.
+        @param commit is the commit object to checkout
+        @param excluded_types is a list of type objects to exclude while checking out the structure
+        @retval the result maybe deferred as a result of the non local checkout. yielding will
+        return the root_object.
+        """
+
+        # Set the excluded types used in checking out this repository
+        self.excluded_types = excluded_types
+
+        if not hasattr(excluded_types, '__contains__' ):
+            raise RepositoryError('Invalid argument excluded_types in checkout_commit: must be a list of object types')
+
+        link = commit.GetLink('objectroot')
+        if link.type.GPBMessage in excluded_types:
+            raise RepositoryError('Can not exclude the type of the root object!')
+
+        root_obj = None
+
+        try:
+            root_obj = self._checkout_local_commit(commit, excluded_types)
+
+        except KeyError, ke:
+
+            log.info('Making none local checkout')
+
+        if root_obj is None:
+
+            root_obj = self._checkout_remote_commit(commit, excluded_types)
+
+
+        return root_obj
+
+
     def _load_element(self, element):
 
         # check that the calculated value in element.sha1 matches the stored value
@@ -352,37 +475,16 @@ class Repository(ObjectContainer):
         
         
         #self.status  is a property determined by the workspace root object status
-        
+
+        ObjectContainer.__init__(self)
+
+
         self._object_counter=1
         """
         A counter object used by this class to identify content objects untill
         they are indexed
         """
-        
-        self._workspace = {}
-        """
-        A dictionary containing objects which are not yet indexed, linked by a
-        counter refrence in the current workspace
-        """
-        
-        self._workspace_root = None
-        """
-        Pointer to the current root object in the workspace
-        """
-        
-        
-        self._commit_index = {}
-        """
-        A dictionary containing the commit objects - all immutable content hashed
-        """
-        
-        self.index_hash = IndexHash()
-        """
-        All content elements are stored here - from incoming messages and
-        new commits - everything goes here. Now it can be decoded for a checkout
-        or sent in a message.
-        """
-        
+
         
         self._current_branch = None
         """
@@ -408,16 +510,7 @@ class Repository(ObjectContainer):
         """
         A place to stash the work space under a saved name.
         """
-        
-        self._upstream={}
-        """
-        The upstream source of this repository. 
-        """
 
-        self._process=None
-        """
-        Need for access to sending messages!
-        """
 
         if not isinstance(persistent, bool):
             raise RepositoryError('Invalid argument type to set the persistent property of a repository')
@@ -468,15 +561,6 @@ class Repository(ObjectContainer):
     def repository_key(self):
         return self._dotgit.repositorykey
 
-    
-    def _set_upstream(self, source):
-        self._upstream = source
-        
-    def _get_upstream(self):
-        return self._upstream
-    
-    upstream = property(_get_upstream, _set_upstream)
-
     def _set_persistent(self, value):
         if not isinstance(value, bool):
             raise RepositoryError('Invalid argument type to set the persistent property of a repository')
@@ -526,7 +610,7 @@ class Repository(ObjectContainer):
         self._current_branch = None
         self.branchnicknames.clear()
         self._stash.clear()
-        self._upstream.clear()
+        self.upstream = None
         self._process = None
 
         if self.merge is not None:
@@ -690,15 +774,21 @@ class Repository(ObjectContainer):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=[]):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, excluded_types=None):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
         Branch can be either a local nick name or a global branch key
-
-        @TODO implement exclude types list in fetching/loading objects!
         """
-        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s"' % (branchname, commit_id, older_than))
+
+        if excluded_types is None:
+            excluded_types = self.excluded_types or self.DefaultExcludedTypes
+        elif not hasattr(excluded_types, '__iter__'):
+            raise RepositoryError('Invalid excluded_types argument passed to checkout')
+
+
+
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, excluded_types))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -827,11 +917,9 @@ class Repository(ObjectContainer):
             
         # Automatically fetch the object from the hashed dictionary
 
-        rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
+        rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, excluded_types)
         self._workspace_root = rootobj
-        
-        yield self.load_remote_links(rootobj)
-        # @TODO figure out if there is any point to checking the value of the result?
+
 
         
         self._detached_head = detached
@@ -913,20 +1001,33 @@ class Repository(ObjectContainer):
         cref = self._current_branch.commitrefs[0]
 
         # Do some clean up!
-        for item in self._workspace.itervalues():
-            item.Invalidate()
-        self._workspace = {}
-        self._workspace_root = None
+        self.purge_workspace()
             
             
         # Automatically fetch the object from the hashed dictionary or fetch if needed!
         rootobj = cref.objectroot
         self._workspace_root = rootobj
         
-        self.load_links(rootobj)
+        self.load_links(rootobj, self.excluded_types)
                 
         return rootobj
-        
+
+
+    def purge_workspace(self):
+
+        if self.status == self.MODIFIED:
+
+            raise RepositoryError('Can not purge repository in a modified state! Data will be lost')
+
+        # Do some clean up!
+        for item in self._workspace.itervalues():
+            item.Invalidate()
+
+        self._workspace.clear()
+        self._workspace_root = None
+
+
+
         
     def commit(self, comment=''):
         """
@@ -936,6 +1037,9 @@ class Repository(ObjectContainer):
         # If the repo is in a valid state - make the commit even if it is up to date
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
+
+            # Reset the commit counter - used for debuging only
+            gpb_wrapper.WrapperType.recurse_counter.count=0
 
             self._workspace_root.RecurseCommit(structure)
 
@@ -974,6 +1078,7 @@ class Repository(ObjectContainer):
         """
         # Now add a Commit Ref
         # make a new commit ref
+
         commit_cls = object_utils.get_gpb_class_from_type_id(COMMIT_TYPE)
         cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
@@ -1071,20 +1176,15 @@ class Repository(ObjectContainer):
                       % (branchname, commit_id))
             raise RepositoryError('merge takes either a branchname argument or a commit_id argument!')
         
-        assert len(crefs) > 0, 'Illegal state reached in Repository Merge function!'
+        assert len(crefs) > 0, 'Illegal state reached in repository Merge With function!'
 
         for cref in crefs:
             # Create a merge container to hold the merge object state for access
 
             mr = MergeRepository(cref, self.index_hash.cache)
 
+            yield mr.load_root(excluded_types = self.excluded_types)
 
-            # Place holder until we deal with getting objects not currently present
-            
-            yield 1
-
-            mr.load_root()
-            
             if self.merge is None:
                 self.merge = MergeContainer()
 
@@ -1221,41 +1321,6 @@ class Repository(ObjectContainer):
             res = True
 
         defer.returnValue(res)
-            
-    def _load_element(self, element):
-        
-        #log.debug('_load_element' + str(element))
-
-        # check that the calculated value in element.sha1 matches the stored value
-        if not element.key == element.sha1:
-            #@TODO Consider removing this somewhat costly check - it is already done when an object is read from a message
-            raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
-
-        cls = object_utils.get_gpb_class_from_type_id(element.type)
-                                
-        # Do not automatically load it into a particular space...
-        obj = self._create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
-            
-        # If it is a leaf element set the bytes for the object, do not load it
-        # If it is not a leaf element load it and find its child links
-        if element.isleaf:
-            
-            obj._bytes = element.value
-            
-        else:
-            obj.ParseFromString(element.value)
-            obj.FindChildLinks()
-
-
-        obj.Modified = False
-        
-        # Make a note in the element of the child links as well!
-        for child in obj.ChildLinks:
-            element.ChildLinks.add(child.key)
-        
-        return obj
-        
         
     def copy_object(self, value, deep_copy=True):
         """
@@ -1393,19 +1458,13 @@ class MergeRepository(ObjectContainer):
         # The commit does not belong to the Merge container - it is an object from the repository
         self.commit = commit
 
-        self.load_root()
 
+    @defer.inlineCallbacks
+    def load_root(self, excluded_types):
 
+        self._workspace_root = yield self.checkout_commit(self.commit, excluded_types)
 
-    def load_root(self):
-
-        obj = self.commit.objectroot
-
-        self._workspace_root = obj
-
-        obj.ReadOnly = True
-
-        self.load_links(obj)
+        self._workspace_root.SetStructureReadOnly()
 
 
 class MergeContainer(object):

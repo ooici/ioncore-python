@@ -8,19 +8,19 @@ These classes are the lowest level of the object management stack
 TODO:
 Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 """
-import sys
 
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
 import struct
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
-    
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
@@ -33,9 +33,12 @@ CDM_GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 CDM_DIMENSION_TYPE = create_type_identifier(object_id=10018, version=1)
 CDM_ATTRIBUTE_TYPE = create_type_identifier(object_id=10017, version=1)
 CDM_ARRAY_INT32_TYPE = create_type_identifier(object_id=10009, version=1)
+CDM_ARRAY_UINT32_TYPE = create_type_identifier(object_id=10010, version=1)
+CDM_ARRAY_INT64_TYPE = create_type_identifier(object_id=10011, version=1)
 CDM_ARRAY_FLOAT32_TYPE = create_type_identifier(object_id=10013, version=1)
+CDM_ARRAY_FLOAT64_TYPE = create_type_identifier(object_id=10014, version=1)
 CDM_ARRAY_STRING_TYPE = create_type_identifier(object_id=10015, version=1)
-
+CDM_ARRAY_OPAQUE_TYPE = create_type_identifier(object_id=10016, version=1)
 
 class OOIObjectError(Exception):
     """
@@ -219,7 +222,7 @@ class WrappedRepeatedScalarProperty(WrappedProperty):
         return ScalarContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Scalar in ION Object')
+        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object')
 
         return None
     
@@ -274,6 +277,11 @@ class WrappedScalarProperty(WrappedProperty):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
 
 
+class CommitCounter(object):
+    """
+    Class used to count the number of recursive calls to commit a data structure
+    """
+    count = 0
 
 class WrapperType(type):
     """
@@ -284,6 +292,10 @@ class WrapperType(type):
     """
 
     _type_cache = {}
+
+
+    recurse_counter = CommitCounter()
+
 
     def __call__(cls, gpbMessage, *args, **kwargs):
         # Cache the custom-built classes
@@ -306,6 +318,8 @@ class WrapperType(type):
             clsDict['_GPBClass'] = gpbMessage.__class__
             clsDict['_Properties'] = properties
             clsDict['_Enums'] = enums
+
+            clsDict['recurse_count'] = WrapperType.recurse_counter
 
             # Now setup the properties to map through to the GPB object
             descriptor = msgType.DESCRIPTOR
@@ -388,9 +402,9 @@ class WrapperType(type):
 
     def _add_specializations(cls, obj_type, clsDict):
 
-        #-----------------------------------#
+        #-------------------------------------#
         # Wrapper_Dataset Specialized Methods #
-        #-----------------------------------#
+        #-------------------------------------#
         def _make_root_group(self, name=''):
             """
             Specialized method for CDM (dataset) Objects to append a group object with the given name
@@ -404,6 +418,58 @@ class WrapperType(type):
             group.name = name
             self.root_group = group
 
+        def _get_variable_names(self):
+            """
+            """
+            def _recurse_get_variable_names(group):
+                result = ""
+                group_name = '"%s"' % str(group.name)
+                for var in group.variables:
+                    var_name = '"%s"' % str(var.name)
+                    result += 'Group: %-20s Variable: %s\n' % (group_name, var_name)
+                for inner_group in group.groups:
+                    result += _recurse_get_variable_names(inner_group)
+                return result
+            
+            return _recurse_get_variable_names(self.root_group)
+
+        def _get_group_attributes_for_display(self, group=None):
+            """
+            """
+            if group is None:
+                group = self.root_group
+                
+            result = ""
+            for atrib in group.attributes:
+                name = str(atrib.name)
+                vals = str(group.FindAttributeByName(name).GetValues())
+                idx = int(group.FindAttributeIndexByName(name))
+                result += "(%02i) %-35s%s\n" % (idx, name, vals)
+            
+            return result
+        
+        def _get_variable_attributes_for_display(self):
+            """
+            """
+            def _recurse_get_variable_atts(group, group_namespace=None):
+                result = ""
+                group_name = group_namespace or ""
+                group_name += group.name
+                for var in group.variables:
+                    result += "\n\n%s.%s" % (str(group_name), str(var.name))
+                    for atrib in var.attributes:
+                        name = str(atrib.name)
+                        vals = str(var.FindAttributeByName(name).GetValues())
+                        idx = var.FindAttributeIndexByName(name)
+                        result += "\n(%03i) %-30s\t\t%s" % (idx, name, vals)
+                        
+                for inner_group in group.groups:
+                    result += _recurse_get_variable_atts(inner_group, group_name + '.')
+                    
+                return result
+            
+            return _recurse_get_variable_atts(self.root_group)
+                
 
         #-----------------------------------#
         # Wrapper_Group Specialized Methods #
@@ -439,10 +505,13 @@ class WrapperType(type):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
-            if not values or not isinstance(values, list):
-                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
-            if not data_type or not isinstance(data_type, int):
-                raise TypeError('Type mismatch for argument "data_type" -- Expected %s; received %s with value: "%s"' % (repr(int), type(data_type), str(data_type)))
+            if values is None or (isinstance(values, list) and 0 == len(values)):
+                raise ValueError('Invalid argument "values" -- Please specify a non-empty list')
+            if not data_type or not isinstance(data_type, (int, long)):
+                raise TypeError('Type mismatch for argument "data_type" -- Expected int or long; received %s with value: "%s"' % (type(data_type), str(data_type)))
+
+            if not isinstance(values, list):
+                values = [values]
 
             # @todo: all items must be the same type...  this includes ommiting/casting null values
             #        since they will cause an error when stored in the GPB array representation
@@ -465,20 +534,42 @@ class WrapperType(type):
 
             # Set the datatype based on the type of values being given
             # @todo: add support for remaining array types (currently only string attributes are even used)
+            # @todo: because many object types are not support fully here -- where should we put value checking...
+            #        ex: since bool is stored as int, prevent any value other than 0 and 1
+            def _attach_byte_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.BYTE
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_UINT32_TYPE)
+            def _attach_short_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.SHORT
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT32_TYPE)
             def _attach_int32_array(parent, atrib_inst):
                 atrib_inst.data_type = atrib_inst.DataType.INT
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT32_TYPE)
+            def _attach_int64_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.LONG
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT64_TYPE)
             def _attach_float32_array(parent, atrib_inst):
                 atrib_inst.data_type = atrib_inst.DataType.FLOAT
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_FLOAT32_TYPE)
+            def _attach_float64_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.DOUBLE
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_FLOAT64_TYPE)
+            def _attach_char_array(parent, atrib_inst): # CHAR doesnt exist in GPB
+                atrib_inst.data_type = atrib_inst.DataType.CHAR
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
             def _attach_string_array(parent, atrib_inst):
                 # @todo: modify this to support unicode types (GPB stringArray already supports it)
                 atrib_inst.data_type = atrib_inst.DataType.STRING
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
 
-            attach_array_definitions = {self.DataType.STRING : _attach_string_array,
-                                        self.DataType.INT    : _attach_int32_array,
-                                        self.DataType.FLOAT  : _attach_float32_array}
+            attach_array_definitions = {self.DataType.BYTE    : _attach_byte_array,
+                                        self.DataType.SHORT   : _attach_short_array,
+                                        self.DataType.INT     : _attach_int32_array,
+                                        self.DataType.LONG    : _attach_int64_array,
+                                        self.DataType.FLOAT   : _attach_float32_array,
+                                        self.DataType.DOUBLE  : _attach_float64_array,
+                                        self.DataType.CHAR    : _attach_char_array,
+                                        self.DataType.STRING  : _attach_string_array}
 
             attach_array_definitions[data_type](self, atrib)
 
@@ -701,7 +792,25 @@ class WrapperType(type):
             return result
 
 
-        def __remove_attribute(self, name):
+        def _cdm_resource_has_attribute(self, name):
+            """
+            Specialized method for CDM Objects to check existance of an attribute object by its name
+            """
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
+
+            result = False
+            for att in self.attributes:
+                if att.name == name:
+                    result = True
+                    break
+
+            return result
+
+
+        def _remove_attribute(self, name):
             """
             Removes an attribute with the given name from this CDM Object (GROUP)
             @return: The attribute which was removed as a convenience
@@ -713,23 +822,32 @@ class WrapperType(type):
             return atr
 
 
-        def _set_attribute(self, name, values):
+        def _set_attribute(self, name, values, data_type=None):
             """
             Specialized method for CDM Objects to set values for existing attributes
+            @raise ValueError: When setting an attribute to a different data_type, if
+                               data_type is not explicitly specified a ValueError will be raised
             """
             # @attention: Should we allow an empty list of values for an attribute?
             if not isinstance(name, str):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
-            if not values or not isinstance(values, list):
-                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
+            if values is None or (isinstance(values, list) and 0 == len(values)):
+                raise ValueError('Invalid argument "values", please specify a non-empty list')
+            
+            if not isinstance(values, list):
+                values = [values]
 
-            atr = __remove_attribute(self, name)
+            atr = _remove_attribute(self, name)
+            data_type = data_type or atr.data_type
             try:
-                _add_attribute(self, name, int(atr.data_type), values)
+                _add_attribute(self, name, int(data_type), values)
+                log.warn('Old references to the attribute "%s" are now detached and will not point to the new attribute value' % name)
             except Exception, ex:
                 log.warn('WARNING! Exception may have left this resource in an invalid state')
+                atr_link = self.attributes.add()
+                atr_link.SetLink(atr)
                 raise ex
 
 
@@ -786,6 +904,19 @@ class WrapperType(type):
             Specialized method for CDM Objects to find the length of an attribute object's values
             """
             return len(self.array.value)
+
+        def _get_attribute_data_type(self):
+            """
+            Specialized method for CDM Objects to retrieve the attribute data_type as a long.
+            This value can be used to compare equality with other attributes' data_types
+            """
+            return self.data_type
+        
+        def _attribute_is_same_type(self, attribute):
+            if not hasattr(attribute, 'GetDataType'):
+                raise TypeError('The datatype of the given attribute cannot be found.:  Please specify an instance of "%s".  Recieved "%s"' % (type(self), type(attribute)))
+            
+            return self.GetDataType() == attribute.GetDataType()
 
 
         #--------------------------------------#
@@ -854,6 +985,9 @@ class WrapperType(type):
         elif obj_type == CDM_DATASET_TYPE:
 
             clsDict['MakeRootGroup'] = _make_root_group
+            clsDict['ShowVariableNames'] = _get_variable_names
+            clsDict['ShowGlobalAttributes'] = _get_group_attributes_for_display
+            clsDict['ShowVariableAttributes'] = _get_variable_attributes_for_display
 
         elif obj_type == CDM_GROUP_TYPE:
 
@@ -867,6 +1001,8 @@ class WrapperType(type):
             clsDict['FindVariableByName'] = _find_variable_by_name
             clsDict['FindVariableIndexByName'] = _find_variable_index_by_name
             clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            clsDict['HasAttribute'] = _cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = _remove_attribute
             clsDict['SetAttribute'] = _set_attribute
             clsDict['SetDimension'] = _set_dimension
 
@@ -881,6 +1017,8 @@ class WrapperType(type):
             # clsDict['SetValue'] = _get_attribute_values
             # clsDict['SetValues'] = _get_attribute_values
             clsDict['GetLength'] = _get_attribute_values_length
+            clsDict['GetDataType'] = _get_attribute_data_type
+            clsDict['IsSameType'] = _attribute_is_same_type
 
 
         elif obj_type == CDM_VARIABLE_TYPE:
@@ -891,6 +1029,8 @@ class WrapperType(type):
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            clsDict['HasAttribute'] = _cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = _remove_attribute
             clsDict['SetAttribute'] = _set_attribute
             clsDict['SetDimension'] = _set_dimension
 
@@ -931,6 +1071,7 @@ class Wrapper(object):
     '''
 
     __metaclass__ = WrapperType
+
 
 
     def __init__(self, gpbMessage):
@@ -1280,8 +1421,14 @@ class Wrapper(object):
         Recursively build up the serialized structure elements which are needed
         to commit this wrapper and reset all the links using its CAS name.
         """
+
+        #print self.Debug()
+
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        self.recurse_count.count += 1
+        log.debug('Entering Recurse Commit: recurse counter - %d, child links - %d, objects to commit - %d' % (self.recurse_count.count, len(self.ChildLinks), len(structure)) )
 
         if not  self.Modified:
             # This object is already committed!
@@ -1290,16 +1437,23 @@ class Wrapper(object):
         # Create the Structure Element in which the binary blob will be stored
         se = StructureElement()
         repo = self.Repository
+
         for link in  self.ChildLinks:
 
             # Test to see if it is already serialized!
-            child_se = repo.index_hash.get(link.key, None)
+            child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
+            #child_se = repo.index_hash.get(link.key, None)
+
+            #print 'Setting child Link:', child_se
             if  child_se is not None:
 
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
 
             else:
+
+                #print 'SE for child not found - determining number of child links'
+
                 child = repo.get_linked_object(link)
 
                 # Determine whether this is a leaf node
@@ -1308,6 +1462,8 @@ class Wrapper(object):
                 else:
                     link.isleaf = False
 
+
+                #print 'Calling Recurse Commit on child'
                 child.RecurseCommit(structure)
 
             # Save the link info as a convience for sending!
@@ -1346,19 +1502,24 @@ class Wrapper(object):
                 # Get the other object with the same name...
                 other = repo._workspace[se.key]
 
+
                 # if the value of a field has been set to the same value again,
                 # it will be re serialized and re hashed. This is not a conflict!
                 if not other is self:
 
-                    self.ParentLinks = set.union(self.ParentLinks, other.ParentLinks)
+
+                    self.ParentLinks.update(other.ParentLinks)
 
                     # Here, we don't want to modify a parent if it is already correct.
                     # The hash conflict provides a back door by which a parent, which is
                     # already benn correctly committed might be modified if we are not careful
                     for link in self.ParentLinks:
-                        if link.key != se.key:
-                            link.key = se.key
 
+
+                        # if it is invalid - the parent has already been serialized
+                        if not link.Invalid and link.key != se.key:
+                            link.key = se.key
+                    """
                     msg = '=============================================\n'
                     msg += '''DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure. This is not an error, but the state of this composite is now shared.\n'''
                     msg +='Shared Object: %s' % self.Debug()
@@ -1367,8 +1528,9 @@ class Wrapper(object):
                         msg +='Parent: %s' % (link.Root.Debug())
                     msg +='Old references to the object are now invalid!\n'
                     msg += '============================================='
-                    #log.warn(msg)
-
+                    log.warn(msg)
+                    """
+                    
                     # Force the object to be reloaded from the workbench!
                     del repo._workspace[se.key]
                     other.Invalidate()
@@ -1388,6 +1550,7 @@ class Wrapper(object):
         # This will only be reached once for a given child object. Set all parents
         # now and the child will return as unmodified when the other parents ask it
         # to recurse commit.
+
         for link in self.ParentLinks:
             link.key = self.MyId
 
@@ -1555,6 +1718,7 @@ class Wrapper(object):
         output += 'Wrapper IsRoot: %s \n' % self.IsRoot
         output += 'Wrapper ParentLinks: %s \n' % str(self.ParentLinks)
         output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
+        output += 'Wrapper Type: %s \n' % str(self.ObjectType)
         output += 'Wrapper current value:\n'
         output += str(self) + '\n'
         output += '================== Wrapper Complete =========================\n'

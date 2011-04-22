@@ -312,5 +312,7 @@ errors = {
     'GET_DEVICE_ERR'            : ['ERROR','GET_DEVICE_ERR','Could not retrieve all parameters from the device.'],
     'EXE_DEVICE_ERR'            : ['ERROR','EXE_DEVICE_ERR','Could not execute device command.'],
     'SET_DEVICE_ERR'            : ['ERROR','SET_DEVICE_ERR','Could not set all device parameters.'],
-    'ACQUIRE_SAMPLE_ERR'        : ['ERROR','ACQUIRE_SAMPLE_ERR','Could not acquire a data sample.']
+    'ACQUIRE_SAMPLE_ERR'        : ['ERROR','ACQUIRE_SAMPLE_ERR','Could not acquire a data sample.'],
+    'DRIVER_NOT_CONFIGURED'     : ['ERROR','DRIVER_NOT_CONFIGURED','The driver could not be configured.'],
+    'DISCONNECT_FAILED'         : ['ERROR','DISCONNECT_FAILED','The driver could not be properly disconnected.']
   }

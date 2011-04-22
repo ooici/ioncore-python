@@ -257,12 +257,88 @@ class WorkBench(object):
         """
         Fork the structure in the wrapped gpb object into a new repository.
         """
-         
+
+
+    def _get_blobs(self, repo, startkeys, filtermethod=None):
+        """
+        Common blob fetching helper method.
+        Used by checkout and pull.
+
+        @param  repo            Repository for the response.
+        @param  startkeys       The keys that should start the fetching process.
+        @param  filtermethod    A callable to be applied to all children of fetched items. If the callable returns true,
+                                the item is included.
+
+        @returns                A dictionary of keys => blobs.
+        """
+        # Slightly different machinary here than in the workbench - Could be made more similar?
+        blobs={}
+        keys_to_get=set(startkeys)
+        def_filter = lambda x: True
+        filtermethod = filtermethod or def_filter
+
+        while len(keys_to_get) > 0:
+            new_links_to_get = set()
+
+            def_list = []
+            #@TODO - put some error checking here so that we don't overflow due to a stupid request!
+            for key in keys_to_get:
+                # Short cut if we have already got it!
+                wse = repo.index_hash.get(key)
+
+                if wse:
+                    blobs[wse.key]=wse
+                    # get the object
+                    obj = repo._load_element(wse)
+
+                    # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
+                    new_links_to_get.update(obj.ChildLinks)
+
+            keys_to_get.clear()
+            for link in new_links_to_get:
+                if not blobs.has_key(link.key) and filtermethod(link):
+                    keys_to_get.add(link.key)
+
+        return blobs
+
+
+
     @defer.inlineCallbacks
-    def pull(self, origin, repo_name, get_head_content=True):
+    def op_checkout(self, content, headers, msg):
+
+        if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
+             raise WorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+            """
+            return (x.type not in content.excluded_types)
+
+        blobs = yield defer.maybeDeferred(self._get_blobs, response.Repository, [content.commit_root_object], filtermethod)
+
+        for element in blobs.values():
+            link = response.blob_elements.add()
+            obj = response.Repository._wrap_message_object(element._element)
+
+            link.SetLink(obj)
+
+        yield self._process.reply_ok(msg, content=response)
+
+
+    @defer.inlineCallbacks
+    def pull(self, origin, repo_name, get_head_content=True, excluded_types=None):
         """
         Pull the current state of the repository
         """
+
+        if excluded_types is None:
+            excluded_types = repository.Repository.DefaultExcludedTypes
+        elif not hasattr(excluded_types, '__iter__'):
+            raise WorkBenchError('Invalid excluded_types argument passed to checkout')
+
 
         # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
@@ -290,6 +366,12 @@ class WorkBench(object):
         pullmsg.repository_key = repo.repository_key
         pullmsg.get_head_content = get_head_content
         pullmsg.commit_keys.extend(commit_list)
+
+        if get_head_content:
+            for extype in excluded_types:
+                exobj = pullmsg.excluded_types.add()
+                exobj.object_id = extype.object_id
+                exobj.version = extype.version
 
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)
@@ -342,9 +424,7 @@ class WorkBench(object):
 
 
         # Where to get objects not yet transfered.
-        repo.upstream['service'] = origin
-        repo.upstream['process'] = headers.get('reply-to')
-
+        repo.upstream = targetname
 
         defer.returnValue(result)
 

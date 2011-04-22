@@ -47,11 +47,21 @@ allowed_mac_addr_list = [
 
 mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
 mac_addr_re = re.compile(mac_addr_pattern,re.MULTILINE)
-#mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
-#RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
+mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
+RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 
-    
-    
+
+# It is useful to be able to easily turn tests on and off
+# during development. Also this will ensure tests do not run
+# automatically. 
+SKIP_TESTS = [
+    'test_configure',
+    'test_connect',
+    'test_get_set',
+    'test_execute',
+    'dummy'
+]
+
 
 class TestSBE37(IonTestCase):
     
@@ -110,6 +120,8 @@ class TestSBE37(IonTestCase):
         self.driver_client = SBE37DriverClient(proc=self.sup,
                                                target=self.driver_pid)
 
+
+
     @defer.inlineCallbacks
     def tearDown(self):
         
@@ -117,13 +129,18 @@ class TestSBE37(IonTestCase):
         yield self.simulator.stop()        
         yield self._stop_container()
 
+
+
     @defer.inlineCallbacks
     def test_configure(self):
-
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
-
+        """
+        Test driver configure functions.
+        """
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_configure' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -141,14 +158,19 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,params)
         self.assertEqual(current_state,'STATE_DISCONNECTED')
 
-        
+
     
     @defer.inlineCallbacks
     def test_connect(self):
-
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        """
+        Test driver connect to device.
+        """
+        
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_connect' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -191,17 +213,20 @@ class TestSBE37(IonTestCase):
         self.assertEqual(success[0],'OK')
         self.assertEqual(result,None)
         self.assertEqual(current_state,'STATE_DISCONNECTED')
+
+        
         
     @defer.inlineCallbacks
     def test_get_set(self):
         """
-        Note that this test changes instrument parameters and can leave them in an
-        altered state if the test fails.
+        Test driver get/set functions. 
         """
 
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_set' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
 
         params = self.sbe_config
@@ -460,16 +485,20 @@ class TestSBE37(IonTestCase):
         self.assertEqual(success[0],'OK')
         self.assertEqual(result,None)
         self.assertEqual(current_state,'STATE_DISCONNECTED')
-        
 
+    
     
     @defer.inlineCallbacks
     def test_execute(self):
+        """
+        Test driver execute functions.
+        """
 
-
-        #if not RUN_TESTS:
-        #    raise unittest.SkipTest("Do not run this test automatically.")
-        raise unittest.SkipTest("Do not run this test automatically.")
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_execute' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
 
         params = self.sbe_config
 
@@ -518,7 +547,6 @@ class TestSBE37(IonTestCase):
         result = reply['result']
 
         self.assertEqual(success[0],'OK')
-        self.assertEqual(params.keys().sort(),result.keys().sort())
         self.assertEqual(current_state,'STATE_CONNECTED')        
 
         # Get all the parameters and dump them to the screen if desired.
@@ -537,15 +565,16 @@ class TestSBE37(IonTestCase):
         dump_dict(result)
 
         # Acquire a polled sample and verify result.
-        
-        params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_ACQUIRE_SAMPLE']}
-        
-        reply = yield self.driver_client.execute(params)
+        channels = ['CHAN_INSTRUMENT']
+        command = ['DRIVER_CMD_ACQUIRE_SAMPLE']
+        timeout = 10
+        reply = yield self.driver_client.execute(channels,command,timeout)
             
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-                    
+        
+        
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
@@ -558,8 +587,10 @@ class TestSBE37(IonTestCase):
         
         
         # Test and verify autosample mode.
-        params = {'channels':['CHAN_INSTRUMENT'],'command':['DRIVER_CMD_START_AUTO_SAMPLING']}
-        reply = yield self.driver_client.execute(params)
+        channels = ['CHAN_INSTRUMENT']
+        command = ['DRIVER_CMD_START_AUTO_SAMPLING']
+        timeout = 10
+        reply = yield self.driver_client.execute(channels,command,timeout)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
@@ -570,26 +601,26 @@ class TestSBE37(IonTestCase):
         yield pu.asleep(30)
 
         # Test and verify autosample exit and check sample data.
-        params = {
-            'channels':['CHAN_INSTRUMENT'],
-            'command':['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA'],
-            'timeout':10
-            }
-
+        channels = ['CHAN_INSTRUMENT']
+        command = ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']
+        timeout = 10
+        
         # If a timeout occurs in stop, reattempt until the test times out.
         # Note: if this times out the instrument will be stuck in autosample
         # mode and require manual reset.
         while True:
   
-            reply = yield self.driver_client.execute(params)
+            reply = yield self.driver_client.execute(channels,command,timeout)
             current_state = yield self.driver_client.get_state()
             success = reply['success']
             result = reply['result']
             
             if success[0] == 'OK':
+                # The command succeeded.
                 break
                             
             elif success[1] == 'TIMEOUT':
+                # The driver command timed out, try again.
                 pass
             
             else:
@@ -607,7 +638,7 @@ class TestSBE37(IonTestCase):
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)
         self.assertEqual(current_state,'STATE_CONNECTED')
-
+        
 
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
@@ -684,9 +715,6 @@ class TestSBE37(IonTestCase):
             print e.msg_content
         else:
             print reply
-
-
-
 
         
         # Dissolve the connection to the device.

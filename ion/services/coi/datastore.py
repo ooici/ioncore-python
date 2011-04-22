@@ -45,7 +45,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -148,30 +148,6 @@ class DataStoreWorkbench(WorkBench):
                     keys_to_get.add(link.key)
 
         defer.returnValue(blobs)
-
-    @defer.inlineCallbacks
-    def op_checkout(self, content, headers, msg):
-
-        if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
-             raise DataStoreWorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
-
-        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
-
-        def filtermethod(x):
-            """
-            Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
-            """
-            return (x.type not in content.excluded_types)
-
-        blobs = yield self._get_blobs(response.Repository, [content.commit_root_object], filtermethod)
-
-        for element in blobs.values():
-            link = response.blob_elements.add()
-            obj = response.Repository._wrap_message_object(element._element)
-
-            link.SetLink(obj)
-
-        yield self._process.reply_ok(msg, content=response)
 
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
@@ -277,7 +253,15 @@ class DataStoreWorkbench(WorkBench):
         if request.get_head_content:
 
             keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
-            blobs = yield self._get_blobs(response.Repository, keys)
+
+
+            def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in request.excluded_types)
+
+            blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.values():
                 link = response.blob_elements.add()
@@ -670,7 +654,8 @@ class DataStoreWorkbench(WorkBench):
         # This is simpler than a push - all of these are guaranteed to be new objects!
         # now put any new commits that are not at the head
         def_list = []
-
+        
+        
 
         for repo_key, repo in self._repos.items():
 
@@ -758,7 +743,11 @@ class DataStoreWorkbench(WorkBench):
         #import pprint
         #print 'After update to heads'
         #pprint.pprint(self._commit_store.kvs)
-
+        log.info("Number of repositories:  %s" % len(self._repos))
+        log.info("Number of blobs: %s " % len(self._workbench_cache))
+        
+        num_commit_keys = map(lambda repo: len(repo._commit_index.keys()), self._repos.values())
+        log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
         self.clear_non_persistent()
@@ -915,6 +904,7 @@ class DataStoreService(ServiceProcess):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
+        self.op_put_blobs = self.workbench.op_put_blobs
 
 
     @defer.inlineCallbacks
@@ -991,7 +981,10 @@ class DataStoreService(ServiceProcess):
                     resource_instance = self._create_resource(value)
                     # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
-                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+                        owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+
+                        self._create_ownership_association(resource_instance.Repository, owner)
 
                     else:
                         del ION_DATASETS[key]
@@ -1004,7 +997,10 @@ class DataStoreService(ServiceProcess):
                     resource_instance = self._create_resource(value)
                     # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
-                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+                        owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+
+                        self._create_ownership_association(resource_instance.Repository, owner)
                     else:
                         del ION_DATA_SOURCES[key]
 
