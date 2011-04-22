@@ -45,7 +45,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -981,7 +981,10 @@ class DataStoreService(ServiceProcess):
                     resource_instance = self._create_resource(value)
                     # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
-                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+                        owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+
+                        self._create_ownership_association(resource_instance.Repository, owner)
 
                     else:
                         del ION_DATASETS[key]
@@ -994,7 +997,10 @@ class DataStoreService(ServiceProcess):
                     resource_instance = self._create_resource(value)
                     # Do not fail if returning none - may or may not load data from disk
                     if resource_instance is not None:
-                        self._create_ownership_association(resource_instance.Repository, ANONYMOUS_USER_ID)
+
+                        owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+
+                        self._create_ownership_association(resource_instance.Repository, owner)
                     else:
                         del ION_DATA_SOURCES[key]
 
