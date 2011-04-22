@@ -3,6 +3,7 @@
 """
 @file ion/agents/instrumentagents/instrument_agent.py
 @author Steve Foley
+@author Edward Hunter
 @brief Instrument Agent, Driver, and Client class definitions
 """
 
@@ -27,7 +28,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 
-
+DEBUG_PRINT = (True,False)[0]
 
 
 
@@ -1831,7 +1832,35 @@ class InstrumentAgent(ResourceAgent):
     ############################################################################
 
 
-
+    @defer.inlineCallbacks
+    def op_driver_event_occurred(self, content, headers, msg):
+        """
+        Called by the driver to announce the occurance of an event. The agent
+        take appropriate action including state transitions, data formatting
+        and publication. This method must be called by a child process of the
+        agent.
+        @param content a dict with 'type' and 'transducer' strings and 'value'
+            object.
+        """
+        
+        assert isinstance(content,dict), 'Expected a content dict.'
+        
+        type = content.get('type',None)
+        transducer = content.get('transducer',None)
+        value = content.get('value',None)
+        
+        assert isinstance(type,str), 'Expected a type string.'
+        assert isinstance(transducer,str), 'Expected a transducer string.'
+        assert value != None, 'Expected a value.'
+        
+        if not (self._is_child_process(headers['sender-name'])):
+            yield self.reply_err(msg,
+                                 'driver event occured evoked from a non-child process')
+            return
+        
+        
+        self._debug_print_driver_event(type,transducer,value)
+        
                 
     @defer.inlineCallbacks
     def op_publish(self, content, headers, msg):
@@ -1902,7 +1931,29 @@ class InstrumentAgent(ResourceAgent):
         """
         return sum(map(lambda x: len(x),self.data_buffer))
         
+        
+    def _debug_print_driver_event(self,type,transducer,value):
+        """
+        """
+        if DEBUG_PRINT:
+            if isinstance(value,str):
+                print 'driver event: '+ type + ',  '+ transducer + ',  ' + value
+                
+            elif isinstance(value,dict):
+                print 'driver event: '+ type + ',  '+ transducer
+                for (key,val) in value.iteritems():
+                    print str(key), ' ', str(val)
+            else:
+                print 'driver event: '+ type + ',  '+ transducer
+                print value
+        
+    def _debug_print(self,event=None,value=None):
+        """
+        """
+        pass
+    
 
+    
         
 class InstrumentAgentClient(ResourceAgentClient):
     """

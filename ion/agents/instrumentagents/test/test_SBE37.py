@@ -573,7 +573,8 @@ class TestSBE37(IonTestCase):
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-                    
+        
+        
         self.assertEqual(success[0],'OK')
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
@@ -637,7 +638,7 @@ class TestSBE37(IonTestCase):
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)
         self.assertEqual(current_state,'STATE_CONNECTED')
-
+        
 
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
