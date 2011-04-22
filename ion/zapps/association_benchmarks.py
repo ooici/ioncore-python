@@ -74,7 +74,7 @@ def find_by_owner():
     for idref in result.idrefs:
         key_list.append(idref.key)
       
-    defer.returnValue(len(key_list))
+    defer.returnValue(key_list)
         
 @defer.inlineCallbacks
 def find_by_lcs():
@@ -116,7 +116,7 @@ def find_by_lcs():
     for idref in result.idrefs:
         key_list.append(idref.key)
         
-    defer.returnValue(len(key_list))    
+    defer.returnValue(key_list)    
 
 @defer.inlineCallbacks
 def find_by_predicate():
@@ -147,6 +147,7 @@ def find_by_predicate():
     for idref in result.idrefs:
         key_list.append(idref.key)
 
+    defer.returnValue(key_list)
          
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
@@ -222,7 +223,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     
     control.add_term_name('find_by_owner',find_by_owner)
     control.add_term_name('find_by_lcs',find_by_lcs)
-    control.add_term_name('find_by_predicate',find_by_lcs)
+    control.add_term_name('find_by_predicate',find_by_predicate)
     defer.returnValue(res)
 
 @defer.inlineCallbacks
