@@ -30,7 +30,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID , TYPE_OF_ID, SAMPLE_PROFILE_DATASET_ID
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 
