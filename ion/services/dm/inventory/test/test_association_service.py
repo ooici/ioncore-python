@@ -30,7 +30,7 @@ from ion.core.exception import ReceivedApplicationError
 
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
-from ion.services.coi.resource_registry_beta import resource_client
+from ion.services.coi.resource_registry import resource_client
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence

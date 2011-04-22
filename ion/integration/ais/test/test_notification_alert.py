@@ -14,7 +14,7 @@ from twisted.internet import defer
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.test.iontest import IonTestCase
 from ion.core.messaging import messaging
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
@@ -54,7 +54,7 @@ class NotificationAlertTest(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {

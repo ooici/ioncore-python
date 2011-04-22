@@ -7,7 +7,7 @@
     "apps":[
         {'name':'datastore',            'version':'0.1', 'config':{'ion.services.coi.datastore':{'blobs':'ion.core.data.store.Store', 'commits':'ion.core.data.store.IndexStore', 'preload':{'ion_datasets':True}}}},
         {'name':'association',          'version':'0.1', 'config':{'ion.services.dm.inventory.association_service':{'index_store_class':'ion.core.data.store.IndexStore'}}},
-        {'name':'resource_registry',    'version':'0.1', 'config':{'ion.services.coi.resource_registry_beta.resource_registry':{'datastore_service':'datastore'}}},
+        {'name':'resource_registry',    'version':'0.1', 'config':{'ion.services.coi.resource_registry.resource_registry':{'datastore_service':'datastore'}}},
         {'name':'ems',                  'version':'0.1', 'config':{}},
         {'name':'pubsub',               'version':'0.1', 'config':{}},
     ]

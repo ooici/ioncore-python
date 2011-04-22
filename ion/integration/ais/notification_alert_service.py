@@ -22,7 +22,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
 

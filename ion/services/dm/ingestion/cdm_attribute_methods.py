@@ -230,7 +230,7 @@ bin/twistd -n cc -h localhost -a sysname=cdmtest,register=demodata res/apps/reso
 #------------------------------------#
 from datetime import datetime
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_TRAJ_DATASET_ID, SAMPLE_PROFILE_DATASET_ID, SAMPLE_TRAJ_DATA_SOURCE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 rc = ResourceClient(proc=sup)
 ds_deferred = rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
 
