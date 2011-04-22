@@ -21,7 +21,8 @@ from ion.core.intercept.policy import user_has_admin_role, \
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE
+                                                       REGISTER_USER_RESPONSE_TYPE, \
+                                                       GET_USER_PROFILE_RESPONSE_TYPE
 from ion.core.object import object_utils
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
@@ -103,69 +104,8 @@ class RegisterUser(object):
         
 
    @defer.inlineCallbacks
-   def updateUserDispatcherQueue (self, msg):
-      log.info('RegisterUser.updateUserDispatcherQueue()\n'+str(msg))
-      
-      # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
-      if result != None:
-         defer.returnValue(result)
-         
-      # check that ooi_id is present in GPB
-      if not msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
-         # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
-         Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [user_ooi_id] not found in message"
-         defer.returnValue(Response)
-
-      # check that queue name is present in GPB
-      if not msg.message_parameters_reference.IsFieldSet('queue_name'):
-         # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
-         Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [queue_name] not found in message"
-         defer.returnValue(Response)
-
-      # build the Identity Registry request for get_user message
-      Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
-      Request.configuration = Request.CreateObject(USER_OOIID_TYPE)
-      Request.configuration.ooi_id = msg.message_parameters_reference.user_ooi_id
-      
-      # get the user information from the Identity Registry 
-      try:
-         user_info = yield self.irc.get_user(Request)
-      except ReceivedApplicationError, ex:
-         # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserDispatcherQueue error response')
-         Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
-         defer.returnValue(Response)
-         
-      # build the Identity Registry request for update_user message
-      Request.configuration = Request.CreateObject(IDENTITY_TYPE)
-      Request.configuration.subject = user_info.resource_reference.subject
-      Request.configuration.dispatcher_queue = msg.message_parameters_reference.queue_name
-      
-      # update the dispatcher queue name for the user  
-      try:
-         result = yield self.irc.update_user(Request)
-      except ReceivedApplicationError, ex:
-         # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserDispatcherQueue error response')
-         Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
-         defer.returnValue(Response)
-         
-      # build AIS response
-      Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS updateUserDispatcherQueue response')
-      Response.result = Response.ResponseCodes.OK
-      defer.returnValue(Response)
-
-
-   @defer.inlineCallbacks
-   def updateUserEmail (self, msg):
-      log.info('RegisterUser.updateUserEmail()\n'+str(msg))
+   def updateUserProfile (self, msg):
+      log.info('RegisterUser.updateUserProfile()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
       result = yield self.CheckRequest(msg)
@@ -283,7 +223,7 @@ class RegisterUser(object):
       Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
       Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_has_dispatcher = user_has_dispatcher_queue(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_is_early_adopter = user_has_dispatcher_queue(result.resource_reference.ooi_id)
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 

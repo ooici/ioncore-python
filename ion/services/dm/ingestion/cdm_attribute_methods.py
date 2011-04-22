@@ -196,10 +196,7 @@ def GetNumericValue(self, data_type, value):
         elif '.' in val:
             result = float(val)
         else:
-            iv = int(val)
-            lv = long(val)
-            if iv == lv: result = iv
-            else:        result = lv
+            result = int(val) # int() method will  upcast to long if necessary!
         return result
         
     _get_numeric_value = {

@@ -418,6 +418,58 @@ class WrapperType(type):
             group.name = name
             self.root_group = group
 
+        def _get_variable_names(self):
+            """
+            """
+            def _recurse_get_variable_names(group):
+                result = ""
+                group_name = '"%s"' % str(group.name)
+                for var in group.variables:
+                    var_name = '"%s"' % str(var.name)
+                    result += 'Group: %-20s Variable: %s\n' % (group_name, var_name)
+                for inner_group in group.groups:
+                    result += _recurse_get_variable_names(inner_group)
+                return result
+            
+            return _recurse_get_variable_names(self.root_group)
+
+        def _get_group_attributes_for_display(self, group=None):
+            """
+            """
+            if group is None:
+                group = self.root_group
+                
+            result = ""
+            for atrib in group.attributes:
+                name = str(atrib.name)
+                vals = str(group.FindAttributeByName(name).GetValues())
+                idx = int(group.FindAttributeIndexByName(name))
+                result += "(%02i) %-35s%s\n" % (idx, name, vals)
+            
+            return result
+        
+        def _get_variable_attributes_for_display(self):
+            """
+            """
+            def _recurse_get_variable_atts(group, group_namespace=None):
+                result = ""
+                group_name = group_namespace or ""
+                group_name += group.name
+                for var in group.variables:
+                    result += "\n\n%s.%s" % (str(group_name), str(var.name))
+                    for atrib in var.attributes:
+                        name = str(atrib.name)
+                        vals = str(var.FindAttributeByName(name).GetValues())
+                        idx = var.FindAttributeIndexByName(name)
+                        result += "\n(%03i) %-30s\t\t%s" % (idx, name, vals)
+                        
+                for inner_group in group.groups:
+                    result += _recurse_get_variable_atts(inner_group, group_name + '.')
+                    
+                return result
+            
+            return _recurse_get_variable_atts(self.root_group)
+                
 
         #-----------------------------------#
         # Wrapper_Group Specialized Methods #
@@ -933,6 +985,9 @@ class WrapperType(type):
         elif obj_type == CDM_DATASET_TYPE:
 
             clsDict['MakeRootGroup'] = _make_root_group
+            clsDict['ShowVariableNames'] = _get_variable_names
+            clsDict['ShowGlobalAttributes'] = _get_group_attributes_for_display
+            clsDict['ShowVariableAttributes'] = _get_variable_attributes_for_display
 
         elif obj_type == CDM_GROUP_TYPE:
 
