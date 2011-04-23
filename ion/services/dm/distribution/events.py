@@ -450,7 +450,7 @@ class ResourceModifiedEventSubscriber(EventSubscriber):
     """
     pass
 
-class DatasourceUnavailableEventPublisher(ResourceModifiedEventPublisher):
+class DatasourceUnavailableEventSubscriber(ResourceModifiedEventSubscriber):
     """
     Event Notification Subscriber for the Datasource Unavailable event.
 
