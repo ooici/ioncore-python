@@ -14,9 +14,11 @@ from twisted.internet import defer
 
 from decimal import Decimal
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationInstance, AssociationManager
 from ion.services.coi.resource_registry.association_client import AssociationClientError
+from ion.services.coi.datastore import DataStoreWorkBenchError
+
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
@@ -142,10 +144,10 @@ class FindDataResources(object):
                 self.__createDownloadURL(dSetResID)
                 self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
 
-                self.__printRootAttributes(dSet)
-                self.__printRootVariables(dSet)
-                self.__printSourceMetadata(dSource)
-                self.__printDownloadURL()
+                #self.__printRootAttributes(dSet)
+                #self.__printRootVariables(dSet)
+                #self.__printSourceMetadata(dSource)
+                #self.__printDownloadURL()
     
                 j = j + 1
             else:
@@ -248,8 +250,17 @@ class FindDataResources(object):
             if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
                 log.debug("----------------------------- 5 ------------------------------")
 
-                dSourceResID = yield self.getAssociatedSource(dSetResID)
-                dSource = yield self.rc.get_instance(dSourceResID)
+                try:
+                    dSourceResID = yield self.getAssociatedSource(dSetResID)
+                    dSource = yield self.rc.get_instance(dSourceResID)
+                except ResourceClientError, DataStoreWorkBenchError:
+                #except ResourceClientError:
+                    log.error('???????????????????????????????????????????????????? AssociationError')
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                          MessageName='AIS findDataResourcesByUser error response')
+                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                    Response.error_str = "Dataset or datasource not found."
+                    defer.returnValue(Response)        
                 
                 rspMsg.message_parameters_reference[0].dataResourceSummary.add()
 
@@ -283,7 +294,14 @@ class FindDataResources(object):
 
         ds = yield self.rc.get_instance(dSetResID)
 
-        results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
+        try:
+            results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
+
+        #except ResourceClientError, DataStoreWorkBenchError:
+        except ResourceClientError:
+            log.error('???????????????????????????????????????????????????? AssociationError')
+            return
+        
         for association in results:
             log.debug('Associated Source for Dataset: ' + \
                       association.ObjectReference.key + \
@@ -389,7 +407,7 @@ class FindDataResources(object):
 
     def __loadMinMetaData(self, dSet, minMetaData):
         for attrib in dSet.root_group.attributes:
-            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
             if attrib.name == 'title':
                 minMetaData['title'] = attrib.GetValue()
             elif attrib.name == 'institution':                
