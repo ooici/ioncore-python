@@ -657,7 +657,7 @@ example_topic1_name = 'example_topic1'
 ION_AIS_RESOURCES={
 example_topic1_name:{ID_CFG:'341FF107-5E42-4C8E-A30B-4A65A5675E63',
                       TYPE_CFG:TOPIC_TYPE,
-                      NAME_CFG:profile_dataset_name,
+                      NAME_CFG:example_topic1_name,
                       DESCRIPTION_CFG:'An example of a topic resource',
                       CONTENT_CFG:{'exchange_space_name':'swap meet',
                                        'exchange_point_name':'science_data',
