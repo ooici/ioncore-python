@@ -153,7 +153,7 @@ class NotificationAlertService(ServiceProcess):
 
         attributes = {}
         # get the user information from the Identity Registry
-        #yield self.GetUserInformation(content.message_parameters_reference.user_ooi_id, attributes)
+        yield self.GetUserInformation(content.message_parameters_reference.user_ooi_id, attributes)
 
         # get the data resource metadata information
         #yield self.GetDatasetInformation(content.message_parameters_reference.data_src_id, attributes)
@@ -335,16 +335,16 @@ class NotificationAlertService(ServiceProcess):
             user_info = yield self.irc.get_user(Request)
         except ReceivedApplicationError, ex:
              # build AIS error response
+             
              log.info('NotificationAlertService.GetUserInformation Send Error: %s ', ex.msg_content.MessageResponseBody)
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS Notification Alert Service: Add Subscription error response')
              Response.error_num = ex.msg_content.MessageResponseCode
              Response.error_str = ex.msg_content.MessageResponseBody
              defer.returnValue(Response)
 
-        log.info('NotificationAlertService.GetUserInformation IR response: %s', user_info)
-
         attributes['user_email'] = user_info.resource_reference.email
-        log.info('NotificationAlertService.op_addSubscription user email: %s', UserEmail)
+        log.info('NotificationAlertService.GetUserInformation user email: %s', user_info.resource_reference.email)
+        #Request.configuration.email = msg.message_parameters_reference.email_address
 
         defer.returnValue(None)
 
