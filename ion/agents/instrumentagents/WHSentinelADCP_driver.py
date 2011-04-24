@@ -5,6 +5,7 @@
 @author Bill Bollenbacher
 @brief Driver code for Teledyne RDI Workhorse Sentinel ADCP
 """
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
@@ -819,3 +820,5 @@ class WHSentinelADCPInstrumentDriverClient(InstrumentDriverClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(WHSentinelADCPInstrumentDriver)
+
+'''

@@ -7,6 +7,8 @@
 @author Bill Bollenbacher
 @see ion.agents.instrumentagents.test.test_instrument
 """
+
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -256,3 +258,5 @@ class DataConsumer(Process):
         log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s", str(self.received_msg))
         self.receive_cnt += 1
         self.received_msg.append(content)
+
+'''

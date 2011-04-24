@@ -5,6 +5,8 @@
 @author Steve Foley
 @brief CI interface for SeaBird SBE-49 CTD
 """
+'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -134,3 +136,4 @@ class SBE49InstrumentAgent(InstrumentAgent):
         
 # Spawn of the process using the module name
 factory = ProcessFactory(SBE49InstrumentAgent)
+'''

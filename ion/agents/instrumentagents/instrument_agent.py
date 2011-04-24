@@ -7,6 +7,8 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 
+'''
+
 from uuid import uuid4
 
 from twisted.internet import defer
@@ -2281,3 +2283,5 @@ class InstrumentAgentClient(ResourceAgentClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentAgent)
+
+'''

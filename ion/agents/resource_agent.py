@@ -7,6 +7,8 @@
 @brief base class for all resource agent processes
 """
 
+'''
+
 import ion.util.ionlog
 from twisted.internet import defer
 
@@ -256,3 +258,5 @@ class ResourceAgentClient(ProcessClient):
               yield self.rpc_send('register_resource', agent_instance.encode())
 
         defer.returnValue(AgentInstance.decode(content))
+
+'''
