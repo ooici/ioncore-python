@@ -37,8 +37,6 @@ class SchedulerTest(IonTestCase):
         services = [
             {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
              'class': 'SchedulerService'},
-            {'name' : 'attributestore', 'module' : 'ion.services.coi.attributestore',
-             'class' : 'AttributeStoreService'},
             {'name' : 'scheduled_task', 'module' : 'ion.services.dm.scheduler.test.receiver',
              'class' : 'ScheduledTask'},
         ]
@@ -47,7 +45,9 @@ class SchedulerTest(IonTestCase):
         self.sup = yield self._spawn_processes(services)
 
         self.proc = Process()
+        yield self.proc.spawn()
 
+        
         # Look up the address of the test receiver by name
         sptid = yield self._get_procid('scheduled_task')
         self.dest = str(sptid)
@@ -71,7 +71,7 @@ class SchedulerTest(IonTestCase):
         Add a task, get a message, remove same.
         """
         # Create clients
-        sc = SchedulerServiceClient(proc=self.sup)
+        sc = SchedulerServiceClient(proc=self.proc)
         mc = self.proc.message_client
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)

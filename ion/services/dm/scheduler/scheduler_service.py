@@ -37,8 +37,8 @@ message AddTaskRequest {
     optional string payload           = 3;
 
     //these are actually optional: epoch times for start/end
-    optional uint64 time_start_unix   = 4;
-    optional uint64 time_end_unix     = 5;
+    //optional uint64 time_start_unix   = 4;
+    //optional uint64 time_end_unix     = 5;
 }
 """
 
@@ -167,7 +167,13 @@ class SchedulerService(ServiceProcess):
         resp.origin   = content.desired_origin
 
 
-        self.scheduled_events[task_id] = content
+        schedule={'origin':content.desired_origin,
+                  'payload':content.payload,
+                  'interval': content.interval_seconds,
+                  #'time_start_unix':content.time_start_unix,
+                  #'time_end_unit':content.time_end_unix
+                  }
+        self.scheduled_events[task_id] = schedule
 
 
         # Now that task is stored into registry, add to messaging callback
@@ -234,11 +240,11 @@ class SchedulerService(ServiceProcess):
             return
 
         log.debug('Time to send "%s" to "%s", id "%s"' % \
-                      (tdef.payload, tdef.desired_origin, task_id))
-        yield self.send(tdef.desired_origin, 'scheduler', tdef.payload)
+                      (tdef['payload'], tdef['origin'], task_id))
+        yield self.send(tdef['origin'], 'scheduler', tdef['payload'])
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        reactor.callLater(tdef.interval_seconds, self._send_and_reschedule, task_id)
+        reactor.callLater(tdef['interval'], self._send_and_reschedule, task_id)
 
         """
         Update last-invoked timestamp in registry
@@ -249,7 +255,7 @@ class SchedulerService(ServiceProcess):
 #        tdef['last_run'] = time.time()
 #        self.store.put(task_id, tdef)
         """
-        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef.interval_seconds))
+        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef['interval']))
 
 class SchedulerServiceClient(ServiceClient):
     """
