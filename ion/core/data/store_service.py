@@ -16,9 +16,6 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.object import object_utils
 
-
-from ion.core.messaging.message_client import MessageClient
-
 from ion.core.data.store import IStore, Store
 
 
@@ -162,7 +159,7 @@ class StoreServiceClient(ServiceClient):
             kwargs['targetname'] = 'store_service'
         ServiceClient.__init__(self, proc, **kwargs)
         
-        self.mc = MessageClient(proc=proc)    
+        self.mc = proc.message_client
 
         
     @defer.inlineCallbacks
