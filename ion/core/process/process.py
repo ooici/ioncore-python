@@ -24,7 +24,7 @@ from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.messaging.message_client import MessageClient, MessageInstance
 
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
-from ion.data.store import Store
+from ion.core.data.store import Store
 from ion.interact.conversation import ProcessConversationManager, CONV_TYPE_NONE
 from ion.interact.message import Message
 from ion.interact.request import RequestType

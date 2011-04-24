@@ -20,7 +20,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.id import Id
-from ion.data.store import Store
 
 def log_attributes(obj):
     """
