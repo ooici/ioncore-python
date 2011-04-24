@@ -5,7 +5,7 @@
 @author Michael Meisinger
 @brief service for registering instruments and platforms
 """
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -117,3 +117,4 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentRegistryService)
+'''

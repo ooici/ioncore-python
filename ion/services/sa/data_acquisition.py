@@ -7,7 +7,7 @@
 @brief service for data acquisition
 """
 
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -82,3 +82,4 @@ class DataAcquisitionServiceClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataAcquisitionService)
+'''
