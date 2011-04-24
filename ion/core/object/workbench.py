@@ -677,6 +677,7 @@ class WorkBench(object):
         # Create push message
         pushmsg = yield self._process.message_client.create_instance(PUSH_MESSAGE_TYPE)
 
+
         #Iterate the list and build the message to send
         for instance in instances:
 
@@ -699,6 +700,15 @@ class WorkBench(object):
 
             repostate.blob_keys.extend(self.list_repository_blobs(repo))
 
+
+        persistent = {}
+        # Do this immediatly before the rpc_send
+        for instance in instances:
+            # Save its current persistence state - do not delete anything that is currently being pushed
+            repo = instance.Repository
+            persistent[repo.repository_key] = repo.persistent
+            repo.persistent = True
+
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'push', pushmsg)
 
@@ -707,6 +717,12 @@ class WorkBench(object):
             
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
+
+        finally:
+            for instance in instances:
+                # Set the persistence state back the way it was!
+                repo = instance.Repository
+                repo.persistent = persistent[repo.repository_key]
 
         defer.returnValue(result)
         # @TODO - check results?
@@ -724,12 +740,13 @@ class WorkBench(object):
         if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
             raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
 
+
         for repostate in pushmsg.repositories:
 
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
-                #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                #if it does not exist make a new one - set it to cached for the time being...
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:

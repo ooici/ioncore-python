@@ -302,6 +302,9 @@ class WorkBenchProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pull(self):
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -331,6 +334,10 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_pull_latest(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
 
         # Get the current head object key - it will not be sent in the pull
         old_key = self.repo1.root_object.MyId
@@ -367,6 +374,9 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_pull_latest_checkout(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
 
         # Get the current head object key - it will not be sent in the pull
         old_key = self.repo1.root_object.MyId
@@ -411,6 +421,9 @@ class WorkBenchProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pull_twice(self):
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -435,6 +448,9 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_pull_update(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
@@ -469,6 +485,9 @@ class WorkBenchProcessTest(IonTestCase):
     def test_pull_branch(self):
 
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         self.branch_key = self.repo1.branch()
 
         self.repo1.root_object.title = 'branch'
@@ -501,6 +520,10 @@ class WorkBenchProcessTest(IonTestCase):
         """
         Test that we can have more than one branch point to the same commit!
         """
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         self.first_branch_key = self.repo1.current_branch_key()
         self.second_branch_key = self.repo1.branch()
 

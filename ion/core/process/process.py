@@ -695,7 +695,17 @@ class Process(BasicLifecycleObject):
         elif hasattr(self,'op_none'):
             yield defer.maybeDeferred(self.op_none, content, payload, msg)
         else:
+            # Change to Raise?
             assert False, "Cannot dispatch to operation"
+
+        # Cleanup the workbench after an op...
+        self.workbench.cache_non_persistent()
+        self.workbench.clear_non_persistent()
+
+        nrepos = len(self.workbench._repos)
+        if  nrepos > 0:
+            log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
+
 
     def op_none(self, content, headers, msg):
         """
