@@ -250,6 +250,8 @@ class WorkBench(object):
                 # Delete it from the deterministically held repo dictionary
                 del self._repos[key]
 
+                repo.purge_workspace()
+
                 # Move it to the cached repositories
                 self._repo_cache[key] = repo
 

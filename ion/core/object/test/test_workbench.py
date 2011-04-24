@@ -188,6 +188,8 @@ class WorkBenchTest(unittest.TestCase):
 
     def test_cache_non_persistent(self):
 
+        self.repo.commit('junk')
+
         key = self.repo.repository_key
 
         self.assertEqual(self.wb.get_repository(key), self.repo)
