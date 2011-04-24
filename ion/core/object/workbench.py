@@ -417,7 +417,7 @@ class WorkBench(object):
         if repo is None:
             #if it does not exist make a new one
             cloning = True
-            repo = repository.Repository(repository_key=repo_name)
+            repo = repository.Repository(repository_key=repo_name, cached=True)
             self.put_repository(repo)
         else:
             cloning = False
@@ -702,10 +702,9 @@ class WorkBench(object):
 
 
         persistent = {}
-        # Do this immediatly before the rpc_send
-        for instance in instances:
+        # Do this immediately before the rpc_send
+        for repo in self._repos.itervalues():
             # Save its current persistence state - do not delete anything that is currently being pushed
-            repo = instance.Repository
             persistent[repo.repository_key] = repo.persistent
             repo.persistent = True
 
@@ -719,10 +718,12 @@ class WorkBench(object):
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
 
         finally:
-            for instance in instances:
+            for repo in self._repos.itervalues():
                 # Set the persistence state back the way it was!
-                repo = instance.Repository
-                repo.persistent = persistent[repo.repository_key]
+
+                # only set the old ones...
+                if repo.repository_key in persistent:
+                    repo.persistent = persistent[repo.repository_key]
 
         defer.returnValue(result)
         # @TODO - check results?

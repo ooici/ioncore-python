@@ -703,7 +703,8 @@ class Process(BasicLifecycleObject):
         self.workbench.clear_non_persistent()
 
         nrepos = len(self.workbench._repos)
-        if  nrepos > 0:
+        if  nrepos > 0 and opname != 'op_fetch_blobs':
+            # Print a warning if someone else is using the persistence tricks...
             log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
 
 

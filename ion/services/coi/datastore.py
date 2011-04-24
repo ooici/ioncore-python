@@ -299,7 +299,7 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
                 #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:
