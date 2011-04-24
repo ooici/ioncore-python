@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.process.process import ProcessFactory
-from ion.data.backends import store_service
+from ion.core.data import store_service
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 CONF = ioninit.config(__name__)
@@ -30,13 +30,7 @@ class AttributeStoreService(store_service.StoreService):
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        ServiceProcess.__init__(self, *args, **kwargs)
-
-        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
-        self.spawn_args['backend_args'] = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
-
-        log.info('AttributeStoreService - Spawn Args:' + str(self.spawn_args))
-
+        store_service.StoreService.__init__(self, *args, **kwargs)
         log.info('AttributeStoreService.__init__()')
 
 
@@ -52,6 +46,8 @@ class AttributeStoreClient(store_service.StoreServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "attributestore"
         ServiceClient.__init__(self, proc, **kwargs)
+
+        self.mc = MessageClient(proc=proc)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AttributeStoreService)
