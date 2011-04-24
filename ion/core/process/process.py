@@ -168,7 +168,9 @@ class Process(BasicLifecycleObject):
         self.child_procs = []
 
         #The data object Workbench for all object repositories used by this process
-        self.workbench = workbench.WorkBench(self)
+
+        cache_size = int(spawnargs.get('cache_size', 10**7))
+        self.workbench = workbench.WorkBench(self, cache_size=cache_size)
 
         # Create a message Client
         self.message_client = MessageClient(proc=self)

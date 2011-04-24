@@ -70,9 +70,9 @@ class DataStoreWorkBenchError(WorkBenchError):
 class DataStoreWorkbench(WorkBench):
 
 
-    def __init__(self, process, blob_store, commit_store):
+    def __init__(self, process, blob_store, commit_store, cache_size=10**8):
 
-        WorkBench.__init__(self, process)
+        WorkBench.__init__(self, process, cache_size)
 
         self._blob_store = blob_store
         self._commit_store = commit_store
@@ -802,7 +802,9 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         self._backend_cls_names[COMMIT_CACHE] = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
-        
+
+        self._cache_size = self.spawn_args.get('cache_size', CONF.getValue('cache_size', default=10**8))
+
         self._backend_classes={}
 
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
@@ -892,7 +894,7 @@ class DataStoreService(ServiceProcess):
 
         
         log.info("Created stores")
-        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
         yield self.initialize_datastore()
 
