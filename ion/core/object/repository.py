@@ -56,6 +56,8 @@ class IndexHash(dict):
         self._workbench_cache = None
         self._has_cache = False
 
+        self._size = 0
+
     def _set_cache(self,cache):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
         self._workbench_cache = cache
@@ -81,6 +83,10 @@ class IndexHash(dict):
     has_cache = property(_get_has_cache, _set_has_cache)
 
 
+    def __sizeof__(self):
+        return self._size
+
+
     def __getitem__(self, key):
 
         if dict.has_key(self, key):
@@ -100,6 +106,8 @@ class IndexHash(dict):
         dict.__setitem__(self, key, val)
         if self.has_cache:
             self.cache[key]=val
+
+        self._size += val.__sizeof__()
 
 
     def copy(self):
@@ -148,7 +156,24 @@ class IndexHash(dict):
         if self.has_cache:
             self.cache.update(*args, **kwargs)
 
+        # For now - don't bother parsing args just recount
+        size = 0
+        for item in self.itervalues():
+            size += item.__sizeof__()
+        self._size = size
 
+    def clear(self):
+        dict.clear(self)
+
+        self._size=0
+
+    def __delitem__(self, key):
+
+        item = self.get(key)
+        if key is not None:
+            self._size -= item.__sizeof__()
+
+        dict.__delitem__(self,key)
 
 
 
@@ -471,7 +496,7 @@ class Repository(ObjectContainer):
     MERGEREQUIRED = 'This repository is currently being merged!'
 
 
-    def __init__(self, head=None, repository_key=None, persistent=False):
+    def __init__(self, head=None, repository_key=None, persistent=False, cached=False):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -518,6 +543,14 @@ class Repository(ObjectContainer):
         """
         Set the persistence of this repository. Any repository which is declared persistent will not be GC'd until
         the persistent setting is changed to false
+        """
+
+        if not isinstance(cached, bool):
+            raise RepositoryError('Invalid argument type to set the cached property of a repository')
+        self._cached = cached
+        """
+        Set the cached property of this repository. Any repository which is declared cached will not be until the
+        cache memory size of the workbench has been exceeded.
         """
 
 
@@ -571,6 +604,18 @@ class Repository(ObjectContainer):
 
     persistent = property(_get_persistent, _set_persistent )
 
+    def _set_cached(self, value):
+        if not isinstance(value, bool):
+            raise RepositoryError('Invalid argument type to set the cached property of a repository')
+        self._cached = value
+
+    def _get_cached(self):
+        return self._cached
+
+    cached = property(_get_cached, _set_cached )
+
+
+
     def _get_root_object(self):
         return self._workspace_root
         
@@ -589,6 +634,14 @@ class Repository(ObjectContainer):
         
     root_object = property(_get_root_object, _set_root_object)
     
+
+    def __sizeof__(self):
+        """
+        Treat the index hash of serialized content as the relevant size of the repository for caching
+        """
+
+        return self.index_hash.__sizeof__()
+
 
     def clear(self):
         """

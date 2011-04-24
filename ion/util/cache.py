@@ -132,6 +132,12 @@ class LRUDict(object):
             a.next.prev = None
             self.first = a.next
             a.next = None
+
+            nobj = self.d[a.me[0]]
+            obj = nobj.me[1]
+            if hasattr(obj, 'clear'):
+                obj.clear()
+
             del self.d[a.me[0]]
             del a
 
@@ -173,6 +179,11 @@ class LRUDict(object):
     def keys(self):
         return self.d.keys()
 
+    def pop(self, key):
+        obj = self.get(key)
+        del self[key]
+        return obj
+
     def touch(self, key):
         """ Recalculate the size of the object at the given key, and update its access time. """
         val = self[key]
@@ -194,6 +205,13 @@ class LRUDict(object):
             self[k] = v
 
     def clear(self):
+
+        for nobj in self.d.itervalues():
+            obj = nobj.me[1]
+
+            if hasattr(obj, 'clear'):
+                obj.clear()
+
         self.d.clear()
         self.total_size = 0
         self.first = None

@@ -25,6 +25,8 @@ from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
 
 import weakref
+
+from ion.util.cache import LRUDict
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -69,14 +71,20 @@ class WorkBenchError(ApplicationError):
 
 class WorkBench(object):
     
-    def __init__(self, process):
+    def __init__(self, process, cache_size=10**7):
     
         self._process = process
-        
+
+        # For storage of repositories which are deterministically held in memory
         self._repos = {}
         
         self._repository_nicknames = {}
-        
+
+
+        # A Cache of repositories that holds upto a certain size between op message calls.
+        self._repo_cache = LRUDict(cache_size, use_size=True)
+
+
         """
         A cache - shared between repositories for hashed objects
         """  
@@ -184,14 +192,23 @@ class WorkBench(object):
         
     def get_repository(self,key):
         """
-        Simple getter for the repository dictionary
+        Getter for the repository dictionary and cache
         """
-        
-        rkey = self._repository_nicknames.get(key, None)
-        if not rkey:
-            rkey = key
-            
-        return self._repos.get(rkey,None)
+
+        # Get the nickname if it exists
+        rkey = self._repository_nicknames.get(key, key)
+
+        repo = self._repos.get(rkey,None)
+
+        if repo is None:
+
+            try:
+                repo = self._repo_cache.pop(rkey)
+                self.put_repository(repo)
+            except KeyError, ke:
+                log.debug('Repository key "%s" not found in cache' % rkey)
+
+        return repo
         
     def list_repositories(self):
         """
@@ -217,21 +234,67 @@ class WorkBench(object):
             if v == key:
                 del self._repository_nicknames[k]
 
+    def cache_non_persistent(self):
+
+        # Can't use iter here - it is actually deleting keys in the dict object.
+        for key, repo in self._repos.items():
+
+            if repo.persistent is False and repo.cached is True:
+
+                # Get rid of the nick name - this is a PITA
+                for k,v in self._repository_nicknames.items():
+                    if v == key:
+                        del self._repository_nicknames[k]
+
+                # Delete it from the deterministically held repo dictionary
+                del self._repos[key]
+
+                # Move it to the cached repositories
+                self._repo_cache[key] = repo
+
+
 
     def clear_non_persistent(self):
 
+        # Can't use iter here - it is actually deleting keys in the dict object.
         for repo in self._repos.values():
 
             if repo.persistent is False:
                 self.clear_repository(repo)
 
 
+    def clear(self):
+        """
+        Completely clean the state or the workbench, wipe any repositories and delete references to them.
+        """
+
+        log.warn('CLEARING THE WORKBENCH - IGNORING PERSISTENCE SETTINGS')
+
+        for repo in self._repos.itervalues():
+            repo.clear()
+
+        self._repos.clear()
+
+        # The cache knows to clear its content objects
+        self._repo_cache.clear()
+
+        # these are just strings
+        self._repository_nicknames.clear()
+
+        # This one is now safe to clear
+        self._workbench_cache.clear()
+
+
 
     def put_repository(self,repo):
-        
+
+        if repo.repository_key in self._repo_cache:
+            raise WorkBenchError('This repository already exists in the workbench cache - that should not happen!')
+
         self._repos[repo.repository_key] = repo
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
+
        
     def reference_repository(self, repo_key, current_state=False):
 

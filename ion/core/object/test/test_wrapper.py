@@ -258,7 +258,33 @@ class WrapperMethodsTest(unittest.TestCase):
         self.assertEqual(p.IsFieldSet('floats'), True)
 
 
+class TestStructureElementWrapper(unittest.TestCase):
 
+    #@TODO - add other explicit tests for the Structure Element class - currently only transitively tested.
+
+    def test_size(self):
+
+        wb = workbench.WorkBench('no process test')
+
+        repo = wb.create_repository(PERSON_TYPE)
+
+        repo.root_object.name = 'David Stuebe'
+        repo.root_object.id = 1592733398
+
+        repo.root_object.phone.add()
+        repo.root_object.phone[0].number = 'a number'
+        repo.root_object.phone[0].type = repo.root_object.phone[0].PhoneType.WORK
+
+
+        commit_key = repo.commit('committed...')
+
+        key = repo.root_object.MyId
+        se = repo.index_hash.get(key)
+        self.assertEqual(se.__sizeof__(), 68)
+
+
+        se = repo.index_hash.get(commit_key)
+        self.assertEqual(se.__sizeof__(), 127)
 
 
 class TestSpecializedCdmMethods(unittest.TestCase):

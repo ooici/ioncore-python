@@ -13,14 +13,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.trial import unittest
 from twisted.internet import defer
 
-import weakref
-import gc
-
-
 from net.ooici.play import addressbook_pb2
 
 from ion.core.object import gpb_wrapper
-from ion.core.object import repository
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
@@ -164,9 +159,12 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(self.wb.get_repository(key), self.repo)
 
 
+        self.assertIn(key, self.wb._repos)
+
         self.wb.clear_non_persistent()
 
         # make sure it is gone!
+        self.assertNotIn(key, self.wb._repos)
         self.assertEqual(self.wb.get_repository(key), None)
 
 
@@ -183,8 +181,37 @@ class WorkBenchTest(unittest.TestCase):
 
         self.wb.clear_non_persistent()
 
+        self.assertIn(key, self.wb._repos)
 
         self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
+    def test_cache_non_persistent(self):
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.cached = True
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Move it to the cache
+        self.wb.cache_non_persistent()
+
+        # Make sure it is in the right place
+        self.assertNotIn(key, self.wb._repos)
+        self.assertIn(key, self.wb._repo_cache)
+
+        # Get it back again
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        # back again...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
 
 
 class WorkBenchProcess(Process):

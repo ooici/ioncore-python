@@ -2358,3 +2358,11 @@ class StructureElement(object):
     def serialize(self):
         return self._element.SerializeToString()
 
+
+    def __sizeof__(self):
+
+        #size = len(self._element.value) + 34
+        #print 'Esimtate: ', size
+        #print 'GPB Size: ', self._element.ByteSize()
+
+        return self._element.ByteSize()
