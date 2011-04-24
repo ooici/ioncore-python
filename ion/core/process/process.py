@@ -44,6 +44,8 @@ processes = {}
 
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
+procRegistry.kvs = {} # Give this instance its own backend...
+
 
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message

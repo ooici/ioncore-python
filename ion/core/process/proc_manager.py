@@ -33,6 +33,7 @@ class ProcessManager(BasicLifecycleObject):
 
         # TEMP: KVS pid (str) -> Process Instance
         self.process_registry = Store()
+        self.process_registry.kvs = {} # Give it its own backend...
 
     # Life cycle
 
