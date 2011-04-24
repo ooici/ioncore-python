@@ -5,8 +5,9 @@
 @author Matt Rodriguez
 @brief Workbench for operating on GPB backed object structures
 
-TODO
-Add persistent store to the work bench. Use it fetch linked objects
+@TODO
+Caching mechanisms are now in place. Consider changing the cache size test to look at the size of the _workbench_cache
+but throw out repositories from the _repo_cache to clear it - that would be better!
 """
 
 from twisted.internet import defer
