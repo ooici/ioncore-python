@@ -470,7 +470,7 @@ class IdentityRegistryService(ServiceProcess):
             if identity.IsFieldSet('profile'):
                i = 0
                for item in identity.profile:
-                  log.debug('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% get_user: setting profile to '+str(item))
+                  log.debug('get_user: setting profile to '+str(item))
                   Response.resource_reference.profile.add()
                   Response.resource_reference.profile[i].name = item.name
                   Response.resource_reference.profile[i].value = item.value
@@ -572,7 +572,7 @@ class IdentityRegistryService(ServiceProcess):
            if request.configuration.IsFieldSet('profile'):
               i = 0
               for item in request.configuration.profile:
-                  log.debug('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% update_user_profile: setting profile to '+str(item))
+                  log.debug('update_user_profile: setting profile to '+str(item))
                   identity.profile.add()
                   identity.profile[i].name = item.name
                   identity.profile[i].value = item.value

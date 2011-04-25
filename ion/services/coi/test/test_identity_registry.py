@@ -257,7 +257,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.assertEqual(user2.resource_reference.email, "someone-else@somplace-else.some-other-domain")
        
         # set the user's profile
-        log.info('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ setting profile')
+        log.info('setting profile')
         IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user profile request')
         IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
         IdentityRequest.configuration.subject = user1.resource_reference.subject
@@ -270,8 +270,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
-        log.info('################################################ user2 = '+str(user2.resource_reference))
-        self.assertEqual(user2.resource_reference.email, "someone@somplace.somedomain")
+        log.info('user2 = '+str(user2.resource_reference))
+        self.assertEqual(user2.resource_reference.profile[0].name, "profile item 1 name")
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 1 value")
 
         # Test if we can find the user we have stuffed in.
         #user_description = coi_resource_descriptions.IdentityResource()
