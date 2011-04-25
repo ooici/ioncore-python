@@ -4,7 +4,7 @@
 @brief Test cases for the SBE37 driver.
 @author Edward Hunter
 """
-'''
+
 import re
 import os
 
@@ -729,4 +729,3 @@ class TestSBE37(IonTestCase):
     """
 
 
-'''

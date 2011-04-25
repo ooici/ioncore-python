@@ -7,12 +7,12 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 
-'''
+
 
 from twisted.internet import defer
 import ion.util.ionlog
-from ion.agents.resource_agent import ResourceAgent
-from ion.agents.resource_agent import ResourceAgentClient
+#from ion.agents.resource_agent import ResourceAgent
+#from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
 from ion.services.dm.distribution.events import InfoLoggingEventPublisher, BusinessStateModificationEventPublisher, DataBlockEventPublisher
 from uuid import uuid4
@@ -315,8 +315,8 @@ class InstrumentDriverClient(ProcessClient):
 
 
         
-
-class InstrumentAgent(ResourceAgent):
+#ResourceAgent
+class InstrumentAgent(Process):
     """
     The base class for developing Instrument Agents. This defines
     the interface to use for an instrument agent and some boiler plate
@@ -342,7 +342,7 @@ class InstrumentAgent(ResourceAgent):
     @defer.inlineCallbacks
     def plc_init(self):
         # Initialize base class.
-        ResourceAgent.plc_init(self)
+        Process.plc_init(self)
                         
         """
         The ID of the instrument this agent represents.
@@ -1890,8 +1890,8 @@ class InstrumentAgent(ResourceAgent):
     
 
     
-        
-class InstrumentAgentClient(ResourceAgentClient):
+#ResourceAgentClient
+class InstrumentAgentClient(ProcessClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
@@ -2217,4 +2217,4 @@ class InstrumentAgentClient(ResourceAgentClient):
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentAgent)
 
-'''
+

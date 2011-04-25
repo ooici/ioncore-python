@@ -150,9 +150,8 @@ class RegisterUser(object):
       
       # update the email address for the user  
       try:
-         result = yield self.irc.update_user(Request)
+         result = yield self.irc.update_user_profile(Request)
       except ReceivedApplicationError, ex:
-         self.fail("update_user failed [%s]"%msg.message_parameters_reference.user_ooi_id)
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
          Response.error_num = ex.msg_content.MessageResponseCode

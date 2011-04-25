@@ -6,7 +6,7 @@
 @author Edward Hunter
 
 """
-'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -1023,4 +1023,3 @@ class TestInstrumentAgent(IonTestCase):
 
 
 
-'''

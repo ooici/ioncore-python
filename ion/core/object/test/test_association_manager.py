@@ -13,22 +13,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.trial import unittest
 from twisted.internet import defer
 
-import weakref
-import gc
 
-
-from net.ooici.play import addressbook_pb2
-
-from ion.core.object import gpb_wrapper
-from ion.core.object import repository
 from ion.core.object import workbench
 from ion.core.object import object_utils
-
-# For testing the message based ops of the workbench
-from ion.core.process.process import ProcessFactory, Process
-from ion.test.iontest import IonTestCase
-
-
 
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 PREDICATE_TYPE = object_utils.create_type_identifier(object_id=14, version=1)

@@ -253,7 +253,6 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                           CONTENT_CFG:{'subject':'ss',
                                        'certificate':'',
                                        'rsa_private_key':'',
-                                       'dispatcher_queue':'',
                                        'email':'',
                                        'life_cycle_state':''}
                         },
@@ -264,8 +263,7 @@ myooici_name:{ID_CFG:'A7B44115-34BC-4553-B51E-1D87617F12E0',
                           DESCRIPTION_CFG:'The first test user - poor sole!.',
                           CONTENT_CFG:{'subject':'/DC=org/DC=cilogon/C=US/O=Google/CN=test user A501',
                                        'certificate':
-'''-----BEGIN CERTIFICATE-----
-MIIEUzCCAzugAwIBAgICBgIwDQYJKoZIhvcNAQELBQAwazETMBEGCgmSJomT8ixkARkWA29yZzEX
+'''MIIEUzCCAzugAwIBAgICBgIwDQYJKoZIhvcNAQELBQAwazETMBEGCgmSJomT8ixkARkWA29yZzEX
 MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRww
 GgYDVQQDExNDSUxvZ29uIE9wZW5JRCBDQSAxMB4XDTExMDQyMTE5MzMyMVoXDTExMDQyMjA3Mzgy
 MVowZTETMBEGCgmSJomT8ixkARkTA29yZzEXMBUGCgmSJomT8ixkARkTB2NpbG9nb24xCzAJBgNV
@@ -284,11 +282,9 @@ Omon3wMV3RFzs28iqs+r1j9WxLSvQXRXtk3BMNNmrobDspb2rodiNGMeVxGD2oGSAfh1Mn/l+vDE
 1333XzQ3BGkucaSSBOTll5ZBqf52w/ru/dyrJ2GvHbIrKv+QkpKuP9uB0eJYi1n7+q/23rBR5V+E
 +LsnTG8BcuzpFxtlY4SKIsijHNV+5y2+hfGHiNGfAr3X8FfwjIfmqBroCRc01ix8+jMnvplLr5rp
 Wkkk8zr1nuzaUjNA/8G+24UBNSgLYOUP/xH2GlPUiAP4tZX+zGsOVkYkbyc67M4TLyD3hxuLbDCU
-Aw3E0TjYpPxuQ8OsJ1LdECRfHgHFfd5KtG8BgQ==
------END CERTIFICATE-----''',
+Aw3E0TjYpPxuQ8OsJ1LdECRfHgHFfd5KtG8BgQ==''',
                                        'rsa_private_key':
-'''-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAu+SQwAWMAY/+6eZjcirp0YfhKdgM06uZmTU9DPJqcNXFROFCeGEkg2jzgfcK
+'''MIIEowIBAAKCAQEAu+SQwAWMAY/+6eZjcirp0YfhKdgM06uZmTU9DPJqcNXFROFCeGEkg2jzgfcK
 5NiT662YbQkxETWDl4XZazmbPv787XJjYnbF8XErztauE3+caWNOpob2yPDtmk3F0I0ullSbqsxP
 vsYAZNEveDBFzxCeeO+GKFQnw12ZYo968RcyZW2Fep9OQ4VfpWQExSA37FA+4KL0RfZnd8Vc1ru9
 tFPw86hEstzC0Lt5HuXUHhuR9xsW3E5xY7mggHOrZWMQFiUN8WPnrHSCarwIPQDKv8pMQ2LIacU8
@@ -308,9 +304,7 @@ JwrrGzIQ+Mne1Q7OADjjOokCgYABgHbOJ9XcMFM+/KGjlzlmqqcRZa9k3zqcZB+xSzZevR6Ka24/
 5Iwv2iggIq1AaIOJu5fMaYpl+6DUf5rUlzzebp3stBneOSUfw9N8TRr2VZtrXQZfXuwE8qTjncXV
 6TpHi8QS2mqu2A5tZmFNbYDzv3i4rc05l0HnvJKZP6yLBQKBgERpUxpX4r5Obi8PNIECZ4ucTlhT
 KJpn8B+9GrIjTqs+ae0oRfbSo1Jt/SDts/c6DYaT2RZma7JVosWd2aOAw9k69zMObHlJrcHGmb3l
-eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
------END RSA PRIVATE KEY-----''',
-                                       'dispatcher_queue':'',
+eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL''',
                                        'email':'myooici@gmail.com',
                                        'life_cycle_state':''}
                         },
@@ -323,7 +317,6 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           CONTENT_CFG:{'subject':'aa',
                                        'certificate':'',
                                        'rsa_private_key':'',
-                                       'dispatcher_queue':'',
                                        'email':'',
                                        'life_cycle_state':''}
                         },
@@ -657,7 +650,7 @@ example_topic1_name = 'example_topic1'
 ION_AIS_RESOURCES={
 example_topic1_name:{ID_CFG:'341FF107-5E42-4C8E-A30B-4A65A5675E63',
                       TYPE_CFG:TOPIC_TYPE,
-                      NAME_CFG:example_topic1_name,
+                      NAME_CFG:profile_dataset_name,
                       DESCRIPTION_CFG:'An example of a topic resource',
                       CONTENT_CFG:{'exchange_space_name':'swap meet',
                                        'exchange_point_name':'science_data',
