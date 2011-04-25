@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry_beta/association_client.py
+@file ion/services/coi/resource_registry/association_client.py
 @author David Stuebe
 @brief Association Client and Association Instance are manager abstractions for associations
 

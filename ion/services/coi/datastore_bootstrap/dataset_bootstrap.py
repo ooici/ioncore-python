@@ -57,7 +57,7 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     assert ds_svc is not None, 'Invalid invocation of the bootstrap_byte_array_dataset function. Must pass the datastore svc instance!'
 
 
-    if filename is None:
+    if not filename or filename == 'None':
         log.info('Could not bootstrap dataset with using datastore service "%s" and filename "%s"' % (str(ds_svc), str(filename)))
         return False
     

@@ -13,8 +13,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.core import ioninit
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
 

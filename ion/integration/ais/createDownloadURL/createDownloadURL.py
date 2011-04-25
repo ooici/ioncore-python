@@ -10,7 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient

@@ -149,7 +149,14 @@ class InteractionObserver(Process):
                 msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
             msc += ' %s -> %s [ label="%s" ];\n' % (sname, rname, mlabel)
         msc += "}\n"
+
+        from IPython.Shell import IPShellEmbed
+
+        ipshell = IPShellEmbed()
+        ipshell()
+
         return msc
+
 
 
 # Spawn off the process using the module name

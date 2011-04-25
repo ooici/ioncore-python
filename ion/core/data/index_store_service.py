@@ -18,8 +18,6 @@ from ion.core.object import object_utils
 
 from ion.core.data.store import Query
 
-from ion.core.messaging.message_client import MessageClient
-
 from ion.core.data.store import IIndexStore, IndexStore, IndexStoreError
 from zope.interface import implements
 
@@ -226,8 +224,7 @@ class IndexStoreServiceClient(ServiceClient):
             kwargs['targetname'] = 'index_store_service'
         ServiceClient.__init__(self, proc, **kwargs)
         
-        self.mc = MessageClient(proc=proc)    
-
+        self.mc = proc.message_client
     
       
     @defer.inlineCallbacks

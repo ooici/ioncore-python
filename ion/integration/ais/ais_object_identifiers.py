@@ -452,7 +452,7 @@ message DataResourceDeleteRequest {
         _VERSION = 1;
     }
 
-    optional string data_resource_id  = 1;
+    repeated string data_resource_id  = 1;
 }
 """
 
@@ -464,7 +464,7 @@ message DataResourceDeleteResponse {
         _VERSION = 1;
     }
 
-    optional bool success  = 1;
+    repeated string successfully_deleted_id  = 1;
 }
 """
 

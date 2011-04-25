@@ -18,7 +18,7 @@ from ion.core.object import gpb_wrapper
 from ion.test.iontest import IonTestCase
 from ion.core.object.object_utils import *
 from ion.core.object.gpb_wrapper import OOIObjectError
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 
 CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -48,7 +48,7 @@ class CdmAttributeTest(IonTestCase):
             },
             {
              'name':'resource_registry_service',
-             'module':'ion.services.coi.resource_registry_beta.resource_registry',
+             'module':'ion.services.coi.resource_registry.resource_registry',
              'class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {

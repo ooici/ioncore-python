@@ -146,7 +146,7 @@ class AssociationManager(object):
         return result
 
     def __iter__(self):
-        return self.get_associations().__iter__()
+        return iter(self.get_associations())
 
     def iteritems(self):
         return self.predicate_sorted_associations.iteritems()

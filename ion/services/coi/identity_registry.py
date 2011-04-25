@@ -16,7 +16,7 @@ CONF = ioninit.config(__name__)
 from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.security.authentication import Authentication
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
 from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils

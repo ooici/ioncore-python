@@ -3,51 +3,37 @@
 """
 @file ion/agents/instrumentagents/instrument_agent.py
 @author Steve Foley
+@author Edward Hunter
 @brief Instrument Agent, Driver, and Client class definitions
 """
 
-from uuid import uuid4
+
 
 from twisted.internet import defer
 import ion.util.ionlog
-import ion.util.procutils as pu
-from ion.agents.resource_agent import ResourceAgent
-from ion.agents.resource_agent import ResourceAgentClient
-from ion.core.exception import ReceivedError
-from ion.services.dm.distribution.pubsub_service import PubSubClient
-from ion.data.dataobject import ResourceReference, DataObject
+#from ion.agents.resource_agent import ResourceAgent
+#from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
-from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
-from ion.resources.dm_resource_descriptions import PublisherResource
+from ion.services.dm.distribution.events import InfoLoggingEventPublisher, BusinessStateModificationEventPublisher, DataBlockEventPublisher
+from uuid import uuid4
+
 
 from ion.agents.instrumentagents.instrument_agent_constants import *
 
 
 log = ion.util.ionlog.getLogger(__name__)
 
-
-
-
-
-
+DEBUG_PRINT = (True,False)[0]
 
 """
 Instrument agent observatory metadata.
 """
 ci_param_metadata = {
     
-    'CI_PARAM_DATA_TOPICS' :
-        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
+    'CI_PARAM_EVENT_PUBLISHER_ORIGIN' :
+        {'META_DATATYPE':'CI_PUBSUB_ORIGIN',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'Data Topics'},
-    'CI_PARAM_EVENT_TOPICS' :
-        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'Event Topics'},
-    'CI_PARAM_STATE_TOPICS' :
-        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'State Topics'},
+         'META_FRIENDLY_NAME':'Event Publisher Origin'},
     'CI_PARAM_DRIVER_ADDRESS' :
         {'META_DATATYPE':'CI_TYPE_ADDRESS',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
@@ -329,8 +315,8 @@ class InstrumentDriverClient(ProcessClient):
 
 
         
-
-class InstrumentAgent(ResourceAgent):
+#ResourceAgent
+class InstrumentAgent(Process):
     """
     The base class for developing Instrument Agents. This defines
     the interface to use for an instrument agent and some boiler plate
@@ -355,10 +341,8 @@ class InstrumentAgent(ResourceAgent):
     
     @defer.inlineCallbacks
     def plc_init(self):
-        
-        
         # Initialize base class.
-        ResourceAgent.plc_init(self)
+        Process.plc_init(self)
                         
         """
         The ID of the instrument this agent represents.
@@ -413,25 +397,35 @@ class InstrumentAgent(ResourceAgent):
 
         
         """
-        A dictionary of the topics where data is published, indexed by transducer
-        name or "Device" for the whole device. Gets set initially by
-        subclass, then at runtime by user as needed.
+	The PubSub origin for the event publisher that this instrument agent uses to
+        distribute messages related to generic events that it handles. One queue
+        sends all messages, each tagged with an event ID number and optionally
+        a channel name if applicable (delimited by "."). If there is no channel name,
+        the event applies to the agent. If the channel is a "*", the event applies
+        to the instrument as a whole or all channels on the instrument
+        For example: 3003.chan1.machine_example_org_14491.357
+        @see    ion/services/dm/distribution/events.py
+        @see    https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
         """
-        self.output_topics = None
-    
+        self.event_publisher_origin = str(self.id)
+        
         """
-        A dictionary of the topics where events are published, indexed by
-        transducer name or "Device" for the whole device. Gets set initially by
-        subclass, then at runtime by user as needed.
+        The PubSub publisher for informational/log events 
         """
-        self.event_topics = None
-    
+        self._log_publisher = InfoLoggingEventPublisher(process=self,
+                                                           origin=self.event_publisher_origin)
+        
         """
-        A dictionary of the topics where state changes are published, indexed by
-        transducer name or "Device" for the whole device. Gets set initially by
-        subclass, then at runtime by user as needed.
+        The PubSub publisher for data events
         """
-        self.state_topics = None
+        self._data_publisher = DataBlockEventPublisher(process=self,
+                                                           origin=self.event_publisher_origin)
+        
+        """
+        The PubSub publisher for state change events
+        """
+        self._state_publisher = BusinessStateModificationEventPublisher(process=self,
+                                                           origin=self.event_publisher_origin)
     
         """
         A UUID specifying the current transaction. None
@@ -503,14 +497,6 @@ class InstrumentAgent(ResourceAgent):
         pass
     """   
        
-        
-    @defer.inlineCallbacks
-    def _register_publisher(self):
-        publisher = PublisherResource.create("IA publisher", self,
-            self.output_topics.values() + self.event_topics.values() + self.state_topics.values(),
-            'DataObject')
-        publisher = yield self.pubsub_client.define_publisher(publisher)
-
     def _is_child_process(self, name):
         """
         Determine if a process with the given name is a child process
@@ -593,10 +579,12 @@ class InstrumentAgent(ResourceAgent):
         """        
 
         result = self._end_transaction(content)
+            
+	# Publish an end transaction message...mainly as a test for now
+        yield self._log_publisher.create_and_publish_event(name="Transaction ended!")
         yield self.reply_ok(msg,result)
                 
     
-
     def _end_transaction(self,tid):
         """
         End the current transaction.
@@ -615,7 +603,6 @@ class InstrumentAgent(ResourceAgent):
         else:
             result['success'] = errors['LOCKED_RESOURCE']
 
-            
         return result
         
 
@@ -842,30 +829,12 @@ class InstrumentAgent(ResourceAgent):
                 result[arg] = (errors['INVALID_PARAMETER'], None)
                 get_errors = True                
                 continue
-            if arg == 'CI_PARAM_DATA_TOPICS' or arg=='all':                            
-                if self.output_topics == None:
-                    result['CI_PARAM_DATA_TOPICS'] = (['OK'],None)
+            if arg == 'CI_PARAM_EVENT_PUBLISHER_ORIGIN' or arg=='all':                            
+                if self.event_publisher_origin == None:
+                    result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = (['OK'],None)
                 else:
-                    # TODO
-                    # result['CI_PARAM_DATA_TOPICS'] = self.output_topics.encode()
-                    pass
-                
-            if arg == 'CI_PARAM_EVENT_TOPICS' or arg=='all':
-                if self.output_topics == None:
-                    result['CI_PARAM_EVENT_TOPICS'] = (['OK'],None)
-                else:
-                    # TODO
-                    # result['CI_PARAM_EVENT_TOPICS'] = self.event_topics.encode()
-                    pass
-                
-            if arg == 'CI_PARAM_STATE_TOPICS' or arg=='all':
-                if self.output_topics == None:
-                    result['CI_PARAM_STATE_TOPICS'] = (['OK'],None)
-                else:
-                    # TODO
-                    # result['CI_PARAM_STATE_TOPICS'] = self.state_topics.encode()
-                    pass
-                
+                    result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = self.event_publisher_origin
+            
             if arg == 'CI_PARAM_DRIVER_ADDRESS' or arg=='all':
                 if self.driver_client:
                     result['CI_PARAM_DRIVER_ADDRESS'] = (['OK'],str(self.driver_client.target))
@@ -899,26 +868,6 @@ class InstrumentAgent(ResourceAgent):
             
         reply['success'] = success
         reply['result'] = result
-        
-        # Do the work.
-        #response = {}
-        ## get data somewhere, or just punt this lower in the class hierarchy
-        #if (ci_param_list[driver_address] in content):
-        #    response[ci_param_list[driver_address]] = str(self.driver_client.target)
-        #
-        #if (ci_param_list['DataTopics'] in content):
-        #    response[ci_param_list['DataTopics']] = {}
-        #    for i in self.output_topics.keys():
-        #        response[ci_param_list['DataTopics']][i] = self.output_topics[i].encode()
-        #if (ci_param_list['StateTopics'] in content):
-        #    response[ci_param_list['StateTopics']] = {}
-        #    for i in self.state_topics.keys():
-        #        response[ci_param_list['StateTopics']][i] = self.state_topics[i].encode()
-        #if (ci_param_list['EventTopics'] in content):
-        #    response[ci_param_list['EventTopics']] = {}
-        #    for i in self.event_topics.keys():
-        #        response[ci_param_list['EventTopics']][i] = self.event_topics[i].encode()
-
         
         # End implicit transactions.
         if tid == 'create':
@@ -990,19 +939,7 @@ class InstrumentAgent(ResourceAgent):
             
             val = params[arg]
             
-            if arg == 'CI_PARAM_DATA_TOPICS':
-                result[arg] = errors['NOT_IMPLEMENTED']
-                set_errors = True
-                
-            elif arg == 'CI_PARAM_EVENT_TOPICS':
-                result[arg] = errors['NOT_IMPLEMENTED']
-                set_errors = True
-            
-            elif arg == 'CI_PARAM_STATE_TOPICS':
-                result[arg] = errors['NOT_IMPLEMENTED']
-                set_errors = True
-            
-            elif arg == 'CI_PARAM_DRIVER_ADDRESS':
+            if arg == 'CI_PARAM_DRIVER_ADDRESS':
                 result[arg] = errors['NOT_IMPLEMENTED']
                 set_errors = True
             
@@ -1831,7 +1768,35 @@ class InstrumentAgent(ResourceAgent):
     ############################################################################
 
 
-
+    @defer.inlineCallbacks
+    def op_driver_event_occurred(self, content, headers, msg):
+        """
+        Called by the driver to announce the occurance of an event. The agent
+        take appropriate action including state transitions, data formatting
+        and publication. This method must be called by a child process of the
+        agent.
+        @param content a dict with 'type' and 'transducer' strings and 'value'
+            object.
+        """
+        
+        assert isinstance(content,dict), 'Expected a content dict.'
+        
+        type = content.get('type',None)
+        transducer = content.get('transducer',None)
+        value = content.get('value',None)
+        
+        assert isinstance(type,str), 'Expected a type string.'
+        assert isinstance(transducer,str), 'Expected a transducer string.'
+        assert value != None, 'Expected a value.'
+        
+        if not (self._is_child_process(headers['sender-name'])):
+            yield self.reply_err(msg,
+                                 'driver event occured evoked from a non-child process')
+            return
+        
+        
+        self._debug_print_driver_event(type,transducer,value)
+        
                 
     @defer.inlineCallbacks
     def op_publish(self, content, headers, msg):
@@ -1848,18 +1813,18 @@ class InstrumentAgent(ResourceAgent):
                   headers["sender-name"], self.child_procs, content)
         if (self._is_child_process(headers["sender-name"])):
             if (content["Type"] == publish_msg_type["Data"]):
-                yield self.pubsub_client.publish(self,
-                            self.output_topics[content["Transducer"]].reference(),
-                            content["Value"])
+                yield self._data_publisher.create_and_publish_event( \
+                    origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                    description=content["Value"])
             elif ((content["Type"] == publish_msg_type["Error"])
                 or (content["Value"] == "ConfigChange")):
-                yield self.pubsub_client.publish(self,
-                            self.event_topics[content["Transducer"]].reference(),
-                            content["Value"])
+                yield self._log_publisher.create_and_publish_event( \
+                    origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                    description=content["Value"])
             elif (content["Type"] == publish_msg_type["StateChange"]):
-                yield self.pubsub_client.publish(self,
-                            self.state_topics[content["Transducer"]].reference(),
-                            content["Value"])
+                yield self._state_publisher.create_and_publish_event( \
+                    origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                    description=content["Value"])
         else:
             # Really should be handled better...what if there isnt a reply
             # expected?
@@ -1884,12 +1849,12 @@ class InstrumentAgent(ResourceAgent):
         if (type == publish_msg_type["Error"]) or \
             (type == publish_msg_type["Event"]) or \
             (type == publish_msg_type["ConfigChange"]):
-                yield self.pubsub_client.publish(self.sup,
-                            self.event_topics["Agent"].reference(),value)
+                yield self._log_publisher.create_and_publish_event( \
+                    origin=self.event_publisher_origin, description=value)
+            
         if (type == publish_msg_type["StateChange"]):
-                yield self.pubsub_client.publish(self.sup,
-                            self.state_topics["Agent"].reference(),value)
-
+                yield self._state_publisher.create_and_publish_event( \
+                    origin=self.event_publisher_origin, description=value)
         
     ############################################################################
     #   Other.
@@ -1902,9 +1867,31 @@ class InstrumentAgent(ResourceAgent):
         """
         return sum(map(lambda x: len(x),self.data_buffer))
         
-
         
-class InstrumentAgentClient(ResourceAgentClient):
+    def _debug_print_driver_event(self,type,transducer,value):
+        """
+        """
+        if DEBUG_PRINT:
+            if isinstance(value,str):
+                print 'driver event: '+ type + ',  '+ transducer + ',  ' + value
+                
+            elif isinstance(value,dict):
+                print 'driver event: '+ type + ',  '+ transducer
+                for (key,val) in value.iteritems():
+                    print str(key), ' ', str(val)
+            else:
+                print 'driver event: '+ type + ',  '+ transducer
+                print value
+        
+    def _debug_print(self,event=None,value=None):
+        """
+        """
+        pass
+    
+
+    
+#ResourceAgentClient
+class InstrumentAgentClient(ProcessClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
@@ -1941,7 +1928,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content,headers,message) = yield self.rpc_send('end_transaction',tid)
         #yield pu.asleep(1)
         #content = {'success':['OK']}
-        assert(isinstance(content,dict))
+        assert(isinstance(content,dict)), 'Expected dict result'
         defer.returnValue(content)
 
     ############################################################################
@@ -2227,6 +2214,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(result)
         """
         pass
-
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentAgent)
+
+

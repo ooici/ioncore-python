@@ -43,7 +43,7 @@ class TestPublisher(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {
@@ -101,6 +101,7 @@ class TestPublisher(IonTestCase):
 
         self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
 
+    #noinspection PyUnreachableCode
     @defer.inlineCallbacks
     def test_psc_plus_factory(self):
         raise SkipTest('Broker bug, no current workaround')
@@ -224,7 +225,7 @@ class TestSubscriber(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {
@@ -373,7 +374,7 @@ class TestPublisherAndSubscriber(IonTestCase):
             },
             {
                 'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
                     'spawnargs':{'datastore_service':'datastore'}},
             {
