@@ -137,6 +137,9 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -166,6 +169,8 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -195,6 +200,8 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -250,7 +257,9 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
-        
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
+
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
@@ -277,7 +286,9 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
-        
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
+
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
@@ -303,6 +314,8 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
@@ -329,6 +342,8 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:

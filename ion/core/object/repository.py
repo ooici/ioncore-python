@@ -853,7 +853,7 @@ class Repository(ObjectContainer):
                 if not cref:
                     raise RepositoryError('End of Ancestors: No matching reference \
                                           found in commit history on branch name %s, \
-                                          commit_id: %s' % (branch_name, commit_id))
+                                          commit_id: %s' % (branchname, commit_id))
                 
             
             

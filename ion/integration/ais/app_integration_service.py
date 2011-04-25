@@ -65,18 +65,10 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResources service method.')
-        try:
-            # Instantiate the worker class
-            worker = FindDataResources(self)
-            returnValue = yield worker.findDataResources(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        # Instantiate the worker class
+        worker = FindDataResources(self)
+        returnValue = yield worker.findDataResources(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_findDataResourcesByUser(self, content, headers, msg):
@@ -89,18 +81,10 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResourcesByUser service method.')
-        try:
-            # Instantiate the worker class
-            worker = FindDataResources(self)
-            returnValue = yield worker.findDataResourcesByUser(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        # Instantiate the worker class
+        worker = FindDataResources(self)
+        returnValue = yield worker.findDataResourcesByUser(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_getDataResourceDetail(self, content, headers, msg):
@@ -111,17 +95,9 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_getDataResourceDetail service method')
-        try:
-            worker = GetDataResourceDetail(self)
-            returnValue = yield worker.getDataResourceDetail(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        worker = GetDataResourceDetail(self)
+        returnValue = yield worker.getDataResourceDetail(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_createDownloadURL(self, content, headers, msg):
@@ -132,18 +108,9 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_createDownloadURL: '+str(content))
-        try:
-            worker = CreateDownloadURL(self)
-            returnValue = yield worker.createDownloadURL(content)
-            yield self.reply_ok(msg, returnValue)   
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-            return
-        
-        return
+        worker = CreateDownloadURL(self)
+        returnValue = yield worker.createDownloadURL(content)
+        yield self.reply_ok(msg, returnValue)   
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):
