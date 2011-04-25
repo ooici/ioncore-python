@@ -6,7 +6,7 @@
     using a live SBE37 driver.
 @author Edward Hunter
 """
-'''
+
 import uuid
 import re
 import os
@@ -46,7 +46,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    'test_execute_instrument',
+    #'test_execute_instrument',
     'dummy'
 ]    
 
@@ -367,5 +367,3 @@ class TestSBE37Agent(IonTestCase):
         
 
         
-
-'''

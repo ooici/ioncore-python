@@ -5,7 +5,7 @@
 @author Edward Hunter
 @brief Driver code for SeaBird SBE-37 CTD
 """
-'''
+
 
 import re
 import time
@@ -27,7 +27,7 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[1]
+DEBUG_PRINT = (True,False)[0]
 IO_LOG = (True,False)[1]
 IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
 
@@ -2439,4 +2439,3 @@ class SBE37DriverClient(InstrumentDriverClient):
 # Spawn of the process using the module name
 factory = ProcessFactory(SBE37Driver)
 
-'''
