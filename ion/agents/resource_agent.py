@@ -7,6 +7,8 @@
 @brief base class for all resource agent processes
 """
 
+'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -258,3 +260,5 @@ class ResourceAgentClient(ProcessClient):
               yield self.rpc_send('register_resource', agent_instance.encode())
 
         defer.returnValue(AgentInstance.decode(content))
+
+'''

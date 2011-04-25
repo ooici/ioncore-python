@@ -25,16 +25,19 @@ RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE       = object_utils.create_type_identifie
 TRIGGER_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2324, version=1)
 RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifier(object_id=2325, version=1)
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
-NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2327, version=1)
-DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE      = object_utils.create_type_identifier(object_id=2328, version=1)
-DATA_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2329, version=1)
+NEW_SUBSCRIPTION_EVENT_MESSAGE_TYPE         = object_utils.create_type_identifier(object_id=2327, version=1)
+DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE         = object_utils.create_type_identifier(object_id=2328, version=1)
+DATA_EVENT_MESSAGE_TYPE                     = object_utils.create_type_identifier(object_id=2329, version=1)
+DATASOURCE_UNAVAILABLE_EVENT_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=2330, version=1)
+DATASET_SUPPLEMENT_ADDED_EVENT_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=2331, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
 CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
 DATASOURCE_UPDATE_EVENT_ID = 1101
-DATASET_MODIFICATION_EVENT_ID = 1111
+DATASOURCE_UNAVAILABLE_EVENT_ID = 1102
+DATASET_SUPPLEMENT_ADDED_EVENT_ID = 1111
 BUSINESS_STATE_MODIFICATION_EVENT_ID = 1112
 NEW_SUBSCRIPTION_EVENT_ID = 1201
 DEL_SUBSCRIPTION_EVENT_ID = 1202
@@ -262,13 +265,21 @@ class ResourceModifiedEventPublisher(EventPublisher):
     """
     msg_type = RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE
 
-class DatasetModificationEventPublisher(ResourceModifiedEventPublisher):
+class DatasourceUnavailableEventPublisher(ResourceModifiedEventPublisher):
     """
-    Event Notification Publisher for Dataset Modifications.
+    Event Notification Publisher for the Datasource Unavailable event.
+    """
+    event_id = DATASOURCE_UNAVAILABLE_EVENT_ID
+    msg_type = DATASOURCE_UNAVAILABLE_EVENT_MESSAGE_TYPE
+
+class DatasetSupplementAddedEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Supplement Added.
 
     The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
     """
-    event_id = DATASET_MODIFICATION_EVENT_ID
+    event_id = DATASET_SUPPLEMENT_ADDED_EVENT_ID
+    msg_type = DATASET_SUPPLEMENT_ADDED_EVENT_MESSAGE_TYPE
 
 class BusinessStateModificationEventPublisher(ResourceModifiedEventPublisher):
     """
@@ -439,13 +450,21 @@ class ResourceModifiedEventSubscriber(EventSubscriber):
     """
     pass
 
-class DatasetModificationEventSubscriber(ResourceModifiedEventSubscriber):
+class DatasourceUnavailableEventSubscriber(ResourceModifiedEventSubscriber):
     """
-    Event Notification Subscriber for Dataset Modifications.
+    Event Notification Subscriber for the Datasource Unavailable event.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_id = DATASOURCE_UNAVAILABLE_EVENT_ID
+
+class DatasetSupplementAddedEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Supplement Added.
 
     The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
     """
-    event_id = DATASET_MODIFICATION_EVENT_ID
+    event_id = DATASET_SUPPLEMENT_ADDED_EVENT_ID
 
 class BusinessStateChangeSubscriber(ResourceModifiedEventSubscriber):
     """

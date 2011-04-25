@@ -5,6 +5,9 @@
 @author Michael Meisinger
 @author Matt Rodriguez
 @brief test attribute store service
+
+@TODO refactor attribute store test or potentially remove is we are not using it?
+Already tested in ion.core.data
 """
 
 import ion.util.ionlog
@@ -28,7 +31,7 @@ class AttrStoreServiceTest(IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
-
+    """
     @defer.inlineCallbacks
     def test_put_separate_backend(self):
         # Test with seperate store backends
@@ -80,7 +83,7 @@ class AttrStoreServiceTest(IonTestCase):
 
         yield asc1.clear_store()
         yield asc2.clear_store()
-
+    """
 
     @defer.inlineCallbacks
     def test_defaults(self):

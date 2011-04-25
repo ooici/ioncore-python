@@ -5,7 +5,7 @@
 @author Michael Meisinger
 @brief service for data acquisition
 """
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -380,3 +380,4 @@ class InstrumentManagementClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentManagementService)
+'''

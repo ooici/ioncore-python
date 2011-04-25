@@ -11,7 +11,7 @@
 @author Stephen Pasco
 @author Steve Foley
 """
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -252,3 +252,4 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['InstrumentState'], 'a-ok')
 
+'''

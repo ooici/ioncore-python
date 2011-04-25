@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @brief service for registering data products
 """
+'''
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -80,3 +81,4 @@ class DataProductRegistryClient(registry.BaseRegistryClient, registry.LCStateMix
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataProductRegistryService)
+'''

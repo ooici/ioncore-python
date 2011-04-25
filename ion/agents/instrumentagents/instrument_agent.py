@@ -7,6 +7,8 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 
+'''
+
 from twisted.internet import defer
 import ion.util.ionlog
 from ion.agents.resource_agent import ResourceAgent
@@ -2214,3 +2216,5 @@ class InstrumentAgentClient(ResourceAgentClient):
         pass
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentAgent)
+
+'''

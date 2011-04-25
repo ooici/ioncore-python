@@ -21,7 +21,7 @@ from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import IProcess, Process, request
-from ion.data.store import Store
+from ion.core.data.store import Store
 import ion.util.procutils as pu
 
 # The following modules must be imported here, because they load config
