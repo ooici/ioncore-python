@@ -55,8 +55,8 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    #'test_configure',
-    #'test_connect',
+    'test_configure',
+    'test_connect',
     'test_get_set',
     'test_execute',
     'dummy'
