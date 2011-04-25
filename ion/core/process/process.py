@@ -621,7 +621,7 @@ class Process(BasicLifecycleObject):
                         raise ProcessError(text)
 
                 # Regular message handling in expected state
-                pu.log_message(msg)
+#                pu.log_message(msg)
 
                 # Delegate further message processing to conversation specific
                 # implementation. Trigger conversation FSM.
@@ -637,13 +637,13 @@ class Process(BasicLifecycleObject):
             elif convid and protocol == CONV_TYPE_NONE:
                 # Case of one-off messages
                 log.debug("Received simple protocol=='none' message")
-                pu.log_message(msg)
+#                pu.log_message(msg)
                 res = yield self._dispatch_message_op(payload, msg, None)
 
             else:
                 # Legacy case of no conv-id set or one-off messages (events?)
                 log.warn("No conversation id in message")
-                pu.log_message(msg)
+#                pu.log_message(msg)
                 res = yield self._dispatch_message_op(payload, msg, None)
 
         except ApplicationError, ex:
