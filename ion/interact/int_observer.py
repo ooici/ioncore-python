@@ -8,15 +8,12 @@
 import string
 
 from twisted.internet import defer
-from zope.interface import implements, Interface
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import ioninit
-from ion.core import messaging
-from ion.core.messaging.receiver import Receiver, FanoutReceiver
-from ion.core.process.process import Process, ProcessClient, ProcessFactory
+from ion.core.messaging.receiver import FanoutReceiver
+from ion.core.process.process import Process, ProcessFactory
 import ion.util.procutils as pu
 
 class InteractionObserver(Process):
@@ -31,7 +28,7 @@ class InteractionObserver(Process):
         """
         Process.__init__(self, *args, **kwargs)
 
-        self.max_msglog = 1000
+        self.max_msglog = 10000
         self.msg_log = []
         self.write_on_term = True
 
@@ -83,7 +80,7 @@ class InteractionObserver(Process):
         log.info(hstr)
 
         # Truncate if too long in increments of 100
-        if (len(self.msg_log) > self.max_msglog + 100):
+        if len(self.msg_log) > self.max_msglog + 100:
             self.msg_log = self.msg_log[100:]
 
     def writeout_msc(self):
@@ -149,11 +146,6 @@ class InteractionObserver(Process):
                 msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
             msc += ' %s -> %s [ label="%s" ];\n' % (sname, rname, mlabel)
         msc += "}\n"
-
-        from IPython.Shell import IPShellEmbed
-
-        ipshell = IPShellEmbed()
-        ipshell()
 
         return msc
 
