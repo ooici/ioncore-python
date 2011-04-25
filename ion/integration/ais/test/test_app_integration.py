@@ -32,6 +32,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
                                                        UPDATE_USER_PROFILE_REQUEST_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
+                                                       GET_USER_PROFILE_REQUEST_TYPE, \
+                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
                                                        CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
@@ -605,13 +607,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
             
     @defer.inlineCallbacks
-    def test_updateUserProfile(self):
+    def test_updateUserProfile_getUser(self):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
-        """
-        # comment this test out until updateUserProfile is added to the policy service
+        # comment these tests out until updateUserProfile is added to the policy service
         # test for authentication policy failure
         # create the update Email request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
@@ -623,7 +624,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('updateUserProfile did not raise exception for ANONYMOUS ooi_id')
         except ReceivedApplicationError, ex:
             log.info("updateUserProfile correctly raised exception for ANONYMOUS ooi_id")
-        """
+            
+        # create the getUser request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
+        msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        try:
+            reply = yield self.aisc.getUser(msg)
+            self.fail('getUser did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("getUser correctly raised exception for ANONYMOUS ooi_id")
         
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
@@ -686,7 +696,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
         
-        # create the update Profile request GPBs
+        # create the update Profile request GPBs for setting the email address
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
@@ -699,6 +709,43 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
+        # create the update Profile request GPBs for setting the profile
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[0].name = "ProfileItem_1_Name"
+        msg.message_parameters_reference.profile[0].value = "ProfileItem_1_Value"
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[1].name = "ProfileItem_2_Name"
+        msg.message_parameters_reference.profile[1].value = "ProfileItem_2_Value"
+        try:
+            reply = yield self.aisc.updateUserProfile(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
+        log.debug('updateUserProfile returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            
+        # test that the email & profile got set
+        # create the getUser request GPBs for getting the email/profile
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getUser request')
+        msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        try:
+            reply = yield self.aisc.getUser(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('getUser incorrectly raised exception for an authenticated ooi_id')
+        log.debug('getUser returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
+        self.assertEqual(reply.message_parameters_reference[0].email_address, "some_person@some_place.some_domain")
+        self.assertEqual(reply.message_parameters_reference[0].profile[0].name, "ProfileItem_1_Name")
+        self.assertEqual(reply.message_parameters_reference[0].profile[0].value, "ProfileItem_1_Value")
+        self.assertEqual(reply.message_parameters_reference[0].profile[1].name, "ProfileItem_2_Name")
+        self.assertEqual(reply.message_parameters_reference[0].profile[1].value, "ProfileItem_2_Value")
+
+
         # try to send updateUserProfile the wrong GPB
         # create a bad request GPBs
         msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
@@ -706,7 +753,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
-        # try to send updateUserBrofile incomplete GPBs
+        # try to send updateUserProfile incomplete GPBs
         # create a bad GPB request w/o payload
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
         reply = yield self.aisc.updateUserProfile(msg)
