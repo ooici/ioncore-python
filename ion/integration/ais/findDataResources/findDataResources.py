@@ -374,6 +374,8 @@ class FindDataResources(object):
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
         pair.object = type_ref
+        
+        log.info('Calling get_subjects with owner: ' + owner)
 
         try:
             result = yield self.asc.get_subjects(request)

@@ -17,6 +17,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
 
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
@@ -206,6 +207,7 @@ class AppIntegrationTest(IonTestCase):
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
+
     @defer.inlineCallbacks
     def test_findDataResourcesByUser(self):
 
@@ -242,7 +244,8 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        #reqMsg.message_parameters_reference.user_ooi_id  = '621F69FC-37C3-421F-8AE9-4D762A2718C9'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -271,7 +274,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -299,7 +302,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -327,7 +330,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
