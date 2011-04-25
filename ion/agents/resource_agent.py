@@ -10,6 +10,8 @@
 '''
 
 import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 
 from ion.services.coi.agent_registry import AgentRegistryClient
@@ -26,7 +28,7 @@ class ResourceAgent(Process):
     If you are going to write a new agent process, subclass this one and
     setup a ResourceRegistryClient
     """
-
+    
     def plc_init(self):
         """
         The Agent Registry client class to hang onto for all registry manipulations

@@ -23,7 +23,7 @@ from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory, PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher,     NewSubscriptionEventSubscriber, \
                                                 DelSubscriptionEventPublisher,     DelSubscriptionEventSubscriber, \
-                                                DatasetModificationEventPublisher, DatasetModificationEventSubscriber
+                                                DatasetSupplementAddedEventPublisher, DatasetSupplementAddedEventSubscriber
 
 # Imports: Associations
 from ion.core.messaging.message_client import MessageClient
@@ -279,7 +279,7 @@ class DispatcherProcess(Process):
         # Step 2: Create the new subscriber
         log.debug('create_dataset_update_subscriber(): Creating new Dataset Update Events Subscriber via SubscriberFactory')
         if self.dues_factory is None:
-            self.dues_factory = SubscriberFactory(subscriber_type=DatasetModificationEventSubscriber, process=self)
+            self.dues_factory = SubscriberFactory(subscriber_type=DatasetSupplementAddedEventSubscriber, process=self)
         subscriber = yield self.dues_factory.build(origin=dataset_id)
         log.debug('create_dataset_update_subscriber(): Bound subscriber to topic: "%s"' % subscriber.topic(dataset_id))
         
@@ -490,7 +490,7 @@ class DispatcherProcessClient(ProcessClient):
         yield self._check_init()
 
         # Step 1: Create the publisher
-        factory = PublisherFactory(publisher_type=DatasetModificationEventPublisher, process=self.proc)
+        factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self.proc)
         publisher = yield factory.build(routing_key=self.target, origin=dataset_id)
         log.debug('test_update_dataset(): Created publisher; bound to topic "%s" for publishing' % publisher.topic(dataset_id))
         

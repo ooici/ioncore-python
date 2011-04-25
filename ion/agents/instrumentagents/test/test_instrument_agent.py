@@ -12,26 +12,21 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-
-import ion.agents.instrumentagents.instrument_agent as instrument_agent
-from ion.core.exception import ReceivedError
 import ion.util.procutils as pu
 import uuid
 from twisted.trial import unittest
 
-
-    
+from ion.core.process.process import Process
+import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+from ion.core.exception import ReceivedError
     
 
 class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        
-        
         yield self._start_container()
-
-
         processes = [
             {'name':'instrument_agent','module':'ion.agents.instrumentagents.instrument_agent','class':'InstrumentAgent'}
         ]
@@ -41,15 +36,8 @@ class TestInstrumentAgent(IonTestCase):
 
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,target=self.svc_id)
         
-        
-
-        
     @defer.inlineCallbacks
     def tearDown(self):
-        
-        
-        
-        pu.asleep(1)
         yield self._stop_container()
         
         
@@ -929,6 +917,7 @@ class TestInstrumentAgent(IonTestCase):
         transaction_id = reply['transaction_id']
         transaction_id_8 = transaction_id
         result_8 = result
+        
 
         self.assertEqual(success[0],'OK')
         self.assertEqual(result_8,result_1)
@@ -973,6 +962,35 @@ class TestInstrumentAgent(IonTestCase):
         raise unittest.SkipTest("To be done.")        
     """    
  
+    @defer.inlineCallbacks
+    def test_publish(self):
+        # Setup a subscriber to an event topic
+        class TestEventSubscriber(InfoLoggingEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+                
+            def ondata(self, data):
+                log.debug("TestEventSubscriber received a message with name: %s",
+                          data['content'].name)
+                self.msgs.append(data)
+                
+        subproc = Process()
+        yield subproc.spawn()
+        testsub = TestEventSubscriber(origin=str(self.svc_id),
+                                      process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+        
+        # Twiddle the IA
+        result = yield self.ia_client.start_transaction(5)
+        tid = result['transaction_id']
+        yield self.ia_client.end_transaction(tid)
+        
+        # check the event
+        yield pu.asleep(1.0)
+        self.assertEqual(len(testsub.msgs), 1)
+        self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!") 
  
     """
     reply_ = yield self.ia_client.get_observatory(instrument_agent.ci_param_list,'none')
@@ -994,14 +1012,12 @@ class TestInstrumentAgent(IonTestCase):
     
     """
  
- 
     """
-    @defer.inlineCallbacks
     def test_something(self):
+        pass
         
-        
-        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
-    """        
+        #raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+    """     
     
     
 

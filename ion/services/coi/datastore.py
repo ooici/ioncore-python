@@ -971,7 +971,7 @@ class DataStoreService(ServiceProcess):
                     self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
                     
         if self.preload[ION_DATASETS_CFG]:
-            log.info('Preloading Data')
+            log.info('Preloading Data Sets: %d' % len(ION_DATASETS))
 
             for key, value in ION_DATASETS.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
@@ -987,8 +987,11 @@ class DataStoreService(ServiceProcess):
                         self._create_ownership_association(resource_instance.Repository, owner)
 
                     else:
+                        # Delete this entry from the CONFIG!
                         del ION_DATASETS[key]
 
+
+            log.info('Preloading Data Sources: %d' % len(ION_DATA_SOURCES))
             for key, value in ION_DATA_SOURCES.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
@@ -1002,6 +1005,7 @@ class DataStoreService(ServiceProcess):
 
                         self._create_ownership_association(resource_instance.Repository, owner)
                     else:
+                        # Delete this entry from the CONFIG!
                         del ION_DATA_SOURCES[key]
 
         if self.preload[ION_AIS_RESOURCES_CFG]:

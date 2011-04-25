@@ -852,7 +852,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
         
-        msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F2"  #data source
+        msg.message_parameters_reference.ooi_id = "3319A67F-91F3-424F-8E69-4F28C4E047F2"  #data source
         reply = yield self.aisc.getResource(msg)
         log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
