@@ -1204,6 +1204,13 @@ class DataStoreClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('fetch_blobs', content)
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def put_blobs(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('put_blobs', content)
+        defer.returnValue(content)
+
 #    @defer.inlineCallbacks
 #    def get_preloaded_datasets_dict(self):
 #        """
