@@ -17,7 +17,11 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
+                                                                    TYPE_OF_ID, \
+                                                                    DATASET_RESOURCE_TYPE_ID, \
+                                                                    DATASOURCE_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, \
                                                                     ResourceInstance
@@ -44,6 +48,8 @@ SCHEDULER_ADD_REQ_TYPE         = object_utils.create_type_identifier(object_id=2
 SCHEDULER_ADD_RSP_TYPE         = object_utils.create_type_identifier(object_id=2602, version=1)
 
 
+DEFAULT_MAX_INGEST_MILLIS = 30000
+
 
 class ManageDataResource(object):
 
@@ -55,8 +61,6 @@ class ManageDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
 
-    def default_max_ingest_millis(self):
-        return 30000
 
     @defer.inlineCallbacks
     def update(self, msg):
@@ -75,7 +79,7 @@ class ManageDataResource(object):
                     "Expected DataResourceUpdateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -86,7 +90,7 @@ class ManageDataResource(object):
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -138,11 +142,11 @@ class ManageDataResource(object):
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != DELETE_DATA_RESOURCE_REQ_TYPE:
-                errtext = "ManageDataResource.deelete(): " + \
+                errtext = "ManageDataResource.delete(): " + \
                     "Expected DataResourceDeleteRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -153,7 +157,7 @@ class ManageDataResource(object):
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -165,17 +169,24 @@ class ManageDataResource(object):
                 #FIXME: if user does not own this data set, don't delete it
 
                 #FIXME: stop scheduling
+                log.info("Getting instance of data source resource")
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
+                log.info("Getting instance of dataset resource from association")
                 dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
 
-                #lifecycle states...GO
+                log.info("Setting data source resource lifecycle = retired")
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
-                dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
-
                 delete_resources.append(datasrc_resource)
-                delete_resources.append(dataset_resource)
+
+                if not None is dataset_resource:
+                    log.info("Setting data set resource lifecycle = retired")
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
+                    delete_resources.append(dataset_resource)
+
+
                 deletions.append(data_source_resource_id)
 
+            log.info("putting all resource changes in one big transaction")
             yield self.rc.put_resource_transaction(delete_resources)
 
 
@@ -232,7 +243,7 @@ class ManageDataResource(object):
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -244,7 +255,7 @@ class ManageDataResource(object):
                     "Missing/incorrect required fields in DataResourceCreateRequest: " + missing
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
@@ -254,7 +265,7 @@ class ManageDataResource(object):
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.  
             if not msg.IsFieldSet("max_ingest_millis"):
-                msg.max_ingest_millis = self.default_max_ingest_millis()
+                msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
 
 
             # get user resource so we can associate it later
@@ -290,7 +301,7 @@ class ManageDataResource(object):
 
 
             #make association
-            association = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
+            #association = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
             association = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
 
@@ -382,7 +393,7 @@ class ManageDataResource(object):
         """
 
         #can also do obj=
-        found = yield self.ac.find_associations(subject=datasource_resource, \
+        found = yield self.ac.find_associations(subject=the_subject, \
                                                 predicate_or_predicates=HAS_A_ID)
 
         association = None
@@ -392,10 +403,15 @@ class ManageDataResource(object):
                 #FIXME: if not association is None then we have data inconsistency!
                 association = a
 
-        #FIXME: if association is None: ERRORZ
+        #this is an error case!
+        if None is association:
+            defer.returnValue(None)
+
 
         the_resource = yield self.rc.get_associated_resource_object(association)
         defer.returnValue(the_resource)
+
+
 
     def _missingResourceRequestFields(self, msg):
         """

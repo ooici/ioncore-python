@@ -37,7 +37,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
-from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE, StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -174,6 +174,34 @@ class DataStoreTest(IonTestCase):
     def test_pull_invalid(self):
 
         self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
+
+    @defer.inlineCallbacks
+    def test_put_blobs(self):
+        msg = yield self.wb1.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        sentkeyset = set()
+        for key,val in self.wb1.workbench.get_repository(self.repo_key).index_hash.iteritems():
+            link = msg.blob_elements.add()
+            obj = msg.Repository._wrap_message_object(val._element)
+
+            link.SetLink(obj)
+            sentkeyset.add(key)
+
+        # get list of keys ds1 has currently
+        origkeyset = set(self.ds1.workbench._blob_store.kvs.keys())
+
+        dsc = DataStoreClient()
+
+        yield dsc.put_blobs(msg)
+
+        # examine ds1
+        postkeyset = set(self.ds1.workbench._blob_store.kvs.keys())
+
+        self.failUnlessEquals(len(origkeyset) + len(sentkeyset), len(postkeyset))
+
+        for key in sentkeyset:
+            self.failIf(key in origkeyset)
+            self.failUnless(key in sentkeyset)
 
     @defer.inlineCallbacks
     def test_checkout(self):
