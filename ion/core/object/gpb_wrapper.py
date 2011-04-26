@@ -13,6 +13,7 @@ from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
 import struct
+import inspect
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -948,7 +949,20 @@ class WrapperType(type):
             # @attention: Sometimes (string) attribute values come back as unicode values..  we can provide
             #             a trap here to convert them, but this may not be necessary.  Lets discuss [TPL]
             return result
+    
+        def _get_var_num_dims(self):
+            """
+            Specialized method for CDM variables to retrieve its dimensionality
+            """
+            return len(self.shape)
 
+        def _get_var_num_ba(self):
+            """
+            Specialized method for CDM variables to retrieve the number of bounded arrays used in
+            defining this variables content
+            """
+            return len(self.shape)
+            
 
         #------------------------------------------------------------------------#
         # Additional helper methods for attaching specialized attributes/methods #
@@ -1011,7 +1025,7 @@ class WrapperType(type):
 
 
         elif obj_type == CDM_ATTRIBUTE_TYPE:
-
+            
             clsDict['GetValue'] = _get_attribute_value_by_index
             clsDict['GetValues'] = _get_attribute_values
             # clsDict['SetValue'] = _get_attribute_values
@@ -1020,11 +1034,20 @@ class WrapperType(type):
             clsDict['GetDataType'] = _get_attribute_data_type
             clsDict['IsSameType'] = _attribute_is_same_type
 
+            from ion.services.dm.ingestion import cdm_attribute_methods
+            for name, data in inspect.getmembers(cdm_attribute_methods, inspect.isfunction):
+                if not name.startswith('_'):
+                    if name in clsDict:
+                        raise RuntimeError('Method "%s" already defined in the class dictionary for CDM Wrapper_Attribute object' % name)
+                    clsDict[name] = data
+
 
         elif obj_type == CDM_VARIABLE_TYPE:
 
             clsDict['GetUnits'] = _get_var_units
             clsDict['GetStandardName'] = _get_var_std_name
+            clsDict['GetNumDimensions'] = _get_var_num_dims
+            clsDict['GetNumBoundedArrays'] = _get_var_num_ba
             clsDict['AddAttribute'] = _add_attribute
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
@@ -1036,6 +1059,13 @@ class WrapperType(type):
 
             # @attention: Value adds are currently manual
 
+            from ion.services.dm.ingestion import cdm_variable_methods
+            for name, data in inspect.getmembers(cdm_variable_methods, inspect.isfunction):
+                if not name.startswith('_'):
+                    if name in clsDict:
+                        raise RuntimeError('Method "%s" already defined in the class dictionary for CDM Wrapper_Variable object' % name)
+                    clsDict[name] = data
+                    
 
 class Wrapper(object):
     '''
