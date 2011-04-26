@@ -14,6 +14,7 @@ from ion.integration.ais.notification_alert_service import NotificationAlertServ
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.test.iontest import IonTestCase
+from ion.core.exception import ReceivedApplicationError
 from ion.core.process.process import Process
 
 import ion.util.procutils as pu
@@ -239,3 +240,4 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            
