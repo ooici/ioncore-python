@@ -150,7 +150,7 @@ class NotificationReceiverTest(IonTestCase):
                                            title="TODO",
                                            url="TODO")
 
-        log.info('NotificationReceiverTest: test_publish_recieve SLEEP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        log.info('NotificationReceiverTest: test_publish_recieve sleep')
         yield pu.asleep(6.0)
 
 
