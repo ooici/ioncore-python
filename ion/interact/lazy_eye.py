@@ -11,8 +11,6 @@ and control the generation and viewing of message sequence charts.
 
 from twisted.internet import defer, reactor
 from twisted.internet import protocol
-from twisted.web import resource
-from twisted.web.server import Site
 
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory, ProcessClient
@@ -20,30 +18,9 @@ from ion.interact.int_observer import InteractionObserver
 
 # Globals
 log = ion.util.ionlog.getLogger(__name__)
-# @todo move these into ion.config
-BINARY_NAME = 'mscgen'
-WEB_PORT = 2012
-page_header = """
-<html>
-<header>
-<title>ion-python MSC creator</title>
-</header>
-<body>
-<img src="http://ooici.net/global.logo.jpeg" alt="ion logo">
-<p />
-"""
-page_footer = """
-</body>
-</html>
-"""
-startbox = """
-<form action="/go/" method="get" <input name="filename" value="msc.txt" size="64" type="text"/>
-</form>
-"""
-stopbutton = """
-<form action="/stop/" method="get" <input value="Stop" type="Submit" /></form>
-"""
 
+# @todo move this into ion.config
+BINARY_NAME = 'mscgen'
 
 class MscProcessProtocol(protocol.ProcessProtocol):
     """
@@ -62,7 +39,7 @@ class MscProcessProtocol(protocol.ProcessProtocol):
 
     def processExited(self, reason):
         log.debug('mscgen exited, %s' % str(reason))
-        self.cb(self.msg)
+        self.cb(self.msg, self.output)
         self.running = False
 
     def outReceived(self, data):
@@ -129,11 +106,11 @@ class LazyEye(InteractionObserver):
         log.debug('image name requested, returning %s' % self.imagename)
         self.reply_ok(msg, self.imagename)
 
-    def _mscgen_callback(self, msg):
+    def _mscgen_callback(self, msg, reply_text):
         """
         Send reply to caller when mscgen is finished. Callback hook.
         """
-        self.reply_ok(msg)
+        self.reply_ok(msg, reply_text)
 
 class LazyEyeClient(ProcessClient):
     """
@@ -157,87 +134,6 @@ class LazyEyeClient(ProcessClient):
         (content, headers, msg) = yield self.rpc_send('get_image_name')
         defer.returnValue(content)
 
-class NavPage(resource.Resource):
-    """
-    Root web page for the user interface
-    """
-    def render_GET(self, request):
-        request.write(page_header)
-        request.write(startbox)
-        request.write(stopbutton)
-        request.write(page_footer)
-        return ''
-
-class StopPage(resource.Resource):
-    """
-    Stop the capture, display results
-    """
-    def __init__(self):
-        resource.Resource.__init__(self)
-        self.isLeaf = True
-
-    @defer.inlineCallbacks
-    def render_GET(self, request):
-        request.write('Stopping capture and rendering PNG...')
-        
-        lec = LazyEyeClient()
-        # Stop method also does the render before returning, maybe slow
-        dp = yield lec.stop()
-
-        # Lookup image name
-        img_file = yield lec.get_image_name()
-        request.write('<img src="%s" alt="msc">' % img_file)
-
-        # DDT
-        request.write('<p>MSC:<p><pre>')
-        request.write(dp)
-        request.write('</pre>')
-
-        defer.returnValue('')
-
-class GoPage(resource.Resource):
-    """
-    Bar.
-    """
-    def __init__(self, filename):
-        resource.Resource.__init__(self)
-        log.debug('go page created with %s ' % filename)
-        self.filename = filename
-        self.isLeaf = True
-
-    #noinspection PyUnusedLocal
-    def render_GET(self, request):
-        lec  = LazyEyeClient()
-        d = lec.start(filename=self.filename)
-        return d
-
-class RootPage(resource.Resource):
-    """
-    If child is required, generate it on the fly
-    @todo init method holding LazyEye instance
-    """
-    def getChild(self, pathstr, request):
-        log.debug('got request for "%s" (%s)' % (pathstr, request))
-
-        if pathstr == 'go':
-            return GoPage(request.args['filename'][0])
-        elif pathstr == 'stop':
-            return StopPage()
-        elif pathstr == '':
-            return NavPage()
-        else:
-            return resource.Resource.getChild(self, pathstr, request)
-
 
 # Spawn off the process using the module name
 factory = ProcessFactory(LazyEye)
-
-def main():
-    root = RootPage()
-    factory = Site(root)
-    reactor.listenTCP(WEB_PORT, factory)
-    log.info('http://localhost:%d/' % WEB_PORT)
-
-if __name__ == '__main__':
-    main()
-    reactor.run()

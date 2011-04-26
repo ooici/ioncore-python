@@ -19,7 +19,7 @@ from ion.core.exception import ApplicationError
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core import ioninit
-import ion.util.ionlogd
+import ion.util.ionlog
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient

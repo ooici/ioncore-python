@@ -1,0 +1,19 @@
+{
+    # pfh 4/26/11
+    # See https://confluence.oceanobservatories.org/display/syseng/Python+CC+Startup
+    #
+    "type":"release",
+    "name":"LazyEyeWeb",
+    "version": "0.1",
+    "description": "App collection to run lazy eye and its website",
+    "ioncore" : "0.4.7",
+    "apps":[
+        {'name':'ccagent', 'version':'0.1',},
+        {'name':'lazyeye', 'version': '0.1',
+            'processapp':('lazy_eye', 'ion.interact.lazy_eye', 'LazyEye'),
+        },
+        {'name':'lazyeye_web', 'version': '0.1',
+            'processapp':('lazy_eye_web', 'ion.interact.lazy_eye_web', 'LazyEyeMonitor'),
+        }
+    ]
+}
