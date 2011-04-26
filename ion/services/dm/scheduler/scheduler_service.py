@@ -6,6 +6,7 @@
 @author Paul Hubbard
 @package ion.services.dm.scheduler.service Implementation of the scheduler
 """
+from ion.core.data.store import IndexStore, Query
 from ion.core.exception import ApplicationError
 from ion.core.object.gpb_wrapper import StructureElement
 from ion.core.object.repository import ObjectContainer
@@ -133,9 +134,12 @@ class SchedulerService(ServiceProcess):
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.scheduled_events = {}
+        self.scheduled_events = IndexStore(indices=['task_id', 'desired_origin', 'interval_seconds', 'payload'])
         self.mc = MessageClient(proc=self)
         self.pub = ScheduleEventPublisher(process=self)
+
+        # maps task_ids to IDelayedCall objects, popped off when callback is called, used to cancel tasks
+        self._callback_tasks = {}
 
         # will move pub through the lifecycle states with the service
         self.add_life_cycle_object(self.pub)
@@ -148,7 +152,8 @@ class SchedulerService(ServiceProcess):
         foreach task in op_query:
           rm_task(task)
         """
-        pass
+        for k, v in self._callback_tasks.iteritems():
+            v.cancel()
         
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
@@ -180,13 +185,19 @@ class SchedulerService(ServiceProcess):
         resp.origin     = desired_origin
 
         # extract content of message
-        self.scheduled_events[task_id] = {'task_id': task_id,
-                                          'desired_origin': desired_origin,
-                                          'payload': payload}
+        self.scheduled_events.put(task_id,
+                                  task_id,  # ok to use for value? seems kind of silly
+                                  index_attributes={'task_id': task_id,
+                                                    'interval_seconds':msg_interval,
+                                                    'desired_origin': desired_origin,
+                                                    'payload': payload})
 
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
-        reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
+
+        ccl = reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
+        self._callback_tasks[task_id] = ccl
+
         log.debug('Add completed OK')
 
         yield self.reply_ok(msg, resp)
@@ -205,29 +216,19 @@ class SchedulerService(ServiceProcess):
             self.reply_err(msg, {'value': err})
             return
 
+        # if the task is active, remove it
+        if self._callback_tasks.has_key(task_id):
+            self._callback_tasks[task_id].cancel()
+            del self._callback_tasks[task_id]
+
         log.debug('Removing task_id %s from store...' % task_id)
-        del self.scheduled_events[task_id]
+        self.scheduled_events.remove(task_id)
 
         resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
         resp.value = 'OK'
 
         log.debug('Removal completed')
         yield self.reply_ok(msg, resp)
-
-    @defer.inlineCallbacks
-    def op_query_tasks(self, content, headers, msg):
-        """
-        Query tasks registered, returns a maybe-empty list
-        """
-        resp = yield self.mc.create_instance(QUERYTASK_RSP_TYPE)
-
-        log.debug('Looking for matching tasks')
-        for task_id, _ in self.scheduled_events.iteritems():
-            if not re.search(content.task_regex, task_id) is None:
-                log.debug("found " + task_id)
-                resp.task_ids.append(task_id)
-
-        self.reply_ok(msg, resp)
 
     ##################################################
     # Internal methods
@@ -240,26 +241,34 @@ class SchedulerService(ServiceProcess):
         """
         log.debug('Worker activated for task %s' % task_id)
 
-        try:
-            tdef = self.scheduled_events[task_id]
-        except KeyError, ke:
-            log.info('Task ID missing in store, assuming removal and aborting')
-            return
+        q = Query()
+        q.add_predicate_eq('task_id', task_id)
+
+        tdefs = yield self.scheduled_events.query(q)
+        assert len(tdefs) == 1
+
+        tdef = tdefs.values()[0]
+
+        # pop callback object off of scheduled items
+        assert self._callback_tasks.has_key(task_id)
+        del self._callback_tasks[task_id]
 
         # deserialize and objectify payload
         # @TODO: this is costly, should keep cache?
-        payload = ObjectContainer._load_element(StructureElement.parse_structure_element(tdef.payload))
+        repo = self.workbench.create_repository()
+        payload = repo._load_element(StructureElement.parse_structure_element(tdef['payload']))
 
         log.debug('Time to send "%s" to "%s", id "%s"' % \
-                      (payload, tdef.desired_origin, task_id))
+                      (payload, tdef['desired_origin'], task_id))
 
-        yield self.pub.create_and_publish_event(origin=tdef.desired_origin,
-                                                task_id=task_id,
+        yield self.pub.create_and_publish_event(origin=tdef['desired_origin'],
+                                                task_id=tdef['task_id'],
                                                 payload=payload)
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        reactor.callLater(tdef.interval_seconds, self._send_and_reschedule, task_id)
+        ccl = reactor.callLater(tdef['interval_seconds'], self._send_and_reschedule, task_id)
+        self._callback_tasks[task_id] = ccl
 
         """
         Update last-invoked timestamp in registry
@@ -270,7 +279,7 @@ class SchedulerService(ServiceProcess):
 #        tdef['last_run'] = time.time()
 #        self.store.put(task_id, tdef)
         """
-        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef.interval_seconds))
+        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef['interval_seconds']))
 
 class SchedulerServiceClient(ServiceClient):
     """
@@ -311,20 +320,6 @@ class SchedulerServiceClient(ServiceClient):
         yield self._check_init()
 
         (ret, heads, message) = yield self.rpc_send('rm_task', msg)
-        defer.returnValue(ret)
-
-
-    @defer.inlineCallbacks
-    def query_tasks(self, msg):
-        """
-        @brief Query tasks in the scheduler by regex. Use '.+' to return all.
-        @param msg protocol buffer
-        @GPB(Input,2605,1)
-        @GPB(Output,2606,1)
-        @retval GPB containing a list, possibly zero-length.
-        """
-        yield self._check_init()
-        (ret, heads, message) = yield self.rpc_send('query_tasks', msg)
         defer.returnValue(ret)
 
 # Spawn of the process using the module name

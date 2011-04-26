@@ -55,8 +55,8 @@ class SchedulerTest(IonTestCase):
         # setup subscriber for trigger event
         self._notices = []
         self.sub = ScheduleEventSubscriber(process=self.proc,
-                                           origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
-                                           handler=lambda c: self._notices.append(c))
+                                           origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+        self.sub.ondata = lambda c: self._notices.append(c)
 
         # normally we'd register before initialize/activate but let's not bring the PSC/EMS into the mix
         # if we can avoid it.
@@ -97,7 +97,7 @@ class SchedulerTest(IonTestCase):
         log.debug(rc)
 
     @defer.inlineCallbacks
-    def XXtest_complete_usecase(self):
+    def test_complete_usecase(self):
         """
         Add a task, get a message, remove same.
         """
@@ -122,9 +122,9 @@ class SchedulerTest(IonTestCase):
         yield asleep(3)
         #cc = yield self.client.get_count()
         #self.failUnless(int(cc['value']) >= 1)
-        self.failUnlessEquals(len(self._notices), 1, "this may fail intermittently due to messaging")
-        self.failUnlessEquals(self._notices[0].content.additional_data.payload.dataset_id, "TESTER")
-        self.failUnlessEquals(self._notices[0].content.additional_data.payload.datasource_id, "TWO")
+        self.failUnless(len(self._notices) > 1, "this may fail intermittently due to messaging")
+        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
+        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
         
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
         msg_r.task_id = resp_msg.task_id
@@ -134,29 +134,6 @@ class SchedulerTest(IonTestCase):
 
         self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)
-
-
-    @defer.inlineCallbacks
-    def test_query(self):
-        # Create clients
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
-
-        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-        msg_a.interval_seconds  = 1
-        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
-        msg_a.payload.dataset_id = "TESTER"
-        msg_a.payload.datasource_id = "TWO"
-
-        yield sc.add_task(msg_a)
-
-        msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
-        msg_q.task_regex = '.+'
-
-        rl = yield sc.query_tasks(msg_q)
-
-        self.failUnless(len(rl.task_ids) == 1)
 
     @defer.inlineCallbacks
     def test_rm(self):
@@ -179,12 +156,3 @@ class SchedulerTest(IonTestCase):
         rc = yield sc.rm_task(msg_r)
         
 
-        msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
-        msg_q.task_regex = msg_r.task_id
-
-        rl = yield sc.query_tasks(msg_q)
-
-        
-        log.debug(rl)
-        self.failUnlessEqual(len(rl.task_ids), 0)
-        yield asleep(0.5)
