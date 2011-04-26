@@ -12,6 +12,7 @@ from twisted.internet import defer
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
+from ion.services.dm.distribution.events import TriggerEventSubscriber, ScheduleEventSubscriber
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 from ion.services.dm.scheduler.test.receiver import STClient
 
@@ -29,6 +30,11 @@ RMTASK_RSP_TYPE      = object_utils.create_type_identifier(object_id=2604, versi
 QUERYTASK_REQ_TYPE   = object_utils.create_type_identifier(object_id=2605, version=1)
 QUERYTASK_RSP_TYPE   = object_utils.create_type_identifier(object_id=2606, version=1)
 
+# other messages used for payloads
+SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE = object_utils.create_type_identifier(object_id=2607, version=1)
+
+# desired_origins
+from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
 class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
@@ -39,8 +45,6 @@ class SchedulerTest(IonTestCase):
              'class': 'SchedulerService'},
             {'name' : 'attributestore', 'module' : 'ion.services.coi.attributestore',
              'class' : 'AttributeStoreService'},
-            {'name' : 'scheduled_task', 'module' : 'ion.services.dm.scheduler.test.receiver',
-             'class' : 'ScheduledTask'},
         ]
 
         yield self._start_container()
@@ -48,11 +52,16 @@ class SchedulerTest(IonTestCase):
 
         self.proc = Process()
 
-        # Look up the address of the test receiver by name
-        sptid = yield self._get_procid('scheduled_task')
-        self.dest = str(sptid)
-        # Instantiate the process client (receiver)
-        self.client = STClient(target=sptid)
+        # setup subscriber for trigger event
+        self._notices = []
+        self.sub = ScheduleEventSubscriber(process=self.proc,
+                                           origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                           handler=lambda c: self._notices.append(c))
+
+        # normally we'd register before initialize/activate but let's not bring the PSC/EMS into the mix
+        # if we can avoid it.
+        yield self.sub.initialize()
+        yield self.sub.activate()
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -64,9 +73,31 @@ class SchedulerTest(IonTestCase):
         # Just run the setup/teardown code
         pass
 
+    @defer.inlineCallbacks
+    def test_add_remove(self):
+        # Create clients
+        mc = MessageClient(proc=self.sup)
+        sc = SchedulerServiceClient(proc=self.sup)
+
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 10
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "TESTER"
+        msg_a.payload.datasource_id = "TWO"
+
+        resp_msg = yield sc.add_task(msg_a)
+
+        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+        msg_r.task_id = resp_msg.task_id
+
+        rc = yield sc.rm_task(msg_r)
+
+        self.failUnlessEqual(rc.value, 'OK')
+        log.debug(rc)
 
     @defer.inlineCallbacks
-    def test_complete_usecase(self):
+    def XXtest_complete_usecase(self):
         """
         Add a task, get a message, remove same.
         """
@@ -75,10 +106,11 @@ class SchedulerTest(IonTestCase):
         mc = self.proc.message_client
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = self.dest
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
         msg_a.interval_seconds  = 1
-        msg_a.payload           = 'pingtest bar'
-
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "TESTER"
+        msg_a.payload.datasource_id = "TWO"
 
         resp_msg = yield sc.add_task(msg_a)
 
@@ -87,10 +119,12 @@ class SchedulerTest(IonTestCase):
         #fixme: also fail if we don't get GPB #2602 back
 
         # Wait for a message to go through the system
-        yield asleep(2)
-        cc = yield self.client.get_count()
-        self.failUnless(int(cc['value']) >= 1)
-
+        yield asleep(3)
+        #cc = yield self.client.get_count()
+        #self.failUnless(int(cc['value']) >= 1)
+        self.failUnlessEquals(len(self._notices), 1, "this may fail intermittently due to messaging")
+        self.failUnlessEquals(self._notices[0].content.additional_data.payload.dataset_id, "TESTER")
+        self.failUnlessEquals(self._notices[0].content.additional_data.payload.datasource_id, "TWO")
         
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
         msg_r.task_id = resp_msg.task_id
@@ -101,27 +135,6 @@ class SchedulerTest(IonTestCase):
         self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)
 
-    @defer.inlineCallbacks
-    def test_add_remove(self):
-        # Create clients
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
-
-        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = self.dest
-        msg_a.interval_seconds  = 10
-        msg_a.payload           = 'pingtest_foo'
-
-        resp_msg = yield sc.add_task(msg_a)
-
-        
-        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
-        msg_r.task_id = resp_msg.task_id
-
-        rc = yield sc.rm_task(msg_r)
-
-        self.failUnlessEqual(rc.value, 'OK')
-        log.debug(rc)
 
     @defer.inlineCallbacks
     def test_query(self):
@@ -130,13 +143,13 @@ class SchedulerTest(IonTestCase):
         sc = SchedulerServiceClient(proc=self.sup)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = self.dest
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
         msg_a.interval_seconds  = 1
-        msg_a.payload           = 'baz'
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "TESTER"
+        msg_a.payload.datasource_id = "TWO"
 
         yield sc.add_task(msg_a)
-
-
 
         msg_q = yield mc.create_instance(QUERYTASK_REQ_TYPE)
         msg_q.task_regex = '.+'
@@ -152,9 +165,11 @@ class SchedulerTest(IonTestCase):
         sc = SchedulerServiceClient(proc=self.sup)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = self.dest
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
         msg_a.interval_seconds  = 1
-        msg_a.payload           = 'pingtest'
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "TESTER"
+        msg_a.payload.datasource_id = "TWO"
 
         resp_msg = yield sc.add_task(msg_a)
 

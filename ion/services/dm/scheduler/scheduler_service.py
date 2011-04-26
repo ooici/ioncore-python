@@ -6,6 +6,9 @@
 @author Paul Hubbard
 @package ion.services.dm.scheduler.service Implementation of the scheduler
 """
+from ion.core.exception import ApplicationError
+from ion.core.object.gpb_wrapper import StructureElement
+from ion.core.object.repository import ObjectContainer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -18,6 +21,11 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
+from ion.services.dm.distribution.events import TriggerEventPublisher, ScheduleEventPublisher
+
+# constants from https://confluence.oceanobservatories.org/display/syseng/Scheduler+Events
+# import these and use them to schedule your events, they should be in the "desired origin" field
+SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE="1001"
 
 ADDTASK_REQ_TYPE  = object_utils.create_type_identifier(object_id=2601, version=1)
 """
@@ -104,6 +112,12 @@ message QueryTaskResponse {
 }
 """
 
+class SchedulerError(ApplicationError):
+    """
+    Raised when invalid params are passed to an op on the scheduler.
+    """
+    pass
+
 
 class SchedulerService(ServiceProcess):
     """
@@ -116,26 +130,26 @@ class SchedulerService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=['attributestore'])
 
-    def slc_init(self):
-        # @note Might want to start another AS instance with a different target name
-        #self.store = AttributeStoreClient(targetname='attributestore')
+    def __init__(self, *args, **kwargs):
+        ServiceProcess.__init__(self, *args, **kwargs)
+
         self.scheduled_events = {}
         self.mc = MessageClient(proc=self)
+        self.pub = ScheduleEventPublisher(process=self)
 
-    def slc_stop(self):
-        log.debug('SLC stop of Scheduler')
+        # will move pub through the lifecycle states with the service
+        self.add_life_cycle_object(self.pub)
+        self.pub.on_terminate = lambda: log.debug("FIX THIS IN PUBLISHER, DAF")
 
-    def slc_deactivate(self):
+    def slc_terminate(self):
         """
         Called before terminate, this is a good place to tear down the AS and jobs.
         @todo iterate over the list
         foreach task in op_query:
           rm_task(task)
         """
-
-    def slc_shutdown(self):
-        log.debug('SLC shutdown of Scheduler')
-
+        pass
+        
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
@@ -146,35 +160,34 @@ class SchedulerService(ServiceProcess):
         @retval reply_ok or reply_err
         """
         try:
-            task_id = str(uuid4())
-            msg_interval = content.interval_seconds
+            task_id         = str(uuid4())
+            msg_interval    = content.interval_seconds
+            desired_origin  = content.desired_origin
+            if content.IsFieldSet('payload'):
+                # extract, serialize
+                payload = content.Repository.index_hash[content.payload.MyId].serialize()
+            else:
+                payload = None
         except KeyError, ke:
-            log.exception('Required keys in payload not found!')
-            yield self.reply_err(msg, {'value': str(ke)})
-            return
+            log.exception('Required keys in op_add_task content not found!')
+            raise SchedulerError(str(ke))
 
         log.debug('ok, gotta task to save')
 
-
-        #FIXME, generate origin if desired_origin was not provided
-        if not content.IsFieldSet('desired_origin'):
-            log.debug('FIXME, generate an origin because one was not provided')
-            content.desired_origin = 'SOMEONE PLEASE FIXME' + str(uuid4())
-
         #create the response: task_id and actual origin
-        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
-        resp.task_id  = task_id
-        resp.origin   = content.desired_origin
+        resp            = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
+        resp.task_id    = task_id
+        resp.origin     = desired_origin
 
-
-        self.scheduled_events[task_id] = content
-
+        # extract content of message
+        self.scheduled_events[task_id] = {'task_id': task_id,
+                                          'desired_origin': desired_origin,
+                                          'payload': payload}
 
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
         reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
         log.debug('Add completed OK')
-
 
         yield self.reply_ok(msg, resp)
 
@@ -233,9 +246,17 @@ class SchedulerService(ServiceProcess):
             log.info('Task ID missing in store, assuming removal and aborting')
             return
 
+        # deserialize and objectify payload
+        # @TODO: this is costly, should keep cache?
+        payload = ObjectContainer._load_element(StructureElement.parse_structure_element(tdef.payload))
+
         log.debug('Time to send "%s" to "%s", id "%s"' % \
-                      (tdef.payload, tdef.desired_origin, task_id))
-        yield self.send(tdef.desired_origin, 'scheduler', tdef.payload)
+                      (payload, tdef.desired_origin, task_id))
+
+        yield self.pub.create_and_publish_event(origin=tdef.desired_origin,
+                                                task_id=task_id,
+                                                payload=payload)
+
         log.debug('Send completed, rescheduling %s' % task_id)
 
         reactor.callLater(tdef.interval_seconds, self._send_and_reschedule, task_id)
