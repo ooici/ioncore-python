@@ -47,11 +47,11 @@ class FindDataResources(object):
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
         self.ais = ais
-        self.rc = ResourceClient()
+        self.rc = ResourceClient(proc=ais)
         self.mc = ais.mc
-        self.dscc = DatasetControllerClient()
+        #self.dscc = DatasetControllerClient(proc=ais)
         self.asc = AssociationServiceClient()
-        self.ac = AssociationClient()
+        self.ac = AssociationClient(proc=ais)
 
     @defer.inlineCallbacks
     def findDataResources(self, msg):
@@ -77,10 +77,6 @@ class FindDataResources(object):
         self.bIsInVerticalBounds  = True
         self.bIsInTimeBounds      = True
 
-        bounds = {}
-        self.__loadBounds(bounds, msg)
-        self.__printBounds(bounds)
-        
         #
         # Create the response message to which we will attach the list of
         # resource IDs
@@ -91,71 +87,17 @@ class FindDataResources(object):
 
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        if dSetResults == None:
+            log.error('Error finding resources.')
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS findDataResources error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "DatasetIDs not found."
+            defer.returnValue(Response)
+            
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        #
-        # Now iterate through the list if dataset resource IDs and for each ID:
-        #   - get the dataset instance
-        #   - get the associated datasource instance
-        #   - check that spatial and temporal criteria are met:
-        #   - if not:
-        #     - continue
-        #   - if so:
-        #     - add the metadata to the response GPB
-        #
-        i = 0
-        j = 0
-        while i < len(dSetResults.idrefs):
-            dSetResID = dSetResults.idrefs[i].key
-            log.debug('Working on dataset: ' + dSetResID)
-            
-            dSet = yield self.rc.get_instance(dSetResID)
-
-            minMetaData = {}
-            self.__loadMinMetaData(dSet, minMetaData)
-
-            #
-            # If the dataset's data is within the given criteria, include it
-            # in the list
-            #
-            if self.filterByLatitude:
-                log.debug("----------------------------- 1 ------------------------------")
-                self.bIsInAreaBounds = self.__isInLatitudeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.filterByLongitude:
-                log.debug("----------------------------- 2 ------------------------------")
-                self.bIsInAreaBounds = self.__isInLongitudeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.filterByVertical:
-                log.debug("----------------------------- 3 ------------------------------")
-                self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
-                                    
-            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
-                log.debug("----------------------------- 4 ------------------------------")
-                self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
-
-                dSourceResID = yield self.getAssociatedSource(dSetResID)
-                dSource = yield self.rc.get_instance(dSourceResID)
-                
-                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-
-                self.__createDownloadURL(dSetResID)
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
-
-                #self.__printRootAttributes(dSet)
-                #self.__printRootVariables(dSet)
-                #self.__printSourceMetadata(dSource)
-                #self.__printDownloadURL()
-    
-                j = j + 1
-            else:
-                log.debug("isInBounds is FALSE")
-
-            
-            i = i + 1
-
+        yield self.__getDataResources(msg, dSetResults, rspMsg, userID)
 
         defer.returnValue(rspMsg)
 
@@ -178,8 +120,6 @@ class FindDataResources(object):
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [user_ooi_id] not found in message"
             defer.returnValue(Response)
-            
-            
 
         self.downloadURL       = 'Uninitialized'
         self.filterByLatitude  = True
@@ -189,10 +129,6 @@ class FindDataResources(object):
         self.bIsInAreaBounds      = True
         self.bIsInVerticalBounds  = True
         self.bIsInTimeBounds      = True
-        
-        bounds = {}
-        self.__loadBounds(bounds, msg)
-        self.__printBounds(bounds)
         
         #
         # Create the response message to which we will attach the list of
@@ -204,82 +140,18 @@ class FindDataResources(object):
 
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
+        if dSetResults == None:
+            log.error('Error finding resources.')
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS findDataResources error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "DatasetIDs not found."
+            defer.returnValue(Response)
+        
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        #
-        # Now iterate through the list if dataset resource IDs and for each ID:
-        #   - get the dataset instance
-        #   - get the associated datasource instance
-        #   - check that spatial and temporal criteria are met:
-        #   - if not:
-        #     - continue
-        #   - if so:
-        #     - add the metadata to the response GPB
-        #
-        i = 0
-        j = 0
-        while i < len(dSetResults.idrefs):
-            dSetResID = dSetResults.idrefs[i].key
-            log.debug('DHE: Working on datasetResID: ' + dSetResID)
-            
-            dSet = yield self.rc.get_instance(dSetResID)
-
-            minMetaData = {}
-            self.__loadMinMetaData(dSet, minMetaData)
-
-            #
-            # If the dataset's data is within the given criteria, include it
-            # in the list
-            #
-            if self.filterByLatitude:
-                log.debug("----------------------------- 1 ------------------------------")
-                self.bIsInAreaBounds = self.__isInLatitudeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.filterByLongitude:
-                log.debug("----------------------------- 2 ------------------------------")
-                self.bIsInAreaBounds = self.__isInLongitudeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.filterByVertical:
-                log.debug("----------------------------- 3 ------------------------------")
-                self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
-                                    
-            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
-                log.debug("----------------------------- 4 ------------------------------")
-                self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
-
-            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
-                log.debug("----------------------------- 5 ------------------------------")
-
-                try:
-                    dSourceResID = yield self.getAssociatedSource(dSetResID)
-                    dSource = yield self.rc.get_instance(dSourceResID)
-                except ResourceClientError, DataStoreWorkBenchError:
-                #except ResourceClientError:
-                    log.error('???????????????????????????????????????????????????? AssociationError')
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                          MessageName='AIS findDataResourcesByUser error response')
-                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
-                    Response.error_str = "Dataset or datasource not found."
-                    defer.returnValue(Response)        
-                
-                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-
-                self.__createDownloadURL(dSetResID)
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
-
-                self.__printRootAttributes(dSet)
-                self.__printRootVariables(dSet)
-                self.__printSourceMetadata(dSource)
-                self.__printDownloadURL()
-    
-                j = j + 1
-            else:
-                log.debug("isInBounds is FALSE")
-
-            
-            i = i + 1
-
-
+        yield self.__getDataResources(msg, dSetResults, rspMsg, userID)
+        
         defer.returnValue(rspMsg)
 
 
@@ -292,16 +164,20 @@ class FindDataResources(object):
         """
         log.debug('getAssociatedSource()')
 
-        ds = yield self.rc.get_instance(dSetResID)
+        try: 
+            ds = yield self.rc.get_instance(dSetResID)
+            
+        except ResourceClientError:    
+            log.error('AssociationError')
+            defer.returnValue(None)
 
         try:
             results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
 
-        #except ResourceClientError, DataStoreWorkBenchError:
-        except ResourceClientError:
-            log.error('???????????????????????????????????????????????????? AssociationError')
-            return
-        
+        except AssociationClientError:
+            log.error('AssociationError')
+            defer.returnValue(None)
+
         for association in results:
             log.debug('Associated Source for Dataset: ' + \
                       association.ObjectReference.key + \
@@ -309,6 +185,99 @@ class FindDataResources(object):
 
         defer.returnValue(association.SubjectReference.key)
                       
+
+    @defer.inlineCallbacks
+    def __getDataResources(self, msg, dSetResults, rspMsg, userID):
+        """
+        Given the list of datasetIDs, determine in the data represented by
+        the dataset is within the given spatial and temporal bounds, and
+        if so, add it to the response GPB.
+        """
+
+        bounds = {}
+        self.__loadBounds(bounds, msg)
+        self.__printBounds(bounds)
+
+        #
+        # Now iterate through the list if dataset resource IDs and for each ID:
+        #   - get the dataset instance
+        #   - get the associated datasource instance
+        #   - check that spatial and temporal criteria are met:
+        #   - if not:
+        #     - continue
+        #   - if so:
+        #     - add the metadata to the response GPB
+        #
+        
+        i = 0
+        j = 0
+        while i < len(dSetResults.idrefs):
+            dSetResID = dSetResults.idrefs[i].key
+            log.debug('Working on dataset: ' + dSetResID)
+            
+            dSet = yield self.rc.get_instance(dSetResID)
+
+            minMetaData = {}
+            self.__loadMinMetaData(dSet, minMetaData)
+
+            #
+            # If the dataset's data is within the given criteria, include it
+            # in the list
+            #
+            if self.filterByLatitude:
+                #log.debug("----------------------------- 1 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLatitudeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.filterByLongitude:
+                #log.debug("----------------------------- 2 ------------------------------")
+                self.bIsInAreaBounds = self.__isInLongitudeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.filterByVertical:
+                #log.debug("----------------------------- 3 ------------------------------")
+                self.bIsInVerticalBounds = self.__isInVerticalBounds(minMetaData, bounds)
+                                    
+            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
+                #log.debug("----------------------------- 4 ------------------------------")
+                self.bIsInTimeBounds = self.__isInTimeBounds(minMetaData, bounds)
+
+            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+
+                dSourceResID = yield self.getAssociatedSource(dSetResID)
+                if dSourceResID is None:
+                    log.error('dSourceResID is None')
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                          MessageName='AIS findDataResources error response')
+                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                    Response.error_str = "Dataset not found."
+                    defer.returnValue(Response)        
+
+                try:
+                    dSource = yield self.rc.get_instance(dSourceResID)
+                
+                except ResourceClientError: 
+                    log.error('ResourceClientError Exception!')
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                          MessageName='AIS findDataResources error response')
+                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                    Response.error_str = "Datasource not found."
+                    defer.returnValue(Response)        
+
+                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+
+                self.__createDownloadURL(dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+
+                #self.__printRootAttributes(dSet)
+                #self.__printRootVariables(dSet)
+                #self.__printSourceMetadata(dSource)
+                #self.__printDownloadURL()
+    
+                j = j + 1
+            else:
+                log.debug("isInBounds is FALSE")
+
+            
+            i = i + 1
 
 
     @defer.inlineCallbacks
@@ -353,7 +322,13 @@ class FindDataResources(object):
         state_ref.lcs = state_ref.LifeCycleState.ACTIVE
         pair.object = state_ref
 
-        result = yield self.asc.get_subjects(request)
+        try:
+            result = yield self.asc.get_subjects(request)
+
+        except AssociationClientError:
+            log.error('__findResourcesOfType: association error!')
+            defer.returnValue(None)
+
         
         defer.returnValue(result)
 
@@ -399,8 +374,15 @@ class FindDataResources(object):
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
         pair.object = type_ref
+        
+        log.info('Calling get_subjects with owner: ' + owner)
 
-        result = yield self.asc.get_subjects(request)
+        try:
+            result = yield self.asc.get_subjects(request)
+        
+        except AssociationClientError:
+            log.error('__findResourcesOfTypeAndOwner: association error!')
+            defer.returnValue(None)
         
         defer.returnValue(result)
 
