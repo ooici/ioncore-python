@@ -107,6 +107,41 @@ class WrapperMethodsTest(unittest.TestCase):
         self.fail('Attribute Error not raised by invalid delete request')
 
 
+    def test_myid(self):
+
+
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+
+        self.assertEqual(ab.MyId, '-1')
+
+        ab.MyId = '5'
+
+        self.assertEqual(ab.MyId, '5')
+
+
+        ab.Invalidate()
+        self.assertRaises(OOIObjectError, getattr, ab, 'MyId')
+
+
+    def test_source(self):
+
+        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab1.MyId = '1'
+
+        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab2.MyId = '2'
+
+        ab1.Invalidate(ab2)
+
+        self.assertEqual(ab1.MyId, '2')
+
+
+    def test_inparents(self):
+
+        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+
+        self.failIf(ab1.InParents(5))
+
 
     def test_set_composite(self):
 
@@ -1280,10 +1315,26 @@ class RecurseCommitTest(unittest.TestCase):
         # there should be only two objects once hashed!
         self.assertEqual(len(strct), 2)
         
-        # Show that the old references are now invalid
-        self.assertEqual(p0.Invalid, True)
-        self.assertEqual(p1.Invalid, True)
-        
+        # Show that the old references are not invalid
+        self.assertEqual(p0.Invalid, False)
+        self.assertEqual(p1.Invalid, False)
+
+        print p0.Debug()
+        print p1.Debug()
+
+
+        print 'PRINT ROOT:',p0.Root
+
+        self.assertEqual(p0.name,'David')
+        self.assertEqual(p1.name,'David')
+
+        if p0._invalid:
+            self.assertIs(p0._twin, p1)
+        else:
+            self.assertIs(p1_twin, p0)
+
+
+
         # manually update the hashed elements...
         repo.index_hash.update(strct)
         
