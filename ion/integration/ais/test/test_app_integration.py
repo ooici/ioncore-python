@@ -17,6 +17,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
 
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
@@ -32,6 +33,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
                                                        UPDATE_USER_PROFILE_REQUEST_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
+                                                       GET_USER_PROFILE_REQUEST_TYPE, \
+                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
                                                        CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
@@ -135,6 +138,9 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -164,6 +170,8 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -193,11 +201,14 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
 
     @defer.inlineCallbacks
     def test_findDataResourcesByUser(self):
@@ -235,7 +246,8 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        #reqMsg.message_parameters_reference.user_ooi_id  = '621F69FC-37C3-421F-8AE9-4D762A2718C9'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -248,7 +260,9 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
-        
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
+
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
@@ -262,7 +276,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -275,7 +289,9 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
-        
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
+
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
@@ -288,7 +304,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -301,6 +317,8 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
@@ -314,7 +332,7 @@ class AppIntegrationTest(IonTestCase):
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = 'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8'
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = -50
         reqMsg.message_parameters_reference.maxLatitude  = -40
         reqMsg.message_parameters_reference.minLongitude = 20
@@ -327,6 +345,8 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         if numResReturned == 0:
@@ -605,13 +625,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
             
     @defer.inlineCallbacks
-    def test_updateUserProfile(self):
+    def test_updateUserProfile_getUser(self):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
-        """
-        # comment this test out until updateUserProfile is added to the policy service
+        # comment these tests out until updateUserProfile is added to the policy service
         # test for authentication policy failure
         # create the update Email request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
@@ -623,7 +642,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('updateUserProfile did not raise exception for ANONYMOUS ooi_id')
         except ReceivedApplicationError, ex:
             log.info("updateUserProfile correctly raised exception for ANONYMOUS ooi_id")
-        """
+            
+        # create the getUser request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
+        msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        try:
+            reply = yield self.aisc.getUser(msg)
+            self.fail('getUser did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("getUser correctly raised exception for ANONYMOUS ooi_id")
         
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
@@ -686,7 +714,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
         
-        # create the update Profile request GPBs
+        # create the update Profile request GPBs for setting the email address
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
@@ -699,6 +727,43 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
+        # create the update Profile request GPBs for setting the profile
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[0].name = "ProfileItem_1_Name"
+        msg.message_parameters_reference.profile[0].value = "ProfileItem_1_Value"
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[1].name = "ProfileItem_2_Name"
+        msg.message_parameters_reference.profile[1].value = "ProfileItem_2_Value"
+        try:
+            reply = yield self.aisc.updateUserProfile(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
+        log.debug('updateUserProfile returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            
+        # test that the email & profile got set
+        # create the getUser request GPBs for getting the email/profile
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getUser request')
+        msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        try:
+            reply = yield self.aisc.getUser(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('getUser incorrectly raised exception for an authenticated ooi_id')
+        log.debug('getUser returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
+        self.assertEqual(reply.message_parameters_reference[0].email_address, "some_person@some_place.some_domain")
+        self.assertEqual(reply.message_parameters_reference[0].profile[0].name, "ProfileItem_1_Name")
+        self.assertEqual(reply.message_parameters_reference[0].profile[0].value, "ProfileItem_1_Value")
+        self.assertEqual(reply.message_parameters_reference[0].profile[1].name, "ProfileItem_2_Name")
+        self.assertEqual(reply.message_parameters_reference[0].profile[1].value, "ProfileItem_2_Value")
+
+
         # try to send updateUserProfile the wrong GPB
         # create a bad request GPBs
         msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
@@ -706,7 +771,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
-        # try to send updateUserBrofile incomplete GPBs
+        # try to send updateUserProfile incomplete GPBs
         # create a bad GPB request w/o payload
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
         reply = yield self.aisc.updateUserProfile(msg)
