@@ -172,23 +172,25 @@ class ManageDataResource(object):
                 log.info("Getting instance of data source resource")
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 log.info("Getting instance of dataset resource from association")
-                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
+                #dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
 
                 log.info("Setting data source resource lifecycle = retired")
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
                 delete_resources.append(datasrc_resource)
 
-                if not None is dataset_resource:
-                    log.info("Setting data set resource lifecycle = retired")
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
-                    delete_resources.append(dataset_resource)
+                #if not None is dataset_resource:
+                #    log.info("Setting data set resource lifecycle = retired")
+                #    dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
+                #    delete_resources.append(dataset_resource)
 
 
                 deletions.append(data_source_resource_id)
+    
 
-            log.info("putting all resource changes in one big transaction")
+            log.info("putting all resource changes in one big transaction, " \
+                         + str(len(delete_resources)))
             yield self.rc.put_resource_transaction(delete_resources)
-
+            log.info("Success!")
 
 
         except ReceivedApplicationError, ex:
@@ -204,7 +206,7 @@ class ManageDataResource(object):
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
-        Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
+        Response.message_parameters_reference[0] = Response.CreateObject(DELETE_DATA_RESOURCE_RSP_TYPE)
         for d in deletions:
             i = len(Response.message_parameters_reference[0].successfully_deleted_id)
             Response.message_parameters_reference[0].successfully_deleted_id.add()
