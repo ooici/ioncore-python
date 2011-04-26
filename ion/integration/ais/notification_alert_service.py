@@ -85,15 +85,15 @@ class NotificationAlertService(ServiceProcess):
 
     @defer.inlineCallbacks
     def handle_update_event2(self, content):
-            log.info('NotificationAlertService.handle_event2 notification event received!!!!!!!!!!!!')
+            log.info('NotificationAlertService.handle_event2 notification event received')
             #Check that the item is in the store
             log.info('NotificationAlertService.handle_event2 check for subscribers!   : %s', content)
-
+            """
             query = Query()
             query.add_predicate_eq('data_src_id', content.data_src_id)
             rows = yield self.index_store.query(query)
             log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
-            """
+
             #add each result row into the response message
             i = 0
             for key, row in rows.iteritems ( ) :
