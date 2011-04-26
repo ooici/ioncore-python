@@ -97,16 +97,19 @@ class ManageDataResource(object):
             datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
 
             if msg.IsFieldSet("update_interval_seconds"):
-                dispatcher_resource.update_interval_seconds = msg.update_interval_seconds
+                datasrc_resource.update_interval_seconds = msg.update_interval_seconds
                 #FIXME: change scheduling
 
             if msg.IsFieldSet("ion_institution_id"):
-                dispatcher_resource.ion_institution_id = msg.ion_institution_id
+                datasrc_resource.ion_institution_id = msg.ion_institution_id
 
             if msg.IsFieldSet("ion_description"):
-                dispatcher_resource.ion_description = msg.ion_description
+                datasrc_resource.ion_description = msg.ion_description
 
-            yield self.rc.put_resource(datasrc_resource)
+            if msg.IsFieldSet("max_ingest_millis"):
+                datasrc_resource.max_ingest_millis = msg.max_ingest_millis
+
+            yield self.rc.put_instance(datasrc_resource)
 
 
         except ReceivedApplicationError, ex:
@@ -172,16 +175,16 @@ class ManageDataResource(object):
                 log.info("Getting instance of data source resource")
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 log.info("Getting instance of dataset resource from association")
-                #dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
+                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
 
                 log.info("Setting data source resource lifecycle = retired")
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
                 delete_resources.append(datasrc_resource)
 
-                #if not None is dataset_resource:
-                #    log.info("Setting data set resource lifecycle = retired")
-                #    dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
-                #    delete_resources.append(dataset_resource)
+                if not None is dataset_resource:
+                    log.info("Setting data set resource lifecycle = retired")
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
+                    delete_resources.append(dataset_resource)
 
 
                 deletions.append(data_source_resource_id)
@@ -209,8 +212,7 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0] = Response.CreateObject(DELETE_DATA_RESOURCE_RSP_TYPE)
         for d in deletions:
             i = len(Response.message_parameters_reference[0].successfully_deleted_id)
-            Response.message_parameters_reference[0].successfully_deleted_id.add()
-            Response.message_parameters_reference[0].successfully_deleted_id[i] = d
+            Response.message_parameters_reference[0].successfully_deleted_id.append(d)
 
         defer.returnValue(Response)
 
@@ -290,6 +292,7 @@ class ManageDataResource(object):
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
+            #don't yield on this.
             self.ing.create_dataset_topics(topics_msg)
 
             # FIXME call the scheduler service client
