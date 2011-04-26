@@ -84,15 +84,16 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.op_update_subscription_db begin  ')
 
     @defer.inlineCallbacks
-    def handle_update_event2(content):
+    def handle_update_event2(self, content):
             log.info('NotificationAlertService.handle_event2 notification event received!!!!!!!!!!!!')
             #Check that the item is in the store
-            log.info('NotificationAlertService.handle_event2 check for subscribers!')
+            log.info('NotificationAlertService.handle_event2 check for subscribers!   : %s', content)
+
             query = Query()
-            query.add_predicate_eq('data_src_id', content.message_parameters_reference.data_src_id)
+            query.add_predicate_eq('data_src_id', content.data_src_id)
             rows = yield self.index_store.query(query)
             log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
-
+            """
             #add each result row into the response message
             i = 0
             for key, row in rows.iteritems ( ) :
@@ -125,6 +126,7 @@ class NotificationAlertService(ServiceProcess):
                     except smtplib.SMTPException:
                         log.info('NotificationAlertService.handle_event Error: unable to send email')
                     log.info('NotificationAlertService.handle_event completed ')
+            """
 
 
 
@@ -245,7 +247,7 @@ class NotificationAlertService(ServiceProcess):
             
             self.sub = DatasetSupplementAddedEventSubscriber(process=self, origin="magnet_topic")
             log.info('NotificationAlertService.op_addSubscription set handler for DatasetSupplementAddedEventSubscriber')
-            self.sub.ondata = self.handle_update_event2()    # need to do something with the data when it is received
+            self.sub.ondata = self.handle_update_event2    # need to do something with the data when it is received
             yield self.sub.register()
             yield self.sub.initialize()
             yield self.sub.activate()
