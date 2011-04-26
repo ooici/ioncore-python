@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessDesc
+from ion.core.process.process import Process
 
 from ion.core.pack import app_supervisor
 
@@ -46,7 +47,6 @@ from ion.core.cc.shell import control
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
-
     
 @defer.inlineCallbacks
 def find_by_owner():
@@ -70,9 +70,11 @@ def find_by_owner():
 
     pair.object = type_ref
     #Uncomment for FAIL
+    t1a = time.time()
     result = yield association_client.get_subjects(request)
-    
-    #print len(result)
+    t2a = time.time()
+    diff = t2a - t1a
+    print "Time to call get_subjects %s " % (diff,)
     
     key_list = []
     for idref in result.idrefs:
@@ -80,20 +82,32 @@ def find_by_owner():
     
     #print key_list  
     #defer.returnValue(key_list)
-    
-    resource_client = ResourceClient()
+    proc = Process()
+    yield proc.spawn()
+    resource_client = ResourceClient(proc)
     resources = []
-    #deferred_list = []
-    for key in key_list:
-        #d = resource_client.get_instance(key)
-        #deferred_list.append(d)
-        resource = yield resource_client.get_instance(key)
-        resources.append(resource)
-    #resources =  yield defer.DeferredList(deferred_list) 
+    
+    t1b = time.time()
+    
+    all_resources = []
+    while len(key_list) > 0:
+        deferred_list = []
+        for i in range(4):
+            try:
+                d = resource_client.get_instance(key_list.pop())
+                deferred_list.append(d)
+            except IndexError:
+                print "Out of keys"               
+            resources = yield defer.DeferredList(deferred_list)
+            all_resources.extend(resources)
+    
+    t2b = time.time()
+    diff = t2b - t1b
+    print "Time to retrieve %s resources: %s" % (len(resources), diff)
     t2 = time.time()
     diff = t2 - t1
-    print "Time to retrieve %s resources: %s" % (len(resources), diff)
-    defer.returnValue(resources)
+    print "Time for entire function: %s " % (diff,)
+    defer.returnValue(all_resources)
 
     
         
@@ -228,7 +242,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
             ds[NAME_CFG] = "".join((station_dataset_name, str(i)))
             yield ds[NAME_CFG],ds
      
-    num_datasets = 5
+    num_datasets = 500
     datasets = dict([ds for ds in make_datasets(num_datasets)])
     ION_DATASETS.update(datasets)
     
