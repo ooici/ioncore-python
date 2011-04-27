@@ -46,7 +46,7 @@ class HelloTest(IonTestCase):
 
         hc = HelloServiceClient(proc=sup)
 
-        count = 500
+        count = 100
         tzero = time.time()
 
         d = []
