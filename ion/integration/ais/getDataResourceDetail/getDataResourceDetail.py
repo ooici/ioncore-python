@@ -183,7 +183,7 @@ class GetDataResourceDetail(object):
         
     def __loadGPBMinMetaData(self, rootAttributes, dSet):
         for attrib in dSet.root_group.attributes:
-            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
             if attrib.name == 'title':
                 rootAttributes.title = attrib.GetValue()
             elif attrib.name == 'institution':                
