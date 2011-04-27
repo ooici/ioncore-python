@@ -28,6 +28,8 @@ from ion.services.dm.inventory.association_service import AssociationServiceClie
 from ion.services.dm.inventory.association_service import IDREF_TYPE
 from ion.core.messaging.message_client import MessageClient
 
+from google.protobuf.internal.containers import RepeatedScalarFieldContainer
+
 CONF = ioninit.config(__name__)
 
 def construct_policy_lists(policydb):
@@ -36,12 +38,16 @@ def construct_policy_lists(policydb):
         for policy_entry in policydb:
             role, action, resources = policy_entry
             service, opname = action.split('.', 1)
-            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN')
+            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'OWNER', 'ADMIN')
 
             if role == 'ADMIN':
                 role_set = set(['ADMIN'])
             elif role == 'OWNER':
                 role_set = set(['OWNER', 'ADMIN'])
+            elif role == 'MARINE_OPERATOR':
+                role_set = set(['MARINE_OPERATOR', 'ADMIN'])
+            elif role == 'DATA_PROVIDER':
+                role_set = set(['DATA_PROVIDER', 'ADMIN'])
             elif role == 'AUTHENTICATED':
                 role_set = set(['AUTHENTICATED', 'ADMIN'])
             else:
@@ -102,9 +108,20 @@ def subject_has_role(subject,role):
 
 # Role methods
 def user_has_role(ooi_id,role):
-    for role_entry in user_role_dict[role]:
-        if role_entry['ooi_id'] == ooi_id:
+    if role == 'OWNER':
+        # Will be special handled within the policy flow
+        return False
+    if role == 'ANONYMOUS':
+        return True
+    elif role == 'AUTHENTICATED':
+        if ooi_id != 'ANONYMOUS':
             return True
+        else:
+            return False
+    else:
+        for role_entry in user_role_dict[role]:
+            if role_entry['ooi_id'] == ooi_id:
+                return True
     return False
 
 def map_ooi_id_to_subject_role(subject,ooi_id,role):
@@ -158,7 +175,7 @@ def get_attribute_value_for_user(ooi_id,attrib):
                     return dict_entry['attributes'][attrib]
     return None
 
-def map_ooi_id_to_subject_dispatcher_queue(subject,ooi_id):
+def map_ooi_id_to_subject_is_early_adopter(subject,ooi_id):
     for dict_entry in user_attrib_list:
         if dict_entry['subject'] == subject:
             dict_entry['ooi_id'] = ooi_id
@@ -175,13 +192,13 @@ def user_has_attribute(ooi_id, attrib):
         return False
     return True
 
-def subject_has_dispatcher_queue(subject):
+def subject_is_early_adopter(subject):
     return subject_has_attribute(subject,'dispatcher-id')
 
-def user_has_dispatcher_queue(ooi_id):
+def user_is_early_adopter(ooi_id):
     return user_has_attribute(ooi_id,'dispatcher-id')
 
-def get_dispatcher_queue_for_user(ooi_id):
+def get_dispatcher_id_for_user(ooi_id):
     return get_attribute_value_for_user(ooi_id,'dispatcher-id')
 
 class PolicyInterceptor(EnvelopeInterceptor):
@@ -260,28 +277,34 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
         log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
         if service in policy_dictionary:
-            role = 'ANONYMOUS'
-            # TODO figure out mechanism to map user id to role
-            if user_id != None and user_id != 'ANONYMOUS':
-                if user_has_admin_role(user_id) :
-                    log.info('Policy Interceptor: Using ADMIN role.')
-                    role = 'ADMIN'
-                else:
-                    log.info('Policy Interceptor: Using AUTHENTICATED role.')
-                    role = 'AUTHENTICATED'
-            else:
-                log.info('Policy Interceptor: Using ANONYMOUS role.')
-
             service_list = policy_dictionary[service]
             # TODO figure out how to handle non-wildcard resource ids
             if operation in service_list:
                 role_entry = service_list[operation]['roles']
                 log.info('Policy Interceptor: Policy tuple [%s]' % str(role_entry))
-                if role in role_entry:
-                    log.info('Policy Interceptor: Role <%s> authentication matches' % role)
-                else:
-                    # See if ownership level entry
-                    if 'OWNER' in role_entry:
+
+                role_match_found = False
+                for role in role_entry:
+                    if user_has_role(user_id, role):
+                        log.info('Policy Interceptor: Role <%s> authentication matches' % role)
+                        role_match_found = True
+                        break
+
+                if role_match_found == False:
+                    # Special handling for ownership role
+                    # ANONYMOUS can never own a resource, so return fail
+                    if user_id == 'ANONYMOUS':
+                        log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for roles [%s]. Returning Not Authorized.' % (service, operation, '*', user_id, expiry, str(role_entry)))
+                        invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+                        defer.returnValue(invocation)
+
+                    isOwnershipPolicy = False
+                    for role in role_entry:
+                        if role == 'OWNER':
+                            isOwnershipPolicy = True
+                            break
+
+                    if isOwnershipPolicy == True:
                         return_uuid_list = self.find_uuids(invocation, msg, user_id, service_list[operation]['resources'])
                         if invocation.status != Invocation.STATUS_PROCESS:
                             log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
@@ -293,11 +316,12 @@ class PolicyInterceptor(EnvelopeInterceptor):
                             defer.returnValue(invocation)
                         else:
                             log.info('Policy Interceptor: Role <OWNER> authentication matches')
-
                     else:
-                        log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [%s]. Returning Not Authorized.' % (service, operation, '*', user_id, expiry, role))
+                        log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for roles [%s]. Returning Not Authorized.' % (service, operation, '*', user_id, expiry, str(role_entry)))
                         invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
                         defer.returnValue(invocation)
+            else:
+                log.info('Policy Interceptor: operation not in policy dictionary.')
         else:
             log.info('Policy Interceptor: service not in policy dictionary.')
 
@@ -315,9 +339,8 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
     @defer.inlineCallbacks
     def check_owner(self, user_id, uuid_list, invocation):
-        self.checking_owner = True
         self.mc = MessageClient(proc=invocation.process)
-        self.asc = AssociationServiceClient()
+        self.asc = AssociationServiceClient(proc=invocation.process)
 
         for uuid in uuid_list:        
             request = yield self.mc.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
@@ -332,9 +355,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
             request.subject.key = uuid
 
             # make the request
-            log.warn('Policy Interceptor: BEFORE ++++++++++++++++++++++++')
+            log.warn('Calling association service for user id <%s> and uuid <%s>' % (user_id, uuid))
             result = yield self.asc.association_exists(request)
-            log.warn('Policy Interceptor: AFTER ++++++++++++++++++++++++')
+            log.warn('Return from association service call for user id <%s> and uuid <%s>' % (user_id, uuid))
             if result.result == False:
                 log.warn('Policy Interceptor: Authentication failed. User <%s> does not own resource <%s>.' % (user_id, uuid))
                 invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
@@ -391,7 +414,16 @@ class PolicyInterceptor(EnvelopeInterceptor):
                     log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
                     invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
                     return
-                uuid_list.append(uuid.decode('utf-8'))
+                if isinstance(uuid, RepeatedScalarFieldContainer):
+                    uuid_values = uuid._values
+                    for id in uuid_values:
+                        uuid_list.append(id.decode('utf-8'))
+                elif isinstance(uuid, unicode):
+                    uuid_list.append(uuid.decode('utf-8'))
+                else:
+                    log.error("Policy Interceptor: Rejecting improperly defined message with unexpected uuid variable type [%s]." % str(msg))
+                    invocation.drop(note='Error: Uuid variable type not supported!', code=Invocation.CODE_BAD_REQUEST)
+                    return
                 log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  Added UUID: %s to return list' % uuid)
 
             log.info('Policy Interceptor: Recursing.')

@@ -25,8 +25,8 @@ from ion.core.object import object_utils
 
 from ion.core.intercept.policy import subject_has_admin_role, \
                                       map_ooi_id_to_subject_admin_role, \
-                                      subject_has_dispatcher_queue, \
-                                      map_ooi_id_to_subject_dispatcher_queue, \
+                                      subject_is_early_adopter, \
+                                      map_ooi_id_to_subject_is_early_adopter, \
                                       subject_has_data_provider_role, \
                                       map_ooi_id_to_subject_data_provider_role, \
                                       subject_has_marine_operator_role, \
@@ -400,8 +400,8 @@ class IdentityRegistryService(ServiceProcess):
             map_ooi_id_to_subject_marine_operator_role(identity.subject, identity.ResourceIdentity)
 
         # Optionally map OOI ID to subject in dispatcher queue user dictionary
-        if subject_has_dispatcher_queue(identity.subject):
-            map_ooi_id_to_subject_dispatcher_queue(identity.subject, identity.ResourceIdentity)
+        if subject_is_early_adopter(identity.subject):
+            map_ooi_id_to_subject_is_early_adopter(identity.subject, identity.ResourceIdentity)
 
         # Create the response object...
         Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
