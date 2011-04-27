@@ -42,7 +42,9 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCES_OF_TYPE_RESPONSE_TYPE, \
                                                        GET_RESOURCE_TYPES_RESPONSE_TYPE, \
                                                        GET_RESOURCE_REQUEST_TYPE, \
-                                                       GET_RESOURCE_RESPONSE_TYPE
+                                                       GET_RESOURCE_RESPONSE_TYPE, \
+                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
+                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -928,6 +930,32 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
         
+
+    @defer.inlineCallbacks
+    def test_createDataResourceSubscription(self):
+        log.debug('Testing createDataResourcesSubscription.')
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        #
+        # Send a request without a resourceID to test that the appropriate error
+        # is returned.
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
+        #reqMsg.message_parameters_reference.dispatcher_id  = 'test_dispatcher_id'
+        #reqMsg.message_parameters_reference.resource_id  = 'test_resource_id'
+        #reqMsg.message_parameters_reference.script_path = '/home/test/testme'
+
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):

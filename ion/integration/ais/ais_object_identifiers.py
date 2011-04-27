@@ -505,12 +505,8 @@ message SubscriptionCreateReqMsg {
       _ID = 9203;
       _VERSION = 1;
     }
-
-    // The message parameters object
-    optional string dispatcher_id  = 1;
-    optional string script_path    = 2;
-    optional string resource_id    = 3;
-
+    
+    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
 }
 """
 
