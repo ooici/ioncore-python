@@ -49,7 +49,7 @@ class ResourceClientError(ApplicationError):
     """
 
 
-class ResourceClient(ApplicationError):
+class ResourceClient(object):
     """
     @brief This is the base class for a resource client. It is a factory for resource
     instances. The resource instance provides the interface for working with resources.

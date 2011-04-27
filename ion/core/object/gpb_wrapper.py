@@ -1744,11 +1744,12 @@ class Wrapper(object):
 
     def Debug(self):
         output  = '================== Wrapper (Modified = %s)====================\n' % self.Modified
-        output += 'Wrapper ID: %s \n' % self.MyId
-        output += 'Wrapper IsRoot: %s \n' % self.IsRoot
-        output += 'Wrapper ParentLinks: %s \n' % str(self.ParentLinks)
-        output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
-        output += 'Wrapper Type: %s \n' % str(self.ObjectType)
+        output += 'Wrapper ID: %s \n' % self._myid
+        output += 'Wrapper Invalid: %s \n' % self._invalid
+        output += 'Wrapper IsRoot: %s \n' % str(self._root == self)
+        output += 'Wrapper ParentLinks: %s \n' % str(self._parent_links)
+        output += 'Wrapper ChildLinks: %s \n' % str(self._child_links)
+        output += 'Wrapper Type: %s \n' % str(self._gpb_type)
         output += 'Wrapper current value:\n'
         output += str(self) + '\n'
         output += '================== Wrapper Complete =========================\n'
