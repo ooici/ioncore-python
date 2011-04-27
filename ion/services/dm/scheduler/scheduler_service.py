@@ -177,11 +177,13 @@ class SchedulerService(ServiceProcess):
         diff = curtime - starttime
         if diff > 0:
             # we started a while ago, so just find what is remaining of the interval from now
-            calctimems = diff % (interval * 1000)
-            calctime = int(calctimems / 1000)
+            lefttimems = diff % (interval * 1000)
+            calctime = interval - int(lefttimems / 1000)
         else:
             # start time is in THE FUTURE
             calctime = 0 - int(diff/1000) + interval
+
+        log.debug("_schedule_event: calculated next callback time of %d" % calctime)
 
         ccl = reactor.callLater(calctime, self._send_and_reschedule, task_id)
         self._callback_tasks[task_id] = ccl
