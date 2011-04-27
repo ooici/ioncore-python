@@ -6,6 +6,7 @@
 @author Paul Hubbard
 @package ion.services.dm.scheduler.service Implementation of the scheduler
 """
+import time
 from ion.core.data.store import IndexStore, Query
 from ion.core.exception import ApplicationError
 from ion.core.object.gpb_wrapper import StructureElement
@@ -154,7 +155,37 @@ class SchedulerService(ServiceProcess):
         """
         for k, v in self._callback_tasks.iteritems():
             v.cancel()
-        
+
+    def _schedule_event(self, starttime, interval, task_id):
+        """
+        Helper method to schedule and record a callback in the service.
+        Used by op_add_task and on startup.
+
+        @param  starttime   The time to start the callbacks. This is used with the interval to calculate the
+                            first callback. If None is specified, will use now. Note: the first callback to
+                            occur will not happen immediatly, it will be after the first interval has elapsed,
+                            whether starttime is specified or not. This parameter should be specified in UNIX
+                            epoch format, in ms. You will have to conver the output from time.time() in Python.
+        @param  interval    The interval to trigger scheduler events, in seconds.
+        @param  task_id     The task_id to trigger.
+        """
+        assert interval and task_id and interval > 0
+        curtime = int(round(time.time() * 1000))
+        starttime = starttime or curtime
+
+        # determine first callback time
+        diff = curtime - starttime
+        if diff > 0:
+            # we started a while ago, so just find what is remaining of the interval from now
+            calctimems = diff % (interval * 1000)
+            calctime = int(calctimems / 1000)
+        else:
+            # start time is in THE FUTURE
+            calctime = 0 - int(diff/1000) + interval
+
+        ccl = reactor.callLater(calctime, self._send_and_reschedule, task_id)
+        self._callback_tasks[task_id] = ccl
+
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
@@ -168,6 +199,10 @@ class SchedulerService(ServiceProcess):
             task_id         = str(uuid4())
             msg_interval    = content.interval_seconds
             desired_origin  = content.desired_origin
+            if content.IsFieldSet('start_time'):
+                starttime = content.start_time
+            else:
+                starttime = None
             if content.IsFieldSet('payload'):
                 # extract, serialize
                 payload = content.Repository.index_hash[content.payload.MyId].serialize()
@@ -195,8 +230,7 @@ class SchedulerService(ServiceProcess):
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
 
-        ccl = reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
-        self._callback_tasks[task_id] = ccl
+        self._schedule_event(starttime, msg_interval, task_id)
 
         log.debug('Add completed OK')
 
@@ -267,8 +301,8 @@ class SchedulerService(ServiceProcess):
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        ccl = reactor.callLater(tdef['interval_seconds'], self._send_and_reschedule, task_id)
-        self._callback_tasks[task_id] = ccl
+        # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
+        self._schedule_event(None, tdef['interval_seconds'], task_id)
 
         """
         Update last-invoked timestamp in registry

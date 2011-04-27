@@ -9,6 +9,7 @@
 
 from twisted.internet import defer
 
+import time
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
@@ -156,3 +157,32 @@ class SchedulerTest(IonTestCase):
         rc = yield sc.rm_task(msg_r)
         
 
+    @defer.inlineCallbacks
+    def test_future_start_time(self):
+
+        mc = MessageClient(proc=self.sup)
+        sc = SchedulerServiceClient(proc=self.sup)
+
+
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 1
+
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "THE FUTURE"
+        msg_a.payload.datasource_id = "IS NOW"
+
+        # calc a start time 5 sec in the future
+        starttime = int(float(time.time() * 1000)) + 5000
+        msg_a.start_time        = starttime
+
+        yield sc.add_task(msg_a)
+
+        # sleep for 4 seconds: should see nothing
+        yield asleep(4)
+        self.failUnlessEquals(len(self._notices), 0)
+
+        # sleep for another 3 - should give us enough time to get 1
+        yield asleep(3)
+        self.failUnless(len(self._notices) > 0, "Could be an intermittent failure, waiting for message delivery")
+        
