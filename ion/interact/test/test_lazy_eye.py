@@ -38,8 +38,9 @@ class LETest(IonTestCase):
         p1id = yield self.test_sup.spawn_child(proc1)
 
         lec = LazyEyeClient(proc=sup1, target=p1id)
-        yield lec.start()
+        yield lec.start('superfile.msc')
         msc_txt = yield lec.stop()
         log.debug('msc says: "%s"' % msc_txt)
         fname = yield lec.get_image_name()
         log.debug("image name: %s" % fname)
+        self.failUnlessEqual(fname, 'superfile.png')

@@ -9,6 +9,8 @@ and control the generation and viewing of message sequence charts.
 @note "RESTful observer = lazy eye" - get it? Sure ya do.
 """
 
+from os import path
+
 from twisted.internet import defer, reactor
 from twisted.internet import protocol
 
@@ -58,7 +60,13 @@ class LazyEye(InteractionObserver):
     @note "RESTful observer = lazy eye" - get it? Sure ya do.
     """
 
-    # Stomp the plc_* hooks in the parent class
+    def __init__(self, *args, **kwargs):
+        InteractionObserver.__init__(self, *args, **kwargs)
+        self.running = False
+        self.filename = None
+        self.imagename = None
+
+    # Stomp the plc_* hooks in the parent class; msg_receiver controlled in op_start/stop
     def plc_init(self):
         pass
 
@@ -73,9 +81,6 @@ class LazyEye(InteractionObserver):
     def op_start(self, request, headers, msg):
         log.debug('Got a start request: %s' % request)
 
-        if not hasattr(self, 'running'):
-            self.running = False
-            
         if self.running:
             if request == self.filename:
                 log.debug('Duplicate start message received, ignoring')
@@ -86,7 +91,11 @@ class LazyEye(InteractionObserver):
 
         self.running = True
         self.filename = request
-        self.imagename = request + '.png'
+
+        # change 'msc.txt' to 'msc.png'
+        base, ext = path.splitext(request)
+        self.imagename = base +'.png'
+
         log.debug('Starting up the message receiver...')
         yield self.msg_receiver.initialize()
         yield self.msg_receiver.activate()

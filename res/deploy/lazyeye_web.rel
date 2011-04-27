@@ -12,8 +12,7 @@
         {'name':'lazyeye', 'version': '0.1',
             'processapp':('lazy_eye', 'ion.interact.lazy_eye', 'LazyEye'),
         },
-        {'name':'lazyeye_web', 'version': '0.1',
-            'processapp':('lazy_eye_web', 'ion.interact.lazy_eye_web', 'LazyEyeMonitor'),
-        }
+        {'name': 'lazyeye_web', 'version':'0.1', 'config':{}},
+        
     ]
 }

@@ -14,6 +14,8 @@ from twisted.internet import defer, reactor
 from twisted.web import resource
 from twisted.web.server import Site
 
+from ion.core.object import object_utils
+from ion.core.messaging.message_client import MessageClient
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory, Process
 
@@ -130,26 +132,22 @@ class RootPage(resource.Resource):
 class LazyEyeMonitor(Process):
     """
     Provides the webservice to start/top/display message sequence charts
-    via Michaels message capture and formatting code.
+    via Michael's message capture and formatting code.
 
     Code cribbed from ion.services.dm.distribution.notify_web_monitor
     """
     def plc_init(self):
         Process.plc_init(self)
 
-        import pdb
-        pdb.set_trace()
-        
         log.debug('starting client init')
-        self.lec = LazyEyeClient(proc=self)
-
-        #self.lec = None
+        
+        #self.lec = LazyEyeClient(proc=self)
+        self.lec = None
         log.debug('client init completed')
         self.rootpage = RootPage(self.lec)
         self.site = Site(self.rootpage)
         reactor.listenTCP(WEB_PORT, self.site)
-        log.debug('Listening on http://localhost:%d/' % WEB_PORT)
-
+        log.info('Listening on http://localhost:%d/' % WEB_PORT)
 
 # Spawn off the process using the module name
 factory = ProcessFactory(LazyEyeMonitor)
