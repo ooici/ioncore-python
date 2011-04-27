@@ -16,6 +16,9 @@ from twisted.internet import protocol
 
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory, ProcessClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.messaging.receiver import FanoutReceiver
+
 from ion.interact.int_observer import InteractionObserver
 
 # Globals
@@ -60,18 +63,32 @@ class LazyEye(InteractionObserver):
     @note "RESTful observer = lazy eye" - get it? Sure ya do.
     """
 
+    declare = ServiceProcess.service_declare(name='lazyeye', version='0.1', dependencies=[])
+    
     def __init__(self, *args, **kwargs):
         InteractionObserver.__init__(self, *args, **kwargs)
         self.running = False
         self.filename = None
         self.imagename = None
 
-    # Stomp the plc_* hooks in the parent class; msg_receiver controlled in op_start/stop
-    def plc_init(self):
-        pass
+        self.main_receiver = FanoutReceiver(
+                name='lazyeye',
+                label='lazyeye',
+                process=self,
+                handler=self.receive,
+                error_handler=self.receive_error)
+        self.add_receiver(self.main_receiver)
+        
 
+    # Stomp the plc_* hooks in the parent class; msg_receiver controlled in op_start/stop
+    @defer.inlineCallbacks
+    def plc_init(self):
+        log.debug('LE plc init')
+        yield self.main_receiver.initialize()
+
+    @defer.inlineCallbacks
     def plc_activate(self):
-        pass
+        yield self.main_receiver.activate()
 
     def plc_terminate(self):
         pass

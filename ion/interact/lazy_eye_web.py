@@ -18,6 +18,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory, Process
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.interact.lazy_eye import LazyEyeClient
 # Globals
@@ -102,11 +103,10 @@ class GoPage(resource.Resource):
         self.isLeaf = True
 
     #noinspection PyUnusedLocal
+    @defer.inlineCallbacks
     def render_GET(self, request):
         request.write('Starting capture...<a href="/stop/">Click here to stop</a>')
-        d = self.lec.start(filename=self.filename)
-        # Returning a deferred, the web framework will yield on same
-        return d
+        yield self.lec.start(filename=self.filename)
 
 class RootPage(resource.Resource):
     """
@@ -140,9 +140,8 @@ class LazyEyeMonitor(Process):
         Process.plc_init(self)
 
         log.debug('starting client init')
-        
-        #self.lec = LazyEyeClient(proc=self)
-        self.lec = None
+        self.lec = LazyEyeClient(proc=self, target='lazyeye')
+        #self.lec = None
         log.debug('client init completed')
         self.rootpage = RootPage(self.lec)
         self.site = Site(self.rootpage)

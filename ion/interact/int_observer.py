@@ -23,6 +23,7 @@ class InteractionObserver(Process):
         testing) and on request.
     """
 
+
     def __init__(self, *args, **kwargs):
         """
         """
