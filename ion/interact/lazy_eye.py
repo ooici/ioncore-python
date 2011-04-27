@@ -20,14 +20,13 @@ from ion.interact.int_observer import InteractionObserver
 log = ion.util.ionlog.getLogger(__name__)
 
 # @todo move this into ion.config
-BINARY_NAME = 'mscgen'
+BINARY_NAME = '/Users/hubbard/bin/mscgen'
 
 class MscProcessProtocol(protocol.ProcessProtocol):
     """
     Wrapper around the mscgen application, saves output
     """
     def __init__(self, callback, msg):
-        protocol.ProcessProtocol.__init__(self)
         self.output = []
         self.running = False
         self.cb = callback
@@ -37,9 +36,12 @@ class MscProcessProtocol(protocol.ProcessProtocol):
         log.debug('mscgen started ok')
         self.running = True
 
+    def processEnded(self, reason):
+        pass
+    
     def processExited(self, reason):
-        log.debug('mscgen exited, %s' % str(reason))
-        self.cb(self.msg, self.output)
+        log.debug('mscgen exited, "%s"' % reason.value)
+        self.cb(self.msg, str(self.output))
         self.running = False
 
     def outReceived(self, data):
@@ -111,11 +113,11 @@ class LazyEye(InteractionObserver):
 
         self.mpp = MscProcessProtocol(self._mscgen_callback, msg)
         log.debug('Spawing mscgen to render the graph...')
-        yield reactor.spawnProcess(self.mpp, BINARY_NAME,
-                                              '-i', self.filename,
-                                              '-o', self.imagename,
-                                              '-T', 'png')
-        log.debug('mscgen started')
+        # @bug spawnProcess drops the first element in the tuple, so pad with blank
+        args = ['', '-T', 'png', '-i', self.filename, '-o', self.imagename]
+        log.debug(args)
+        yield reactor.spawnProcess(self.mpp, BINARY_NAME, args)
+        log.debug('%s started' % BINARY_NAME)
 
     #noinspection PyUnusedLocal
     def op_get_image_name(self, request, headers, msg):
@@ -126,6 +128,7 @@ class LazyEye(InteractionObserver):
         """
         Send reply to caller when mscgen is finished. Callback hook.
         """
+        log.debug('mscgen callback fired, %s' % reply_text)
         self.reply_ok(msg, reply_text)
 
 class LazyEyeClient(ProcessClient):

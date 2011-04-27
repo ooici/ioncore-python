@@ -24,6 +24,10 @@ from ion.core.exception import ReceivedError
 
 class TestInstrumentAgent(IonTestCase):
 
+    # Increase the timeout so we can handle longer instrument interactions.
+    timeout = 120
+
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -86,6 +90,89 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(success_5[0],'OK')
 
 
+
+    @defer.inlineCallbacks
+    def test_transaction_timeouts(self):
+        """
+        Test acquisition and expire transaction timeouts.
+        """
+        
+        
+        # Set the expire timeout to a high value.
+        params = {
+            'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':300
+        }
+        reply = yield self.ia_client.set_observatory(params,'create')
+        success = reply['success']
+        result = reply['result']
+        self.assertEqual(success[0],'OK')
+
+        
+        # Start a transaction.        
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+        
+        # Sleep the agent to simulate some activity.
+        params = ['CI_CMD_SLEEP',5]
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+
+        # Sleep the agent to simulate some activity.
+        # The transaction should still be valid.
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+        
+        # End the transaction
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+        
+        # Set the expire timeout to a low value.
+        params = {
+            'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':3
+        }
+        reply = yield self.ia_client.set_observatory(params,'create')
+        success = reply['success']
+        result = reply['result']
+        self.assertEqual(success[0],'OK')
+                
+        # Start a transaction.        
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # Sleep the agent to simulate some activity.
+        # This should complete normally but the transaction should timeout
+        # while it is running.
+        params = ['CI_CMD_SLEEP',5]
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+
+        # Sleep the agent to simulate some activity.
+        # This should fail as the transaction has timed out.
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'ERROR')
+
+        # End the transaction.
+        # This should fail as the resource is now free and can't be unlocked.
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'ERROR')
+
+           
                   
     @defer.inlineCallbacks
     def test_execute_observatory(self):

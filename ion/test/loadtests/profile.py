@@ -2,7 +2,7 @@ import cProfile
 import pstats
 import re
 from cStringIO import StringIO
-# from guppy import hpy
+from guppy import hpy
 
 from twisted.internet import defer, protocol, reactor, threads
 from ion.test.load_runner import LoadTestRunner
@@ -35,13 +35,11 @@ def run():
     reactor.callWhenRunning(testrunner.load_runner_main)
     reactor.run()
 
-'''
 h = hpy()
 def dumpHeap():
     h.dumph('out.pb')
 def showHeap():
     print h.heap()
-'''
 
 #threads.deferToThread(dumpHeap)
 #reactor.callLater(5, showHeap)
@@ -74,3 +72,47 @@ percentTime('brokerload', 'protobuf', printResult=True)
 
 
 #run()
+memoryOrCpu = 'cpu'
+
+if memoryOrCpu == 'memory':
+    from guppy import hpy
+    
+    h = hpy()
+    
+    def dumpHeap():
+        h.dumph('out.pb')
+
+    def showHeap():
+        print h.heap()
+
+    run()
+
+    #showHeap()
+    #h.pb('out.pb')
+    hh = h.heap().get_rp(40)
+    for i in range(5):
+        print hh
+        hh = hh.more
+
+elif memoryOrCpu == 'cpu':
+    #threads.deferToThread(dumpHeap)
+    #reactor.callLater(5, showHeap)
+    cProfile.run('run()', 'brokerload')
+
+    pstats.Stats('brokerload').sort_stats('time').print_stats(100)
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_callers('ListFields')
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats(100)
+    #pstats.Stats('brokerload').sort_stats('time').print_stats('google/protobuf')
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_callers('isinstance')
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('(gpb_wrapper|object_utils)')
+    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
+
+
+    #percentTime('brokerload', 'gpb_wrapper', printResult=True)
+    percentTime('brokerload', 'protobuf', printResult=True)
+    #percentTime('brokerload', 'twisted', printResult=True)
+    #percentTime('brokerload', '{isinstance}', printResult=True)
+    #percentTime('brokerload', '{select.select}', printResult=True)
+else:
+    run()
