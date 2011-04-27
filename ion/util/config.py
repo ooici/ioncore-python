@@ -21,6 +21,7 @@ class Config(object):
         @param config if present, a Config instance for which the value given
             by cfgFile will be extracted
         """
+        assert cfgFile
         self.filename = cfgFile
         self.config = None
 

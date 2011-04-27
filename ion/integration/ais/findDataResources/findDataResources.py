@@ -91,7 +91,7 @@ class FindDataResources(object):
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
-            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
             Response.error_str = "DatasetIDs not found."
             defer.returnValue(Response)
             
@@ -144,7 +144,7 @@ class FindDataResources(object):
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
-            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
             Response.error_str = "DatasetIDs not found."
             defer.returnValue(Response)
         
@@ -247,7 +247,7 @@ class FindDataResources(object):
                     log.error('dSourceResID is None')
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
-                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
                     Response.error_str = "Dataset not found."
                     defer.returnValue(Response)        
 
@@ -258,7 +258,7 @@ class FindDataResources(object):
                     log.error('ResourceClientError Exception!')
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
-                    Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
                     Response.error_str = "Datasource not found."
                     defer.returnValue(Response)        
 
@@ -374,6 +374,8 @@ class FindDataResources(object):
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
         pair.object = type_ref
+        
+        log.info('Calling get_subjects with owner: ' + owner)
 
         try:
             result = yield self.asc.get_subjects(request)
