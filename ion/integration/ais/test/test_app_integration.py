@@ -930,6 +930,11 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
         
+        msg.message_parameters_reference.ooi_id = "bogus-ooi_id"  #non-existant item
+        reply = yield self.aisc.getResource(msg)
+        log.debug('getResource returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):

@@ -18,9 +18,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.core.process.process import Process
 
 import ion.util.procutils as pu
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
-from ion.services.dm.distribution.publisher_subscriber import  PublisherFactory
-
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -119,7 +117,7 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
 
         log.info("NotificationReceiverTest: call the service")
         # try to register this user for the first time
@@ -131,25 +129,25 @@ class NotificationReceiverTest(IonTestCase):
 
         log.info('NotificationReceiverTest: test_publish_recieve publish notification')
 
-        #self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self.test_sup)
-        #pub = yield self._notify_ingest_factory.build()
-        pub = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
-        yield pub.initialize()
-        yield pub.activate()
-        #yield pub.create_and_publish_event(name="foo", origin="xyz")
+        pubSupplementAdded = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSupplementAdded.initialize()
+        yield pubSupplementAdded.activate()
+
+        pubSourceOffline = DatasourceUnavailableEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSourceOffline.initialize()
+        yield pubSourceOffline.activate()
+
         # creates the event notification for us and sends it
 
-        yield pub.create_and_publish_event(origin="magnet_topic",
+        yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
                                            dataset_id="dataresrc123",
                                            datasource_id="dataresrc123",
                                            title="TODO",
                                            url="TODO")
 
-        yield pub.create_and_publish_event(origin="magnet_topic",
-                                           dataset_id="dataresrc123",
+        yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
                                            datasource_id="dataresrc123",
-                                           title="TODO",
-                                           url="TODO")
+                                           explanation="explanation")
 
         log.info('NotificationReceiverTest: test_publish_recieve sleep')
         yield pu.asleep(3.0)
