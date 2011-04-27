@@ -28,7 +28,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
-from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+#from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.data.store import Query
@@ -70,7 +70,7 @@ class NotificationAlertService(ServiceProcess):
         self.mc =    MessageClient(proc = self)
         self.irc =   IdentityRegistryClient(proc = self)
         self.store = AttributeStoreClient(proc = self)
-        self.aisc =  AppIntegrationServiceClient(proc = self)
+        #self.aisc =  AppIntegrationServiceClient(proc = self)
 
         #initialize index store for subscription information
         SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path']

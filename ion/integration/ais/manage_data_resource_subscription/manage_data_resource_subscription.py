@@ -25,7 +25,7 @@ from ion.services.coi.resource_registry.resource_client import ResourceClientErr
 
 from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
-#from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
+from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
 from ion.core.intercept.policy import get_dispatcher_id_for_user
 
@@ -88,7 +88,7 @@ class ManageDataResourceSubscription(object):
         self.ac  = AssociationClient(proc=ais)
         self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
         self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
-        #self.nac = NotificationAlertServiceClient(proc=ais)
+        self.nac = NotificationAlertServiceClient(proc=ais)
 
 
     def update(self, msg):
