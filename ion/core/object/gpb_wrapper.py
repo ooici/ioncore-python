@@ -1337,27 +1337,40 @@ class Wrapper(object):
 
         if other is not None:
             if not self == other:
+                log.error(self.Debug())
                 raise OOIObjectError('Can not replace source with an object which is not equal.')
 
-            if self._source is not self:
+            if self is other:
+                log.error(self.Debug())
+                raise OOIObjectError('Can not replace source with self in invalidate!')
+
+            if self._invalid:
+                log.error(self.Debug())
                 raise OOIObjectError('It is unexpected to try and invalidate an object with a new source a second time')
 
+
+            if self._source is not self:
+                log.error(self.Debug())
+                raise OOIObjectError('It is unexpected to try and invalidate an object which already has an alternate source')
+
             if self._repository is not other._repository:
+                log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by passing a wrapper from another repository')
 
-            self._source = other
         else:
-            self._source = self
+            other = self
 
-        if self._invalid:
-            return
+            if self._invalid:
+                return
         
         if self.IsRoot:
-            if other is None:
+            if other is self:
                 for item in self.DerivedWrappers.values():
                     item.Invalidate()
             else:
                 self._merge_derived_wrappers(other)
+
+        self._source = other
 
         self._derived_wrappers = None
         self._gpbMessage = None
@@ -1389,10 +1402,11 @@ class Wrapper(object):
 
                 if hasattr(self_obj, '__iter__'):
 
-                    print 'EHHEHEHEEHEHEH'
 
+                    print 'DLKDNSKNSKS'
                     for arg1, arg2 in zip(self_obj, other_obj):
-                        print 'ARGS', arg1,arg2
+                        print 'ARG1', arg1
+                        print 'ARG2', arg2
                         arg1._merge_derived_wrappers(arg2)
 
                 else:
@@ -2216,6 +2230,13 @@ class ContainerWrapper(object):
             self.__delitem__(index)
 
 
+    @GPBSourceCW
+    def __iter__(self):
+
+        for i in range(len(self)):
+            yield self[i]
+
+
 
 class ScalarContainerWrapper(object):
     """
@@ -2375,6 +2396,13 @@ class ScalarContainerWrapper(object):
     def __str__(self):
 
         return str(self._gpbcontainer._values)
+
+    @GPBSourceSCW
+    def __iter__(self):
+
+        for i in range(len(self)):
+            yield self[i]
+
 
 class StructureElementError(Exception):
     """
