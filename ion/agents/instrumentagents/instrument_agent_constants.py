@@ -123,7 +123,8 @@ Observatory commands names.
 """
 ci_command_list = [
     'CI_CMD_STATE_TRANSITION',
-    'CI_CMD_TRANSMIT_DATA'
+    'CI_CMD_TRANSMIT_DATA',
+    'CI_CMD_SLEEP'
 ]
 
 """
