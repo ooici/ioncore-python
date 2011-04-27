@@ -125,22 +125,62 @@ class WrapperMethodsTest(unittest.TestCase):
 
     def test_source(self):
 
-        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSLINK_TYPE)
         ab1.MyId = '1'
 
-        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSLINK_TYPE)
         ab2.MyId = '2'
 
         ab1.Invalidate(ab2)
 
         self.assertEqual(ab1.MyId, '2')
 
+        self.assertIdentical(ab1._source, ab2)
 
-    def test_inparents(self):
+    def test_source_set(self):
+
+        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSLINK_TYPE)
+        ab1.MyId = '1'
+
+        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab2.MyId = '2'
+
+        self.assertRaises(OOIObjectError, ab1.Invalidate, ab2)
+
+    def test_source_derived(self):
 
         ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
 
-        self.failIf(ab1.InParents(5))
+        ab1.owner.name = 'David'
+        ab1.owner.id = 5
+        owner1 = ab1.owner
+
+        person1 = ab1.person.add()
+        ab1.person[0].name = 'john'
+        ab1.person[0].id = 1
+
+
+        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+
+        ab2.owner.name = 'David'
+        ab2.owner.id = 5
+        owner2 = ab2.owner
+
+        person2 = ab2.person.add()
+        ab2.person[0].name = 'john'
+        ab2.person[0].id = 2
+        
+        # Since the values are not equal - this will fail
+        self.assertRaises(OOIObjectError, ab1.Invalidate, ab2)
+
+        ab2.person[0].id = 1
+
+        ab1.Invalidate(ab2)
+
+        self.assertEqual(person1, person2)
+        person1.name = 'Michael'
+        self.assertEqual(person1, person2)
+
 
 
     def test_set_composite(self):
@@ -1064,6 +1104,32 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.wb = wb
 
 
+    def test_inparents_1(self):
+
+        person = self.ab.Repository.create_object(PERSON_TYPE)
+        self.ab.owner = person
+
+        self.failUnless(person.InParents(self.ab))
+        self.failIf(self.ab.InParents(person))
+
+    def test_inparents_2(self):
+
+        person1 = self.ab.Repository.create_object(PERSON_TYPE)
+        self.ab.person.add()
+        self.ab.person[0] = person1
+
+        person2 = self.ab.Repository.create_object(PERSON_TYPE)
+        self.ab.person.add()
+        self.ab.person[1] = person2
+
+        self.failUnless(person1.InParents(self.ab))
+        self.failIf(self.ab.InParents(person1))
+
+        self.failIf(person2.InParents(person1))
+        self.failIf(person1.InParents(person2))
+
+
+
     def test_listsetfields_composite(self):
 
 
@@ -1188,13 +1254,7 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.assertNotIn(p0_link, self.ab.DerivedWrappers)
         self.assertNotIn(p0_type, self.ab.DerivedWrappers)
         self.assertEqual(len(self.ab.DerivedWrappers),1)
-        
-        
-    
-    
 
-        
-        
         
 
 class NodeLinkTest(unittest.TestCase):
@@ -1323,16 +1383,24 @@ class RecurseCommitTest(unittest.TestCase):
         print p1.Debug()
 
 
-        print 'PRINT ROOT:',p0.Root
-
         self.assertEqual(p0.name,'David')
         self.assertEqual(p1.name,'David')
 
         if p0._invalid:
-            self.assertIs(p0._twin, p1)
+            self.failUnlessIdentical(p0._source, p1)
         else:
-            self.assertIs(p1_twin, p0)
+            self.failUnlessIdentical(p1._source, p0)
 
+
+        self.failUnlessIdentical(p0.ParentLinks, p1.ParentLinks)
+        self.failUnlessIdentical(p0.Repository, p1.Repository)
+        self.failUnlessIdentical(p0.GPBMessage, p1.GPBMessage)
+        self.failUnlessIdentical(p0.DerivedWrappers, p1.DerivedWrappers)
+        self.failUnlessIdentical(p0.MyId, p1.MyId)
+        self.failUnlessIdentical(p0.Root, p1.Root)
+        self.failUnlessIdentical(p0.ChildLinks, p1.ChildLinks)
+        self.failUnlessIdentical(p0.ReadOnly, p1.ReadOnly)
+        self.failUnlessIdentical(p0.Modified, p1.Modified)
 
 
         # manually update the hashed elements...
