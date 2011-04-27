@@ -24,7 +24,7 @@ def send_messages():
     yield proc.spawn()
     hc = HelloServiceClient(proc)
 
-    count = 600
+    count = 4
     tzero = time.time()
     
     yield hc._check_init()
