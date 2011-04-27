@@ -100,8 +100,8 @@ def MergeAttGreater(self, attname, src):
     # @todo: Ensure the length of the attribute list is exactly ONE
     
     
-    src_val = GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
-    dst_val = GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
+    src_val = _GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
+    dst_val = _GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
     if src_val > dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val > src_val:
@@ -141,8 +141,8 @@ def MergeAttLesser(self, attname, src):
     # @todo: Ensure the length of the attribute list is exactly ONE
     
     
-    src_val = GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
-    dst_val = GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
+    src_val = _GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
+    dst_val = _GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
     if src_val < dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val < src_val:
@@ -187,7 +187,7 @@ def _get_attribs(src, dst, attname):
     
     return (src_att, dst_att)
 
-def GetNumericValue(self, data_type, value):
+def _GetNumericValue(self, data_type, value):
     
     def _norm_string(val):
         result = 0

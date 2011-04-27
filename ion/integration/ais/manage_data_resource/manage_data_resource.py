@@ -97,16 +97,19 @@ class ManageDataResource(object):
             datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
 
             if msg.IsFieldSet("update_interval_seconds"):
-                dispatcher_resource.update_interval_seconds = msg.update_interval_seconds
+                datasrc_resource.update_interval_seconds = msg.update_interval_seconds
                 #FIXME: change scheduling
 
             if msg.IsFieldSet("ion_institution_id"):
-                dispatcher_resource.ion_institution_id = msg.ion_institution_id
+                datasrc_resource.ion_institution_id = msg.ion_institution_id
 
             if msg.IsFieldSet("ion_description"):
-                dispatcher_resource.ion_description = msg.ion_description
+                datasrc_resource.ion_description = msg.ion_description
 
-            yield self.rc.put_resource(datasrc_resource)
+            if msg.IsFieldSet("max_ingest_millis"):
+                datasrc_resource.max_ingest_millis = msg.max_ingest_millis
+
+            yield self.rc.put_instance(datasrc_resource)
 
 
         except ReceivedApplicationError, ex:
@@ -185,10 +188,12 @@ class ManageDataResource(object):
 
 
                 deletions.append(data_source_resource_id)
+    
 
-            log.info("putting all resource changes in one big transaction")
+            log.info("putting all resource changes in one big transaction, " \
+                         + str(len(delete_resources)))
             yield self.rc.put_resource_transaction(delete_resources)
-
+            log.info("Success!")
 
 
         except ReceivedApplicationError, ex:
@@ -204,11 +209,10 @@ class ManageDataResource(object):
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
 
         Response.message_parameters_reference.add()
-        Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
+        Response.message_parameters_reference[0] = Response.CreateObject(DELETE_DATA_RESOURCE_RSP_TYPE)
         for d in deletions:
             i = len(Response.message_parameters_reference[0].successfully_deleted_id)
-            Response.message_parameters_reference[0].successfully_deleted_id.add()
-            Response.message_parameters_reference[0].successfully_deleted_id[i] = d
+            Response.message_parameters_reference[0].successfully_deleted_id.append(d)
 
         defer.returnValue(Response)
 
@@ -288,6 +292,7 @@ class ManageDataResource(object):
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
+            #don't yield on this.
             self.ing.create_dataset_topics(topics_msg)
 
             # FIXME call the scheduler service client

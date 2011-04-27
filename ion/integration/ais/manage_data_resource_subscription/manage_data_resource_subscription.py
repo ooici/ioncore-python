@@ -23,6 +23,10 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient, \
 from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
                                                                     ResourceInstanceError
 
+from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
+from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
+
+
 from ion.core.intercept.policy import get_dispatcher_queue_for_user
 
 from ion.core.object import object_utils
@@ -192,7 +196,7 @@ class ManageDataResourceSubscription(object):
         defer.returnValue(Response)
 
         
-
+    @defer.inlineCallbacks
     def create(self, msg):
         """
         @brief subscribe to a data resource 
@@ -204,8 +208,22 @@ class ManageDataResourceSubscription(object):
         log.info('ManageDataResourceSubscription.createDataResourceSubscription()\n')
         
 
+        #### TEMPTEMPTEMP ####
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        
+        log.debug('user_ooi_id = ' + msg.message_parameters_reference.subscriptionInfo.user_ooi_id)
+
+        Response.message_parameters_reference.add()
+        Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
+        Response.message_parameters_reference[0].success  = True
+        defer.returnValue(Response)
+        #### END TEMPTEMPTEMP ####
 
         try:
+            
+            # look at Maurice's service: notification alert service (test_notification_alert)
+            
+            
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:
