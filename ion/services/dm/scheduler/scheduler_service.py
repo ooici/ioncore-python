@@ -166,7 +166,6 @@ class SchedulerService(ServiceProcess):
 
         # will move pub through the lifecycle states with the service
         self.add_life_cycle_object(self.pub)
-        self.pub.on_terminate = lambda: log.debug("FIX THIS IN PUBLISHER, DAF")
 
     @defer.inlineCallbacks
     def slc_activate(self):
