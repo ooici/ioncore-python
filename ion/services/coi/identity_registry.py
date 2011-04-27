@@ -15,14 +15,29 @@ CONF = ioninit.config(__name__)
 
 from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.exception import ApplicationError
 from ion.core.security.authentication import Authentication
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
-from ion.core.intercept.policy import subject_has_admin_role, map_ooi_id_to_subject_admin_role, subject_has_dispatcher_queue, map_ooi_id_to_subject_dispatcher_queue, \
- subject_has_data_provider_role, map_ooi_id_to_subject_data_provider_role, subject_has_marine_operator_role, map_ooi_id_to_subject_marine_operator_role
+from ion.core.intercept.policy import subject_has_admin_role, \
+                                      map_ooi_id_to_subject_admin_role, \
+                                      subject_has_dispatcher_queue, \
+                                      map_ooi_id_to_subject_dispatcher_queue, \
+                                      subject_has_data_provider_role, \
+                                      map_ooi_id_to_subject_data_provider_role, \
+                                      subject_has_marine_operator_role, \
+                                      map_ooi_id_to_subject_marine_operator_role
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID, \
+                                                                    TYPE_OF_ID
+
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
@@ -145,38 +160,6 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue(content)
 
         
-    @defer.inlineCallbacks
-    def is_user_registered(self, user_cert, user_private_key):
-        """
-        This determines if a user is registered by deriving the subject line from the certificate and scanning the registry for that line.
-        It returns True or False
-        """
-        cont = {
-            'user_cert': user_cert,
-            'user_private_key': user_private_key,
-        }
-        
-        (content, headers, msg) = yield self.rpc_send('verify_registration', cont)
-        log.debug("in is_user_registered client" + str(content))
-        defer.returnValue( content )
-        
-
-    #
-    #
-    # UPDATE FIND_USERS when the repository supports this operation
-    #
-    #
-
-    #--#op_find_users = BaseRegistryService.base_find_resource
-
-    @defer.inlineCallbacks
-    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=None):
-        """
-        """
-        #--if attnames is None: attnames = []
-        #--#return self.base_find_resource('find_users',user_description,regex,ignore_defaults,attnames)
-
-
     @defer.inlineCallbacks
     def set_identity_lcstate(self, ooi_id, lcstate):
         """
@@ -314,11 +297,10 @@ class IdentityRegistryService(ServiceProcess):
         
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
+        self.asc = AssociationServiceClient()
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
         
         self.instance_counter = 1
-        # This is a hack to get past no 
-        self._user_dict = {}
 
 
     @defer.inlineCallbacks
@@ -371,7 +353,7 @@ class IdentityRegistryService(ServiceProcess):
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         # Check for correct protocol buffer type
-        self.CheckRequest(request)
+        self._CheckRequest(request)
         
         # check for required fields
         if not request.configuration.IsFieldSet('certificate'):
@@ -405,10 +387,6 @@ class IdentityRegistryService(ServiceProcess):
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
         
-        # Now we store the subject/ResourceIdentity pair so we can get around not having find.
-        self._user_dict[cert_info['subject']] = identity.ResourceIdentity
-        # Above line needs to be altered when FIND is implemented
-
         # Optionally map OOI ID to subject in admin role dictionary
         if subject_has_admin_role(identity.subject):
             map_ooi_id_to_subject_admin_role(identity.subject, identity.ResourceIdentity)
@@ -432,20 +410,21 @@ class IdentityRegistryService(ServiceProcess):
         Response.result = "OK"
         defer.returnValue(Response)
 
+
     @defer.inlineCallbacks
     def op_get_user(self, request, headers, msg):
         """
-        This returns user information for a specific ooi_id.
+        This returns user information for a specific ooi_id if the user is registered.
         """
         # Check for correct protocol buffer type
-        self.CheckRequest(request)
+        self._CheckRequest(request)
         
         # check for required fields
         if not request.configuration.IsFieldSet('ooi_id'):
             raise IdentityRegistryException("Required field [ooi_id] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
 
-        log.debug('in op_get_user:\n'+str(request))
+        #log.debug('in op_get_user:\n'+str(request))
         log.debug('in op_get_user: request.configuration\n'+str(request.configuration))
 
         response = yield self.get_user(request)
@@ -457,9 +436,9 @@ class IdentityRegistryService(ServiceProcess):
     def get_user(self, request):
         """
         """
-        log.debug('in get_user')
-        if request.configuration.ooi_id in self._user_dict.values():
-            identity = yield self.rc.get_instance(request.configuration.ooi_id)
+        log.debug('get_user: ooi_id='+str(request.configuration.ooi_id))
+        try:
+            identity = yield self.rc.get_instance(str(request.configuration.ooi_id))
             # Create the response object...
             Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
             Response.resource_reference = Response.CreateObject(IDENTITY_TYPE)
@@ -478,21 +457,20 @@ class IdentityRegistryService(ServiceProcess):
             Response.resource_reference.life_cycle_state = identity.ResourceLifeCycleState
             Response.result = "OK"
             defer.returnValue(Response)
-        else:
+        except ApplicationError, ex:
            log.debug('get_user: no match')
-           raise IdentityRegistryException("user [%s] not found"%request.configuration.ooi_id,
+           raise IdentityRegistryException("user [%s] not found: %s"%(request.configuration.ooi_id, ex),
                                            request.ResponseCodes.NOT_FOUND)
-
 
 
     @defer.inlineCallbacks
     def op_authenticate_user_credentials(self, request, headers, msg):
         """
         This authenticates that the user exists. If so, the credentials are replaced with the current ones,
-        and a ooi_id is returned. If not, None is returned.
+        and a ooi_id is returned. If not, NOT_FOUND is returned.
         """
         # Check for correct protocol buffer type
-        self.CheckRequest(request)
+        self._CheckRequest(request)
         
         # check for required fields
         if not request.configuration.IsFieldSet('certificate'):
@@ -517,13 +495,13 @@ class IdentityRegistryService(ServiceProcess):
         authentication = Authentication()
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
-        if cert_info['subject'] in self._user_dict.keys():
+        identity = yield self._findUser(cert_info['subject'])
+        if identity != None:
            log.info('authenticate_user_credentials: Registration VERIFIED')
-           identity = yield self.rc.get_instance(self._user_dict[cert_info['subject']])
            identity.certificate = request.configuration.certificate
            identity.rsa_private_key = request.configuration.rsa_private_key
            yield self.rc.put_instance(identity, 'Updated user credentials')
-           log.debug(str(identity.ResourceIdentity))
+           log.debug('authenticate_user_credentials: '+str(identity.ResourceIdentity))
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
            Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
@@ -544,25 +522,22 @@ class IdentityRegistryService(ServiceProcess):
         log.info('in op_update_user_profile')
         
         # Check for correct protocol buffer type
-        self.CheckRequest(request)
+        self._CheckRequest(request)
         
         log.debug('in op_update_user_profile:\n'+str(request))
         log.debug('in op_update_user_profile: request.configuration\n'+str(request.configuration))
 
         response = yield self.update_user_profile(request)
 
-        yield self.reply_ok(msg, response)
-        
+        yield self.reply_ok(msg, response)      
         
 
     @defer.inlineCallbacks
     def update_user_profile(self, request):
         log.info('in update_user_profile')
         
-        if request.configuration.subject in self._user_dict.keys():
-           log.info('update_user_profile: Found match')
-           # first get user's info
-           identity = yield self.rc.get_instance(self._user_dict[request.configuration.subject])
+        identity = yield self._findUser(request.configuration.subject)
+        if identity != None:
            log.info('update_user_profile: identity = '+str(identity))
                        
            if request.configuration.IsFieldSet('email'):
@@ -590,25 +565,40 @@ class IdentityRegistryService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_verify_registration(self, request, headers, msg):
+    def _findUser(self, Subject):
         """
-        This determines if a user is registered by deriving the subject line from the certificate and scanning the registry for that line.
-        It returns True or False
+        Implementation of User find that uses the registry and associations.
         """
-        log.info('in op_verify_registration')
+        log.debug('_findUser searching for "%s"' %Subject)
+        
+        # get all the identity resources out of the Association Service
+        request = yield self.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = request.pairs.add()
+   
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+        pair.predicate = pref
+   
+        # Set the Object search term
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = IDENTITY_RESOURCE_TYPE_ID    
+        pair.object = type_ref
+   
+        ooi_id_list = yield self.asc.get_subjects(request)     
 
-        authentication = Authentication()
-        cert_info = authentication.decode_certificate(request['user_cert'])
+        # Now we have a list of ooi_ids. Gotta pull and search them individually.
+        for ooi_id in ooi_id_list.idrefs:
+            Resource = yield self.rc.get_instance(ooi_id)
+            if Subject == getattr(Resource, 'subject'):
+                log.debug('subject %s found'%Subject)
+                defer.returnValue(Resource)
 
-        if cert_info['subject'] in self._user_dict.keys():
-           log.info('op_verify_registration: Registration VERIFIED')
-           yield self.reply_ok(msg, True)
-        else:
-           yield self.reply_ok(msg, False)
-           log.info('op_verify_registration: Registration NOT PRESENT')
+        log.debug('subject %s not found'%Subject)
+        defer.returnValue(None)
 
 
-    def CheckRequest(self, request):
+    def _CheckRequest(self, request):
         # Check for correct request protocol buffer type
         if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
             raise IdentityRegistryException('Bad message type receieved, ignoring',
@@ -618,7 +608,5 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [configuration] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
         
-
-
 # Spawn of the process using the module name
 factory = ProcessFactory(IdentityRegistryService)
