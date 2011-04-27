@@ -28,7 +28,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        REGISTER_USER_REQUEST_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       SUBSCRIPTION_INFO_TYPE
+                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
+                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
 
 class NotificationReceiverTest(IonTestCase):
 
@@ -114,11 +115,11 @@ class NotificationReceiverTest(IonTestCase):
 
         # create the register_user request GPBs
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.data_src_id = 'dataset123'
-        reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
         log.info("NotificationReceiverTest: call the service")
         # try to register this user for the first time
@@ -139,19 +140,19 @@ class NotificationReceiverTest(IonTestCase):
         # creates the event notification for us and sends it
 
         yield pub.create_and_publish_event(origin="magnet_topic",
-                                           dataset_id="dataset_id",
-                                           datasource_id="TODO",
+                                           dataset_id="dataresrc123",
+                                           datasource_id="dataresrc123",
                                            title="TODO",
                                            url="TODO")
 
         yield pub.create_and_publish_event(origin="magnet_topic",
-                                           dataset_id="dataset_id",
-                                           datasource_id="TODO",
+                                           dataset_id="dataresrc123",
+                                           datasource_id="dataresrc123",
                                            title="TODO",
                                            url="TODO")
 
         log.info('NotificationReceiverTest: test_publish_recieve sleep')
-        yield pu.asleep(6.0)
+        yield pu.asleep(3.0)
 
 
         log.info('NotificationReceiverTest: test_publish_recieve completed')
