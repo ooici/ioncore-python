@@ -1341,8 +1341,13 @@ class Repository(ObjectContainer):
 
         if value.Modified:
             structure={}
+            value_repo = value.Repository
             value.RecurseCommit(structure)
-            value.Repository.index_hash.update(structure)
+            # Deal with the case where this serialization causes a hash conflict...
+            value_repo.index_hash.update(structure)
+
+
+
 
 
         element = self.index_hash.get(value.MyId)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/res/config.py
+@file ion/services/coi/datastore_bootstrap/ion_preload_config.py
 @author David Stuebe
 
 @Brief This module contains defined constants and configuration dictionaries which are used in the data store and other

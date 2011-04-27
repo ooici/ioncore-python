@@ -373,7 +373,7 @@ message GetResourceResponse {
 
 SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
 """
-message SubscriptionInfoReqMsg {
+message SubscriptionInfoType {
     enum _MessageTypeIdentifier {
       _ID = 9201;
       _VERSION = 1;
@@ -390,8 +390,8 @@ message SubscriptionInfoReqMsg {
      optional SubscriptionType subscription_type = 3 [default = EMAIL];
      enum AlertsFilter {
           UPDATES = 0;
-          METADATACHENGE = 1;
-          DATASOURCEOFFLINE = 2;
+          DATASOURCEOFFLINE = 1;
+          UPDATESANDDATASOURCEOFFLINE = 2;
      }
      optional AlertsFilter email_alerts_filter = 4;
      optional AlertsFilter dispatcher_alerts_filter = 5;
@@ -505,12 +505,8 @@ message SubscriptionCreateReqMsg {
       _ID = 9203;
       _VERSION = 1;
     }
-
-    // The message parameters object
-    optional string dispatcher_id  = 1;
-    optional string script_path    = 2;
-    optional string resource_id    = 3;
-
+    
+    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
 }
 """
 
@@ -525,6 +521,31 @@ message SubscriptionCreateRspMsg {
     optional bool success = 1;
 }
 """
+
+DELETE_SUBSCRIPTION_REQ_TYPE  = object_utils.create_type_identifier(object_id=9205, version=1)
+"""
+message SubscriptionDeleteReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9205;
+      _VERSION = 1;
+    }
+
+    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+}
+"""
+
+DELETE_SUBSCRIPTION_RSP_TYPE  = object_utils.create_type_identifier(object_id=9206, version=1)
+"""
+message SubscriptionDeleteRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9206;
+      _VERSION = 1;
+    }
+
+    optional bool success = 1;
+}
+"""
+
 
 GET_SUBSCRIPTION_LIST_REQ_TYPE = object_utils.create_type_identifier(object_id=9207, version=1)
 """
