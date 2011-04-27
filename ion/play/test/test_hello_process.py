@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.play.hello_process import HelloProcessClient
 from ion.test.iontest import IonTestCase
 
-from ion.core.process.process import Process, ProcessClient, ProcessDesc
+from ion.core.process.process import ProcessDesc
 from ion.core import bootstrap
 
 class HelloProcessTest(IonTestCase):
@@ -52,7 +52,7 @@ class HelloProcessTest(IonTestCase):
 
         log.info('Calling hello there with hc(sup2)')
         hc2 = HelloProcessClient(proc=sup2,target=proc1_id)
-        yield hc2.hello("Hi there, hello1")
+        yield hc2.hello("Hi there, hello2")
 
 
         log.info('Tada!')

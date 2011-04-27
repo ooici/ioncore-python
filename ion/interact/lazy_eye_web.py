@@ -137,9 +137,13 @@ class LazyEyeMonitor(Process):
     def plc_init(self):
         Process.plc_init(self)
 
+        import pdb
+        pdb.set_trace()
+        
         log.debug('starting client init')
-        #self.lec = LazyEyeClient(proc=self)
-        self.lec = None
+        self.lec = LazyEyeClient(proc=self)
+
+        #self.lec = None
         log.debug('client init completed')
         self.rootpage = RootPage(self.lec)
         self.site = Site(self.rootpage)

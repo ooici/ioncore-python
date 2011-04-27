@@ -56,12 +56,26 @@ class LazyEye(InteractionObserver):
     @note "RESTful observer = lazy eye" - get it? Sure ya do.
     """
 
-    #noinspection PyUnusedLocal
-    def op_start(self, request, headers, msg):
-        log.debug('Got a start request')
+    # Stomp the plc_* hooks in the parent class
+    def plc_init(self):
+        pass
 
+    def plc_activate(self):
+        pass
+
+    def plc_terminate(self):
+        pass
+
+    #noinspection PyUnusedLocal
+    @defer.inlineCallbacks
+    def op_start(self, request, headers, msg):
+        log.debug('Got a start request: %s' % request)
+
+        if not hasattr(self, 'running'):
+            self.running = False
+            
         if self.running:
-            if request.filename == self.filename:
+            if request == self.filename:
                 log.debug('Duplicate start message received, ignoring')
                 return
             else:
@@ -69,11 +83,13 @@ class LazyEye(InteractionObserver):
                 return
 
         self.running = True
-        self.filename = request.filename
-        self.imagename = request.filename + '.png'
-        d = self.plc_init()
-        d.addCallback(self.plc_activate())
+        self.filename = request
+        self.imagename = request + '.png'
+        log.debug('Starting up the message receiver...')
+        yield self.msg_receiver.initialize()
+        yield self.msg_receiver.activate()
 
+        log.debug('Started OK')
         self.reply_ok(msg)
 
     #noinspection PyUnusedLocal
@@ -114,7 +130,7 @@ class LazyEye(InteractionObserver):
 
 class LazyEyeClient(ProcessClient):
     """
-    Minimal process client, start/stop.
+    Minimal process client, start/stop/query. Does not use GPB messages!
     """
     @defer.inlineCallbacks
     def start(self, filename='msc.txt'):
@@ -125,13 +141,13 @@ class LazyEyeClient(ProcessClient):
     @defer.inlineCallbacks
     def stop(self):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('stop')
+        (content, headers, msg) = yield self.rpc_send('stop', '')
         defer.returnValue(content)
 
     @defer.inlineCallbacks
     def get_image_name(self):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('get_image_name')
+        (content, headers, msg) = yield self.rpc_send('get_image_name', '')
         defer.returnValue(content)
 
 
