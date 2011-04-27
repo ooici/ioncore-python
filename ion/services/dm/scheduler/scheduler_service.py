@@ -6,6 +6,7 @@
 @author Paul Hubbard
 @package ion.services.dm.scheduler.service Implementation of the scheduler
 """
+import time
 from ion.core.data.store import IndexStore, Query
 from ion.core.exception import ApplicationError
 from ion.core.object.gpb_wrapper import StructureElement
@@ -131,10 +132,32 @@ class SchedulerService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=['attributestore'])
 
+    class SchedulerIndexStore(IndexStore):
+        """
+        Specifically derived IndexStore for scheduler use.
+        We do NOT want to use class variables for storage, we want fresh copies
+        on every instance.
+        """
+        def __init__(self, *args, **kwargs):
+            self.kvs = {}
+            self.indices = {}
+
+            IndexStore.__init__(self, *args, **kwargs)
+
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.scheduled_events = IndexStore(indices=['task_id', 'desired_origin', 'interval_seconds', 'payload'])
+        # columns we have
+        indices = ['task_id',
+                   'desired_origin',
+                   'interval_seconds',
+                   'payload',
+                   'user_id',
+                   'constant',
+                   'start_time',
+                   'end_time']
+
+        self.scheduled_events = self.SchedulerIndexStore(indices=indices)
         self.mc = MessageClient(proc=self)
         self.pub = ScheduleEventPublisher(process=self)
 
@@ -143,7 +166,17 @@ class SchedulerService(ServiceProcess):
 
         # will move pub through the lifecycle states with the service
         self.add_life_cycle_object(self.pub)
-        self.pub.on_terminate = lambda: log.debug("FIX THIS IN PUBLISHER, DAF")
+
+    @defer.inlineCallbacks
+    def slc_activate(self):
+        # get all items from the store
+        query = Query()
+        query.add_predicate_eq('constant', '1')
+        rows = yield self.scheduled_events.query(query)
+
+        for task_id, tdef in rows.iteritems():
+            log.debug("slc_activate: scheduling %s" % task_id)
+            self._schedule_event(tdef['start_time'], tdef['interval_seconds'], task_id)
 
     def slc_terminate(self):
         """
@@ -154,7 +187,39 @@ class SchedulerService(ServiceProcess):
         """
         for k, v in self._callback_tasks.iteritems():
             v.cancel()
-        
+
+    def _schedule_event(self, starttime, interval, task_id):
+        """
+        Helper method to schedule and record a callback in the service.
+        Used by op_add_task and on startup.
+
+        @param  starttime   The time to start the callbacks. This is used with the interval to calculate the
+                            first callback. If None is specified, will use now. Note: the first callback to
+                            occur will not happen immediatly, it will be after the first interval has elapsed,
+                            whether starttime is specified or not. This parameter should be specified in UNIX
+                            epoch format, in ms. You will have to conver the output from time.time() in Python.
+        @param  interval    The interval to trigger scheduler events, in seconds.
+        @param  task_id     The task_id to trigger.
+        """
+        assert interval and task_id and interval > 0
+        curtime = int(round(time.time() * 1000))
+        starttime = starttime or curtime
+
+        # determine first callback time
+        diff = curtime - starttime
+        if diff > 0:
+            # we started a while ago, so just find what is remaining of the interval from now
+            lefttimems = diff % (interval * 1000)
+            calctime = interval - int(lefttimems / 1000)
+        else:
+            # start time is in THE FUTURE
+            calctime = 0 - int(diff/1000) + interval
+
+        log.debug("_schedule_event: calculated next callback time of %d" % calctime)
+
+        ccl = reactor.callLater(calctime, self._send_and_reschedule, task_id)
+        self._callback_tasks[task_id] = ccl
+
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
@@ -168,11 +233,25 @@ class SchedulerService(ServiceProcess):
             task_id         = str(uuid4())
             msg_interval    = content.interval_seconds
             desired_origin  = content.desired_origin
+            if content.IsFieldSet('start_time'):
+                starttime = content.start_time
+            else:
+                starttime = None
             if content.IsFieldSet('payload'):
                 # extract, serialize
                 payload = content.Repository.index_hash[content.payload.MyId].serialize()
             else:
                 payload = None
+            if content.IsFieldSet('end_time'):
+                log.warn("Scheduler does not handle end_time yet!")
+                endtime = content.end_time
+            else:
+                endtime = None
+            if content.IsFieldSet('user_id'):
+                user_id = content.user_id
+            else:
+                user_id = ''
+
         except KeyError, ke:
             log.exception('Required keys in op_add_task content not found!')
             raise SchedulerError(str(ke))
@@ -188,6 +267,10 @@ class SchedulerService(ServiceProcess):
         self.scheduled_events.put(task_id,
                                   task_id,  # ok to use for value? seems kind of silly
                                   index_attributes={'task_id': task_id,
+                                                    'constant': '1',    # used for being able to pull all tasks
+                                                    'user_id': user_id,
+                                                    'start_time': starttime,
+                                                    'end_time': endtime,
                                                     'interval_seconds':msg_interval,
                                                     'desired_origin': desired_origin,
                                                     'payload': payload})
@@ -195,8 +278,7 @@ class SchedulerService(ServiceProcess):
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
 
-        ccl = reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
-        self._callback_tasks[task_id] = ccl
+        self._schedule_event(starttime, msg_interval, task_id)
 
         log.debug('Add completed OK')
 
@@ -263,12 +345,13 @@ class SchedulerService(ServiceProcess):
 
         yield self.pub.create_and_publish_event(origin=tdef['desired_origin'],
                                                 task_id=tdef['task_id'],
+                                                user_id=tdef['user_id'],
                                                 payload=payload)
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        ccl = reactor.callLater(tdef['interval_seconds'], self._send_and_reschedule, task_id)
-        self._callback_tasks[task_id] = ccl
+        # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
+        self._schedule_event(None, tdef['interval_seconds'], task_id)
 
         """
         Update last-invoked timestamp in registry
