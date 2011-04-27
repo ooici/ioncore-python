@@ -237,6 +237,9 @@ class WrappedMessageProperty(WrappedProperty):
 
     def __get__(self, wrapper, objtype=None):
 
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
@@ -247,7 +250,11 @@ class WrappedMessageProperty(WrappedProperty):
         return result
 
     def __set__(self, wrapper, value):
-        
+
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not set message (composite) property in a wrapper which is invalidated.')
+
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
 
@@ -264,6 +271,9 @@ class WrappedRepeatedScalarProperty(WrappedProperty):
 
     def __get__(self, wrapper, objtype=None):
 
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get repeated scalar property in a wrapper which is invalidated.')
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         
@@ -279,7 +289,10 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
     """ Data descriptor (like a property) for passing through GPB properties of Type Repeated Composite from the Wrapper. """
 
     def __get__(self, wrapper, objtype=None):
-        
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get repeated composite property in a wrapper which is invalidated.')
+
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
 
@@ -296,9 +309,17 @@ class WrappedScalarProperty(WrappedProperty):
 
     def __get__(self, wrapper, objtype=None):
         # This may be the result we were looking for, in the case of a simple scalar field
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get scalar property in a wrapper which is invalidated.')
+
         return getattr(wrapper.GPBMessage, self.name)
 
     def __set__(self, wrapper, value):
+
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not set scalar property in a wrapper which is invalidated.')
 
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
@@ -1305,7 +1326,7 @@ class Wrapper(object):
 
     @property
     def Invalid(self):
-        return self._invalid
+        return self._source._invalid
   
     def Invalidate(self,other=None):
 
@@ -1953,9 +1974,29 @@ class ContainerWrapper(object):
         # Be careful - this is a hard link
         self._wrapper = wrapper
         if not isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer):
-            raise OOIObjectError('The Container Wrapper is only for use with Repeated Composit Field Containers')
+            raise OOIObjectError('The Container Wrapper is only for use with Repeated Composite Field Containers')
         self._gpbcontainer = gpbcontainer
         self.Repository = wrapper.Repository
+
+    def GPBSourceCW(func):
+
+        def call_func(self, *args, **kwargs):
+
+            func_name = func.__name__
+            print 'GPB SOURCE CW'
+            print 'func name', func_name, func
+            print 'args', args
+            print 'kwargs', kwargs
+
+            source = self._wrapper._source
+            if source._invalid:
+                log.error(source.Debug())
+                raise OOIObjectError('Can not access Invalidated Object in function "%s"' % func_name)
+
+            return func(source, *args, **kwargs)
+
+        return call_func
+
 
     @classmethod
     def factory(cls, wrapper, gpbcontainer):
@@ -1979,9 +2020,6 @@ class ContainerWrapper(object):
 
     @property
     def Root(self):
-        if self.Invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-
         return self._wrapper.Root
 
     @property
@@ -1991,13 +2029,15 @@ class ContainerWrapper(object):
         return self._wrapper._invalid
 
     def Invalidate(self):
-        self._gpbcontainer = None
-        self._wrapper = None
-        self.Repository = None
+        pass
+        #self._gpbcontainer = None
+        #self._wrapper = None
+        #self.Repository = None
 
     def __setitem__(self, key, value):
-        """Sets the item on the specified position.
-        Depricated"""
+        """
+        Sets the item in the specified position.
+        """
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
@@ -2009,7 +2049,7 @@ class ContainerWrapper(object):
         if item.ObjectType == LINK_TYPE:
             self.Repository.set_linked_object(item, value)
         else:
-            raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
+            raise OOIObjectError('It is illegal to set a value of a repeated composite field unless it is a CASRef - Link')
 
         self._wrapper._set_parents_modified()
 
