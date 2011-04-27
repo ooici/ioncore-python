@@ -51,6 +51,7 @@ class GetDataResourceDetail(object):
             log.debug('getDataResourceDetail getting dataset resource instance')
             ds = yield self.rc.get_instance(resID)
 
+            """
             for atrib in ds.root_group.attributes:
                 log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
     
@@ -61,6 +62,7 @@ class GetDataResourceDetail(object):
                 log.debug("....Dimensions:")
                 for dim in var.shape:
                     log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+            """                    
 
         except ReceivedApplicationError, ex:
             # build AIS error response
