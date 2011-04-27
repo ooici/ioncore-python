@@ -92,15 +92,16 @@ class TestInstrumentAgent(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_transaction_timeouts(self):
+    def test_transaction_expire_timeouts(self):
         """
-        Test acquisition and expire transaction timeouts.
+        Test that transactions expire after the appropriate time.
         """
+        #raise unittest.SkipTest("Temp skip.")
         
         
         # Set the expire timeout to a high value.
         params = {
-            'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':300
+            'CI_PARAM_DEFAULT_EXP_TIMEOUT':300
         }
         reply = yield self.ia_client.set_observatory(params,'create')
         success = reply['success']
@@ -137,7 +138,7 @@ class TestInstrumentAgent(IonTestCase):
         
         # Set the expire timeout to a low value.
         params = {
-            'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':3
+            'CI_PARAM_DEFAULT_EXP_TIMEOUT':3
         }
         reply = yield self.ia_client.set_observatory(params,'create')
         success = reply['success']
@@ -172,13 +173,138 @@ class TestInstrumentAgent(IonTestCase):
         success = reply['success']
         self.assertEqual(success[0],'ERROR')
 
+
+        # Start a transaction with explicit expire timeout.    
+        reply = yield self.ia_client.start_transaction(0,250)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+        
+        # Sleep the agent to simulate some activity.
+        params = ['CI_CMD_SLEEP',5]
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+
+        # Sleep the agent to simulate some activity.
+        # The transaction should still be valid.
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+        
+        # End the transaction
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+                        
+        # Start a transaction with a low explicit expire timeout.        
+        reply = yield self.ia_client.start_transaction(0,3)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # Sleep the agent to simulate some activity.
+        # This should complete normally but the transaction should timeout
+        # while it is running.
+        params = ['CI_CMD_SLEEP',5]
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+
+        # Sleep the agent to simulate some activity.
+        # This should fail as the transaction has timed out.
+        reply = yield self.ia_client.execute_observatory(params,transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'ERROR')
+
+        # End the transaction.
+        # This should fail as the resource is now free and can't be unlocked.
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'ERROR')
+
            
+
+    @defer.inlineCallbacks
+    def test_transaction_acquire_timeouts(self):
+        """
+        Test lifetime of an asynchronous transaction request.
+        """
+        #raise unittest.SkipTest("Temp skip.")
+        
+        
+        
+        # Start a transaction.        
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # End the transaction
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+
+        # Tell the agent to start an unused transaction and expire it
+        # in a few seconds.
+        reply = yield self.ia_client.start_transaction(0,3)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # Acquire another transaction and wait on the release.
+        reply = yield self.ia_client.start_transaction(10)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # End the transaction newly acquired transaction.
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+        # Start a transaction.        
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # Request another transaction with a short acquisition timeout.
+        reply = yield self.ia_client.start_transaction(3)
+        success = reply['success']
+        transaction_id_attempt = reply['transaction_id']
+        self.assertEqual(success[0],'ERROR')
+        self.assertEqual(transaction_id_attempt,None)
+
+        # End the first transaction.
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        self.assertEqual(success[0],'OK')
+        
+        
+
                   
     @defer.inlineCallbacks
     def test_execute_observatory(self):
         """
         Test observatory command execution, and implicit and explicit transactions.
         """
+
+        #raise unittest.SkipTest("Temp skip.")
         
         cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_INITIALIZE']
         
@@ -313,6 +439,8 @@ class TestInstrumentAgent(IonTestCase):
         Test observatory get and set operations.
         """
         
+        #raise unittest.SkipTest("Temp skip.")
+        
         # Get current configuration without a transacton. Verify all parameters were
         # attempted. Verify no transaction is issued.
         params_1 = instrument_agent.ci_param_list
@@ -369,8 +497,8 @@ class TestInstrumentAgent(IonTestCase):
         params_5 = {}
         params_5['CI_PARAM_TIME_SOURCE'] = 'TIME_LOCAL_OSCILLATOR'
         params_5['CI_PARAM_CONNECTION_METHOD'] = 'CONNECTION_PART_TIME_RANDOM'
-        params_5['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = 600
-        params_5['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = 60 
+        params_5['CI_PARAM_MAX_EXP_TIMEOUT'] = 600
+        params_5['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = 60 
         reply_5 = yield self.ia_client.set_observatory(params_5,'none')
         success_5 = reply_5['success']
         result_5 = reply_5['result']
@@ -442,8 +570,8 @@ class TestInstrumentAgent(IonTestCase):
         params_11 = {}
         params_11['CI_PARAM_TIME_SOURCE'] = result_1['CI_PARAM_TIME_SOURCE'][1] 
         params_11['CI_PARAM_CONNECTION_METHOD'] = result_1['CI_PARAM_CONNECTION_METHOD'][1] 
-        params_11['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = result_1['CI_PARAM_MAX_TRANSACTION_TIMEOUT'][1] 
-        params_11['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = result_1['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'][1]
+        params_11['CI_PARAM_MAX_EXP_TIMEOUT'] = result_1['CI_PARAM_MAX_EXP_TIMEOUT'][1] 
+        params_11['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = result_1['CI_PARAM_DEFAULT_EXP_TIMEOUT'][1]
         reply_11 = yield self.ia_client.set_observatory(params_11,transaction_id_8)
         success_11 = reply_11['success']
         result_11 = reply_11['result']
@@ -479,16 +607,16 @@ class TestInstrumentAgent(IonTestCase):
         # Try to set a parameter to a bad value. This should fail for the invalid values only.
         params_14 = params_5
         params_14['CI_PARAM_CONNECTION_METHOD'] = 'I am an invalid connection method string.'
-        params_14['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = -99
+        params_14['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = -99
         reply_14 = yield self.ia_client.set_observatory(params_14,transaction_id_8)
         success_14 = reply_14['success']
         result_14 = reply_14['result']
         transaction_id_14 = reply_14['transaction_id']
         self.assertEqual(success_14[0],'ERROR')
         self.assertEqual(result_14['CI_PARAM_TIME_SOURCE'][0],'OK')
-        self.assertEqual(result_14['CI_PARAM_MAX_TRANSACTION_TIMEOUT'][0],'OK')
+        self.assertEqual(result_14['CI_PARAM_MAX_EXP_TIMEOUT'][0],'OK')
         self.assertEqual(result_14['CI_PARAM_CONNECTION_METHOD'][0],'ERROR')
-        self.assertEqual(result_14['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'][0],'ERROR')
+        self.assertEqual(result_14['CI_PARAM_DEFAULT_EXP_TIMEOUT'][0],'ERROR')
         self.assertEqual(type(transaction_id_11),str)
         self.assertEqual(len(transaction_id_11),36)
         self.assertEqual(transaction_id_14,transaction_id_8)
@@ -496,14 +624,14 @@ class TestInstrumentAgent(IonTestCase):
         # Try to set an unknown parameter. This should fail for unknown parameters only.
         params_15 = {
             'I_AM_AN_UNKNOWN_PARAMETER':'With a strange string value.',
-            'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT': 15}
+            'CI_PARAM_DEFAULT_EXP_TIMEOUT': 15}
         reply_15 = yield self.ia_client.set_observatory(params_15,transaction_id_8)
         success_15 = reply_15['success']
         result_15 = reply_15['result']
         transaction_id_15 = reply_15['transaction_id']
         self.assertEqual(success_15[0],'ERROR')
         self.assertEqual(result_15['I_AM_AN_UNKNOWN_PARAMETER'][0],'ERROR')
-        self.assertEqual(result_15['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'][0],'OK')
+        self.assertEqual(result_15['CI_PARAM_DEFAULT_EXP_TIMEOUT'][0],'OK')
         self.assertEqual(type(transaction_id_15),str)
         self.assertEqual(len(transaction_id_15),36)
         self.assertEqual(transaction_id_15,transaction_id_8)
@@ -526,16 +654,16 @@ class TestInstrumentAgent(IonTestCase):
             if key == 'CI_PARAM_TIME_SOURCE':
                 self.assertEqual(val[0][0],'OK')
                 self.assertEqual(val[1],params_14['CI_PARAM_TIME_SOURCE'])
-            elif key == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT':
+            elif key == 'CI_PARAM_MAX_EXP_TIMEOUT':
                 self.assertEqual(val[0][0],'OK')
-                self.assertEqual(val[1],params_14['CI_PARAM_MAX_TRANSACTION_TIMEOUT'])
-            elif key == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT':
+                self.assertEqual(val[1],params_14['CI_PARAM_MAX_EXP_TIMEOUT'])
+            elif key == 'CI_PARAM_DEFAULT_EXP_TIMEOUT':
                 self.assertEqual(val[0][0],'OK')
-                self.assertEqual(val[1],params_15['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'])
+                self.assertEqual(val[1],params_15['CI_PARAM_DEFAULT_EXP_TIMEOUT'])
             else:
                 self.assertEqual(val,result_1[key])
         self.assertEqual(result_15['I_AM_AN_UNKNOWN_PARAMETER'][0],'ERROR')
-        self.assertEqual(result_15['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'][0],'OK')
+        self.assertEqual(result_15['CI_PARAM_DEFAULT_EXP_TIMEOUT'][0],'OK')
         self.assertEqual(type(transaction_id_15),str)
         self.assertEqual(len(transaction_id_15),36)
         self.assertEqual(transaction_id_15,transaction_id_8)
@@ -546,12 +674,16 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test observatory get metadata and related variables.
         """
+
+        #raise unittest.SkipTest("Temp skip.")
+        
         # Get current metadata without a transacton using 'all' syntax.
         params_1 = [('all','all')]
         reply_1 = yield self.ia_client.get_observatory_metadata(params_1,'none')
         success_1 = reply_1['success']
         result_1 = reply_1['result']
         transaction_id_1 = reply_1['transaction_id']
+        
         self.assertEqual(success_1[0],'OK')
         self.assertEqual(transaction_id_1,None)
         self.assertEqual(result_1.keys().sort(),instrument_agent.ci_param_list.sort())
@@ -576,16 +708,16 @@ class TestInstrumentAgent(IonTestCase):
         
 
         # Get all metadata for a couple of parameters.
-        params_3 = [('CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT','all'),('CI_PARAM_TIME_SOURCE','all')]
+        params_3 = [('CI_PARAM_DEFAULT_EXP_TIMEOUT','all'),('CI_PARAM_TIME_SOURCE','all')]
         reply_3 = yield self.ia_client.get_observatory_metadata(params_3,'none')
         success_3 = reply_3['success']
         result_3 = reply_3['result']
         transaction_id_3 = reply_3['transaction_id']
         self.assertEqual(success_3[0],'OK')
         self.assertEqual(transaction_id_3,None)
-        self.assertEqual(result_3.has_key('CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'),True)
+        self.assertEqual(result_3.has_key('CI_PARAM_DEFAULT_EXP_TIMEOUT'),True)
         self.assertEqual(result_3.has_key('CI_PARAM_TIME_SOURCE'),True)
-        timeout_metadata = result_3['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT']
+        timeout_metadata = result_3['CI_PARAM_DEFAULT_EXP_TIMEOUT']
         timesource_metadata = result_3['CI_PARAM_TIME_SOURCE']
         for (key,val) in timeout_metadata.iteritems():
             self.assertEqual(key in instrument_agent.metadata_list,True)
@@ -611,10 +743,10 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(result_4['CI_PARAM_TIME_SOURCE']['META_UNITS'][1],None)
         self.assertEqual(result_4['CI_PARAM_CONNECTION_METHOD']['META_UNITS'][0][0],'ERROR')
         self.assertEqual(result_4['CI_PARAM_CONNECTION_METHOD']['META_UNITS'][1],None)
-        self.assertEqual(result_4['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT']['META_UNITS'][0][0],'OK')
-        self.assertEqual(result_4['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT']['META_UNITS'][1],'Seconds')
-        self.assertEqual(result_4['CI_PARAM_MAX_TRANSACTION_TIMEOUT']['META_UNITS'][0][0],'OK')
-        self.assertEqual(result_4['CI_PARAM_MAX_TRANSACTION_TIMEOUT']['META_UNITS'][1],'Seconds')
+        self.assertEqual(result_4['CI_PARAM_DEFAULT_ACQ_TIMEOUT']['META_UNITS'][0][0],'OK')
+        self.assertEqual(result_4['CI_PARAM_DEFAULT_ACQ_TIMEOUT']['META_UNITS'][1],'Seconds')
+        self.assertEqual(result_4['CI_PARAM_MAX_EXP_TIMEOUT']['META_UNITS'][0][0],'OK')
+        self.assertEqual(result_4['CI_PARAM_MAX_EXP_TIMEOUT']['META_UNITS'][1],'Seconds')
         for arg in result_4.keys():
             self.assertEqual(arg in instrument_agent.ci_param_list, True)
         
@@ -724,6 +856,9 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test observatory get status and related variables.
         """
+        
+        #raise unittest.SkipTest("Temp skip.")
+        
         # Get all observatory status vals using 'all' syntax.
         params_1 = ['all']
         reply_1 = yield self.ia_client.get_observatory_status(params_1,'none')
@@ -886,6 +1021,9 @@ class TestInstrumentAgent(IonTestCase):
     
     @defer.inlineCallbacks
     def test_get_capabilities(self):
+
+        #raise unittest.SkipTest("Temp skip.")
+
 
         # Get all capabilities with the 'all' syntax.
         params = ['all']
@@ -1051,6 +1189,9 @@ class TestInstrumentAgent(IonTestCase):
  
     @defer.inlineCallbacks
     def test_publish(self):
+        
+        #raise unittest.SkipTest("Temp skip.")
+        
         # Setup a subscriber to an event topic
         class TestEventSubscriber(InfoLoggingEventSubscriber):
             def __init__(self, *args, **kwargs):
