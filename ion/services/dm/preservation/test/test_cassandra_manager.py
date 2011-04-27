@@ -45,19 +45,27 @@ class CassandraManagerTester(IonTestCase):
         sup = yield self._spawn_processes(services)
         self.client = CassandraManagerClient(proc=sup)
         self.keyspace = 'ManagerServiceKeyspace'
-        self.mc = MessageClient(proc = self.test_sup)
+        self.column_family = "SomeCF"
+        self.mc = MessageClient(proc=self.test_sup)
+        self.keyspace_reference = None
+        self.column_family_reference = None
+        self.column_family_id = None
         
 
     @defer.inlineCallbacks
     def tearDown(self):
         log.info("In tearDown")
+        
+        if self.keyspace_reference is not None:
+            delete_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a delete_request')
+            delete_request.configuration =  delete_request.CreateObject(cassandra_keyspace_type)
+            delete_request.configuration.name = self.keyspace
+            delete_request.resource_reference = self.keyspace_reference
+            yield self.client.delete_persistent_archive(delete_request)
         yield self._shutdown_processes()
         yield self._stop_container()
-        
-    @itv(CONF)
-    def test_instantiation_only(self):
-        pass
-
+     
+    
     @itv(CONF)
     @defer.inlineCallbacks
     def test_create_archive(self):
@@ -71,10 +79,11 @@ class CassandraManagerTester(IonTestCase):
         #persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(cassandra_keyspace_type)
         create_request.configuration.name = self.keyspace
         log.info("create_request.configuration " + str(create_request))
-    
+        
         create_response = yield self.client.create_persistent_archive(create_request)
         log.info("create_response.result " + str(create_response.result))
         self.failUnlessEqual(create_response.result, "Created")
+        self.keyspace_reference = create_response.resource_reference
     
     @itv(CONF)
     @defer.inlineCallbacks
@@ -84,14 +93,22 @@ class CassandraManagerTester(IonTestCase):
         The test assumes that the ManagerServiceKeyspace exists and tries to add a column family to that keyspace.
         Do not run it unless you know how to delete the column family using another client. 
         """
+        #Create the keyspace
+        yield self.test_create_archive()
+        
         create_request = yield self.mc.create_instance(cassandra_request_type, MessageName='Creating a create_request')
         create_request.persistent_archive = create_request.CreateObject(cassandra_keyspace_type)
-        create_request.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
+        self.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
+        create_request.cache_configuration = self.cache_configuration
+        
+        
         
         create_request.persistent_archive.name = self.keyspace
-        create_request.cache_configuration.name = "SomeCF"
+        create_request.cache_configuration.name = self.column_family
         
         create_response = yield self.client.create_cache(create_request)
+        
+        self.column_family_reference = create_response.resource_reference
         log.info("create_response.result " + str(create_response.result))
         self.failUnlessEqual(create_response.result, "Created")
         
@@ -99,48 +116,34 @@ class CassandraManagerTester(IonTestCase):
     @defer.inlineCallbacks
     def test_update_archive(self):
         
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        create_request.configuration =  create_request.CreateObject(cassandra_keyspace_type)
-
-        create_request.configuration.name = self.keyspace
-        log.info("create_request.configuration " + str(create_request))
-    
-        create_response = yield self.client.create_persistent_archive(create_request)
-        self.failUnlessEqual(create_response.result, "Created")
+        yield self.test_create_archive()
         
-        log.info("create_response " + str(create_response))
         update_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating an update_request')
-        update_request.configuration =  create_request.configuration
-        update_request.configuration.name = 'ManagerServiceKeyspace' 
+        update_request.configuration =  update_request.CreateObject(cassandra_keyspace_type)
+        update_request.configuration.name = self.keyspace
         update_request.configuration.strategy_class='org.apache.cassandra.locator.SimpleStrategy'
         update_request.configuration.replication_factor = 2
         
-        update_request.resource_reference = create_response.resource_reference
+        update_request.resource_reference = self.keyspace_reference
         log.info("Sending delete_request")
         
         update_response = yield self.client.update_persistent_archive(update_request)
         log.info("update_response.result " + str(update_response.result))
         self.failUnlessEqual(update_response.result, "Updated")
         
-        delete_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a delete_request')
-        delete_request.configuration =  create_request.configuration
-        
-        delete_request.resource_reference = create_response.resource_reference
-        log.info("Sending delete_request")
-        
-        delete_response = yield self.client.delete_persistent_archive(delete_request)
-        log.info("delete_response.result " + str(delete_response.result))
-        self.failUnlessEqual(delete_response.result, "Deleted")
+
     
     @itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache(self):
+        yield self.test_create_archive()
+        
         create_request = yield self.mc.create_instance(cassandra_request_type, MessageName='Creating a create_request')
         create_request.persistent_archive = create_request.CreateObject(cassandra_keyspace_type)
         create_request.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
         
         create_request.persistent_archive.name = self.keyspace
-        create_request.cache_configuration.name = "SomeCF"
+        create_request.cache_configuration.name = self.column_family
         create_request.cache_configuration.column_type= 'Standard'
         create_request.cache_configuration.comparator_type='org.apache.cassandra.db.marshal.BytesType'
         
@@ -178,7 +181,9 @@ class CassandraManagerTester(IonTestCase):
         delete_response = yield self.client.delete_cache(delete_request)
         log.info("delete_response.result " + str(delete_response.result))
         self.failUnlessEqual(delete_response.result, "Deleted")
+        
 
+        
         
         
      
@@ -206,9 +211,12 @@ class CassandraManagerTester(IonTestCase):
         log.info("delete_response.result " + str(delete_response.result))
         self.failUnlessEqual(delete_response.result, "Deleted")
         
+        
     @itv(CONF)
     @defer.inlineCallbacks
     def test_delete_cache(self):
+        yield self.test_create_archive()
+        
         create_request = yield self.mc.create_instance(cassandra_request_type, MessageName='Creating a create_request')
         create_request.persistent_archive = create_request.CreateObject(cassandra_keyspace_type)
         create_request.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
@@ -234,4 +242,5 @@ class CassandraManagerTester(IonTestCase):
         
         delete_response = yield self.client.delete_cache(delete_request)
         log.info("delete_response.result " + str(delete_response.result))
-        self.failUnlessEqual(delete_response.result, "Deleted")    
+        self.failUnlessEqual(delete_response.result, "Deleted")  
+        
