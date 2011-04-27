@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
@@ -465,11 +465,11 @@ class ManageResources(object):
          log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
          try:
             Result = yield self.rc.get_instance(msg.message_parameters_reference.ooi_id)
-         except ReceivedApplicationError, ex:
+         except ApplicationError, ex:
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
-            Response.error_num = ex.msg_content.MessageResponseCode
-            Response.error_str = ex.msg_content.MessageResponseBody
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = str(ex)
             defer.returnValue(Response)
    
          # debug print for dumping the attributes of the resource

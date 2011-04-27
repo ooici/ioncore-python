@@ -48,9 +48,10 @@ class GetDataResourceDetail(object):
             defer.returnValue(Response)
             
         try:        
-            log.debug('getDataResourceDetail getting dataset resource instance')
+            log.debug('getDataResourceDetail getting dataset resource instance: ' + resID)
             ds = yield self.rc.get_instance(resID)
 
+            """
             for atrib in ds.root_group.attributes:
                 log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
     
@@ -61,6 +62,7 @@ class GetDataResourceDetail(object):
                 log.debug("....Dimensions:")
                 for dim in var.shape:
                     log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+            """                                    
 
         except ReceivedApplicationError, ex:
             # build AIS error response
@@ -181,7 +183,8 @@ class GetDataResourceDetail(object):
         
     def __loadGPBMinMetaData(self, rootAttributes, dSet):
         for attrib in dSet.root_group.attributes:
-            log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+            #log.debug('Root Attribute: %s = %s'  % (attrib.name, attrib.GetValue()))
             if attrib.name == 'title':
                 rootAttributes.title = attrib.GetValue()
             elif attrib.name == 'institution':                

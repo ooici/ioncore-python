@@ -163,7 +163,6 @@ class SchedulerTest(IonTestCase):
         mc = MessageClient(proc=self.sup)
         sc = SchedulerServiceClient(proc=self.sup)
 
-
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
         msg_a.interval_seconds  = 1
@@ -185,4 +184,30 @@ class SchedulerTest(IonTestCase):
         # sleep for another 3 - should give us enough time to get 1
         yield asleep(3)
         self.failUnless(len(self._notices) > 0, "Could be an intermittent failure, waiting for message delivery")
-        
+
+    @defer.inlineCallbacks
+    def test_past_start_time(self):
+
+        mc = MessageClient(proc=self.sup)
+        sc = SchedulerServiceClient(proc=self.sup)
+
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 30
+
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "THE PAST"
+        msg_a.payload.datasource_id = "IS A WHILE AGO"
+
+        # calc a start time 25 sec in the past
+        starttime = int(float(time.time() * 1000)) - 25000
+        msg_a.start_time        = starttime
+
+        yield sc.add_task(msg_a)
+
+        # sleep for 2 seconds, no messages yet
+        yield asleep(2)
+        self.failUnlessEquals(len(self._notices), 0)
+
+        yield asleep(4)
+        self.failUnless(len(self._notices) > 0, "Could be an intermittent failure, waiting for message delivery")

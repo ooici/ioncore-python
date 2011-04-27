@@ -69,6 +69,9 @@ class Publisher(BasicLifecycleObject):
     def on_activate(self, *args, **kwargs):
         return self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
 
+    def on_terminate(self, *args, **kwargs):
+        pass
+
     def register(self, xp_name, topic_name, publisher_name, credentials):
         return _psc_setup_publisher(self, xp_name=xp_name, routing_key=topic_name,
                                     credentials=credentials, publisher_name=publisher_name)

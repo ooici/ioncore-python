@@ -983,6 +983,7 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is not None:
 
                         owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+                        log.info('Dataset Owner ID: %s' % owner)
 
                         self._create_ownership_association(resource_instance.Repository, owner)
 
@@ -1002,6 +1003,7 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is not None:
 
                         owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+                        log.info('Datasource Owner ID: %s' % owner)
 
                         self._create_ownership_association(resource_instance.Repository, owner)
                     else:
