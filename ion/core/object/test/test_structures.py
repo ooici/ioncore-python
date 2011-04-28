@@ -42,10 +42,7 @@ class IntegerAndFloatTest(unittest.TestCase):
 
         # Nans are not equal in Python
         self.failIf(simple1==simple2)       # False
-        self.failUnless(simple1>simple2)    # True
-        self.failUnless(simple1>=simple2)   # True
-        self.failIf(simple1<=simple2)       # False
-        self.failIf(simple1<simple2)        # False
+        self.failUnless(simple1!=simple2)
 
     def test_f_inf(self):
 
