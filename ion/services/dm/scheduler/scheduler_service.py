@@ -336,17 +336,18 @@ class SchedulerService(ServiceProcess):
         del self._callback_tasks[task_id]
 
         # deserialize and objectify payload
-        # @TODO: this is costly, should keep cache?
-        repo = self.workbench.create_repository()
-        payload = repo._load_element(StructureElement.parse_structure_element(tdef['payload']))
+        log.debug('Time to send to "%s", id "%s"' % (tdef['desired_origin'], task_id))
 
-        log.debug('Time to send "%s" to "%s", id "%s"' % \
-                      (payload, tdef['desired_origin'], task_id))
+        msg = yield self.pub.create_event(origin=tdef['desired_origin'],
+                                          task_id=tdef['task_id'],
+                                          user_id=tdef['user_id'])
 
-        yield self.pub.create_and_publish_event(origin=tdef['desired_origin'],
-                                                task_id=tdef['task_id'],
-                                                user_id=tdef['user_id'],
-                                                payload=payload)
+        se = StructureElement.parse_structure_element(tdef['payload'])
+        payload = msg.Repository._load_element(se)
+        msg.Repository.index_hash[payload.MyId]=se
+
+        msg.additional_data.payload = payload
+        yield self.pub.publish_event(msg, origin=tdef['desired_origin'])
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
