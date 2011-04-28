@@ -117,7 +117,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [user_ooi_id] not found in message"
+         Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
          defer.returnValue(Response)
 
       # build the Identity Registry request for get_user message
@@ -132,7 +132,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getUser error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
+         Response.error_str = 'Error calling get_user (AIS): '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
                 
       # build AIS response
@@ -167,7 +167,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [user_ooi_id] not found in message"
+         Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
          defer.returnValue(Response)
 
       # build the Identity Registry request for get_user message
@@ -180,9 +180,9 @@ class RegisterUser(object):
          user_info = yield self.irc.get_user(Request)
       except ReceivedApplicationError, ex:
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserProfile error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
+         Response.error_str = 'Error calling get_user (AIS): '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
       # build the Identity Registry request for update_user_profile message
@@ -210,7 +210,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = ex.msg_content.MessageResponseBody
+         Response.error_str = 'Error calling update_user_profile (AIS): '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
       # build AIS response
@@ -267,7 +267,7 @@ class RegisterUser(object):
                # build AIS error response
                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS RegisterUser error response')
                Response.error_num = ex.msg_content.MessageResponseCode
-               Response.error_str = ex.msg_content.MessageResponseBody
+               Response.error_str = 'Error calling register_user (AIS): '+ex.msg_content.MessageResponseBody
                defer.returnValue(Response)
 
       # build AIS response with user's ooi_id
@@ -291,7 +291,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = 'Bad message type receieved, ignoring'
+         Response.error_str = 'Bad message type receieved, ignoring (AIS)'
          defer.returnValue(Response)
 
       # Check payload in message
@@ -299,7 +299,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [message_parameters_reference] not found in message"
+         Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
          defer.returnValue(Response)
   
       defer.returnValue(None)
