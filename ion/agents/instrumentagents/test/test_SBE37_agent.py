@@ -298,7 +298,6 @@ class TestSBE37Agent(IonTestCase):
             result = reply['result']
             
             if success[0] == 'OK':
-                print 'autosample stopped'
                 break
             
             elif success[1] == 'TIMEOUT':

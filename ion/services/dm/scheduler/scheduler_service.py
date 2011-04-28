@@ -48,16 +48,16 @@ message AddTaskRequest {
     // desired_origin is where the event notification will originate from
     //   this is not required to be sent... one will be generated if not
     // interval is seconds between messages
-    // payload is string
+    // payload is ref to some GPB
 
-    optional string desired_origin    = 1;
-    optional uint64 interval_seconds  = 2;
-    optional string payload           = 3;
-
-    //these are actually optional: epoch times for start/end
-    optional uint64 time_start_unix   = 4;
-    optional uint64 time_end_unix     = 5;
+    optional string desired_origin              = 1;
+    optional uint64 interval_seconds            = 2;
+    optional sint64 start_time                  = 3;        // format:UNIX epoch, in ms, can be unset, will use current time
+    optional sint64 end_time                    = 4;        // format:UNIX epoch, in ms, can be unset
+    optional string user_id                     = 5;
+    optional net.ooici.core.link.CASRef payload = 6;
 }
+
 """
 
 ADDTASK_RSP_TYPE  = object_utils.create_type_identifier(object_id=2602, version=1)

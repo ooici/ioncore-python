@@ -44,7 +44,9 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCE_REQUEST_TYPE, \
                                                        GET_RESOURCE_RESPONSE_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
+                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
+                                                       FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
+                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -221,7 +223,7 @@ class AppIntegrationTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
         
         #
-        # Send a request without a resourceID to test that the appropriate error
+        # Send a request without a userID to test that the appropriate error
         # is returned.
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -938,14 +940,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
-        log.debug('Testing createDataResourcesSubscription.')
+        log.debug('Testing createDataResourceSubscription.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
         #
-        # Send a request without a resourceID to test that the appropriate error
-        # is returned.
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -962,6 +962,38 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+
+
+    @defer.inlineCallbacks
+    def test_findDataResourceSubscriptions(self):
+        log.debug('Testing findDataResourceSubscriptions.')
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        #
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
+        reqMsg.message_parameters_reference.dataBounds.minLatitude  = -50
+        reqMsg.message_parameters_reference.dataBounds.maxLatitude  = -40
+        reqMsg.message_parameters_reference.dataBounds.minLongitude = 20
+        reqMsg.message_parameters_reference.dataBounds.maxLongitude = 30
+        reqMsg.message_parameters_reference.dataBounds.cminVertical  = 20
+        reqMsg.message_parameters_reference.dataBounds.maxVertical  = 30
+        reqMsg.message_parameters_reference.dataBounds.posVertical  = 'down'
+        reqMsg.message_parameters_reference.dataBounds.minTime      = '2008-08-1T10:00:00Z'
+        reqMsg.message_parameters_reference.dataBounds.maxTime      = '2008-08-1T11:00:00Z'
+
+        
+        log.debug('Calling findDataResourceSubscriptions.')
+        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to findDataResourceSubscriptions')
+        else:
+            log.debug('POSITIVE rspMsg to findDataResourceSubscriptions')
+
 
 
     @defer.inlineCallbacks
