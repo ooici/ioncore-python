@@ -179,13 +179,8 @@ class WrapperMethodsTest(unittest.TestCase):
 
         person2 = ab2.person.add()
         ab2.person[0].name = 'john'
-        ab2.person[0].id = 2
-        
-        # Since the values are not equal - this will fail
-        self.assertRaises(OOIObjectError, ab1.Invalidate, ab2)
-
         ab2.person[0].id = 1
-
+        
         # Make sure they are equal now...
         self.assertEqual(person1, person2)
 
@@ -197,6 +192,12 @@ class WrapperMethodsTest(unittest.TestCase):
 
         person1.name = 'Michael'
         self.assertEqual(person1, person2)
+
+        owner1.phone.add()
+        owner1.phone.number = '58'
+
+        self.assertEqual(owner1, owner2)
+
 
 
     def test_set_composite(self):

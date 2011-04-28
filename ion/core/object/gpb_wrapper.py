@@ -1361,18 +1361,15 @@ class Wrapper(object):
     def Invalidate(self,other=None):
 
         if other is not None:
-            if not self == other:
-                log.error(self.Debug())
-                raise OOIObjectError('Can not replace source with an object which is not equal.')
 
-            if self is other:
+            if self.ObjectType != other.ObjectType:
                 log.error(self.Debug())
-                raise OOIObjectError('Can not replace source with self in invalidate!')
+                raise OOIObjectError('Can not invalidate by merge when two objects are not the same type')
+
 
             if self._invalid:
                 log.error(self.Debug())
                 raise OOIObjectError('It is unexpected to try and invalidate an object with a new source a second time')
-
 
             if self._source is not self:
                 log.error(self.Debug())
@@ -2096,10 +2093,6 @@ class ContainerWrapper(object):
 
     @classmethod
     def factory(cls, wrapper, gpbcontainer):
-
-        # Check the root wrapper objects list of derived wrappers before making a new one
-        if wrapper._invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
         #print cls, type(wrapper), type(gpbcontainer)
         #objhash = hash(gpbcontainer)

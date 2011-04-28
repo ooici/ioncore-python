@@ -16,9 +16,10 @@ from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
 
-from net.ooici.play import basic_pb2
 from ion.core.object import workbench
 from ion.core.object import object_utils
+from ion.core.object import gpb_wrapper
+
 
 #basic_pb2.KeyValue
 keyvalue_type = object_utils.create_type_identifier(object_id=20005, version=1)
@@ -28,6 +29,58 @@ testobj_type = object_utils.create_type_identifier(object_id=20010, version=1)
 
 #basic_pb2.ListObj
 listobj_type = object_utils.create_type_identifier(object_id=20004, version=1)
+
+class IntegerAndFloatTest(unittest.TestCase):
+
+    def test_f_nans(self):
+
+        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1.float = float('nan')
+
+        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2.float = float('nan')
+
+        # Nans are not equal in Python
+        self.failIf(simple1==simple2)       # False
+        self.failUnless(simple1>simple2)    # True
+        self.failUnless(simple1>=simple2)   # True
+        self.failIf(simple1<=simple2)       # False
+        self.failIf(simple1<simple2)        # False
+
+    def test_f_inf(self):
+
+        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1.float = float('inf')
+
+        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2.float = float('inf')
+
+        # Nans are not equal in Python
+        self.assertEqual(simple1,simple2)
+
+    def test_f_ninf(self):
+
+        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1.float = float('-inf')
+
+        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2.float = float('-inf')
+
+        # Nans are not equal in Python
+        self.assertEqual(simple1,simple2)
+
+
+    def test_i(self):
+
+        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1.integer = 1
+
+        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2.integer = 1
+
+        # Nans are not equal in Python
+        self.assertEqual(simple1,simple2)
+
 
 
 class SimpleObjectTest(unittest.TestCase):
