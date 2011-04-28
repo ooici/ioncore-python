@@ -84,19 +84,10 @@ ci_param_metadata = {
          'META_FRIENDLY_NAME':'Default Transaction Acquire Timeout'}    
 }
 
-
-
-
-
         
-#ResourceAgent
 class InstrumentAgent(Process):
     """
-    The base class for developing Instrument Agents. This defines
-    the interface to use for an instrument agent and some boiler plate
-    function implementations that may be good enough for most agents.
-    Child instrument agents should supply instrument-specific routines such as
-    getCapabilities.
+    A generic ion representation of an instrument.
     """
     
     
@@ -145,7 +136,8 @@ class InstrumentAgent(Process):
         """
         self.driver_pid = None
         if self.driver_process_description:
-            self.driver_pid = yield self.spawn_child(self.driver_process_description)
+            self.driver_pid = yield \
+                self.spawn_child(self.driver_process_description)
         else:
             yield
 
@@ -158,14 +150,18 @@ class InstrumentAgent(Process):
 
 
         """
-        The driver client to communicate with the child driver. Attempt to construct
-        this object if there is a driver PID and a client description dict containing
-        module and class attributes.
+        The driver client to communicate with the child driver. Attempt to
+        construct this object if there is a driver PID and a client description
+        dict containing module and class attributes.
         """
         self.driver_client = None
-        if self.driver_pid and self.client_desc and self.client_desc.has_key('module') and self.client_desc.has_key('class'):
-            import_str = 'from ' + self.client_desc['module'] + ' import ' + self.client_desc['class']
-            ctor_str = 'self.driver_client = ' + self.client_desc['class'] + '(proc=self,target=self.driver_pid)'
+        if self.driver_pid and self.client_desc and \
+            self.client_desc.has_key('module') and \
+            self.client_desc.has_key('class'):
+            import_str = 'from ' + self.client_desc['module'] + \
+                ' import ' + self.client_desc['class']
+            ctor_str = 'self.driver_client = ' + self.client_desc['class'] + \
+                '(proc=self,target=self.driver_pid)'
             exec import_str
             exec ctor_str
 
@@ -186,20 +182,23 @@ class InstrumentAgent(Process):
         """
         The PubSub publisher for informational/log events 
         """
-        self._log_publisher = InfoLoggingEventPublisher(process=self,
-                                                           origin=self.event_publisher_origin)
+        self._log_publisher = \
+            InfoLoggingEventPublisher(process=self,
+                                      origin=self.event_publisher_origin)
         
         """
         The PubSub publisher for data events
         """
-        self._data_publisher = DataBlockEventPublisher(process=self,
-                                                           origin=self.event_publisher_origin)
+        self._data_publisher = \
+            DataBlockEventPublisher(process=self,
+                                    origin=self.event_publisher_origin)
         
         """
         The PubSub publisher for state change events
         """
-        self._state_publisher = BusinessStateModificationEventPublisher(process=self,
-                                                           origin=self.event_publisher_origin)
+        self._state_publisher = \
+            BusinessStateModificationEventPublisher(process=self,
+                                    origin=self.event_publisher_origin)
     
         """
         A UUID specifying the current transaction. None
@@ -298,31 +297,8 @@ class InstrumentAgent(Process):
             'Uncertainty': None,
             'Peers' : None
         }
-
-    """
-    do we need this here?
-    @defer.inlineCallbacks
-    def plc_terminate(self):
-        #yield self.driver_pd.shutdown()
-        #'In plc terminate'
-        #ResourceAgent.plc_terminate()
-        pass
-    """   
        
-    def _is_child_process(self, name):
-        """
-        Determine if a process with the given name is a child process
-        @param name The name to test for subprocess-ness
-        @retval True if the name matches a child process name, False otherwise
-        """
-        log.debug("__is_child_process looking for process '%s' in %s",
-                  name, self.child_procs)
-        found = False
-        for proc in self.child_procs:
-            if proc.proc_name == name:
-                found = True
-                break
-        return found
+
 
 
 
@@ -491,6 +467,7 @@ class InstrumentAgent(Process):
         """
         End the current transaction.
         @param content A uuid specifying the current transaction to end.
+        @retval success/fail message.
         """        
 
         result = self._end_transaction(content)
@@ -505,6 +482,7 @@ class InstrumentAgent(Process):
         End the current transaction and start the next pending transaction
             if one is waiting.
         @param tid A uuid specifying the current transaction to end.
+        @retval success/fail message.        
         """        
         
         assert(isinstance(tid,str)), 'Expected a str transaction ID.'
@@ -551,11 +529,14 @@ class InstrumentAgent(Process):
     
     def _verify_transaction(self,tid,optype):
         """
-        Verify the passed transaction ID is currently open, or open an implicit transaction.
-        @param tid 'create' to create an implicit transaction, 'none' to perform the operation without
-            a transaction, or a UUID to test against the current transaction ID.
+        Verify the passed transaction ID is currently open, or open an
+        implicit transaction.
+        @param tid 'create' to create an implicit transaction, 'none' to
+            perform the operation without a transaction, or a UUID to test
+            against the current transaction ID.
         @param optype 'get' 'set' or 'execute'
-        @retval True if the transaction is valid or if one was successfully created, False otherwise.
+        @retval True if the transaction is valid or if one was successfully
+            created, False otherwise.
         """
 
 
@@ -592,9 +573,11 @@ class InstrumentAgent(Process):
         Execute infrastructure commands related to the Instrument Agent
         instance. This includes commands for messaging, resource management
         processes, etc.
-        @param content A dict {'command':[command,arg, ,arg],'transaction_id':transaction_id)}
+        @param content A dict {'command':[command,arg, ,arg],
+            'transaction_id':transaction_id)}
         @retval ACK message containing a dict
-            {'success':success,'result':command-specific,'transaction_id':transaction_id}.
+            {'success':success,'result':command-specific,
+            'transaction_id':transaction_id}.
         """
 
         self._in_protected_function = True
@@ -650,7 +633,8 @@ class InstrumentAgent(Process):
                     elif cmd[1] == 'CI_TRANS_GO_ACTIVE':
                         driver_config = self.spawn_args.get('driver-config',None)
                         if driver_config != None:
-                            config_reply = yield self.driver_client.configure(driver_config)
+                            config_reply = yield \
+                                self.driver_client.configure(driver_config)
                             config_success = config_reply['success']
                             
                             # Could not configure driver.
@@ -662,11 +646,13 @@ class InstrumentAgent(Process):
                                 
                                 # Attempt connect.
                                 try:
-                                    connect_reply = yield self.driver_client.connect()
+                                    connect_reply = yield \
+                                                    self.driver_client.connect()
                                     
                                 # Could not connect, exception raised.
                                 except:
-                                    reply['success'] = errors['INSTRUMENT_UNREACHABLE']
+                                    reply['success'] = \
+                                        errors['INSTRUMENT_UNREACHABLE']
                                     
                                 # Driver responded to connect request.
                                 else:
@@ -736,10 +722,11 @@ class InstrumentAgent(Process):
         """
         Get data from the cyberinfrastructure side of the agent (registry info,
         topic locations, messaging parameters, process parameters, etc.)
-        @param content A dict {'params':[param_arg, ,param_arg],'transaction_id':transaction_id}.
+        @param content A dict {'params':[param_arg, ,param_arg],
+            'transaction_id':transaction_id}.
         @retval A reply message containing a dict
-            {'success':success,'result':{param_arg:(success,val),...,param_arg:(success,val)},
-            'transaction_id':transaction_id)
+            {'success':success,'result':{param_arg:(success,val),...,
+            param_arg:(success,val)},'transaction_id':transaction_id)
         """
 
         self._in_protected_function = True
@@ -791,14 +778,17 @@ class InstrumentAgent(Process):
                     if self.event_publisher_origin == None:
                         result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = (['OK'],None)
                     else:
-                        result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = self.event_publisher_origin
+                        result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = \
+                            self.event_publisher_origin
                 
                 if arg == 'CI_PARAM_DRIVER_ADDRESS' or arg=='all':
                     if self.driver_client:
-                        result['CI_PARAM_DRIVER_ADDRESS'] = (['OK'],str(self.driver_client.target))
+                        result['CI_PARAM_DRIVER_ADDRESS'] = \
+                            (['OK'],str(self.driver_client.target))
                     else:
                         get_errors = True
-                        result['CI_PARAM_DRIVER_ADDRESS'] = (errors['INVALID_DRIVER'],None)
+                        result['CI_PARAM_DRIVER_ADDRESS'] = \
+                            (errors['INVALID_DRIVER'],None)
                         
                 if arg == 'CI_PARAM_RESOURCE_ID' or arg=='all':
                     # TODO: how do we access this?
@@ -808,19 +798,24 @@ class InstrumentAgent(Process):
                     result['CI_PARAM_TIME_SOURCE'] = (['OK'],self.time_source)
                     
                 if arg == 'CI_PARAM_CONNECTION_METHOD' or arg=='all':
-                    result['CI_PARAM_CONNECTION_METHOD'] = (['OK'],self.connection_method)
+                    result['CI_PARAM_CONNECTION_METHOD'] = \
+                        (['OK'],self.connection_method)
                     
                 if arg == 'CI_PARAM_DEFAULT_ACQ_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = (['OK'],self.default_acq_timeout)
+                    result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = \
+                        (['OK'],self.default_acq_timeout)
                     
                 if arg == 'CI_PARAM_MAX_ACQ_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_MAX_ACQ_TIMEOUT'] = (['OK'],self.max_acq_timeout)
+                    result['CI_PARAM_MAX_ACQ_TIMEOUT'] = \
+                        (['OK'],self.max_acq_timeout)
                     
                 if arg == 'CI_PARAM_DEFAULT_EXP_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = (['OK'],self.default_exp_timeout)
+                    result['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = \
+                        (['OK'],self.default_exp_timeout)
 
                 if arg == 'CI_PARAM_MAX_EXP_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_MAX_EXP_TIMEOUT'] = (['OK'],self.max_exp_timeout)
+                    result['CI_PARAM_MAX_EXP_TIMEOUT'] = \
+                        (['OK'],self.max_exp_timeout)
                     
             if get_errors:
                 success = errors['GET_OBSERVATORY_ERR']
@@ -848,7 +843,8 @@ class InstrumentAgent(Process):
         @param content A dict {'params':{param_arg:val,..., param_arg:val},
             'transaction_id':transaction_id}.
         @retval Reply message with dict
-            {'success':success,'result':{param_arg:success,...,param_arg:success},'transaction_id':transaction_id}.
+            {'success':success,'result':{param_arg:success,...,param_arg:success},
+            'transaction_id':transaction_id}.
         """
 
         self._in_protected_function = True
@@ -981,9 +977,6 @@ class InstrumentAgent(Process):
                         set_errors = True
                         success = errors['INVALID_PARAM_VALUE']
                     result[arg] = success
-
-
-
     
             if set_errors:
                 success = errors['SET_OBSERVATORY_ERR']
@@ -1008,9 +1001,12 @@ class InstrumentAgent(Process):
         """
         Retrieve metadata about the observatory configuration parameters.
         @param content A dict
-            {'params':[(param_arg,meta_arg),...,(param_arg,meta_arg)],'transaction_id':transaction_id}
-        @retval A reply message with a dict {'success':success,'result':{param_arg:{meta_arg):(success,val),...,
-            meta_arg:(success,val)},...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},'transaction_id':transaction_id}.
+            {'params':[(param_arg,meta_arg),...,(param_arg,meta_arg)],
+            'transaction_id':transaction_id}
+        @retval A reply message with a dict {'success':success,
+            'result':{param_arg:{meta_arg):(success,val),...,meta_arg:(success,val)},
+            ...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},
+            'transaction_id':transaction_id}.
         """
         
         self._in_protected_function = True
@@ -1140,12 +1136,13 @@ class InstrumentAgent(Process):
     @defer.inlineCallbacks
     def op_get_observatory_status(self,content,headers,msg):
         """
-        Retrieve the observatory status values, including lifecycle state and other
-        dynamic observatory status values indexed by status keys.
-        @param content A dict {'params':[status_arg,...,status_arg],'transaction_id':transaction_id}.
+        Retrieve the observatory status values, including lifecycle state and
+        other dynamic observatory status values indexed by status keys.
+        @param content A dict {'params':[status_arg,...,status_arg],
+            'transaction_id':transaction_id}.
         @retval Reply message with a dict
-            {'success':success,'result':{status_arg:(success,val),..., status_arg:(success,val)},
-            'transaction_id':transaction_id}
+            {'success':success,'result':{status_arg:(success,val),...,
+            status_arg:(success,val)},'transaction_id':transaction_id}
         """
         
         self._in_protected_function = True        
@@ -1259,9 +1256,12 @@ class InstrumentAgent(Process):
         """
         Retrieve the agent capabilities, including observatory and device values,
         both common and specific to the agent / device.
-        @param content A dict {'params':[cap_arg,...,cap_arg],'transaction_id':transaction_id} 
-        @retval Reply message with a dict {'success':success,'result':{cap_arg:(success,[cap_val,...,cap_val]),...,
-            cap_arg:(success,[cap_val,...,cap_val])}, 'transaction_id':transaction_id}
+        @param content A dict {'params':[cap_arg,...,cap_arg],
+            'transaction_id':transaction_id} 
+        @retval Reply message with a dict {'success':success,
+            'result':{cap_arg:(success,[cap_val,...,cap_val]),...,
+            cap_arg:(success,[cap_val,...,cap_val])},
+            'transaction_id':transaction_id}
         """
 
         self._in_protected_function = True
@@ -1387,9 +1387,11 @@ class InstrumentAgent(Process):
         common or specific to the device, with specific commands known through
         knowledge of the device or a previous get_capabilities query.
         @param content A dict
-            {'channels':[chan_arg,...,chan_arg],'command':[command,arg,...,argN]),'transaction_id':transaction_id)
+            {'channels':[chan_arg,...,chan_arg],'command':[command,arg,...,argN],
+            'transaction_id':transaction_id}
         @retval A reply message with a dict
-            {'success':success,'result':{chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
+            {'success':success,'result':{chan_arg:(success,command_specific_values),
+            ...,chan_arg:(success,command_specific_values)},
             'transaction_id':transaction_id}. 
         """
 
@@ -1451,9 +1453,11 @@ class InstrumentAgent(Process):
     def op_get_device(self, content, headers, msg):
         """
         Get configuration parameters from the instrument. 
-        @param content A dict {'params':[(chan_arg,param_arg),...,(chan_arg,param_arg)],'transaction_id':transaction_id}
+        @param content A dict {'params':[(chan_arg,param_arg),...,
+            (chan_arg,param_arg)],'transaction_id':transaction_id}
         @retval A reply message with a dict
-            {'success':success,'result':{(chan_arg,param_arg):(success,val),...,(chan_arg,param_arg):(success,val)},
+            {'success':success,'result':{(chan_arg,param_arg):(success,val),
+            ...,(chan_arg,param_arg):(success,val)},
             'transaction_id':transaction_id}
         """
         
@@ -1514,11 +1518,11 @@ class InstrumentAgent(Process):
     def op_set_device(self, content, headers, msg):
         """
         Set parameters to the instrument side of of the agent. 
-        @param content A dict {'params':{(chan_arg,param_arg):val,...,(chan_arg,param_arg):val},
-            'transaction_id':transaction_id}.
+        @param content A dict {'params':{(chan_arg,param_arg):val,...,
+            (chan_arg,param_arg):val},'transaction_id':transaction_id}.
         @retval Reply message with a dict
-            {'success':success,'result':{(chan_arg,param_arg):success,...,chan_arg,param_arg):success},
-            'transaction_id':transaction_id}.
+            {'success':success,'result':{(chan_arg,param_arg):success,...,
+            chan_arg,param_arg):success},'transaction_id':transaction_id}.
         """
         
         self._in_protected_function = True
@@ -1576,11 +1580,13 @@ class InstrumentAgent(Process):
     def op_get_device_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.
-        @param content A dict {'params':[(chan_arg,param_arg,meta_arg),...,(chan_arg,param_arg,meta_arg)],
-            'transaction_id':transaction_id}
+        @param content A dict {'params':[(chan_arg,param_arg,meta_arg),...,
+            (chan_arg,param_arg,meta_arg)],'transaction_id':transaction_id}
         @retval Reply message with a dict
-            {'success':success,'result':{(chan_arg,param_arg,meta_arg):(success,val),...,
-            chan_arg,param_arg,meta_arg):(success,val)}, 'transaction_id':transaction_id}.
+            {'success':success,
+            'result':{(chan_arg,param_arg,meta_arg):(success,val),
+            ...,chan_arg,param_arg,meta_arg):(success,val)},
+            'transaction_id':transaction_id}.
         """
         
         self._in_protected_function = True
@@ -1642,8 +1648,8 @@ class InstrumentAgent(Process):
         """
         Obtain the status of an instrument. This includes non-parameter
         and non-lifecycle state of the instrument.
-        @param content A dict {'params':[(chan_arg,status_arg),...,chan_arg,status_arg)],
-            'transaction_id':transaction_id}.
+        @param content A dict {'params':[(chan_arg,status_arg),...,
+            chan_arg,status_arg)],'transaction_id':transaction_id}.
         @retval A reply message with a dict
             {'success':success,'result':{(chan_arg,status_arg):(success,val),...,
             chan_arg,status_arg):(success,val)}, 'transaction_id':transaction_id}.
@@ -1793,7 +1799,7 @@ class InstrumentAgent(Process):
         
         if not (self._is_child_process(headers['sender-name'])):
             yield self.reply_err(msg,
-                                 'driver event occured evoked from a non-child process')
+                        'driver event occured evoked from a non-child process')
             return
         
         
@@ -1858,70 +1864,27 @@ class InstrumentAgent(Process):
                 yield self._state_publisher.create_and_publish_event( \
                     origin=self.event_publisher_origin, description=value)
         
-    ############################################################################
-    #   Nonpublic methods.
-    ############################################################################
-
-    @defer.inlineCallbacks
-    def op_sleep(self, content, headers, msg):
-        """
-        Sleep the agent in a blocking call for a specified time.
-        @param time an int for number of seconds to sleep.
-        """
-        
-        self._in_protected_function = True
-        
-        assert(isinstance(content,dict)), 'Expected a dict content.'
-        assert(content.has_key('time')), 'Expected time.'
-        assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
-        
-        time = content['time']
-        tid = content['transaction_id']
-
-        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
-        assert(isinstance(time,int)), 'Expected an int time.'
-        assert(time>0), 'Expected a positive time.'
-        
-        reply = {'success':None,'result':None,'transaction_id':None}
-
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
-            yield self.reply_ok(msg,reply)
-            return
-
-
-        # Set up the transaction
-        result = yield self._verify_transaction(tid,'execute')
-        if not result:
-            if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
-            elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
-            else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
-            yield self.reply_ok(msg,reply)
-            return
-
-        reply['transaction_id'] = self.transaction_id
-                    
-        try:
-            
-            yield pu.asleep(time)
-        
-        # Transaction clean up. End implicit or expired transactions.        
-        finally:
-            if (tid == 'create') or (self._transaction_timed_out == True):
-                self._end_transaction(self.transaction_id)
-            self._in_protected_function = False
-                    
-        yield self.reply_ok(msg,reply)
-        
         
         
         
     ############################################################################
     #   Other.
     ############################################################################
+        
+    def _is_child_process(self, name):
+        """
+        Determine if a process with the given name is a child process
+        @param name The name to test for subprocess-ness
+        @retval True if the name matches a child process name, False otherwise
+        """
+        log.debug("__is_child_process looking for process '%s' in %s",
+                  name, self.child_procs)
+        found = False
+        for proc in self.child_procs:
+            if proc.proc_name == name:
+                found = True
+                break
+        return found        
         
     def _get_buffer_size(self):
         """
@@ -1934,6 +1897,9 @@ class InstrumentAgent(Process):
     def _debug_print_driver_event(self,type,transducer,value):
         """
         Print debug driver events to stdio.
+        @param type String event type.
+        @param transducer String transducer producing the event.
+        @param value Value of the event.
         """
         if DEBUG_PRINT:
             if isinstance(value,str):
@@ -1950,19 +1916,20 @@ class InstrumentAgent(Process):
     def _debug_print(self,event=None,value=None):
         """
         Print debug agent events to stdio.
+        @param event String event type.
+        @param value String event value.
         """
         if DEBUG_PRINT:
             print event, ' ', value
     
 
-    
-#ResourceAgentClient
+
 class InstrumentAgentClient(ProcessClient):
     """
-    The base class for an Instrument Agent Client. It is a service
-    that allows for RPC messaging
+    Agent client class provides RPC messaging to the agent service.
     """
     
+    # Increased rpc timeout for agent operations.
     default_rpc_timeout = 180
     
     ############################################################################
@@ -2302,12 +2269,9 @@ class InstrumentAgentClient(ProcessClient):
     #   Publishing interface.
     ############################################################################
 
+    # op_publish and op_driver_event_occurred are used by the driver
+    # child process and are not invoked through a client.
 
-    @defer.inlineCallbacks
-    def publish(self):
-        """
-        """
-        pass
 
     ############################################################################
     #   Registration interface.
@@ -2334,22 +2298,6 @@ class InstrumentAgentClient(ProcessClient):
         """
         pass
     
-    ############################################################################
-    #   Nonpublic interface.
-    ############################################################################
-
-    @defer.inlineCallbacks
-    def sleep(self,time,transaction_id='none'):
-        """
-        Sleep the agent in a blocking call for a specified time.
-        @param time an int for number of seconds to sleep.
-        """
-        
-        assert(isinstance(time,int)), 'Expected an int time.'
-        assert(time>0), 'Expected a positive time.'
-
-        content = {'time':time,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('sleep',content)
         
         
 
