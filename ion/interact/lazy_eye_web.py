@@ -30,11 +30,25 @@ HOSTNAME = CONF['hostname']
 # Web page elements, could also be moved to configuration file.
 page_header = """
 <html>
-<header>
+<head>
 <title>ion-python MSC creator</title>
-</header>
+</head>
 <body>
 <a href="/"><img src="http://ooici.net/global.logo.jpeg" alt="OOI-CI logo"></a>
+"""
+
+msc_inprogress_page = """
+<html>
+<head>
+<meta http-equiv="refresh" content="1">
+</head>
+<body>
+Working, %d messages so far...
+<form action="/stop" method="get">
+<input type="submit" value="Stop"/>
+</form>
+</body>
+</html>
 """
 mainpage_text = """
 <h3>Instructions</h3>
@@ -121,9 +135,9 @@ class StopPage(AsyncResource):
         yield self.lec.stop()
 
         rc = yield self.lec.get_results()
-        request.write('<br>Results:')
-        for cur_key, cur_val in rc.iteritems():
-            request.write('  <br>%s: %s' % (cur_key, cur_val))
+        request.write('<br><b>Results:</b> ')
+        request.write('%d message(s) in %f seconds for a rate of %f messages per second.' %
+                    (rc['num_edges'], rc['elapsed_time'], rc['msg_rate']))
 
         # Lookup image name
         img_file = rc['imagename']

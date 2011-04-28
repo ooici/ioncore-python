@@ -39,6 +39,7 @@ class MscProcessProtocol(protocol.ProcessProtocol):
         self.running = False
         self.cb = callback
         self.msg = msg
+        self.start_time = time.time()
 
     def connectionMade(self):
         log.debug('mscgen started ok')
@@ -48,7 +49,9 @@ class MscProcessProtocol(protocol.ProcessProtocol):
         pass
     
     def processExited(self, reason):
-        log.debug('mscgen exited, "%s"' % reason.value)
+        self.end_time = time.time()
+        log.debug('mscgen exited, %f seconds, "%s"' %
+                  ((self.end_time - self.start_time), reason.value))
         self.cb(self.msg, str(self.output))
         self.running = False
 
