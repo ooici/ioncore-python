@@ -11,20 +11,21 @@ interface only. The observer is in lazy_eye.py
 """
 
 from twisted.internet import defer, reactor
-from twisted.web import resource
-from twisted.web.server import Site
+from twisted.web import resource, static
+from twisted.web.server import Site, NOT_DONE_YET
 
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
+from ion.core import ioninit
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory, Process
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-
 from ion.interact.lazy_eye import LazyEyeClient
+
 # Globals
 log = ion.util.ionlog.getLogger(__name__)
-# @todo move these into ion.config
-WEB_PORT = 2012
+CONF = ioninit.config(__name__)
+
+WEB_PORT = CONF['WEB_PORT']
+IMAGE_PORT = CONF['IMAGE_PORT']
+HOSTNAME = CONF['hostname']
 
 # Web page elements, could also be moved to configuration file.
 page_header = """
@@ -33,25 +34,64 @@ page_header = """
 <title>ion-python MSC creator</title>
 </header>
 <body>
-<img src="http://ooici.net/global.logo.jpeg" alt="OOI-CI logo">
-<h3>Where am I?</h3>
-This page controls the ION Python message capture and diagramming tool. Pick a filename,
-press Enter, then hit stop when your code is done, and it presents a graphical message
-sequence chart via <a href="http://www.mcternan.me.uk/mscgen/">mscgen</a>.
-<p />
+<a href="/"><img src="http://ooici.net/global.logo.jpeg" alt="OOI-CI logo"></a>
+"""
+mainpage_text = """
+<h3>Instructions</h3>
+This page controls the ION Python message capture and diagramming tool. Pick a
+<a href="http://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol#Exchange_types_and_the_effect_of_bindings">binding pattern</a>
+, press 'Start collection', then hit <a href="/stop">stop</a> when your code is done,
+and it presents a graphical message sequence chart via
+<a href="http://www.mcternan.me.uk/mscgen/">mscgen</a>.
+<p>
+<a href="https://github.com/ooici/ioncore-python/tree/develop/ion/interact">Source code is here.</a>
+<p>
+Clicking on the logo will return you to this page.
+<p>
+"""
+doitagain = """
+<form action="/" method="get">
+<input type="submit" value="Do it again" />
+</form>
 """
 page_footer = """
 </body>
 </html>
 """
-startbox = """
-<form action="/go/" method="get">
- Filename: <input name="filename" value="msc.txt" size="64" type="text"/>
+binding_form = """
+<form action="/go" method="get">
+Binding pattern: <input name="binding" value="#" size="32" type="text" />
+<input type="submit" value="Start collection" />
 </form>
 """
-stopbutton = """
-<form action="/stop/" method="get" <input value="Stop" type="Submit" /></form>
-"""
+
+class AsyncResource(resource.Resource):
+    """
+    Code from ion.services.dm.distribution.notify_web_monitor
+    @author Dave Foster
+    """
+    isLeaf = True
+
+    @defer.inlineCallbacks
+    def _do_action(self, request):
+        """
+        inlineCallbacks decorated action handler called from render_GET.
+        Override this in your derived class.
+        """
+        raise NotImplementedError("You must override _do_action in your derived class")
+
+    def render_GET(self, request):
+        """
+        Common handler for get requests. Calls into _do_action which you must override.
+        """
+        def finish_req(res, request):
+            request.write(res)
+            request.finish()
+
+        def_action = self._do_action(request)
+        def_action.addCallback(finish_req, request)
+
+        return NOT_DONE_YET
 
 class NavPage(resource.Resource):
     """
@@ -59,54 +99,63 @@ class NavPage(resource.Resource):
     """
     def render_GET(self, request):
         request.write(page_header)
-        request.write(startbox)
-        request.write(stopbutton)
+        request.write(mainpage_text)
+        request.write(binding_form)
         request.write(page_footer)
         return ''
 
-class StopPage(resource.Resource):
+class StopPage(AsyncResource):
     """
     Stop the capture, display results
     """
     def __init__(self, lec):
-        resource.Resource.__init__(self)
-        self.isLeaf = True
+        AsyncResource.__init__(self)
         self.lec = lec
 
     @defer.inlineCallbacks
-    def render_GET(self, request):
-        request.write('Stopping capture and rendering PNG...')
-        
+    def _do_action(self, request):
+        request.write(page_header)
+        request.write('<p>Stopping capture and rendering PNG...')
+
         # Stop method also does the render before returning, maybe slow
-        dp = yield self.lec.stop()
+        yield self.lec.stop()
+
+        rc = yield self.lec.get_results()
+        request.write('<br>Results:')
+        for cur_key, cur_val in rc.iteritems():
+            request.write('  <br>%s: %s' % (cur_key, cur_val))
 
         # Lookup image name
-        img_file = yield self.lec.get_image_name()
-        request.write('<img src="%s" alt="msc">' % img_file)
+        img_file = rc['imagename']
+        request.write('<h3>MSC</h3><img src="http://%s:%d/%s" alt="msc">' %
+                      (HOSTNAME, IMAGE_PORT, img_file))
 
         # DDT
-        request.write('<p>MSC:<p><pre>')
-        request.write(dp)
-        request.write('</pre>')
+        # dp = yield self.lec.stop()
+        #request.write('<h4>MSC debug output:</h4><pre>')
+        #request.write(dp)
+        #request.write('</pre>')
+        request.write(doitagain)
+        request.write(page_footer)
 
         defer.returnValue('')
-
-class GoPage(resource.Resource):
+        
+class GoPage(AsyncResource):
     """
     Bar.
     """
-    def __init__(self, lec, filename):
-        resource.Resource.__init__(self)
-        log.debug('Going, filename=%s ' % filename)
-        self.filename = filename
+    def __init__(self, lec, binding_key='#'):
+        AsyncResource.__init__(self)
         self.lec = lec
-        self.isLeaf = True
+        self.binding_key = binding_key
 
-    #noinspection PyUnusedLocal
     @defer.inlineCallbacks
-    def render_GET(self, request):
-        request.write('Starting capture...<a href="/stop/">Click here to stop</a>')
-        yield self.lec.start(filename=self.filename)
+    def _do_action(self, request):
+        request.write(page_header)
+        request.write('<p>Starting capture... <a href="/stop/">Click here to stop</a>')
+        yield self.lec.start(binding_key=self.binding_key)
+        request.write(page_footer)
+        defer.returnValue('')
 
 class RootPage(resource.Resource):
     """
@@ -121,13 +170,13 @@ class RootPage(resource.Resource):
         log.debug('got request for "%s"' % request)
 
         if pathstr == 'go':
-            return GoPage(self.lec, request.args['filename'][0])
+            return GoPage(self.lec, binding_key=request.args['binding'][0])
         elif pathstr == 'stop':
             return StopPage(self.lec)
         elif pathstr == '':
             return NavPage()
-        else:
-            return resource.Resource.getChild(self, pathstr, request)
+
+        return resource.Resource.getChild(self, pathstr, request)
 
 class LazyEyeMonitor(Process):
     """
@@ -139,14 +188,18 @@ class LazyEyeMonitor(Process):
     def plc_init(self):
         Process.plc_init(self)
 
-        log.debug('starting client init')
         self.lec = LazyEyeClient(proc=self, target='lazyeye')
-        #self.lec = None
-        log.debug('client init completed')
         self.rootpage = RootPage(self.lec)
         self.site = Site(self.rootpage)
         reactor.listenTCP(WEB_PORT, self.site)
-        log.info('Listening on http://localhost:%d/' % WEB_PORT)
+        log.info('Listening on http://%s:%d/' % (HOSTNAME, WEB_PORT))
+
+        # For simplicity, serve mscgen output from current directory using the
+        # supplied server, on a different port.
+        self.imgs = static.File('.')
+        self.img_site = Site(self.imgs)
+        reactor.listenTCP(IMAGE_PORT, self.img_site
+        )
 
 # Spawn off the process using the module name
 factory = ProcessFactory(LazyEyeMonitor)

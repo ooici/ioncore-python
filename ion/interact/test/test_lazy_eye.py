@@ -41,6 +41,10 @@ class LETest(IonTestCase):
         yield lec.start('superfile.msc')
         msc_txt = yield lec.stop()
         log.debug('msc says: "%s"' % msc_txt)
-        fname = yield lec.get_image_name()
-        log.debug("image name: %s" % fname)
-        self.failUnlessEqual(fname, 'superfile.png')
+        rc = yield lec.get_results()
+
+        log.debug("image name: %s" % rc['imagename'])
+        self.failUnlessEqual(rc['imagename'], 'superfile.png')
+        self.failIf(rc['num_edges'] <= 0)
+
+        
