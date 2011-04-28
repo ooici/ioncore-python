@@ -226,6 +226,9 @@ class WrappedProperty(object):
     def __get__(self, wrapper, objtype=None):
         raise NotImplementedError('Abstract base class for property wrappers: __get__')
 
+    def _get_backdoor(self, wrapper):
+        raise NotImplementedError('Abstract base class for property wrappers: _get_backdoor')
+
     def __set__(self, wrapper, value):
         raise NotImplementedError('Abstract base class for property wrappers: __set__')
 
@@ -250,6 +253,18 @@ class WrappedMessageProperty(WrappedProperty):
             result = wrapper.Repository.get_linked_object(result)
 
         return result
+
+    def _get_backdoor(self, wrapper):
+
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
+        # This may be the result we were looking for, in the case of a simple scalar field
+        field = getattr(wrapper.GPBMessage, self.name)
+        result = wrapper._rewrap(field)
+
+        return result
+
 
     def __set__(self, wrapper, value):
 
@@ -293,13 +308,23 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
     def __get__(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get repeated composite property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not "get" from a repeated composite property in a wrapper which is invalidated.')
 
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
 
         return ContainerWrapper.factory(wrapper, field)
-        
+
+    def _get_backdoor(self, wrapper, objtype=None):
+        if wrapper.Invalid:
+            log.error(wrapper.Debug())
+            raise OOIObjectError('Can not get_backdoor from a repeated composite property in a wrapper which is invalidated.')
+
+        # This may be the result we were looking for, in the case of a simple scalar field
+        field = getattr(wrapper.GPBMessage, self.name)
+
+        return ContainerWrapper.factory(wrapper, field)
+
     def __set__(self, wrapper, value):
         raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Composite in ION Object')
 
@@ -1353,7 +1378,7 @@ class Wrapper(object):
                 log.error(self.Debug())
                 raise OOIObjectError('It is unexpected to try and invalidate an object which already has an alternate source')
 
-            if self._repository is not other._repository:
+            if self.Repository is not other.Repository:
                 log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by passing a wrapper from another repository')
 
@@ -1362,13 +1387,17 @@ class Wrapper(object):
 
             if self._invalid:
                 return
-        
-        if self.IsRoot:
-            if other is self:
-                for item in self.DerivedWrappers.values():
-                    item.Invalidate()
-            else:
-                self._merge_derived_wrappers(other)
+
+
+        if other is not self:
+            # If we are doing an invalidate to other...
+            self._merge_derived_wrappers(other)
+
+        elif self.IsRoot:
+            # If this is a straight invalidation - clear the derived wrappers if root
+            for item in self.DerivedWrappers.values():
+                item.Invalidate()
+
 
         self._source = other
 
@@ -1377,10 +1406,9 @@ class Wrapper(object):
         self._parent_links = None
         self._child_links = None
         self._myid = None
-        self._repository = None
         self._bytes = None
 
-        # Do not clear root
+        # Do not clear root or Repository
 
         self._invalid = True
 
@@ -1389,32 +1417,19 @@ class Wrapper(object):
 
         for name, prop in self._Properties.iteritems():
 
-            print 'NAME:', name
             if prop.field_type == 'TYPE_MESSAGE':
-                print 'MESSAGE!'
 
-                self_obj = prop.__get__(self)
-                print 'Self obj', self_obj
+                self_obj = prop._get_backdoor(self)
 
-                other_obj = prop.__get__(other)
-                print 'Other_obj', other_obj
-
+                other_obj = prop._get_backdoor(other)
 
                 if hasattr(self_obj, '__iter__'):
 
-
-                    print 'DLKDNSKNSKS'
                     for arg1, arg2 in zip(self_obj, other_obj):
-                        print 'ARG1', arg1
-                        print 'ARG2', arg2
-                        arg1._merge_derived_wrappers(arg2)
+                        arg1.Invalidate(arg2)
 
                 else:
                     self_obj.Invalidate(other_obj)
-
-
-            else:
-                print 'Junk'
 
 
     @property
@@ -1679,17 +1694,17 @@ class Wrapper(object):
             # Possible DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure
             if se.key in repo._workspace:
 
-                # Get the other object with the same name...
+                # Get the other object with the same name that is already committed...
                 other = repo._workspace[se.key]
-
-
-
 
                 other.ParentLinks.update(self.ParentLinks)
 
+                # Invalidate ourself
                 self.Invalidate(other)
 
-        repo._workspace[se.key] = self
+            else:
+                # Now add it back the workspace under the new name
+                repo._workspace[se.key] = self
 
 
         self.MyId = se.key
@@ -1850,13 +1865,27 @@ class Wrapper(object):
 
     def Debug(self):
         output  = '================== Wrapper ====================\n'
-        output += 'Wrapper ID: %s \n' % self._myid
+
+        key = self._myid
+        try:
+            key = sha1_to_hex(key)
+        except struct.error, er:
+            pass
+
+        output += 'Wrapper ID: %s \n' % key
+        output += 'Wrapper repr: %s \n' % repr(self)
         output += 'Wrapper Invalid: %s \n' % self._invalid
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
+
+        if hasattr(self._repository,'repository_key'):
+            output += 'Repository: %s \n' % str(self._repository.repository_key)
+        else:
+            output += 'Repository: %s \n' % str(self._repository)
+
+
         if self._root:
             output += 'Wrapper ParentLinks: %s \n' % str(self._parent_links)
             output += 'Wrapper ChildLinks: %s \n' % str(self._child_links)
-            output += 'Wrapper ChildLinks: %s \n' % str(self._root._modified)
             output += 'Wrapper Modified: %s \n' % self._root._modified
 
 
@@ -2085,9 +2114,15 @@ class ContainerWrapper(object):
         return inst
 
 
+
     @property
     def Root(self):
-        return self._wrapper.Root
+        return self._wrapper._root
+
+
+    @property
+    def Invalid(self):
+        return self.Root.Invalid
 
     def Invalidate(self, source=None):
 
@@ -2288,7 +2323,13 @@ class ScalarContainerWrapper(object):
 
         return call_func
 
+    @property
+    def Root(self):
+        return self._wrapper._root
 
+    @property
+    def Invalid(self):
+        return self.Root.Invalid
 
     def Invalidate(self, source=None):
         self._gpbcontainer = None

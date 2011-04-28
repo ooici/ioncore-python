@@ -394,4 +394,10 @@ class AssociationInstance(object):
         previous_predicate.branch = self.NULL
         previous_predicate.commit = self.NULL
 
+
+        for item in self.Repository._workspace.values():
+            print "Is in repo:", item.Repository is self.Repository
+            print item.Debug()
+
+
         self.Repository.commit('Association set to null!')

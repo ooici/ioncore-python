@@ -137,6 +137,17 @@ class WrapperMethodsTest(unittest.TestCase):
 
         self.assertIdentical(ab1._source, ab2)
 
+        # Can set the ID from either one!
+        ab1.MyId = '4'
+        self.assertEqual(ab1.MyId, '4')
+        self.assertEqual(ab2.MyId, '4')
+
+        ab2.MyId = '6'
+        self.assertEqual(ab1.MyId, '6')
+        self.assertEqual(ab1.MyId, '6')
+
+
+
     def test_source_set(self):
 
         ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSLINK_TYPE)
@@ -175,12 +186,17 @@ class WrapperMethodsTest(unittest.TestCase):
 
         ab2.person[0].id = 1
 
+        # Make sure they are equal now...
+        self.assertEqual(person1, person2)
+
         ab1.Invalidate(ab2)
 
-        self.assertEqual(person1, person2)
+        self.assertIdentical(ab1._source, ab2)
+        self.assertIdentical(person1._source, person2)
+        self.assertIdentical(owner1._source, owner2)
+
         person1.name = 'Michael'
         self.assertEqual(person1, person2)
-
 
 
     def test_set_composite(self):

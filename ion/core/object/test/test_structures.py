@@ -205,7 +205,7 @@ class SimpleObjectTest(unittest.TestCase):
         
         # Checkout to invalidate it
         simple_2 = yield self.repo.checkout('master')
-        
+
         self.assertEqual(object.__getattribute__(simple,'Invalid'), True)
         self.assertEqual(object.__getattribute__(floats,'Invalid'), True)
         
