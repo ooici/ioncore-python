@@ -211,6 +211,17 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
+    def op_findDataResourceSubscriptions(self, content, headers, msg):
+        """
+        @brief find subscriptions to a data resource
+        """
+        log.debug('op_findDataResourceSubscriptions: \n'+str(content))
+        worker = ManageDataResourceSubscription(self)
+        log.debug('op_findDataResourceSubscriptions: calling worker')
+        response = yield worker.find(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
     def op_deleteDataResourceSubscription(self, content, headers, msg):
         """
         @brief delete subscription to a data resource
@@ -407,6 +418,14 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug("AIS_client.createDataResourceSubscription: sending following message:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResourceSubscription', message)
         log.debug('AIS_client.createDataResourceSubscription: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def findDataResourceSubscriptions(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.findDataResourceSubscriptions: sending following message:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('findDataResourceSubscriptions', message)
+        log.debug('AIS_client.findDataResourceSubscriptions: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
