@@ -930,6 +930,11 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
         
+        msg.message_parameters_reference.ooi_id = "bogus-ooi_id"  #non-existant item
+        reply = yield self.aisc.getResource(msg)
+        log.debug('getResource returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
@@ -946,35 +951,11 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
-        #reqMsg.message_parameters_reference.subscriptionInfo.subscription_type  = 
-        #reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = 
-        #reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = 
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = 'test_path'
-
-
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
         
-        """
-        enum SubscriptionType {
-            EMAIL = 0;
-            DISPATCHER = 1;
-            EMAILANDDISPATCHER = 2;
-        }
-        optional SubscriptionType subscription_type = 3 [default = EMAIL];
-        enum AlertsFilter {
-            UPDATES = 0;
-            DATASOURCEOFFLINE = 1;
-            UPDATESANDDATASOURCEOFFLINE = 2;
-        }
-        optional AlertsFilter email_alerts_filter = 4;
-        optional AlertsFilter dispatcher_alerts_filter = 5;
-        optional string dispatcher_script_path = 6;
-        """
-     
-     
-        #reqMsg.message_parameters_reference.dispatcher_id  = 'test_dispatcher_id'
-        #reqMsg.message_parameters_reference.resource_id  = 'test_resource_id'
-        #reqMsg.message_parameters_reference.script_path = '/home/test/testme'
-
         log.debug('Calling createDataResourceSubscription.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:

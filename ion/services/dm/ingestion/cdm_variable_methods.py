@@ -9,7 +9,6 @@
 Based on Porter - Duff Alpha Composite rules
 """
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 def GetValue(self, *args):
     """
