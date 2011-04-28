@@ -19,11 +19,11 @@ from ion.core.process.process import ProcessFactory
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriverClient
-from ion.agents.instrumentagents.ion_fsm import IonFiniteStateMachine
-from ion.agents.instrumentagents.instrument_agent_constants import driver_command_list
-from ion.agents.instrumentagents.instrument_agent_constants import driver_state_list
-from ion.agents.instrumentagents.instrument_agent_constants import driver_event_list
-from ion.agents.instrumentagents.instrument_agent_constants import errors
+from ion.agents.instrumentagents.instrument_fsm import InstrumentFSM
+from ion.agents.instrumentagents.instrument_constants import driver_command_list
+from ion.agents.instrumentagents.instrument_constants import driver_state_list
+from ion.agents.instrumentagents.instrument_constants import driver_event_list
+from ion.agents.instrumentagents.instrument_constants import errors
 from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -625,9 +625,8 @@ class SBE37Driver(InstrumentDriver):
         """
         Instrument state machine.
         """
-        self.fsm = IonFiniteStateMachine(sbe37_state_list,
-                                         sbe37_event_list,
-                                         self.state_handlers)
+        self.fsm = InstrumentFSM(sbe37_state_list,sbe37_event_list,
+                                 self.state_handlers)
 
 
     ###########################################################################

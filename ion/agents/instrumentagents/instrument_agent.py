@@ -24,7 +24,7 @@ from ion.services.dm.distribution.events import BusinessStateModificationEventPu
 from ion.services.dm.distribution.events import DataBlockEventPublisher
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriverClient
-from ion.agents.instrumentagents.instrument_agent_constants import *
+from ion.agents.instrumentagents.instrument_constants import *
 
 
 log = ion.util.ionlog.getLogger(__name__)
