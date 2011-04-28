@@ -985,6 +985,7 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is not None:
 
                         owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+                        log.info('Dataset Owner ID: %s' % owner)
 
                         self._create_ownership_association(resource_instance.Repository, owner)
 
@@ -1004,6 +1005,7 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is not None:
 
                         owner = value.get(OWNER_ID) or ANONYMOUS_USER_ID
+                        log.info('Datasource Owner ID: %s' % owner)
 
                         self._create_ownership_association(resource_instance.Repository, owner)
                     else:
@@ -1204,6 +1206,13 @@ class DataStoreClient(ServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('fetch_blobs', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def put_blobs(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('put_blobs', content)
         defer.returnValue(content)
 
 #    @defer.inlineCallbacks

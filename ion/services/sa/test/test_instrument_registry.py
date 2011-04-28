@@ -6,7 +6,7 @@
 @author David Stuebe
 @brief test service for registering resources and client classes
 """
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -54,4 +54,4 @@ class InstrumentRegistryTest(IonTestCase):
         res3 = yield self.irc.get_instrument_type(ref)
 
         self.assertEqual(res3.manufacturer, "SeaBird Electronics")
-
+'''

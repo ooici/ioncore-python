@@ -23,13 +23,18 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient, \
 from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
                                                                     ResourceInstanceError
 
-from ion.core.intercept.policy import get_dispatcher_queue_for_user
+from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
+from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
+from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
+
+from ion.core.intercept.policy import get_dispatcher_id_for_user
 
 from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
+                                                       SUBSCRIPTION_INFO_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
 
@@ -83,6 +88,8 @@ class ManageDataResourceSubscription(object):
         self.ac  = AssociationClient(proc=ais)
         self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
         self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
+        self.nac = NotificationAlertServiceClient(proc=ais)
+
 
     def update(self, msg):
         """
@@ -192,7 +199,7 @@ class ManageDataResourceSubscription(object):
         defer.returnValue(Response)
 
         
-
+    @defer.inlineCallbacks
     def create(self, msg):
         """
         @brief subscribe to a data resource 
@@ -202,10 +209,50 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.createDataResourceSubscription()\n')
-        
+        log.debug('user_ooi_id = ' + msg.message_parameters_reference.subscriptionInfo.user_ooi_id)
 
+
+        #### TEMPTEMPTEMP ####
+
+        """
+        Response.message_parameters_reference.add()
+        Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
+        Response.message_parameters_reference[0].success  = True
+        defer.returnValue(Response)
+        """
+        #### END TEMPTEMPTEMP ####
 
         try:
+            
+            # look at Maurice's service: notification alert service (test_notification_alert)
+            
+            ### NEW CODE START
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIPTION_INFO_TYPE)
+            reqMsg.message_parameters_reference.user_ooi_id = '0'
+            reqMsg.message_parameters_reference.data_src_id = 'dataset123'
+            reqMsg.message_parameters_reference.subscription_type = reqMsg.message_parameters_reference.SubscriptionType.EMAILANDDISPATCHER
+            reqMsg.message_parameters_reference.email_alerts_filter = reqMsg.message_parameters_reference.AlertsFilter.UPDATES
+            log.debug("createDataResourceSubscription calling notification alert service")
+            #reply = yield self.nac.addSubscription(reqMsg)
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+            Response.message_parameters_reference.add()
+            Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
+        
+
+            if False:
+            #if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+                log.error('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+                Response.message_parameters_reference[0].success  = False
+            else:            
+                Response.message_parameters_reference[0].success  = True
+            
+            defer.returnValue(Response)
+
+
+            ### NEW CODE END
+            
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:

@@ -9,7 +9,6 @@
 Based on Porter - Duff Alpha Composite rules
 """
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 def GetValue(self, *args):
     """
@@ -74,8 +73,14 @@ def GetIntersectingBoundedArrays(self, bounded_array):
 
 
 def _flatten_index(indices, shape):
+    """
+    Uses the given indices representing a position in a multidimensional context to determine the
+    equivalent position in a flattened 1D array representation of that same nD context.  The
+    cardinality (also size) of each dimension in multidimensional space is given by "shape".
+    Note: This means that both "indices" and "shape" must be lists with the same rank (aka length.)
+    """
     assert(isinstance(indices, list))
-    assert(isinstance(indices, list))
+    assert(isinstance(shape, list))
     assert(len(indices) == len(shape))
     
     result = 0
@@ -90,7 +95,9 @@ def _flatten_index(indices, shape):
 
 
 """
-
+#---------------------------
+# Test a 1D dataset
+#---------------------------
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_DLY_DISCHARGE_DATASET_ID
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 rc = ResourceClient()
@@ -107,6 +114,52 @@ from ion.services.dm.ingestion.cdm_variable_methods import GetValue
 for i in range(flow.content.bounded_arrays[0].bounds[0].size):
     print GetValue(flow, i)
 
+
+#---------------------------
+# Test a 3D/4D dataset
+#---------------------------
+from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_HYCOM_DATASET_ID
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+rc = ResourceClient()
+ds_headers_d = rc.get_instance(SAMPLE_HYCOM_DATASET_ID)
+
+ds_slim = ds_headers_d.result.ResourceObject
+ds_d = ds_slim.Repository.checkout('master', excluded_types=[])
+
+ds = ds_d.result.resource_object
+root = ds.root_group
+ssh = root.FindVariableByName('ssh')
+for dim in ssh.shape:
+    print str(dim.name)
+
+
+#--------------------------------------------------------------------
+
+from ion.services.dm.ingestion.cdm_variable_methods import GetValue
+count = 1
+for bounds in ssh.content.bounded_arrays[0].bounds:
+    count *= bounds.size 
+
+# All values iterated by bounds
+for i in range(ssh.content.bounded_arrays[0].bounds[0].size):
+    for j in range(ssh.content.bounded_arrays[0].bounds[1].size):
+        for k in range(ssh.content.bounded_arrays[0].bounds[2].size):
+            print '(%03i,%03i,%03i) = %s' % (i, j, k, str(ssh.GetValue(i, j, k)))
+
+# List a specific range of Sea Surface Height Values
+i = 0
+k = 174
+for j in range(ssh.content.bounded_arrays[0].bounds[1].size):
+    print '(%03i,%03i,%03i) = %s' % (i, j, k, str(ssh.GetValue(i, j, k)))
+
+# List a vertical column of values for temperature
+temp = root.FindVariableByName('layer_temperature')
+depth = root.FindDimensionByName('Layer')
+i = 0
+k = 100
+l = 200
+for j in range(depth.length):
+    print '(%03i,%03i,%03i,%03i) = %s' % (i, j, k, l, str(temp.GetValue(i, j, k, l)))
 
 
 

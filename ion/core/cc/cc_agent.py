@@ -13,7 +13,7 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.agents.resource_agent import ResourceAgent
+#from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst, ioninit
 from ion.core.ioninit import ion_config
 from ion.core.cc.container import Container
@@ -26,7 +26,8 @@ from ion.services.coi.exchange.agent_client import ExchangeManagementClient
 CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)
 
-class CCAgent(ResourceAgent):
+#class CCAgent(ResourceAgent):
+class CCAgent(Process):
 
     instance = None
 

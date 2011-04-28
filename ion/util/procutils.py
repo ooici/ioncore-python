@@ -6,6 +6,7 @@
 @brief  utility helper functions for processes in capability containers
 """
 
+import logging
 import sys
 import traceback
 import re
@@ -20,7 +21,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.id import Id
-from ion.data.store import Store
 
 def log_attributes(obj):
     """
@@ -36,6 +36,12 @@ def log_message(msg):
     Log an inbound message with all headers unless quiet attribute set.
     @param msg  carrot BaseMessage instance
     """
+
+    if log.getEffectiveLevel() > logging.DEBUG:
+        # This method is extremely expensive to call since it constructs the message before letting
+        # log.debug decide to throw away the string we just spend 3 seconds constructing.
+        return
+    
     body = msg.payload
     lstr = ""
     procname = str(body.get('receiver',None))

@@ -7,6 +7,7 @@
 @author Steve Foley
 @see ion.agents.instrumentagents.test.test_instrument
 """
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -184,3 +185,4 @@ class TestSBE49(IonTestCase):
 
         yield self.driver_client.disconnect(['some arg'])
 
+'''

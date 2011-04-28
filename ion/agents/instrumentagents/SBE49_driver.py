@@ -6,6 +6,7 @@
 @author Dave Everett
 @brief Driver code for SeaBird SBE-49 CTD
 """
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
@@ -890,3 +891,5 @@ class SBE49InstrumentDriverClient(InstrumentDriverClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(SBE49InstrumentDriver)
+
+'''

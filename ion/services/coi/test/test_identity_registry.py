@@ -17,6 +17,8 @@ from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
@@ -39,9 +41,9 @@ message UserIdentity {
    optional string subject=1;
    optional string certificate=2;
    optional string rsa_private_key=3;
-   optional string dispatcher_queue=4;
-   optional string email=5;
-   //optional string life_cycle_state=6;
+   optional string email=4;
+   repeated net.ooici.services.coi.identity.NameValuePairType profile=5;
+   optional string life_cycle_state=6;
 }
 """""
 
@@ -105,19 +107,28 @@ class IdentityRegistryClientTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-        services = [{'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService', 'spawnargs':{'servicename':'datastore'}},
-                    {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService', 'spawnargs':{'datastore_service':'datastore'}},
-                    {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}]
+        services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
+                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
+            {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
+            {'name':'dataset_controller', 'module':'ion.services.dm.inventory.dataset_controller', 'class':'DatasetControllerClient'},
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
+             'spawnargs':{'datastore_service':'datastore'}},
+            {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
+        ]
 
         sup = yield self._spawn_processes(services)
 
         self.irc = IdentityRegistryClient(proc=sup)
         self.mc = MessageClient(proc=self.test_sup)
         
-        # initialize the user
-        self.user_subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
+        # initialize the user1; should not be already registered
+        self.user1_subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
 
-        self.user_certificate =  """-----BEGIN CERTIFICATE-----
+        self.user1_certificate =  """-----BEGIN CERTIFICATE-----
 MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
 MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRsw
 GQYDVQQDExJDSUxvZ29uIEJhc2ljIENBIDEwHhcNMTAxMTE4MjIyNTA2WhcNMTAxMTE5MTAzMDA2
@@ -139,7 +150,7 @@ f8b270icOVgkOKRdLP/Q4r/x8skKSCRz1ZsRdR+7+B/EgksAJj7Ut3yiWoUekEMxCaTdAHPTMD/g
 Mh9xL90hfMJyoGemjJswG5g3fAdTP/Lv0I6/nWeH/cLjwwpQgIEjEAVXl7KHuzX5vPD/wqQ=
 -----END CERTIFICATE-----"""
 
-        self.user_rsa_private_key = """-----BEGIN RSA PRIVATE KEY-----
+        self.user1_rsa_private_key = """-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA6QhsWxhUXbIxg+1ZyEc7d+hIGvchVmtbg0kKLmivgoVsA4U7swNDRH6svW24
 2THta0oTf6crkRx7kOKg6jma2lcAC1sjOSddqX7/92ChoUPq7LWt2T6GVVA10ex5WAeB/o7br/Z4
 U8/75uCBis+ru7xEDl09PToK20mrkcz9M4HqIv1eSoPkrs3b2lUtQc6cjuHRDU4NknXaVMXTBHKP
@@ -163,6 +174,58 @@ WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
 c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
 
+        # initialize the user2; should be already registered
+        self.user2_subject = '/DC=org/DC=cilogon/C=US/O=Google/CN=test user A501'
+        self.user2_ooi_id = 'A7B44115-34BC-4553-B51E-1D87617F12E0'
+        
+        self.user2_certificate =  """-----BEGIN CERTIFICATE-----
+MIIEUzCCAzugAwIBAgICBgIwDQYJKoZIhvcNAQELBQAwazETMBEGCgmSJomT8ixkARkWA29yZzEX
+MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRww
+GgYDVQQDExNDSUxvZ29uIE9wZW5JRCBDQSAxMB4XDTExMDQyMTE5MzMyMVoXDTExMDQyMjA3Mzgy
+MVowZTETMBEGCgmSJomT8ixkARkTA29yZzEXMBUGCgmSJomT8ixkARkTB2NpbG9nb24xCzAJBgNV
+BAYTAlVTMQ8wDQYDVQQKEwZHb29nbGUxFzAVBgNVBAMTDnRlc3QgdXNlciBBNTAxMIIBIjANBgkq
+hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu+SQwAWMAY/+6eZjcirp0YfhKdgM06uZmTU9DPJqcNXF
+ROFCeGEkg2jzgfcK5NiT662YbQkxETWDl4XZazmbPv787XJjYnbF8XErztauE3+caWNOpob2yPDt
+mk3F0I0ullSbqsxPvsYAZNEveDBFzxCeeO+GKFQnw12ZYo968RcyZW2Fep9OQ4VfpWQExSA37FA+
+4KL0RfZnd8Vc1ru9tFPw86hEstzC0Lt5HuXUHhuR9xsW3E5xY7mggHOrZWMQFiUN8WPnrHSCarwI
+PQDKv8pMQ2LIacU8QYzVow74WUjs7hMd3naQ2+QgRd7eRc3fRYXPPNCYlomtnt4OcXcQSwIDAQAB
+o4IBBTCCAQEwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCBLAwEwYDVR0lBAwwCgYIKwYBBQUH
+AwIwGAYDVR0gBBEwDzANBgsrBgEEAYKRNgEDAzBsBgNVHR8EZTBjMC+gLaArhilodHRwOi8vY3Js
+LmNpbG9nb24ub3JnL2NpbG9nb24tb3BlbmlkLmNybDAwoC6gLIYqaHR0cDovL2NybC5kb2Vncmlk
+cy5vcmcvY2lsb2dvbi1vcGVuaWQuY3JsMEQGA1UdEQQ9MDuBEW15b29pY2lAZ21haWwuY29thiZ1
+cm46cHVibGljaWQ6SUROK2NpbG9nb24ub3JnK3VzZXIrQTUwMTANBgkqhkiG9w0BAQsFAAOCAQEA
+Omon3wMV3RFzs28iqs+r1j9WxLSvQXRXtk3BMNNmrobDspb2rodiNGMeVxGD2oGSAfh1Mn/l+vDE
+1333XzQ3BGkucaSSBOTll5ZBqf52w/ru/dyrJ2GvHbIrKv+QkpKuP9uB0eJYi1n7+q/23rBR5V+E
++LsnTG8BcuzpFxtlY4SKIsijHNV+5y2+hfGHiNGfAr3X8FfwjIfmqBroCRc01ix8+jMnvplLr5rp
+Wkkk8zr1nuzaUjNA/8G+24UBNSgLYOUP/xH2GlPUiAP4tZX+zGsOVkYkbyc67M4TLyD3hxuLbDCU
+Aw3E0TjYpPxuQ8OsJ1LdECRfHgHFfd5KtG8BgQ==
+-----END CERTIFICATE-----"""
+
+        self.user2_rsa_private_key = """-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAu+SQwAWMAY/+6eZjcirp0YfhKdgM06uZmTU9DPJqcNXFROFCeGEkg2jzgfcK
+5NiT662YbQkxETWDl4XZazmbPv787XJjYnbF8XErztauE3+caWNOpob2yPDtmk3F0I0ullSbqsxP
+vsYAZNEveDBFzxCeeO+GKFQnw12ZYo968RcyZW2Fep9OQ4VfpWQExSA37FA+4KL0RfZnd8Vc1ru9
+tFPw86hEstzC0Lt5HuXUHhuR9xsW3E5xY7mggHOrZWMQFiUN8WPnrHSCarwIPQDKv8pMQ2LIacU8
+QYzVow74WUjs7hMd3naQ2+QgRd7eRc3fRYXPPNCYlomtnt4OcXcQSwIDAQABAoIBAE7JjC0I5mlt
+US4RbpfcCMnU2YTrVI2ZwkGtQllgeWOxMBQvBOlniqET7DAOQGIvsu87jtQB67JUp0ZtWPsOX9vt
+nm+O7L/IID6a/wyvlrUUaKkEfGF17Jvb8zYl8JH/8Y4WEmRvYe0UJ+wej3Itg8hNJrZ9cdsNVtMk
+N4JNufbH0+s2t+nZPm7jLNbXfdP6CIiyTB6OIB9M3JRKed5lpFOOsTB0HNgBFGaZvmmzWpGQJ6wQ
+YsEWbMiFrB4e8qutfF+itzq5cyMrMVsAJiecMfc/j1gv+77wSi3x6tqYWgLsk5jZBNm99UM/nxWp
+Xl+091gN7aha9DQ1WmCpG+D6h4kCgYEA7AuKIn/m4riQ7PsuGKNIU/h8flsO+op5FUP0NBRBY8Mc
+LTon/QBcZTqpkWYblkz/ME8AEuPWKsPZQrCO9sCFRBMk0L5IZQ43kr2leB43iHDhc+OsjDB0sV8M
+oEWCI4BFu7wrtbmYTqJhQaHBh0lu3jWmKnaMkWIXsF2nvqDt7VcCgYEAy8brqFssASiDFJsZB1kK
+AzVkM0f43/+51fzdPW6YnrxOMt3nQqzUOF1FlmvMog/fRPjcfcttdjVu12s9DljB0AaMoBRxmKcj
+/mIvxPNrTBhAHeqowZ0XyCtgEl8c+8sZUi1hUmnCIDFvi9LKXbX/mnXp0aKqWD03Hnbm/o3vaC0C
+gYEAmrcFl49V+o0XEP2iPSvpIIDiuL9elgFlU/byfaA5K/aa5VoVE9PEu+Uzd8YBlwZozXU6iycj
+HWy5XujzC/EsaG5T1y6hrPsgmeIMLys/IwM6Awfb9RddpVSzpelpX3OYQXEZBUfc+M2eCbLIcrBD
+JwrrGzIQ+Mne1Q7OADjjOokCgYABgHbOJ9XcMFM+/KGjlzlmqqcRZa9k3zqcZB+xSzZevR6Ka24/
+5Iwv2iggIq1AaIOJu5fMaYpl+6DUf5rUlzzebp3stBneOSUfw9N8TRr2VZtrXQZfXuwE8qTjncXV
+6TpHi8QS2mqu2A5tZmFNbYDzv3i4rc05l0HnvJKZP6yLBQKBgERpUxpX4r5Obi8PNIECZ4ucTlhT
+KJpn8B+9GrIjTqs+ae0oRfbSo1Jt/SDts/c6DYaT2RZma7JVosWd2aOAw9k69zMObHlJrcHGmb3l
+eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
+-----END RSA PRIVATE KEY-----"""
+
+
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -172,19 +235,53 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     #@itv(CONF)
     @defer.inlineCallbacks
     def test_identity_registry(self):
+       
+        # Test for user2 being found when calling get_user.
+        log.info("testing for user2 being found when calling get_user")
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        OoiIdRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
+        OoiIdRequest.configuration = IdentityRequest.CreateObject(USER_OOIID_TYPE)
+        OoiIdRequest.configuration.ooi_id = self.user2_ooi_id
+        try:
+            result = yield self.irc.get_user(OoiIdRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("get_user failed to find a registered user")
 
-        # test that user is not yet registered
-        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
-        self.assertEqual(found, False)
-        
-        # build GPB for test case user
-        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+        # Test that subject is correct
+        log.info("testing user2 subject is correct")
+        self.assertEqual(result.resource_reference.subject, self.user2_subject)
+      
+        # build GPB for test case user2
         IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
-        IdentityRequest.configuration.certificate = self.user_certificate
-        IdentityRequest.configuration.rsa_private_key = self.user_rsa_private_key
+        IdentityRequest.configuration.certificate = self.user2_certificate
+        IdentityRequest.configuration.rsa_private_key = self.user2_rsa_private_key
 
-        # test that user is not found
-        log.info("testing for user not found")
+        # test that user2 is found when calling authenticate_user
+        log.info("testing for user2 being found when calling authenticate_user")
+        try:
+            ooi_id1 = yield self.irc.authenticate_user(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("authenticate_user failed to find a registered user")
+        
+        # Test for user not found when calling get_user with user1.
+        log.info("testing for user1 not found when calling get_user")
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        OoiIdRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
+        OoiIdRequest.configuration = IdentityRequest.CreateObject(USER_OOIID_TYPE)
+        OoiIdRequest.configuration.ooi_id = "bogus-ooi_id"
+        try:
+            result = yield self.irc.get_user(OoiIdRequest)
+            self.fail("get_user found an unregistered user")
+        except ReceivedApplicationError, ex:
+            self.assertEqual(ex.msg_content.MessageResponseCode, IdentityRequest.ResponseCodes.NOT_FOUND)
+
+        # build GPB for test case user1
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.certificate = self.user1_certificate
+        IdentityRequest.configuration.rsa_private_key = self.user1_rsa_private_key
+
+        # test that user1 is not found when calling authenticate_user
+        log.info("testing for user1 not found when calling authenticate_user")
         try:
             ooi_id1 = yield self.irc.authenticate_user(IdentityRequest)
             self.fail("Authenticate_user found an unregistered user")
@@ -201,11 +298,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         except ReceivedApplicationError, ex:
             self.fail("register_user failed")
         
-        # Verify we can find it.
-        log.info("testing for finding registered user")
-        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
-        self.assertEqual(found, True)
-        
         log.info("testing authentication")
         try:
             Response = yield self.irc.authenticate_user(IdentityRequest)
@@ -216,8 +308,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         # load the user back
         log.info("testing get_user")
-        OoiIdRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
-        OoiIdRequest.configuration = IdentityRequest.CreateObject(USER_OOIID_TYPE)
         OoiIdRequest.configuration.ooi_id = ooi_id1
         try:
             user1 = yield self.irc.get_user(OoiIdRequest)
@@ -229,29 +319,51 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.assertNotEqual(user1, None)  
 
         # Test that subject is correct
-        log.info("testing subject is correct")
-        self.assertEqual(user1.resource_reference.subject, "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
+        log.info("testing user1 subject is correct")
+        self.assertEqual(user1.resource_reference.subject, self.user1_subject)
       
-        # Test that update work
-        log.info("testing update")
-        IdentityRequest.configuration.certificate = self.user_certificate + "\nA Small Change"
+        # set the user's email
+        log.info('setting email')
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user email request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.email = "someone@somplace.somedomain"
         IdentityRequest.configuration.subject = user1.resource_reference.subject
         try:
-            response = yield self.irc.update_user(IdentityRequest)
+            response = yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
-            self.fail("update_user failed for user %s"%IdentityRequest.configuration.subject)
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
-        self.assertEqual(user2.resource_reference.certificate, self.user_certificate + "\nA Small Change")
+        self.assertEqual(user2.resource_reference.email, "someone@somplace.somedomain")
+        
+        # Test that update works 
+        log.info("testing update")
+        IdentityRequest.configuration.email = "someone-else@somplace-else.some-other-domain"
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        try:
+            response = yield self.irc.update_user_profile(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        self.assertEqual(user2.resource_reference.email, "someone-else@somplace-else.some-other-domain")
        
-        # Test if we can find the user we have stuffed in.
-        #user_description = coi_resource_descriptions.IdentityResource()
-        #user_description.subject = 'Roger'
-
-        # Disabled until find is properly implemented
-        #users1 = yield self.irc.find_users(user_description,regex=True)
-        #self.assertEqual(len(users1), 1) # should only return 1 match
-        #self.assertEqual("/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED", users1[0].subject)
-             
+        # set the user's profile
+        log.info('setting profile')
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user profile request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        IdentityRequest.configuration.profile.add()
+        IdentityRequest.configuration.profile[0].name = "profile item 1 name"
+        IdentityRequest.configuration.profile[0].value = "profile item 1 value"
+        log.info('IR.C = '+str(IdentityRequest.configuration))
+        try:
+            response = yield self.irc.update_user_profile(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        log.info('user2 = '+str(user2.resource_reference))
+        self.assertEqual(user2.resource_reference.profile[0].name, "profile item 1 name")
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 1 value")
+            
         # Test if we can set the life cycle state
         result = yield self.irc.set_identity_lcstate_retired(ooi_id1) # Wishful thinking Roger!
         try:
@@ -259,12 +371,3 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         except ReceivedApplicationError, ex:
             self.fail("get_user failed to find a registered user")
         self.assertEqual(user2.resource_reference.life_cycle_state, 'Retired') # Should be retired now
-
-        # Test for user not found handled properly.
-        OoiIdRequest.configuration.ooi_id = "bogus-ooi_id"
-        try:
-            result = yield self.irc.get_user(OoiIdRequest)
-            self.fail("get_user found an unregistered user")
-        except ReceivedApplicationError, ex:
-            self.assertEqual(ex.msg_content.MessageResponseCode, IdentityRequest.ResponseCodes.NOT_FOUND)
-

@@ -6,7 +6,7 @@
 @author David Stuebe
 @brief service for registering agent (types and instances).
 """
-
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -313,3 +313,4 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         Find agent instances which meet a description
         """
         return self.base_find_resource('find_registered_agent_instance_from_description', agent_instance_description,regex,ignore_defaults)
+'''

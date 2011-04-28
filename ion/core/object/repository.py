@@ -906,10 +906,8 @@ class Repository(ObjectContainer):
                 if not cref:
                     raise RepositoryError('End of Ancestors: No matching reference \
                                           found in commit history on branch name %s, \
-                                          commit_id: %s' % (branch_name, commit_id))
-                
-            
-            
+                                          commit_id: %s' % (branchname, commit_id))
+
         elif older_than:
             
             # IF you are checking out a specific commit date it is always a detached head!
@@ -954,14 +952,14 @@ class Repository(ObjectContainer):
         else:
             
             if len(branch.commitrefs) ==1:
-                
                 cref = branch.commitrefs[0]
                 
             else:
                 log.warn('BRANCH STATE HAS DIVERGED - MERGING') 
                 
                 cref = self.merge_by_date(branch)
-                
+
+
         # Do some clean up!
         for item in self._workspace.itervalues():
             item.Invalidate()
@@ -969,12 +967,9 @@ class Repository(ObjectContainer):
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
-
         rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, excluded_types)
         self._workspace_root = rootobj
 
-
-        
         self._detached_head = detached
         
         if detached:
@@ -1097,7 +1092,8 @@ class Repository(ObjectContainer):
             self._workspace_root.RecurseCommit(structure)
 
             cref = self._create_commit_ref(comment=comment)
-                
+
+
             # Add the CRef to the hashed elements
             cref.RecurseCommit(structure)
 
@@ -1394,8 +1390,13 @@ class Repository(ObjectContainer):
 
         if value.Modified:
             structure={}
+            value_repo = value.Repository
             value.RecurseCommit(structure)
-            value.Repository.index_hash.update(structure)
+            # Deal with the case where this serialization causes a hash conflict...
+            value_repo.index_hash.update(structure)
+
+
+
 
 
         element = self.index_hash.get(value.MyId)

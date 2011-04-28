@@ -17,7 +17,7 @@ from ion.core import ioninit
 from ion.core.process import process
 from ion.core.process.process import Process
 from ion.core.process.process import IProcess, ProcessDesc, ProcessInstantiator
-from ion.data.store import Store
+from ion.core.data.store import Store
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
 
@@ -33,6 +33,7 @@ class ProcessManager(BasicLifecycleObject):
 
         # TEMP: KVS pid (str) -> Process Instance
         self.process_registry = Store()
+        self.process_registry.kvs = {} # Give it its own backend...
 
     # Life cycle
 

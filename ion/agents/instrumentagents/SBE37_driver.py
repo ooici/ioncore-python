@@ -6,6 +6,7 @@
 @brief Driver code for SeaBird SBE-37 CTD
 """
 
+
 import re
 import time
 
@@ -2437,3 +2438,4 @@ class SBE37DriverClient(InstrumentDriverClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(SBE37Driver)
+

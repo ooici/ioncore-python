@@ -4,6 +4,8 @@
 @file ion/agents/test/test_resource_agent.py
 @author Steve Foley
 """
+'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -182,3 +184,4 @@ class TestResourceAgent(IonTestCase):
         self.assertEqual(ref, registered_res)
         result = yield self.RAClient.get_lifecycle_state()
         self.assertEqual(result, inactive_state)
+'''

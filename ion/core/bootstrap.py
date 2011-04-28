@@ -18,7 +18,6 @@ from ion.core.cc.modloader import ModuleLoader
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
-from ion.resources import description_utility
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -57,8 +56,6 @@ def init_ioncore():
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
 
-    # OBSOLETE-REMOVE Load All Resource Descriptions for future decoding
-    description_utility.load_descriptions()
 
     # @todo Service registry call for local service/version registration
     #yield bs_register_services()

@@ -14,9 +14,9 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.intercept.policy import user_has_admin_role, \
-                                      user_has_dispatcher_queue, \
-                                      get_dispatcher_queue_for_user
-                                      
+                                      user_is_early_adopter, \
+                                      user_has_marine_operator_role, \
+                                      user_has_data_provider_role
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -104,8 +104,8 @@ class RegisterUser(object):
         
 
    @defer.inlineCallbacks
-   def updateUserProfile (self, msg):
-      log.info('RegisterUser.updateUserProfile()\n'+str(msg))
+   def getUser (self, msg):
+      log.info('RegisterUser.getUser()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
       result = yield self.CheckRequest(msg)
@@ -120,12 +120,54 @@ class RegisterUser(object):
          Response.error_str = "Required field [user_ooi_id] not found in message"
          defer.returnValue(Response)
 
-      # check that email address is present in GPB
-      if not msg.message_parameters_reference.IsFieldSet('email_address'):
+      # build the Identity Registry request for get_user message
+      Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+      Request.configuration = Request.CreateObject(USER_OOIID_TYPE)
+      Request.configuration.ooi_id = msg.message_parameters_reference.user_ooi_id
+      
+      # get the user information from the Identity Registry 
+      try:
+         user_info = yield self.irc.get_user(Request)
+      except ReceivedApplicationError, ex:
+         # build AIS error response
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getUser error response')
+         Response.error_num = ex.msg_content.MessageResponseCode
+         Response.error_str = ex.msg_content.MessageResponseBody
+         defer.returnValue(Response)
+                
+      # build AIS response
+      Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getUser response')
+      Response.message_parameters_reference.add()
+      Response.message_parameters_reference[0] = Response.CreateObject(GET_USER_PROFILE_RESPONSE_TYPE)
+      if user_info.resource_reference.IsFieldSet('email'):
+         Response.message_parameters_reference[0].email_address = user_info.resource_reference.email
+      if user_info.resource_reference.IsFieldSet('profile'):
+         i = 0
+         for item in user_info.resource_reference.profile:
+            log.debug('getUser: setting profile to '+str(item))
+            Response.message_parameters_reference[0].profile.add()
+            Response.message_parameters_reference[0].profile[i].name = item.name
+            Response.message_parameters_reference[0].profile[i].value = item.value
+            i = i + 1
+      Response.result = Response.ResponseCodes.OK
+      defer.returnValue(Response)
+ 
+
+   @defer.inlineCallbacks
+   def updateUserProfile (self, msg):
+      log.info('RegisterUser.updateUserProfile()\n'+str(msg))
+
+      # check that the GPB is correct type & has a payload
+      result = yield self.CheckRequest(msg)
+      if result != None:
+         defer.returnValue(result)
+         
+      # check that ooi_id is present in GPB
+      if not msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [email_address] not found in message"
+         Response.error_str = "Required field [user_ooi_id] not found in message"
          defer.returnValue(Response)
 
       # build the Identity Registry request for get_user message
@@ -143,16 +185,28 @@ class RegisterUser(object):
          Response.error_str = ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
-      # build the Identity Registry request for update_user message
+      # build the Identity Registry request for update_user_profile message
       Request.configuration = Request.CreateObject(IDENTITY_TYPE)
       Request.configuration.subject = user_info.resource_reference.subject
-      Request.configuration.email = msg.message_parameters_reference.email_address
       
-      # update the email address for the user  
+      # check to see if email address is present in GPB
+      if msg.message_parameters_reference.IsFieldSet('email_address'):
+         Request.configuration.email = msg.message_parameters_reference.email_address
+      
+      # check to see if profile is present in GPB
+      if msg.message_parameters_reference.IsFieldSet('profile'):
+         i = 0
+         for item in msg.message_parameters_reference.profile:
+             log.debug('updateUserProfile: adding to profile - '+str(item))
+             Request.configuration.profile.add()
+             Request.configuration.profile[i].name = item.name
+             Request.configuration.profile[i].value = item.value
+             i = i + 1
+
+      # update the profile for the user  
       try:
-         result = yield self.irc.update_user(Request)
+         result = yield self.irc.update_user_profile(Request)
       except ReceivedApplicationError, ex:
-         self.fail("update_user failed [%s]"%msg.message_parameters_reference.user_ooi_id)
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
          Response.error_num = ex.msg_content.MessageResponseCode
@@ -223,7 +277,9 @@ class RegisterUser(object):
       Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
       Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_is_early_adopter = user_has_dispatcher_queue(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_is_early_adopter = user_is_early_adopter(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_is_data_provider = user_has_marine_operator_role(result.resource_reference.ooi_id)
+      Response.message_parameters_reference[0].user_is_marine_operator = user_has_data_provider_role(result.resource_reference.ooi_id)
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 

@@ -55,6 +55,10 @@ class HelloServiceClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('hello', text)
         log.info('Service reply: '+str(content))
         defer.returnValue(str(content))
+        
+    
+    def hello_deferred(self, text='Hi there'):
+        return self.rpc_send('hello', text)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(HelloService)

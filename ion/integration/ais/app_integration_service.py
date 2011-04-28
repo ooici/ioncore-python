@@ -65,18 +65,10 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResources service method.')
-        try:
-            # Instantiate the worker class
-            worker = FindDataResources(self)
-            returnValue = yield worker.findDataResources(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        # Instantiate the worker class
+        worker = FindDataResources(self)
+        returnValue = yield worker.findDataResources(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_findDataResourcesByUser(self, content, headers, msg):
@@ -89,18 +81,10 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResourcesByUser service method.')
-        try:
-            # Instantiate the worker class
-            worker = FindDataResources(self)
-            returnValue = yield worker.findDataResourcesByUser(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        # Instantiate the worker class
+        worker = FindDataResources(self)
+        returnValue = yield worker.findDataResourcesByUser(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_getDataResourceDetail(self, content, headers, msg):
@@ -111,17 +95,9 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_getDataResourceDetail service method')
-        try:
-            worker = GetDataResourceDetail(self)
-            returnValue = yield worker.getDataResourceDetail(content)
-            yield self.reply_ok(msg, returnValue)
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        worker = GetDataResourceDetail(self)
+        returnValue = yield worker.getDataResourceDetail(content)
+        yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
     def op_createDownloadURL(self, content, headers, msg):
@@ -132,18 +108,9 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_createDownloadURL: '+str(content))
-        try:
-            worker = CreateDownloadURL(self)
-            returnValue = yield worker.createDownloadURL(content)
-            yield self.reply_ok(msg, returnValue)   
-
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-            return
-        
-        return
+        worker = CreateDownloadURL(self)
+        returnValue = yield worker.createDownloadURL(content)
+        yield self.reply_ok(msg, returnValue)   
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):
@@ -159,6 +126,14 @@ class AppIntegrationService(ServiceProcess):
         worker = RegisterUser(self)
         log.debug('op_updateUserProfile: calling worker')
         response = yield worker.updateUserProfile(content);
+        yield self.reply_ok(msg, response)
+        
+    @defer.inlineCallbacks
+    def op_getUser(self, content, headers, msg):
+        log.debug('op_getUser: \n'+str(content))
+        worker = RegisterUser(self)
+        log.debug('op_getUser: calling worker')
+        response = yield worker.getUser(content);
         yield self.reply_ok(msg, response)
         
     def getTestDatasetID(self):
@@ -258,10 +233,6 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
-
-
-
-
 class AppIntegrationServiceClient(ServiceClient):
     """
     This is a service client for AppIntegrationServices.
@@ -345,7 +316,7 @@ class AppIntegrationServiceClient(ServiceClient):
         result = yield self.CheckRequest(message)
         if result is not None:
             defer.returnValue(result)
-       # check that ooi_id is present in GPB
+        # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
@@ -358,6 +329,28 @@ class AppIntegrationServiceClient(ServiceClient):
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
         log.debug('AIS_client.updateUserProfile: IR Service reply:\n' + str(content))
+        defer.returnValue(content)
+              
+    @defer.inlineCallbacks
+    def getUser(self, message):
+        yield self._check_init()
+        # check that the GPB is correct type & has a payload
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            defer.returnValue(result)
+        # check that ooi_id is present in GPB
+        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [user_ooi_id] not found in message"
+            defer.returnValue(Response)
+        log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send_protected('getUser',
+                                                                    message,
+                                                                    message.message_parameters_reference.user_ooi_id,
+                                                                    "0")
+        log.debug('AIS_client.getUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks

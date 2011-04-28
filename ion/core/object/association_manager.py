@@ -146,7 +146,7 @@ class AssociationManager(object):
         return result
 
     def __iter__(self):
-        return self.get_associations().__iter__()
+        return iter(self.get_associations())
 
     def iteritems(self):
         return self.predicate_sorted_associations.iteritems()
@@ -393,5 +393,11 @@ class AssociationInstance(object):
         previous_predicate.key = self.NULL
         previous_predicate.branch = self.NULL
         previous_predicate.commit = self.NULL
+
+
+        for item in self.Repository._workspace.values():
+            print "Is in repo:", item.Repository is self.Repository
+            print item.Debug()
+
 
         self.Repository.commit('Association set to null!')

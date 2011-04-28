@@ -698,7 +698,10 @@ class WorkBench(object):
             # Set the head element
             head_element = self.serialize_mutable(repo._dotgit)
             # Pull out the structure element and use it as the linked object in the message.
-            obj = repo._wrap_message_object(head_element._element)
+
+            # MUST USE THE REPOSTATE MESSAGES REPOSITY TO WRAP THE ELEMENT.
+            # CAN CAUSE HASH CONFLICT DURING THE COPY IF IT IS CREATED IN THE REPO WE ARE PUSHING!
+            obj = repostate.Repository._wrap_message_object(head_element._element)
             repostate.repo_head_element = obj
 
             repostate.blob_keys.extend(self.list_repository_blobs(repo))

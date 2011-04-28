@@ -53,7 +53,7 @@ SKIP_TESTS = [
 class TestSBE37Agent(IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 120
+    timeout = 180
 
 
     @defer.inlineCallbacks
@@ -292,7 +292,8 @@ class TestSBE37Agent(IonTestCase):
         chans = ['CHAN_INSTRUMENT']
         cmd = ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']
         while True:
-            reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
+            reply = yield self.ia_client.execute_device(chans,cmd,
+                                                        transaction_id)
             success = reply['success']
             result = reply['result']
             
@@ -366,5 +367,4 @@ class TestSBE37Agent(IonTestCase):
         
         
 
-        
         

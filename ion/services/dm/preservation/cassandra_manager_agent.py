@@ -129,7 +129,7 @@ class CassandraManagerService(ServiceProcess):
         yield self.register_life_cycle_object(manager)
         
         self.manager = manager
-        yield self._bootstrap()
+        #yield self._bootstrap()
         
         
     @defer.inlineCallbacks

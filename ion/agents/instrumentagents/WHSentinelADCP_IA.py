@@ -5,6 +5,7 @@
 @author Bill Bollenbacher
 @brief CI interface for Teledyne RDI Workhorse Sentinel ADCP
 """
+'''
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -119,3 +120,4 @@ class WHSentinelADCPInstrumentAgent(InstrumentAgent):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(WHSentinelADCPInstrumentAgent)
+'''
