@@ -46,7 +46,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    'test_execute_instrument',
+    #'test_execute_instrument',
     'dummy'
 ]    
 
@@ -298,7 +298,6 @@ class TestSBE37Agent(IonTestCase):
             result = reply['result']
             
             if success[0] == 'OK':
-                print 'autosample stopped'
                 break
             
             elif success[1] == 'TIMEOUT':
