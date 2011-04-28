@@ -53,24 +53,30 @@ ci_param_metadata = {
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_VALID_VALUES':connection_methods,
          'META_FRIENDLY_NAME':'Connection Method'},
-    'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT' :
+    'CI_PARAM_DEFAULT_EXP_TIMEOUT' :
         {'META_DATATYPE':'CI_TYPE_INT',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_MINIMUM_VALUE':0,
          'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Default Transaction Timeout'},
-    'CI_PARAM_MAX_TRANSACTION_TIMEOUT' :
+         'META_FRIENDLY_NAME':'Default Transaction Expire Timeout'},
+    'CI_PARAM_MAX_EXP_TIMEOUT' :
         {'META_DATATYPE':'CI_TYPE_INT',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_MINIMUM_VALUE':0,
          'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Max Transaction Timeout'},
-    'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT' :
+         'META_FRIENDLY_NAME':'Max Transaction Expire Timeout'},
+    'CI_PARAM_MAX_ACQ_TIMEOUT' :
         {'META_DATATYPE':'CI_TYPE_INT',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_MINIMUM_VALUE':0,
          'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Transaction Expire Timeout'}    
+         'META_FRIENDLY_NAME':'Max Transaction Acquire Timeout'},
+    'CI_PARAM_DEFAULT_ACQ_TIMEOUT' :
+        {'META_DATATYPE':'CI_TYPE_INT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_MINIMUM_VALUE':0,
+         'META_UNITS':'Seconds',
+         'META_FRIENDLY_NAME':'Default Transaction Acquire Timeout'}    
 }
 
 
@@ -449,27 +455,38 @@ class InstrumentAgent(Process):
         self._transaction_timeout_call = None
         
         """
+        A queue of pending transactions. Start the top one on the list when
+        the current transaction ends.
+        """
+        self._pending_transactions = []
+        
+        """
         An integer in seconds for how long to wait to acquire a new
         transaction if a value is not explicitly given.
         """
-        self.default_transaction_timeout = 20   
+        self.default_acq_timeout = 20   
         
         """
         An integer in seconds for the maximum allowable timeout to wait for
         a new transaction.
         """
-        self.max_transaction_timeout = 60
+        self.max_acq_timeout = 60
     
         """
-        An integer in seconds for the minimum required transaction expire
-        timeout.
+        An integer in seconds for the minimum time a transaction must be open.
         """
-        self.min_transaction_expire_timeout = 1
+        self.min_exp_timeout = 1
         
         """
-        An integer in seconds for the maximum time a transaction may be open.
+        An integer in seconds for the default time a transaction may be open.
         """
-        self.transaction_expire_timeout = 300
+        self.default_exp_timeout = 300
+        
+        """
+        An integer in seconds giving the maximum allowable time a transaction
+        may be open.
+        """
+        self.max_exp_timeout = 600
         
         """
         Upon transaction expire timeout, this flag indicates if the transaction
@@ -551,94 +568,162 @@ class InstrumentAgent(Process):
     def op_start_transaction(self,content,headers,msg):
         """
         Begin an exclusive transaction with the agent.
-        @param content An integer specifying the time to wait in seconds for the
-            transaction.
-        @retval Transaction ID UUID string.
+        @param content A dict with None or nonnegative integer values
+            'acq_timeout' and 'exp_timeout' for acquisition and expiration
+            timeouts respectively.
+        @retval A dict with 'success' success/fail string and
+            'transaction_id' transaction ID UUID string.
         """
         
-        result = yield self._start_transaction(content)                
-        yield self.reply_ok(msg,result)
-        
-    
-    def _start_transaction(self,timeout):
-        """
-        Begin an exclusive transaction with the agent.
-        @param timeout An integer specifying time to wait in seconds for the transaction.
-        @retval Transaction ID UUID string.
-        """
-        
-        assert(isinstance(timeout,int)), 'Expected an integer timeout.'
+        assert(isinstance(content,dict)), 'Expected a dict content.'
+        acq_timeout = content.get('acq_timeout',None)
+        exp_timeout = content.get('exp_timeout',None)
+        assert(acq_timeout==None or
+               (isinstance(acq_timeout,int) and acq_timeout>=0)), \
+            'Expected None or nonnegative int acquisition timeout'
+        assert(exp_timeout==None or
+               (isinstance(exp_timeout,int)) and exp_timeout >=0), \
+            'Expected None or nonnegative int expiration timeout'
         
         result = {'success':None,'transaction_id':None}
         
-        if timeout < 0:
-            timeout = self.default_transaction_timeout
+        (success,tid) = yield self._request_transaction(acq_timeout,exp_timeout)
+        result['success'] = success
+        result['transaction_id'] = tid
+            
+        yield self.reply_ok(msg,result)
         
-        if timeout > self.max_transaction_timeout:
-            timeout = self.max_transaction_timeout
+    
+    def _start_transaction(self,exp_timeout):
+        """
+        Begin an exclusive transaction with the agent.
+        @param exp_timeout An integer in seconds giving the allowable time
+            the transaction may be open.
+        @retval A tuple containing (success/fail,transaction ID UUID string).
+        """
         
+        assert(exp_timeout==None or
+               (isinstance(exp_timeout,int)) and exp_timeout >=0), \
+            'Expected None or nonnegative int expiration timeout'
+        
+        # Ensure the expiration timeout is in the valid range.
+        if exp_timeout == None:
+            exp_timeout = self.default_exp_timeout        
+        elif exp_timeout > self.max_exp_timeout: 
+            exp_timeout = self.max_exp_timeout
+        elif exp_timeout < self.min_exp_timeout:
+            exp_timeout = self.min_exp_timeout
             
+        # If the resource is free, issue a new transaction immediately.
+        if self.transaction_id == None:
+            self.transaction_id = str(uuid4())
             
+            self._debug_print('started transaction',self.transaction_id)
             
-        if timeout == 0:
-            if self.transaction_id == None:
-                self.transaction_id = str(uuid4())
+            # Create and queue up a transaction expiration callback.
+            def transaction_expired():
+                """
+                A callback to expire a transaction. Either retire the transaction
+                directly (no protected call running), or set a flag for a
+                protected call to do the cleanup when finishing.
+                """
                 
-                def transaction_expired():
-                    """
-                    A callback to expire a transaction. Either retire the transaction
-                    directly (no protected call running), or set a flag for a
-                    protected call to do the cleanup when finishing.
-                    """
-                    self._transaction_timeout_call = None                    
-                    if self._in_protected_function:
-                        self._transaction_timed_out = True
-                    else:
-                        self._end_transaction(self.transaction_id)
+                self._debug_print('transaction expired',self.transaction_id)
 
-                self._transaction_timeout_call = reactor.callLater(self.transaction_expire_timeout,
-                                                                   transaction_expired)
-                        
-                result['success'] = ['OK']
-                result['transaction_id']=self.transaction_id
-            else:
-                result['success'] = errors['LOCKED_RESOURCE']
-                
+                self._transaction_timeout_call = None                    
+                if self._in_protected_function:
+                    self._transaction_timed_out = True
+                else:
+            
+                    self._end_transaction(self.transaction_id)
+
+            self._transaction_timeout_call = reactor.callLater(exp_timeout,
+                                                            transaction_expired)
+            return (['OK'],self.transaction_id)
+        
+        # Otherwise return locked resource error.
         else:
-            #TODO replay this with callback/timeout logic as necessary
-            if self.transaction_id == None:
-                self.transaction_id = str(uuid4())
+            
+            return (errors['LOCKED_RESOURCE'],None)
+            
 
-                def transaction_expired():
-                    """
-                    A callback to expire a transaction. Either retire the transaction
-                    directly (no protected call running), or set a flag for a
-                    protected call to do the cleanup when finishing.
-                    """
-                    self._transaction_timeout_call = None                    
-                    if self._in_protected_function:
-                        self._transaction_timed_out = True
-                    else:
-                        self._end_transaction(self.transaction_id)
 
-                self._transaction_timeout_call = reactor.callLater(self.transaction_expire_timeout,
-                                                                   transaction_expired)                
+    def _request_transaction(self,acq_timeout,exp_timeout):
+        """
+        @param acq_timeout An integer in seconds to wait to acquire a new
+            transaction.
+        @param exp_timeout An integer in seconds to allow the new transaction
+            to remain open.
+        @retval A deferred that will fire when the a new transaction has
+            been constructed or timeout occurs. The deferred value is a
+            tuple (success/fail,transaction_id).
+        """
+        
+        assert(acq_timeout==None or
+               (isinstance(acq_timeout,int) and acq_timeout>=0)), \
+            'Expected None or nonnegative int acquisition timeout'
+        assert(exp_timeout==None or
+               (isinstance(exp_timeout,int)) and exp_timeout >=0), \
+            'Expected None or nonnegative int expiration timeout'
+        
+        # Ensure the expiration timeout is in the valid range.
+        if exp_timeout == None:
+            exp_timeout = self.default_exp_timeout        
+        elif exp_timeout > self.max_exp_timeout: 
+            exp_timeout = self.max_exp_timeout
+        elif exp_timeout < self.min_exp_timeout:
+            exp_timeout = self.min_exp_timeout
+            
+        # Ensure the acquisition timeout is in the valid range.
+        if acq_timeout == None:
+            acq_timeout = 0
+        elif acq_timeout > self.max_acq_timeout:
+            acq_timeout = self.max_acq_timeout
+
+        d = defer.Deferred()
+
+        # If the resource is free, issue a new transaction immediately.
+        if self.transaction_id == None:
+
+            (success,tid) = self._start_transaction(exp_timeout)
+            d.callback((success,tid))
+            return d
+        
+        else:
+            
+            # If resourse not free and no acquisition timeout, return
+            # locked error immediately.
+            if acq_timeout == 0:
+                d.callback((errors['LOCKED_RESOURCE'],None))
+                return d
+
+            # If resource not free and there is a valid acquisition timeout,
+            # add the deferred return to the list of pending transactions and
+            # start the acquisition timeout.
+            
+            self._debug_print('acquiring transaction')
+            
+            def acquisition_timeout():
                 
-                result['success'] = ['OK']
-                result['transaction_id']=self.transaction_id
-            else:
-                result['success'] = errors['LOCKED_RESOURCE']
-        
-        return result
-        
-        
+                self._debug_print('acquire transaction timed out')
+
+                for item in self._pending_transactions:
+                    if item[0] == d:
+                        self._pending_transactions.remove(item)
+                        d.callback((errors['TIMEOUT'],None))
+            
+            acq_timeout_call = reactor.callLater(acq_timeout,acquisition_timeout)
+            
+            self._pending_transactions.append((d,acq_timeout_call,exp_timeout))
+            
+            return d
         
     
     @defer.inlineCallbacks
     def op_end_transaction(self,content,headers,msg):
         """
         End the current transaction.
-        @param tid A uuid specifying the current transaction to end.
+        @param content A uuid specifying the current transaction to end.
         """        
 
         result = self._end_transaction(content)
@@ -650,7 +735,8 @@ class InstrumentAgent(Process):
     
     def _end_transaction(self,tid):
         """
-        End the current transaction.
+        End the current transaction and start the next pending transaction
+            if one is waiting.
         @param tid A uuid specifying the current transaction to end.
         """        
         
@@ -659,15 +745,36 @@ class InstrumentAgent(Process):
         result = {'success':None}
 
         if tid == self.transaction_id:
+                        
+            self._debug_print('ending transaction',self.transaction_id)
+
+            
+            # Remove the current transaction.
             self.transaction_id = None
+            
+            # Reset expiration flag and cancel expiration timeout.
             self._transaction_timed_out = False
             if self._transaction_timeout_call != None:
                 self._transaction_timeout_call.cancel()
                 self._transaction_timeout_call = None
                 
+            # If there is a pending transaction, issue a new transaction
+            # and cancel the acquisition timeout.
+            if len(self._pending_transactions) > 0:
+                (d,call,exp_timeout) = self._pending_transactions.pop(0)
+                call.cancel()
+                (success,tid) = self._start_transaction(exp_timeout)
+                d.callback((success,tid))
+
+            # Return success.
             result['success'] = ['OK']
+            
+        # If there is no transaction to end, return not locked error.
         elif self.transaction_id == None:
             result['success'] = errors['RESOURCE_NOT_LOCKED']
+            
+        # If the tid does not match the current trasaction, return
+        # locked error.
         else:
             result['success'] = errors['LOCKED_RESOURCE']
 
@@ -690,8 +797,7 @@ class InstrumentAgent(Process):
 
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
-            result = self._start_transaction(self.default_transaction_timeout)
-            success = result['success']
+            (success,tid) = self._start_transaction(self.default_exp_timeout)
             if success[0]=='OK':
                 return True
             else:
@@ -703,10 +809,8 @@ class InstrumentAgent(Process):
             return True
                 
         # Otherwise, the given ID must match the outstanding one
-        if tid == self.transaction_id:
-            return True
-        
-        return False
+        return (tid == self.transaction_id)
+
     
     
     ############################################################################
@@ -939,14 +1043,17 @@ class InstrumentAgent(Process):
                 if arg == 'CI_PARAM_CONNECTION_METHOD' or arg=='all':
                     result['CI_PARAM_CONNECTION_METHOD'] = (['OK'],self.connection_method)
                     
-                if arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = (['OK'],self.default_transaction_timeout)
+                if arg == 'CI_PARAM_DEFAULT_ACQ_TIMEOUT' or arg=='all':
+                    result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = (['OK'],self.default_acq_timeout)
                     
-                if arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = (['OK'],self.max_transaction_timeout)
+                if arg == 'CI_PARAM_MAX_ACQ_TIMEOUT' or arg=='all':
+                    result['CI_PARAM_MAX_ACQ_TIMEOUT'] = (['OK'],self.max_acq_timeout)
                     
-                if arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'] = (['OK'],self.transaction_expire_timeout)
+                if arg == 'CI_PARAM_DEFAULT_EXP_TIMEOUT' or arg=='all':
+                    result['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = (['OK'],self.default_exp_timeout)
+
+                if arg == 'CI_PARAM_MAX_EXP_TIMEOUT' or arg=='all':
+                    result['CI_PARAM_MAX_EXP_TIMEOUT'] = (['OK'],self.max_exp_timeout)
                     
             if get_errors:
                 success = errors['GET_OBSERVATORY_ERR']
@@ -1065,38 +1172,51 @@ class InstrumentAgent(Process):
                         success = errors['INVALID_PARAM_VALUE']
                     result[arg] = success
                     
-                elif arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT':
+                elif arg == 'CI_PARAM_DEFAULT_ACQ_TIMEOUT':
                     if isinstance(val,int) and val >= 0:
-                        self.default_transaction_timeout = val
+                        self.default_acq_timeout = val
                         success = ['OK']
-                        if self.max_transaction_timeout < val:
-                            self.max_transaction_timeout = val
-                            result['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = ['OK']
+                        if self.max_acq_timeout < val:
+                            self.max_acq_timeout = val
+                            result['CI_PARAM_MAX_ACQ_TIMEOUT'] = ['OK']
                     else:
                         set_errors = True
                         success = errors['INVALID_PARAM_VALUE']
                     result[arg] = success
                     
-                elif arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT':
+                elif arg == 'CI_PARAM_MAX_ACQ_TIMEOUT':
                     if isinstance(val,int) and val >= 0:
-                        self.max_transaction_timeout = val
+                        self.max_acq_timeout = val
                         success = ['OK']
-                        if self.default_transaction_timeout > val:
-                            self.default_transaction_timeout = val
-                            result['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = ['OK']
+                        if self.default_acq_timeout > val:
+                            self.default_acq_timeout = val
+                            result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = ['OK']
                     else:
                         set_errors = True
                         success = errors['INVALID_PARAM_VALUE']
                     result[arg] = success
     
-                elif arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':
-                    if isinstance(val,int) and val > self.min_transaction_expire_timeout:
-                        self.transaction_expire_timeout = val
+                elif arg == 'CI_PARAM_DEFAULT_EXP_TIMEOUT':
+                    if isinstance(val,int) and val >= self.min_exp_timeout \
+                        and val <= self.max_exp_timeout:
+                        self.default_exp_timeout = val
                         success = ['OK']
                     else:
                         set_errors = True
                         success = errors['INVALID_PARAM_VALUE']
                     result[arg] = success
+
+                elif arg == 'CI_PARAM_MAX_EXP_TIMEOUT':
+                    if isinstance(val,int) and val > self.min_exp_timeout:
+                        self.max_exp_timeout = val
+                        success = ['OK']
+                    else:
+                        set_errors = True
+                        success = errors['INVALID_PARAM_VALUE']
+                    result[arg] = success
+
+
+
     
             if set_errors:
                 success = errors['SET_OBSERVATORY_ERR']
@@ -2046,6 +2166,7 @@ class InstrumentAgent(Process):
         
     def _debug_print_driver_event(self,type,transducer,value):
         """
+        Print debug driver events to stdio.
         """
         if DEBUG_PRINT:
             if isinstance(value,str):
@@ -2061,8 +2182,10 @@ class InstrumentAgent(Process):
         
     def _debug_print(self,event=None,value=None):
         """
+        Print debug agent events to stdio.
         """
-        pass
+        if DEBUG_PRINT:
+            print event, ' ', value
     
 
     
@@ -2073,23 +2196,42 @@ class InstrumentAgentClient(ProcessClient):
     that allows for RPC messaging
     """
     
+    default_rpc_timeout = 180
+    
     ############################################################################
     #   Transaction Management.
     ############################################################################
 
     @defer.inlineCallbacks
-    def start_transaction(self,timeout):
+    def start_transaction(self,acq_timeout=None,exp_timeout=None):
         """
         Begin an exclusive transaction with the agent.
-        @param timeout An integer specifying the time to wait in seconds for the
-            transaction.
+        @param acq_timeout An integer in seconds to wait for the transaction.
+        @param exp_timeout An integer in seconds to expire the transaction.
         @retval Transaction ID UUID string.
         """
+
+        assert(acq_timeout==None or isinstance(acq_timeout,int)), \
+            'Expected int or None acquisition timeout.'
+        assert(exp_timeout==None or isinstance(exp_timeout,int)), \
+            'Expected int or None expire timeout.'
         
+        params = {
+            'acq_timeout': acq_timeout,
+            'exp_timeout': exp_timeout
+        }
         
-        assert(timeout==None or isinstance(timeout,int)), 'Expected int or None timeout.'
-        (content,headers,message) = yield self.rpc_send('start_transaction',timeout)    
-        assert(isinstance(content,dict))
+        if acq_timeout != None and acq_timeout > 0:
+            rpc_timeout = acq_timeout + 10
+            (content,headers,message) = \
+                yield self.rpc_send('start_transaction',params,timeout=rpc_timeout)
+        
+        else:
+            (content,headers,message) = \
+                yield self.rpc_send('start_transaction',params,
+                                    timeout=self.default_rpc_timeout)
+        
+        assert(isinstance(content,dict)), 'Expected dict result'
         
         defer.returnValue(content)
         
@@ -2127,8 +2269,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
 
         content = {'command':command,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('execute_observatory',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('execute_observatory',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2149,8 +2292,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_observatory',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_observatory',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2173,8 +2317,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('set_observatory',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('set_observatory',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2195,8 +2340,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_observatory_metadata',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_observatory_metadata',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2216,7 +2362,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_observatory_status',content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_observatory_status',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2235,7 +2383,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_capabilities',content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_capabilities',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2263,11 +2413,12 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(command,list)), 'Expected a command list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
-        rpc_timeout = 30
         
-        content = {'channels':channels,'command':command,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('execute_device',
-                                                         content,timeout=rpc_timeout)
+        content = {'channels':channels,'command':command,
+                   'transaction_id':transaction_id}
+        (content,headers,messaage) = yield \
+            self.rpc_send('execute_device',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2287,7 +2438,8 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_device',content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_device',content,timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2308,7 +2460,8 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('set_device',content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('set_device',content,timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2328,8 +2481,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_device_metadata',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_device_metadata',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2349,8 +2503,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'params':params,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('get_device_status',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('get_device_status',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2369,8 +2524,9 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
         content = {'bytes':bytes,'transaction_id':transaction_id}
-        (content,headers,messaage) = yield self.rpc_send('execute_device_direct',
-                                                         content)
+        (content,headers,messaage) = yield \
+            self.rpc_send('execute_device_direct',content,
+                          timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
@@ -2427,6 +2583,9 @@ class InstrumentAgentClient(ProcessClient):
 
         content = {'time':time,'transaction_id':transaction_id}
         (content,headers,messaage) = yield self.rpc_send('sleep',content)
+        
+        
+
         
     
     

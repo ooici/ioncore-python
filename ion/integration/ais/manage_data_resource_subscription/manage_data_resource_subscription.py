@@ -27,7 +27,7 @@ from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
-from ion.core.intercept.policy import get_dispatcher_queue_for_user
+from ion.core.intercept.policy import get_dispatcher_id_for_user
 
 from ion.core.object import object_utils
 
