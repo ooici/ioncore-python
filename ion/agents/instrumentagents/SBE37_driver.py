@@ -1898,9 +1898,6 @@ class SBE37Driver(InstrumentDriver):
         cur_state = self.fsm.current_state
         yield self.reply_ok(msg, cur_state)
 
-    @defer.inlineCallbacks
-    def op_test_stub():
-        pass
 
 
     ###########################################################################
