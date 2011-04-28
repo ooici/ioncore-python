@@ -277,7 +277,7 @@ class SchedulerService(ServiceProcess):
         @retval reply_ok or reply_err
         """
         try:
-            task_id         = str(uuid4())
+            task_id         = content.task_id or str(uuid4())
             msg_interval    = content.interval_seconds
             desired_origin  = content.desired_origin
             if content.IsFieldSet('start_time'):
@@ -303,10 +303,19 @@ class SchedulerService(ServiceProcess):
             log.exception('Required keys in op_add_task content not found!')
             raise SchedulerError(str(ke))
 
-        log.debug('ok, gotta task to save')
+        log.debug('AddTask: about to add task %s' % task_id)
+
+        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
+
+        # check to see if the task_id already exists in the store
+        existing_task = yield self.scheduled_events.get(task_id)
+        if existing_task is not None:
+            log.warn("Already have task with id %s scheduled." % task_id)
+            resp.duplicate = True
+            yield self.reply_ok(msg, resp)
+            defer.returnValue(None)
 
         #create the response: task_id and actual origin
-        resp            = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
         resp.task_id    = task_id
         resp.origin     = desired_origin
 

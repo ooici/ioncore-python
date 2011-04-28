@@ -133,6 +133,46 @@ class SchedulerTest(IonTestCase):
         #log.debug(rc)
 
     @defer.inlineCallbacks
+    def test_add_remove_duplicate_task_id(self):
+        """
+        Making sure we can specify a "known" task_id and that it won't duplicate.
+        """
+        # Create clients
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
+
+        task_id = "the_one_true_task"
+
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.task_id           = task_id
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 10
+        msg_a.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_a.payload.dataset_id = "TESTER"
+        msg_a.payload.datasource_id = "TWO"
+
+        resp_msg = yield sc.add_task(msg_a)
+        self.failIf(resp_msg.duplicate)
+
+        # try to schedule it again!
+        msg_b = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_b.task_id           = task_id
+        msg_b.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_b.interval_seconds  = 30
+        msg_b.payload           = msg_a.CreateObject(SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE)
+        msg_b.payload.dataset_id = "SOME SIMILAR TASK"
+        msg_b.payload.datasource_id = "BUT NOT RLY"
+
+        msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+        msg_r.task_id = task_id
+
+        resp_msg = yield sc.add_task(msg_b)
+        self.failUnless(resp_msg.duplicate)
+
+        rc = yield sc.rm_task(msg_r)
+        self.failUnlessEqual(rc.value, 'OK')
+
+    @defer.inlineCallbacks
     def test_complete_usecase(self):
         """
         Add a task, get a message, remove same.
