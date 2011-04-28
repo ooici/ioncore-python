@@ -17,7 +17,6 @@ from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.SBE37_driver import SBE37DriverClient
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.SBE37_driver import DriverException
-from ion.agents.instrumentagents.instrument_agent import errors
 
 
 log = ion.util.ionlog.getLogger(__name__)

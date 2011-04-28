@@ -211,6 +211,17 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
+    def op_findDataResourceSubscriptions(self, content, headers, msg):
+        """
+        @brief find subscriptions to a data resource
+        """
+        log.debug('op_findDataResourceSubscriptions: \n'+str(content))
+        worker = ManageDataResourceSubscription(self)
+        log.debug('op_findDataResourceSubscriptions: calling worker')
+        response = yield worker.find(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
     def op_deleteDataResourceSubscription(self, content, headers, msg):
         """
         @brief delete subscription to a data resource
@@ -290,7 +301,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
         log.debug("AppIntegrationServiceClient: createDownloadURL(): sending msg to AppIntegrationService.")
@@ -321,7 +332,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             defer.returnValue(Response)
         log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('updateUserProfile',
@@ -343,7 +354,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             defer.returnValue(Response)
         log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('getUser',
@@ -410,6 +421,14 @@ class AppIntegrationServiceClient(ServiceClient):
         defer.returnValue(content)
         
     @defer.inlineCallbacks
+    def findDataResourceSubscriptions(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.findDataResourceSubscriptions: sending following message:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('findDataResourceSubscriptions', message)
+        log.debug('AIS_client.findDataResourceSubscriptions: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
     def deleteDataResourceSubscription(self, message):
         yield self._check_init()
         log.debug("AIS_client.deleteDataResourceSubscription: sending following message:\n%s" % str(message))
@@ -433,7 +452,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = 'Bad message type receieved, ignoring'
+            Response.error_str = 'Bad message type received, ignoring (AIS)'
             defer.returnValue(Response)
 
         # Check payload in message
@@ -441,7 +460,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [message_parameters_reference] not found in message"
+            Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
             defer.returnValue(Response)
   
         defer.returnValue(None)
