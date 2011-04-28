@@ -175,7 +175,7 @@ class ManageDataResource(object):
                 log.info("Getting instance of data source resource")
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 log.info("Getting instance of dataset resource from association")
-                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID)
+                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID, DATASET_RESOURCE_TYPE_ID)
 
                 log.info("Setting data source resource lifecycle = retired")
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
@@ -391,7 +391,7 @@ class ManageDataResource(object):
 
 
     @defer.inlineCallbacks
-    def _getOneAssociationObject(self, the_subject, the_predicate):
+    def _getOneAssociationObject(self, the_subject, the_predicate, the_object_type):
         """
         @brief get the subject side of an association when you only expect one
         @return id of what you're after
@@ -403,8 +403,8 @@ class ManageDataResource(object):
 
         association = None
         for a in found:
-            exists = yield self.ac.association_exists(a.ObjectReference.key, TYPE_OF_ID, DATASOURCE_RESOURCE_TYPE_ID)
-            if exists:
+            mystery_resource = yield self.rc.get_instance(a.ObjectReference.key)
+            if the_object_type == mystery_resource.ResourceTypeID.key:
                 #FIXME: if not association is None then we have data inconsistency!
                 association = a
 
