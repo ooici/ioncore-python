@@ -59,7 +59,7 @@ class SchedulerTest(IonTestCase):
 
         # setup subscriber for trigger event
         self._notices = []
-        self.sub = ScheduleEventSubscriber(process=self.proc,
+        self.sub = ScheduleEventSubscriber(process=self.sup,
                                            origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
         self.sub.ondata = lambda c: self._notices.append(c)
 
