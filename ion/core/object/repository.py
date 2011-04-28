@@ -228,6 +228,7 @@ class ObjectContainer(object):
         The list of currently excluded object types
         """
 
+
     @property
     def root_object(self):
         return self._workspace_root
@@ -553,6 +554,13 @@ class Repository(ObjectContainer):
         cache memory size of the workbench has been exceeded.
         """
 
+        self.convid_context = 'DEFAULT'
+        """
+        This context object is used to determine when a repository should be moved from level 1 persistent caching
+        to level 2 LRU caching in the workbench.
+        """
+
+
 
         ### Structures for managing associations to a repository:
 
@@ -654,6 +662,9 @@ class Repository(ObjectContainer):
         for item in self._commit_index.itervalues():
             #print 'ITEM',item
             item.Invalidate()
+
+        self.purge_associations()
+
 
         self._dotgit.Invalidate()
 
@@ -1065,6 +1076,7 @@ class Repository(ObjectContainer):
 
         if self.status == self.MODIFIED:
 
+            #@TODO consider changing this to a warning rather than an exception
             raise RepositoryError('Can not purge repository in a modified state! Data will be lost')
 
         # Do some clean up!
@@ -1075,6 +1087,11 @@ class Repository(ObjectContainer):
         self._workspace_root = None
 
 
+    def purge_associations(self):
+
+        self.associations_as_object.predicate_sorted_associations.clear()
+        self.associations_as_predicate.predicate_sorted_associations.clear()
+        self.associations_as_subject.predicate_sorted_associations.clear()
 
         
     def commit(self, comment=''):

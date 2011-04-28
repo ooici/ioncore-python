@@ -27,11 +27,16 @@ from ion.core.exception import ReceivedApplicationError, ReceivedContainerError,
 
 import weakref
 
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+from ion.core.ioninit import request
+from net.ooici.core.container import container_pb2
+
+
 from ion.util.cache import LRUDict
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from net.ooici.core.container import container_pb2
 
 STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
 STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=2, version=1)
@@ -235,35 +240,45 @@ class WorkBench(object):
             if v == key:
                 del self._repository_nicknames[k]
 
-    def cache_non_persistent(self):
+
+    def cache_repository(self, repo):
+
+        key = repo.repository_key
+        # Get rid of the nick name - this is a PITA
+        for k,v in self._repository_nicknames.items():
+            if v == key:
+                del self._repository_nicknames[k]
+
+        # Delete it from the deterministically held repo dictionary
+        del self._repos[key]
+
+        repo.purge_workspace()
+
+        repo.purge_associations()
+
+        # Move it to the cached repositories
+        self._repo_cache[key] = repo
+
+
+    def manage_workbench_cache(self, convid_context=None):
+        """
+        @Brief Move repositories from the level 1 persistent cache to the level two LRU cache
+        @param convid_context if not None, move only objects in a particular context
+        """
 
         # Can't use iter here - it is actually deleting keys in the dict object.
         for key, repo in self._repos.items():
 
-            if repo.persistent is False and repo.cached is True:
+            if repo.persistent is True:
+                continue
 
-                # Get rid of the nick name - this is a PITA
-                for k,v in self._repository_nicknames.items():
-                    if v == key:
-                        del self._repository_nicknames[k]
+            if repo.convid_context == convid_context or repo.convid_context is None:
 
-                # Delete it from the deterministically held repo dictionary
-                del self._repos[key]
+                if repo.cached is False:
+                    self.clear_repository(repo)
 
-                repo.purge_workspace()
-
-                # Move it to the cached repositories
-                self._repo_cache[key] = repo
-
-
-
-    def clear_non_persistent(self):
-
-        # Can't use iter here - it is actually deleting keys in the dict object.
-        for repo in self._repos.values():
-
-            if repo.persistent is False:
-                self.clear_repository(repo)
+                else:
+                    self.cache_repository(repo)
 
 
     def clear(self):
@@ -278,7 +293,7 @@ class WorkBench(object):
 
         self._repos.clear()
 
-        # The cache knows to clear its content objects
+        #The cache knows to clear its content objects
         self._repo_cache.clear()
 
         # these are just strings
@@ -297,6 +312,8 @@ class WorkBench(object):
         self._repos[repo.repository_key] = repo
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
+
+        repo.convid_context = request.get('workbench_context',None)
 
        
     def reference_repository(self, repo_key, current_state=False):

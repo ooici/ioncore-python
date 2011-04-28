@@ -823,14 +823,14 @@ class RepositoryTest(unittest.TestCase):
         repo_refs = closure(self.wb)
 
         for item in repo_refs:
-            self.assertNotEqual(item(),None)
+            self.assertNotIdentical(item(),None)
 
-        self.wb.clear_non_persistent()
+        self.wb.clear()
 
         gc.collect()
 
         for item in repo_refs:
-            self.assertEqual(item(),None)
+            self.assertIdentical(item(),None)
             
             
 class MergeContainerTest(unittest.TestCase):

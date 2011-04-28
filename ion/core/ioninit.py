@@ -11,6 +11,7 @@ import logging.config
 import re
 import os, os.path
 
+from ion.util.context import StackLocal
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
@@ -57,6 +58,12 @@ sys_name = None
 
 # Global flag determining whether currently running unit test
 testing = True
+
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+request = StackLocal()
+
+
 
 def config(name):
     """

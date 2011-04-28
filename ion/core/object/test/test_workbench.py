@@ -161,7 +161,7 @@ class WorkBenchTest(unittest.TestCase):
 
         self.assertIn(key, self.wb._repos)
 
-        self.wb.clear_non_persistent()
+        self.wb.manage_workbench_cache()
 
         # make sure it is gone!
         self.assertNotIn(key, self.wb._repos)
@@ -179,7 +179,7 @@ class WorkBenchTest(unittest.TestCase):
 
         self.repo.persistent = True
 
-        self.wb.clear_non_persistent()
+        self.wb.manage_workbench_cache()
 
         self.assertIn(key, self.wb._repos)
 
@@ -201,7 +201,53 @@ class WorkBenchTest(unittest.TestCase):
         self.assertNotIn(key, self.wb._repo_cache)
 
         # Move it to the cache
-        self.wb.cache_non_persistent()
+        self.wb.manage_workbench_cache()
+
+        # Make sure it is in the right place
+        self.assertNotIn(key, self.wb._repos)
+        self.assertIn(key, self.wb._repo_cache)
+
+        # Get it back again
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        # back again...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+
+    def test_manage_cache_context(self):
+
+        self.repo.commit('junk')
+
+        self.repo.convid_context = 'mine!'
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.cached = True
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage without context
+        self.wb.manage_workbench_cache()
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage other context
+        self.wb.manage_workbench_cache('Not Mine')
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage with context
+        self.wb.manage_workbench_cache('mine!')
+
 
         # Make sure it is in the right place
         self.assertNotIn(key, self.wb._repos)
@@ -241,8 +287,6 @@ factory = ProcessFactory(WorkBenchProcess)
 
 
 class WorkBenchProcessTest(IonTestCase):
-
-
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -327,11 +371,11 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def test_pull_invalid(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
+        yield self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
 
 
     @defer.inlineCallbacks
