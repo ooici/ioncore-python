@@ -16,6 +16,10 @@ from ion.test.iontest import IonTestCase
 from ion.core.process.process import ProcessDesc
 
 from ion.core import bootstrap
+from ion.util.itv_decorator import itv
+from ion.core import ioninit
+
+CONF = ioninit.config(__name__)
 
 class LETest(IonTestCase):
     @defer.inlineCallbacks
@@ -26,6 +30,7 @@ class LETest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_basic(self):
 
@@ -38,13 +43,11 @@ class LETest(IonTestCase):
         p1id = yield self.test_sup.spawn_child(proc1)
 
         lec = LazyEyeClient(proc=sup1, target=p1id)
-        yield lec.start('superfile.msc')
+        yield lec.start()
         msc_txt = yield lec.stop()
         log.debug('msc says: "%s"' % msc_txt)
         rc = yield lec.get_results()
 
-        log.debug("image name: %s" % rc['imagename'])
-        self.failUnlessEqual(rc['imagename'], 'superfile.png')
         self.failIf(rc['num_edges'] <= 0)
 
         
