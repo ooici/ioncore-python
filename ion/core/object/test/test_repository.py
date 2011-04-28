@@ -284,8 +284,8 @@ class RepositoryTest(unittest.TestCase):
         
         repo, person = self.wb.init_repository(PERSON_TYPE)
         
-        repo.commit('junk commit')
-        
+        cref_id = repo.commit('junk commit')
+
         # Checkout to invalidate it
         person_2 = yield repo.checkout('master')
         

@@ -40,16 +40,16 @@ message AddTaskRequest {
     // desired_origin is where the event notification will originate from
     //   this is not required to be sent... one will be generated if not
     // interval is seconds between messages
-    // payload is string
+    // payload is ref to some GPB
 
-    optional string desired_origin    = 1;
-    optional uint64 interval_seconds  = 2;
-    optional string payload           = 3;
-
-    //these are actually optional: epoch times for start/end
-    optional uint64 time_start_unix   = 4;
-    optional uint64 time_end_unix     = 5;
+    optional string desired_origin              = 1;
+    optional uint64 interval_seconds            = 2;
+    optional sint64 start_time                  = 3;        // format:UNIX epoch, in ms, can be unset, will use current time
+    optional sint64 end_time                    = 4;        // format:UNIX epoch, in ms, can be unset
+    optional string user_id                     = 5;
+    optional net.ooici.core.link.CASRef payload = 6;
 }
+
 """
 
 ADDTASK_RSP_TYPE  = object_utils.create_type_identifier(object_id=2602, version=1)
@@ -336,17 +336,18 @@ class SchedulerService(ServiceProcess):
         del self._callback_tasks[task_id]
 
         # deserialize and objectify payload
-        # @TODO: this is costly, should keep cache?
-        repo = self.workbench.create_repository()
-        payload = repo._load_element(StructureElement.parse_structure_element(tdef['payload']))
+        log.debug('Time to send to "%s", id "%s"' % (tdef['desired_origin'], task_id))
 
-        log.debug('Time to send "%s" to "%s", id "%s"' % \
-                      (payload, tdef['desired_origin'], task_id))
+        msg = yield self.pub.create_event(origin=tdef['desired_origin'],
+                                          task_id=tdef['task_id'],
+                                          user_id=tdef['user_id'])
 
-        yield self.pub.create_and_publish_event(origin=tdef['desired_origin'],
-                                                task_id=tdef['task_id'],
-                                                user_id=tdef['user_id'],
-                                                payload=payload)
+        se = StructureElement.parse_structure_element(tdef['payload'])
+        payload = msg.Repository._load_element(se)
+        msg.Repository.index_hash[payload.MyId]=se
+
+        msg.additional_data.payload = payload
+        yield self.pub.publish_event(msg, origin=tdef['desired_origin'])
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
