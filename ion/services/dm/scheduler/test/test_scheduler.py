@@ -38,28 +38,26 @@ SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE = object_utils.create_type_i
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
 class SchedulerTest(IonTestCase):
+    services = [
+            {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
+             'class': 'SchedulerService'},
+        ]
+
     @defer.inlineCallbacks
     def setUp(self):
         self.timeout = 10
-        services = [
-            {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
-             'class': 'SchedulerService'},
-
-            {'name' : 'attributestore', 'module' : 'ion.services.coi.attributestore',
-             'class' : 'AttributeStoreService'},
-
-        ]
 
         yield self._start_container()
-        self.sup = yield self._spawn_processes(services)
+        sup = yield self._spawn_processes(self.services)
+
+        yield self._setup_store()
 
         self.proc = Process()
         yield self.proc.spawn()
 
-
         # setup subscriber for trigger event
         self._notices = []
-        self.sub = ScheduleEventSubscriber(process=self.sup,
+        self.sub = ScheduleEventSubscriber(process=self.proc,
                                            origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
         self.sub.ondata = lambda c: self._notices.append(c)
 
@@ -70,10 +68,27 @@ class SchedulerTest(IonTestCase):
 
 
     @defer.inlineCallbacks
+    def _setup_store(self):
+        """
+        Override this in derived tests for Cassandra setup, etc.
+        """
+        yield 1
+        defer.returnValue(None)
+
+    @defer.inlineCallbacks
     def tearDown(self):
 
+        yield self._cleanup_store()
         yield self._shutdown_processes()
         yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def _cleanup_store(self):
+        """
+        Override this in derived tests for Cassandra cleanup, etc.
+        """
+        yield 1
+        defer.returnValue(None)
 
     def test_service_init(self):
         # Just run the setup/teardown code
@@ -82,8 +97,8 @@ class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_add_remove(self):
         # Create clients
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
@@ -144,8 +159,8 @@ class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_rm(self):
         # Create clients
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
@@ -165,8 +180,8 @@ class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_future_start_time(self):
 
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
@@ -193,8 +208,8 @@ class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_past_start_time(self):
 
-        mc = MessageClient(proc=self.sup)
-        sc = SchedulerServiceClient(proc=self.sup)
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
 
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
         msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE

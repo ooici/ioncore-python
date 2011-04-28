@@ -139,6 +139,7 @@ class EventPublisher(Publisher):
         """
         for k,v in msgargs.items():
             if hasattr(msg, k):
+                log.debug("_set_msg_fields: setting field %s" % k)
                 # is this an enum field and we've passed a string that looks like it could be a name?
                 if msg._Properties[k].field_type == "TYPE_ENUM" and isinstance(v, str):
                     # translate v into the real value
