@@ -290,7 +290,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
         log.debug("AppIntegrationServiceClient: createDownloadURL(): sending msg to AppIntegrationService.")
@@ -321,7 +321,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             defer.returnValue(Response)
         log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('updateUserProfile',
@@ -343,7 +343,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
             defer.returnValue(Response)
         log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('getUser',
@@ -433,7 +433,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = 'Bad message type receieved, ignoring'
+            Response.error_str = 'Bad message type received, ignoring (AIS)'
             defer.returnValue(Response)
 
         # Check payload in message
@@ -441,7 +441,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [message_parameters_reference] not found in message"
+            Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
             defer.returnValue(Response)
   
         defer.returnValue(None)

@@ -250,7 +250,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [resource_type] not found in message"
+         Response.error_str = "Required field [resource_type] not found in message (AIS)"
          defer.returnValue(Response)
 
       # check for known resource type
@@ -265,7 +265,7 @@ class ManageResources(object):
          log.debug('resource type ' + msg.message_parameters_reference.resource_type + ' is unknown')
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Unknown resource type [%s] in message"%msg.message_parameters_reference.resource_type
+         Response.error_str = "Unknown resource type [%s] in message (AIS)"%msg.message_parameters_reference.resource_type
          defer.returnValue(Response)
 
       # Get the list of resource IDs for this type of resource
@@ -452,7 +452,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [ooi_id] not found in message"
+         Response.error_str = "Required field [ooi_id] not found in message (AIS)"
          defer.returnValue(Response)
          
       if 'epu_controller' in msg.message_parameters_reference.ooi_id:
@@ -469,7 +469,7 @@ class ManageResources(object):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = str(ex)
+            Response.error_str = 'Error calling get_instance (AIS): '+str(ex)
             defer.returnValue(Response)
    
          # debug print for dumping the attributes of the resource
