@@ -101,7 +101,6 @@ class ManageDataResourceSubscription(object):
         """
         log.info('ManageDataResourceSubscription.updateDataResourceSubscription()\n')
 
-
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
@@ -117,8 +116,6 @@ class ManageDataResourceSubscription(object):
 
             #FIXME: just delete and re-add
 
-
-
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
 
@@ -127,9 +124,6 @@ class ManageDataResourceSubscription(object):
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         #Response.message_parameters_reference.add()
@@ -152,7 +146,7 @@ class ManageDataResourceSubscription(object):
         @GPB{Returns,9201,1}
         @retval success
         """
-        log.info('ManageDataResourceSubscription.deletDataResourceSubscription()\n')
+        log.info('ManageDataResourceSubscription.delete()\n')
 
         try:
             # Check only the type received and linked object types. All fields are
@@ -167,9 +161,6 @@ class ManageDataResourceSubscription(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-
-
-        
             #check that we have GPB for subscription_modify_type
             #get msg. dispatcher_id, script_path, data_source_resource_id
             #check that dispatcher_id exists -- look up the resource gpb #7002
@@ -187,8 +178,6 @@ class ManageDataResourceSubscription(object):
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         #Response.message_parameters_reference.add()
