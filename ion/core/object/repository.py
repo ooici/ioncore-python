@@ -198,7 +198,7 @@ class ObjectContainer(object):
         The upstream source of this repository.
         """
 
-        self.excluded_types = []
+        self.excluded_types = self.DefaultExcludedTypes[:]
         """
         The list of currently excluded object types
         """
