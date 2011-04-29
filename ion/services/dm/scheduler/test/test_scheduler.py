@@ -192,20 +192,35 @@ class SchedulerTest(IonTestCase):
 
         log.debug(resp_msg.task_id)
         self.failIf(resp_msg.task_id is None)
+
+
+        print 'HEEKNENEKNEKENKNEKEKNENKNEKNEKNKEEKNKNEENK'
         #fixme: also fail if we don't get GPB #2602 back
 
         # Wait for a message to go through the system
         yield asleep(3)
         #cc = yield self.client.get_count()
         #self.failUnless(int(cc['value']) >= 1)
-        self.failUnless(len(self._notices) > 1, "this may fail intermittently due to messaging")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
-        
+        #self.failUnless(len(self._notices) > 1, "this may fail intermittently due to messaging")
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
+
+
+        print 'HEEKNENEKNEKENKNEKEKNENKNEKNEKNKEEKNKNEENK222222'
+
+
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
+
+        print 'HEEKNENEKNEKENKNEKEKNENKNEKNEKNKEEKNKNEENK222222.5'
+
         msg_r.task_id = resp_msg.task_id
 
+        print 'HEEKNENEKNEKENKNEKEKNENKNEKNEKNKEEKNKNEENK33333333'
+
+
         rc = yield sc.rm_task(msg_r)
+
+        print 'HEEKNENEKNEKENKNEKEKNENKNEKNEKNKEEKNKNEENK44444444444'
 
 
         self.failUnlessEqual(rc.value, 'OK')

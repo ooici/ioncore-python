@@ -325,6 +325,8 @@ class Receiver(BasicLifecycleObject):
                         print 'No Workbench!'
                         print 'Receiver Process: ', self.process
 
+                    print 'FINISHED with receiver - after CLEANUP!'
+
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
