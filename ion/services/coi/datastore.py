@@ -758,7 +758,7 @@ class DataStoreWorkbench(WorkBench):
         log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
-        self.clear_non_persistent()
+        self.clear()
 
 
     @defer.inlineCallbacks

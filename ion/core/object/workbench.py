@@ -719,14 +719,6 @@ class WorkBench(object):
 
             repostate.blob_keys.extend(self.list_repository_blobs(repo))
 
-
-        persistent = {}
-        # Do this immediately before the rpc_send
-        for repo in self._repos.itervalues():
-            # Save its current persistence state - do not delete anything that is currently being pushed
-            persistent[repo.repository_key] = repo.persistent
-            repo.persistent = True
-
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'push', pushmsg)
 
@@ -736,14 +728,7 @@ class WorkBench(object):
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
 
-        finally:
-            for repo in self._repos.itervalues():
-                # Set the persistence state back the way it was!
-
-                # only set the old ones...
-                if repo.repository_key in persistent:
-                    repo.persistent = persistent[repo.repository_key]
-
+        
         defer.returnValue(result)
         # @TODO - check results?
 
