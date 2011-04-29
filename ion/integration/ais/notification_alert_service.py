@@ -121,7 +121,7 @@ class NotificationAlertService(ServiceProcess):
             #rows[key]['subscription_type'] == SUBSCRIPTION_INFO_TYPE.subscription_type.EMAIL
 
             if (rows[key]['subscription_type'] == 2 or rows[key]['subscription_type'] == 0 ) \
-                and (rows[key]['email_alerts_filter'] == 0 or  rows[key]['email_alerts_filter'] ) == 2:
+                and (rows[key]['email_alerts_filter'] == 1 or  rows[key]['email_alerts_filter'] == 2 ) :
                 # Send the message via our own SMTP server, but don't include the envelope header.
                 # Create the container (outer) email message.
                 log.info('NotificationAlertService.handle_offline_event CREATE EMAIL')
@@ -183,7 +183,7 @@ class NotificationAlertService(ServiceProcess):
                 #rows[key]['subscription_type'] == SUBSCRIPTION_INFO_TYPE.subscription_type.EMAIL
 
                 if (rows[key]['subscription_type'] == 2 or rows[key]['subscription_type'] == 0 ) \
-                    and (rows[key]['email_alerts_filter'] == 1 or  rows[key]['email_alerts_filter'] ) == 2:
+                    and (rows[key]['email_alerts_filter'] == 0 or  rows[key]['email_alerts_filter'] == 2 ) :
                     # Send the message via our own SMTP server, but don't include the envelope header.
                     # Create the container (outer) email message.
                     log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
@@ -234,7 +234,7 @@ class NotificationAlertService(ServiceProcess):
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [subscriptionInfo] not found in message"
              defer.returnValue(Response)
@@ -242,7 +242,7 @@ class NotificationAlertService(ServiceProcess):
         # check that AisDatasetMetadataType is present in GPB
         if not content.message_parameters_reference.IsFieldSet('datasetMetadata'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [datasetMetadata] not found in message"
              defer.returnValue(Response)
@@ -250,14 +250,14 @@ class NotificationAlertService(ServiceProcess):
         # check that ooi_id is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [data_src_id] not found in message"
              defer.returnValue(Response)
@@ -265,7 +265,7 @@ class NotificationAlertService(ServiceProcess):
         # check that subscription type enum is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [subscription_type] not found in message"
              defer.returnValue(Response)
@@ -275,6 +275,7 @@ class NotificationAlertService(ServiceProcess):
 
 
         #add the subscription to the index store
+        log.info('NotificationAlertService.op_addSubscription() add attributes\n ')
         self.attributes = {'user_ooi_id':content.message_parameters_reference.subscriptionInfo.user_ooi_id,
                    'data_src_id': content.message_parameters_reference.subscriptionInfo.data_src_id,
                    'subscription_type':content.message_parameters_reference.subscriptionInfo.subscription_type,
@@ -346,7 +347,7 @@ class NotificationAlertService(ServiceProcess):
 
         # create the AIS response GPBs
         log.info('NotificationAlertService.op_addSubscription construct response message')
-        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         respMsg.result = respMsg.ResponseCodes.OK;
 
         log.info('NotificationAlertService.op_addSubscription complete')
@@ -368,7 +369,7 @@ class NotificationAlertService(ServiceProcess):
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [subscriptionInfo] not found in message"
              defer.returnValue(Response)
@@ -376,7 +377,7 @@ class NotificationAlertService(ServiceProcess):
         # check that ooi_id is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
@@ -384,7 +385,7 @@ class NotificationAlertService(ServiceProcess):
         # check that data_src_id name is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [data_src_id] not found in message"
              defer.returnValue(Response)
@@ -399,7 +400,7 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.op_removeSubscription  Removal completed')
 
         # create the AIS response GPB
-        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         respMsg.result = respMsg.ResponseCodes.OK
 
         log.info('NotificationAlertService..op_removeSubscription complete')
@@ -423,7 +424,7 @@ class NotificationAlertService(ServiceProcess):
         # check that ooi_id is present in GPB
         if not content.message_parameters_reference.IsFieldSet('user_ooi_id'):
              # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
@@ -435,7 +436,7 @@ class NotificationAlertService(ServiceProcess):
         log.info("NotificationAlertService.op_getSubscriptionList  Rows returned %s " % (rows,))
 
         # create the register_user request GPBs
-        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         respMsg.message_parameters_reference.add()
         respMsg.message_parameters_reference[0] = respMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
 
@@ -482,7 +483,7 @@ class NotificationAlertService(ServiceProcess):
       # Check for correct request protocol buffer type
       if request.MessageType != AIS_REQUEST_MSG_TYPE:
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
          Response.error_str = 'Bad message type receieved, ignoring'
          defer.returnValue(Response)
@@ -490,7 +491,7 @@ class NotificationAlertService(ServiceProcess):
       # Check payload in message
       if not request.IsFieldSet('message_parameters_reference'):
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
          Response.error_str = "Required field [message_parameters_reference] not found in message"
          defer.returnValue(Response)
@@ -502,7 +503,7 @@ class NotificationAlertService(ServiceProcess):
 
         log.info('NotificationAlertService.GetUserInformation user:  %s  attributes: %s', user_ooi_id, tempTbl)
         #Build the Identity Registry request for get_user message
-        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE)
         Request.configuration = Request.CreateObject(USER_OOIID_TYPE)
         Request.configuration.ooi_id = user_ooi_id
 
@@ -512,7 +513,7 @@ class NotificationAlertService(ServiceProcess):
         except ReceivedApplicationError, ex:
              # build AIS error response
              log.info('NotificationAlertService.GetUserInformation Send Error: %s ', ex.msg_content.MessageResponseBody)
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS Notification Alert Service: Add Subscription error response')
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = ex.msg_content.MessageResponseCode
              Response.error_str = ex.msg_content.MessageResponseBody
              defer.returnValue(Response)
