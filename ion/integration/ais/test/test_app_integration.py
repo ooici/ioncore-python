@@ -82,8 +82,8 @@ class AppIntegrationTest(IonTestCase):
         store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
-
-
+        
+        self.dispatcher_id = None
 
         services = [
             {
@@ -96,20 +96,23 @@ class AppIntegrationTest(IonTestCase):
                 'module':'ion.services.coi.datastore',
                 'class':'DataStoreService',
                 'spawnargs':
+                    {
+                        PRELOAD_CFG:
                             {
-                                PRELOAD_CFG:
-                                    {
-                                        ION_DATASETS_CFG:True,
-                                        ION_AIS_RESOURCES_CFG:True
-                                    },
-                                COMMIT_CACHE:'ion.core.data.store.IndexStore'
-                            }
+                                ION_DATASETS_CFG:True,
+                                ION_AIS_RESOURCES_CFG:True
+                            },
+                        COMMIT_CACHE:'ion.core.data.store.IndexStore'
+                    }
             },
             {
                 'name':'resource_registry1',
                 'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
-                    'spawnargs':{'datastore_service':'datastore'}},
+                'spawnargs':
+                    {
+                        'datastore_service':'datastore'}
+                    },
             {
                 'name':'exchange_management',
                 'module':'ion.services.coi.exchange.exchange_management',
@@ -161,6 +164,21 @@ class AppIntegrationTest(IonTestCase):
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
 
+        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
+        f = None
+        id = None
+
+        """        
+        try:
+            f = open('dispatcher.id', 'r')
+            id = f.read().strip()
+            # @todo: ensure this resource exists in the ResourceRepo
+        except IOError:
+             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
+        finally:
+            if f is not None:
+                f.close()
+        """
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -1013,12 +1031,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        
+
+       # Add a subscription for this user to this data resource
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
-        #reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
