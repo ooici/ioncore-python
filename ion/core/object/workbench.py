@@ -68,7 +68,10 @@ PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1
 BLOBS_REQUSET_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=51, version=1)
 BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
 
-
+DATA_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=53, version=1)
+DATA_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=54, version=1)
+GET_OBJECT_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=55, version=1)
+GET_OBJECT_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=56, version=1)
 
 class WorkBenchError(ApplicationError):
     """
@@ -400,6 +403,8 @@ class WorkBench(object):
             """
             return (x.type not in content.excluded_types)
 
+        # this is inherited by DatastoreWorkbench, which requires the _get_blobs call be a deferred, whereas here it is not.
+        # tldr; maybeDeferred necessary.
         blobs = yield defer.maybeDeferred(self._get_blobs, response.Repository, [content.commit_root_object], filtermethod)
 
         for element in blobs.values():
@@ -416,12 +421,8 @@ class WorkBench(object):
         """
         Pull the current state of the repository
         """
-
-        if excluded_types is None:
-            excluded_types = repository.Repository.DefaultExcludedTypes
-        elif not hasattr(excluded_types, '__iter__'):
+        if excluded_types is not None and not hasattr(excluded_types, '__iter__'):
             raise WorkBenchError('Invalid excluded_types argument passed to checkout')
-
 
         # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
@@ -444,6 +445,10 @@ class WorkBench(object):
             # If we have a current version - get the list of commits
             commit_list = self.list_repository_commits(repo)
 
+        # set excluded types on this repository
+        if excluded_types is not None:
+            repo.excluded_types = excluded_types
+
         # Create pull message
         pullmsg = yield self._process.message_client.create_instance(PULL_MESSAGE_TYPE)
         pullmsg.repository_key = repo.repository_key
@@ -451,7 +456,7 @@ class WorkBench(object):
         pullmsg.commit_keys.extend(commit_list)
 
         if get_head_content:
-            for extype in excluded_types:
+            for extype in repo.excluded_types:
                 exobj = pullmsg.excluded_types.add()
                 exobj.object_id = extype.object_id
                 exobj.version = extype.version
@@ -562,31 +567,22 @@ class WorkBench(object):
             link.SetLink(obj)
 
 
+
+
+
         if request.get_head_content:
-            blobs=set()
-            for commit in repo.current_heads():
 
-                root_object_link = commit.GetLink('objectroot')
+            keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
 
-                element = repo.index_hash.get(root_object_link.key, None)
-                if element is None:
-                    raise WorkBenchError('Repository root object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+            def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in request.excluded_types)
 
-                new_elements = set([element,])
+            blobs = self._get_blobs(response.Repository, keys, filtermethod)
 
-                while len(new_elements) > 0:
-                    children = set()
-                    for element in new_elements:
-                        blobs.add(element)
-                        for child_key in element.ChildLinks:
-                            child = repo.index_hash.get(child_key,None)
-                            if child is None:
-                                raise WorkBenchError('Repository object not found in op_pull', request.ResponseCodes.NOT_FOUND)
-                            elif child not in blobs:
-                                children.add(child)
-                    new_elements = children
-
-            for element in blobs:
+            for element in blobs.itervalues():
                 link = response.blob_elements.add()
                 obj = response.Repository._wrap_message_object(element._element)
 

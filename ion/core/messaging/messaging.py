@@ -192,18 +192,33 @@ class ProcessExchangeSpace(ExchangeSpace):
     """
     def __init__(self, message_space, name):
         ExchangeSpace.__init__(self, message_space, name)
+        self.pub_cache = {}
+        self.pub_cache_lock = defer.DeferredLock()
         self.type = "process"
         self.exchange = Exchange(name)
 
+
     @defer.inlineCallbacks
     def send(self, to_name, message_data, publisher_config=None, **kwargs):
-        if publisher_config is None: publisher_config = {}
-
-        pub_config = {'routing_key' : str(to_name)}
-        pub_config.update(publisher_config)
-        publisher = yield Publisher.name(self, pub_config)
+        # Need a lock to avoid a race condition on multiple sends to the same topic
+        
+        yield self.pub_cache_lock.acquire()
+        try:
+            if to_name in self.pub_cache:
+                publisher = self.pub_cache[to_name]
+            else:
+                if publisher_config is None: publisher_config = {}
+                pub_config = {'routing_key' : str(to_name)}
+                pub_config.update(publisher_config)
+                publisher = yield Publisher.name(self, pub_config)
+                
+                self.pub_cache[to_name] = publisher
+        finally:
+            self.pub_cache_lock.release()
+        
         yield publisher.send(message_data)
-        publisher.close()
+        #TODO we should close the publishers in the appropriate lifecycle state
+        #publisher.close()
 
 
 class TopicExchangeSpace(ExchangeSpace):

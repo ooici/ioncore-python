@@ -36,7 +36,9 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        SUBSCRIPTION_INFO_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
+                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
+                                                       GET_SUBSCRIPTION_LIST_REQ_TYPE, \
+                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE
 
 #fixme, don't need all of these
 
@@ -247,6 +249,106 @@ class ManageDataResourceSubscription(object):
                 Response.message_parameters_reference[0].success  = False
             else:            
                 Response.message_parameters_reference[0].success  = True
+            
+            defer.returnValue(Response)
+
+
+            ### NEW CODE END
+            
+            # Check only the type received and linked object types. All fields are
+            #strongly typed in google protocol buffers!
+            if msg.MessageType != SUBSCRIBE_DATA_RESOURCE_REQ_TYPE:
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
+                    "Expected SubscriptionCreateReqMsg type, got " + str(msg)
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+            if not (msg.IsFieldSet("user_ooi_id") and 
+                    msg.IsFieldSet("data_source_id") and
+                    msg.IsFieldSet("subscription_type")):
+
+                errtext = "ManageDataResourceSubscription.createDataResourceSubscription(): " + \
+                    "required fields not provided (user_ooi_id, data_ource_id, subscription_type)"
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+
+                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+
+            if msg.DISPATCHER == msg.subscription_type or msg.EMAILANDDISPATCHER == msg.subscription_type:
+                yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
+                
+            #FIXME: call maurice's code
+
+
+        except ReceivedApplicationError, ex:
+            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+
+            Response.error_num =  ex.msg_content.MessageResponseCode
+            Response.error_str =  ex.msg_content.MessageResponseBody
+            defer.returnValue(Response)
+
+
+
+        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+
+        Response.message_parameters_reference.add()
+        Response.message_parameters_reference[0] = Response.SubscribeObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
+        #FIXME
+        defer.returnValue(Response)
+
+
+    @defer.inlineCallbacks
+    def find(self, msg):
+        """
+        @brief find all subscriptions for a data resource
+        @param msg GPB, 
+        @GPB{Input,9203,1}
+        @GPB{Returns,9204,1}
+        @retval success
+        """
+        log.info('ManageDataResourceSubscription.findDataResourceSubscriptions()\n')
+        log.debug('user_ooi_id = ' + msg.message_parameters_reference.user_ooi_id)
+
+
+        try:
+            
+            # look at Maurice's service: notification alert service (test_notification_alert)
+            
+            ### NEW CODE START
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
+            reqMsg.message_parameters_reference.user_ooi_id = msg.message_parameters_reference.user_ooi_id
+    
+            log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
+            #reply = yield self.nac.getSubscriptionList(reqMsg)
+    
+            #if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            #    self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+    
+            #numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
+            #log.info('find: Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
+    
+            Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+            Response.message_parameters_reference.add()
+            Response.message_parameters_reference[0] = Response.CreateObject(FIND_DATA_SUBSCRIPTIONS_RSP_TYPE)
+        
+
+            if False:
+            #if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+                log.error('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+                #Response.message_parameters_reference[0].success  = False
+            else:
+                log.debug('find returning response message')
+                #Response.message_parameters_reference[0].success  = True
             
             defer.returnValue(Response)
 

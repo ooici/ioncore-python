@@ -18,12 +18,20 @@ from twisted.internet import defer, reactor
 import re
 from uuid import uuid4
 
+from ion.core.data import cassandra, store
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.services.dm.distribution.events import TriggerEventPublisher, ScheduleEventPublisher
+from ion.core.data.storage_configuration_utility import get_cassandra_configuration, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
+
+import ion.util.procutils as pu
+
+# get configuration
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 # constants from https://confluence.oceanobservatories.org/display/syseng/Scheduler+Events
 # import these and use them to schedule your events, they should be in the "desired origin" field
@@ -40,16 +48,16 @@ message AddTaskRequest {
     // desired_origin is where the event notification will originate from
     //   this is not required to be sent... one will be generated if not
     // interval is seconds between messages
-    // payload is string
+    // payload is ref to some GPB
 
-    optional string desired_origin    = 1;
-    optional uint64 interval_seconds  = 2;
-    optional string payload           = 3;
-
-    //these are actually optional: epoch times for start/end
-    //optional uint64 time_start_unix   = 4;
-    //optional uint64 time_end_unix     = 5;
+    optional string desired_origin              = 1;
+    optional uint64 interval_seconds            = 2;
+    optional sint64 start_time                  = 3;        // format:UNIX epoch, in ms, can be unset, will use current time
+    optional sint64 end_time                    = 4;        // format:UNIX epoch, in ms, can be unset
+    optional string user_id                     = 5;
+    optional net.ooici.core.link.CASRef payload = 6;
 }
+
 """
 
 ADDTASK_RSP_TYPE  = object_utils.create_type_identifier(object_id=2602, version=1)
@@ -132,6 +140,18 @@ class SchedulerService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=['attributestore'])
 
+    INDICES = ['task_id',
+               'desired_origin',
+               'interval_seconds',
+               'payload',
+               'user_id',
+               'constant',
+               'start_time',
+               'end_time'
+               ]
+
+    COLUMN_FAMILY = "scheduler"
+
     class SchedulerIndexStore(IndexStore):
         """
         Specifically derived IndexStore for scheduler use.
@@ -147,25 +167,52 @@ class SchedulerService(ServiceProcess):
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        # columns we have
-        indices = ['task_id',
-                   'desired_origin',
-                   'interval_seconds',
-                   'payload',
-                   'user_id',
-                   'constant',
-                   'start_time',
-                   'end_time']
+        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default=None))
+        if index_store_class_name is not None:
+            self.index_store_class = pu.get_class(index_store_class_name)
+        else:
+            self.index_store_class = self.SchedulerIndexStore
 
-        self.scheduled_events = self.SchedulerIndexStore(indices=indices)
+        assert store.IIndexStore.implementedBy(self.index_store_class), \
+            'The back end class for the index store passed to the scheduler service does not implement the required IIndexStore interface.'
+
+        if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
+            self._username = self.spawn_args.get("username", CONF.getValue("username", None))
+            self._password = self.spawn_args.get("password", CONF.getValue("password", None))
+            self._storage_provider = self.spawn_args.get("storage_provider", CONF.getValue("storage_provider", {}))
+            self._keyspace = self.spawn_args.get("keyspace", CONF.getValue("keyspace", ioninit.sys_name))   # use sysname as default
+
+            if self._storage_provider is not None and not self._storage_provider.has_key("host"):
+                log.warn("Storage provider provided but no host set, using localhost")
+                self._storage_provider['host'] = 'localhost'
+            if self._storage_provider is not None and not self._storage_provider.has_key("port"):
+                log.warn("Storage provider provided but no port set, using default of 9160")
+                self._storage_provider['port'] = 9160
+
+        # Get the configuration for cassandra - may or may not be used depending on the backend class
+        #self._storage_conf = get_cassandra_configuration()
+
         self.mc = MessageClient(proc=self)
-        self.pub = ScheduleEventPublisher(process=self)
 
         # maps task_ids to IDelayedCall objects, popped off when callback is called, used to cancel tasks
         self._callback_tasks = {}
 
         # will move pub through the lifecycle states with the service
+        self.pub = ScheduleEventPublisher(process=self)
         self.add_life_cycle_object(self.pub)
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
+            log.info("Instantiating Cassandra Index Store")
+
+            self.scheduled_events = self.index_store_class(self._username, self._password, self._storage_provider, self._keyspace, self.COLUMN_FAMILY)
+
+            yield self.register_life_cycle_object(self.scheduled_events)
+        else:
+            self.scheduled_events = self.index_store_class(self, indices=self.INDICES)
+
+        log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
     def slc_activate(self):
@@ -176,7 +223,7 @@ class SchedulerService(ServiceProcess):
 
         for task_id, tdef in rows.iteritems():
             log.debug("slc_activate: scheduling %s" % task_id)
-            self._schedule_event(tdef['start_time'], tdef['interval_seconds'], task_id)
+            self._schedule_event(int(tdef['start_time']), int(tdef['interval_seconds']), task_id)
 
     def slc_terminate(self):
         """
@@ -230,7 +277,7 @@ class SchedulerService(ServiceProcess):
         @retval reply_ok or reply_err
         """
         try:
-            task_id         = str(uuid4())
+            task_id         = content.task_id or str(uuid4())
             msg_interval    = content.interval_seconds
             desired_origin  = content.desired_origin
             if content.IsFieldSet('start_time'):
@@ -256,10 +303,19 @@ class SchedulerService(ServiceProcess):
             log.exception('Required keys in op_add_task content not found!')
             raise SchedulerError(str(ke))
 
-        log.debug('ok, gotta task to save')
+        log.debug('AddTask: about to add task %s' % task_id)
+
+        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
+
+        # check to see if the task_id already exists in the store
+        existing_task = yield self.scheduled_events.get(task_id)
+        if existing_task is not None:
+            log.warn("Already have task with id %s scheduled." % task_id)
+            resp.duplicate = True
+            yield self.reply_ok(msg, resp)
+            defer.returnValue(None)
 
         #create the response: task_id and actual origin
-        resp            = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
         resp.task_id    = task_id
         resp.origin     = desired_origin
 
@@ -269,9 +325,9 @@ class SchedulerService(ServiceProcess):
                                   index_attributes={'task_id': task_id,
                                                     'constant': '1',    # used for being able to pull all tasks
                                                     'user_id': user_id,
-                                                    'start_time': starttime,
-                                                    'end_time': endtime,
-                                                    'interval_seconds':msg_interval,
+                                                    'start_time': str(starttime),
+                                                    'end_time': str(endtime),
+                                                    'interval_seconds': str(msg_interval),
                                                     'desired_origin': desired_origin,
                                                     'payload': payload})
 
@@ -352,7 +408,7 @@ class SchedulerService(ServiceProcess):
         log.debug('Send completed, rescheduling %s' % task_id)
 
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
-        self._schedule_event(None, tdef['interval_seconds'], task_id)
+        self._schedule_event(None, int(tdef['interval_seconds']), task_id)
 
         """
         Update last-invoked timestamp in registry
@@ -363,8 +419,7 @@ class SchedulerService(ServiceProcess):
 #        tdef['last_run'] = time.time()
 #        self.store.put(task_id, tdef)
         """
-
-        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, tdef['interval_seconds']))
+        log.debug('Task %s rescheduled for %s seconds OK' % (task_id, tdef['interval_seconds']))
 
 class SchedulerServiceClient(ServiceClient):
     """

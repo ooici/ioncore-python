@@ -150,41 +150,29 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(blobs)
 
     @defer.inlineCallbacks
-    def op_pull(self,request, headers, msg):
+    def _resolve_repo_state(self, repository_key):
         """
-        The operation which responds to a pull request
-
-        The pull is much higher heat that I would like - it requires decoding the serialized blobs.
-        We should consider storing the child links of each element external to the element - but then the put is
-        high heat... Not sure what to do.
+        @returns Repo.
         """
 
-        log.info('op_pull!')
-
-        if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
-
-
-        repo = self.get_repository(request.repository_key)
+        repo = self.get_repository(repository_key)
         if repo is None:
             #if it does not exist make a new one
-            repo = repository.Repository(repository_key=request.repository_key)
+            repo = repository.Repository(repository_key=repository_key)
             self.put_repository(repo)
 
         # Must reconstitute the head and merge with existing
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
         new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
-        new_head.repositorykey = request.repository_key
-
+        new_head.repositorykey = repository_key
 
         q = Query()
-        q.add_predicate_eq(REPOSITORY_KEY, request.repository_key)
+        q.add_predicate_eq(REPOSITORY_KEY, repository_key)
 
         rows = yield self._commit_store.query(q)
 
         if len(rows) == 0:
-            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % request.repository_key, request.ResponseCodes.NOT_FOUND)
-
+            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
 
         for key, columns in rows.items():
 
@@ -222,6 +210,26 @@ class DataStoreWorkbench(WorkBench):
 
         # Do the update!
         self._update_repo_to_head(repo, new_head)
+
+        # return repository
+        defer.returnValue(repo)
+
+    @defer.inlineCallbacks
+    def op_pull(self,request, headers, msg):
+        """
+        The operation which responds to a pull request
+
+        The pull is much higher heat that I would like - it requires decoding the serialized blobs.
+        We should consider storing the child links of each element external to the element - but then the put is
+        high heat... Not sure what to do.
+        """
+
+        log.info('op_pull!')
+
+        if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        repo = yield self._resolve_repo_state(request.repository_key)
 
         ####
         # Back to boiler plate op_pull
@@ -767,6 +775,9 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(len(rows)>0)
 
 
+    #@defer.inlineCallbacks
+    def op_get_object(self, request, headers, message):
+        pass
 
 
 
@@ -1214,6 +1225,12 @@ class DataStoreClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('put_blobs', content)
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_object(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_object', content)
 
 #    @defer.inlineCallbacks
 #    def get_preloaded_datasets_dict(self):

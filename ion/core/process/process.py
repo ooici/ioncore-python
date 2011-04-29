@@ -232,6 +232,7 @@ class Process(BasicLifecycleObject):
 
         # Callback to subclasses
         try:
+            #import pdb; pdb.set_trace()
             yield defer.maybeDeferred(self.plc_init)
             log.info('Process [%s] id=%s: INIT OK' % (self.proc_name, self.id))
         except Exception, ex:
