@@ -1395,7 +1395,7 @@ class Wrapper(object):
             for item in self.DerivedWrappers.values():
                 item.Invalidate()
 
-
+        # Source must always be set to self or another gpb_wrapper object!
         self._source = other
 
         self._derived_wrappers = None
@@ -1847,7 +1847,12 @@ class Wrapper(object):
         return not self == other
 
     def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the wrapper object
+        """
 
+        '''
+        # Too complex - don't do things that might raise errors in str method!
         if self._gpb_type == LINK_TYPE:
             key = self._gpbMessage.key
             try:
@@ -1857,11 +1862,15 @@ class Wrapper(object):
             msg = '\nkey: %s \ntype { %s }' % (key, self._gpbMessage.type)
         else:
             msg = '\n' +self._gpbMessage.__str__()
-
+        '''
+        msg = '\n %s \n'  % str(self._gpbMessage)
         return msg
 
     def Debug(self):
-        output  = '================== Wrapper ====================\n'
+        """
+        Since Debug is for debugging it should never return an exception - no matter the state of the wrapper object
+        """
+        output  = '================== GPB Wrapper ====================\n'
 
         key = self._myid
         try:
@@ -1874,7 +1883,8 @@ class Wrapper(object):
         output += 'Wrapper Invalid: %s \n' % self._invalid
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
-        if hasattr(self._repository,'repository_key'):
+        # This is dangerous - this can result in an exception loop!
+        if hasattr(self._repository,'_dotgit') and not self._repository._dotgit.Invalid:
             output += 'Repository: %s \n' % str(self._repository.repository_key)
         else:
             output += 'Repository: %s \n' % str(self._repository)

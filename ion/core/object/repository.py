@@ -234,6 +234,28 @@ class ObjectContainer(object):
         return self._workspace_root
 
 
+    def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the repository object
+        """
+        output  = '============== %s  ==============\n' % self.__class__.__name__
+
+        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Excluded types:\n'
+
+        try:
+            for type in self.excluded_types:
+                output += str(type)
+        except TypeError, te:
+            output += te
+
+        output += '============== Root Object ==============\n'
+        output += str(self._workspace_root) + '\n'
+        output += '============ End Resource ============\n'
+        return output
+
+
     def clear(self):
         """
         Clear the repository in preparation for python garbage collection
@@ -494,6 +516,8 @@ class Repository(ObjectContainer):
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
+    INVALID = 'The repository or its content objects are in an invalid state!'
+
     MERGEREQUIRED = 'This repository is currently being merged!'
 
 
@@ -583,7 +607,22 @@ class Repository(ObjectContainer):
         """
     
     def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the repository object
+        """
+
         output  = '============== Repository (status: %s) ==============\n' % self.status
+
+        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Excluded types:\n'
+        try:
+            for type in self.excluded_types:
+                output += str(type)
+        except TypeError, te:
+            output += te
+
+        output += '============== .git Object ==============\n'
         output += str(self._dotgit) + '\n'
         output += '============== Root Object ==============\n'
         output += str(self._workspace_root) + '\n'
@@ -1261,14 +1300,19 @@ class Repository(ObjectContainer):
     def status(self):
         """
         Check the status of the current workspace - return a status
-          up to date
-          changed
+
+        # Be very careful with this method - it must not raise exceptions!
         """
+        if self._workspace_root is not None:
 
-        retval = None
-        if self._workspace_root:
+            try:
+                modified = self._workspace_root._source._modified
+            except AttributeError, ae:
+                log.error(ae)
+                return self.INVALID
 
-            if self._workspace_root.Modified:
+
+            if modified:
                 retval = self.MODIFIED
             else:
                 retval = self.UPTODATE
