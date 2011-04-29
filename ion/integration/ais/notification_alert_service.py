@@ -378,7 +378,10 @@ class NotificationAlertService(ServiceProcess):
 
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
-        #rc = yield self.index_store.get(self.keyval)
+
+        if not ( yield self.index_store.has_key(self.keyval) ):
+              raise NotificationAlertException('Invalid request, subscription does not exist, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
         yield self.index_store.remove(self.keyval)
 
         # create the AIS response GPB
