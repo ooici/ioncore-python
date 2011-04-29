@@ -241,7 +241,7 @@ class ManageResources(object):
       log.debug('ManageResources.getResourcesOfType()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -443,7 +443,7 @@ class ManageResources(object):
       log.debug('ManageResources.getResource()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -492,13 +492,13 @@ class ManageResources(object):
 
 
    @defer.inlineCallbacks
-   def CheckRequest(self, request):
+   def _CheckRequest(self, request):
       # Check for correct request protocol buffer type
       if request.MessageType != AIS_REQUEST_MSG_TYPE:
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = 'Bad message type receieved, ignoring'
+         Response.error_str = 'Bad message type receieved, ignoring (AIS)'
          defer.returnValue(Response)
 
       # Check payload in message
@@ -506,7 +506,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [message_parameters_reference] not found in message"
+         Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
          defer.returnValue(Response)
   
       defer.returnValue(None)

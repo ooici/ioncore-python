@@ -180,9 +180,11 @@ message GetDataResourceDetailRspMsg {
        _VERSION = 1;
    }
    optional string data_resource_id = 1;
-   optional net.ooici.integration.ais.aisDataVariable.AisDataVariableType variable = 2;
-   optional net.ooici.integration.ais.aisDataResourceMetadata.AisDatasourceMetadata source = 3;
+   optional net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasetMetadataType dataResourceSummary = 2;
+   optional net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasourceMetadataType source = 3;
+   repeated net.ooici.integration.ais.common.aisDataVariable.AisDataVariableType variable = 4;
 }
+
 """
 
 # CreateDownloadURL GPB from ion-object-definitions/net/ooici/integration/ais/createDownloadURL/create_download_url.proto
@@ -576,7 +578,7 @@ UPDATE_SUBSCRIPTION_REQ_TYPE  = object_utils.create_type_identifier(object_id=92
 """
 message SubscriptionUpdateReqMsg {
     enum _MessageTypeIdentifier {
-      _ID = 9205;
+      _ID = 9209;
       _VERSION = 1;
     }
 
@@ -588,7 +590,7 @@ UPDATE_SUBSCRIPTION_RSP_TYPE  = object_utils.create_type_identifier(object_id=92
 """
 message SubscriptionUpdateRspMsg {
     enum _MessageTypeIdentifier {
-      _ID = 9206;
+      _ID = 9210;
       _VERSION = 1;
     }
 
@@ -596,4 +598,29 @@ message SubscriptionUpdateRspMsg {
 }
 """
 
+FIND_DATA_SUBSCRIPTIONS_REQ_TYPE = object_utils.create_type_identifier(object_id=9218, version=1)
+"""
+message SubscriptionFindReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9217;
+      _VERSION = 1;
+    }
+
+    optional string user_ooi_id = 1;
+    optional net.ooici.integration.ais.common.aisDataBounds.AisDataBoundsType dataBounds = 2;
+}
+"""
+
+FIND_DATA_SUBSCRIPTIONS_RSP_TYPE = object_utils.create_type_identifier(object_id=9219, version=1)
+"""
+message SubscriptionFindRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9218;
+      _VERSION = 1;
+    }
+
+    repeated SubscriptionFindRspPayloadType data = 1;
+    //repeated net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+}
+"""
 
