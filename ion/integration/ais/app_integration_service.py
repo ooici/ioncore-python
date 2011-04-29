@@ -244,6 +244,7 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
+
 class AppIntegrationServiceClient(ServiceClient):
     """
     This is a service client for AppIntegrationServices.
@@ -391,6 +392,10 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def createDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('createDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResource', message)
         log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
@@ -399,6 +404,10 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def updateDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('updateDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
         log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
@@ -407,6 +416,10 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def deleteDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('deleteDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
         log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
@@ -447,7 +460,9 @@ class AppIntegrationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def CheckRequest(self, request):
-        # Check for correct request protocol buffer type
+        """
+        @brief Check for correct request GPB type -- this is good for ALL AIS requests
+        """
         if request.MessageType != AIS_REQUEST_MSG_TYPE:
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')

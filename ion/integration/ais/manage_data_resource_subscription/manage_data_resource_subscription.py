@@ -108,26 +108,24 @@ class ManageDataResourceSubscription(object):
         """
         log.info('ManageDataResourceSubscription.update()\n')
 
-        try:
-            # Check only the type received and linked object types. All fields are
-            #strongly typed in google protocol buffers!
-            if msg.MessageType != UPDATE_SUBSCRIPTION_REQ_TYPE:
-                errtext = "ManageDataResourceSubscription.update(): " + \
-                    "Expected SubscriptionUpdateRspMsg type, got " + str(msg)
-                log.info(errtext)
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  msg.ResponseCodes.BAD_REQUEST
-                Response.error_str =  errtext
-                defer.returnValue(Response)
+        # check that user_ooi_id is present in GPB
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [user_ooi_id] not found in message"
+            defer.returnValue(Response)
+
+        # check that data_src_id is present in GPB
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [data_src_id] not found in message"
+            defer.returnValue(Response)
+
 
             #FIXME: just delete and re-create
-
-        except ReceivedApplicationError, ex:
-            log.info('ManageDataResourceSubscription.delete(): Error attempting to FIXME: %s' %ex)
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-            Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  ex.msg_content.MessageResponseBody
-            defer.returnValue(Response)
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()
@@ -148,18 +146,15 @@ class ManageDataResourceSubscription(object):
         log.info('ManageDataResourceSubscription.delete()\n')
 
         # check that user_ooi_id is present in GPB
-        print "GOT HERE 0"
-        if not msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
-            print "GOT HERE 1"
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [user_ooi_id] not found in message"
             defer.returnValue(Response)
 
-        print "GOT HERE 2"
         # check that data_src_id is present in GPB
-        if not msg.message_parameters_reference.IsFieldSet('data_src_id'):
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
@@ -174,15 +169,6 @@ class ManageDataResourceSubscription(object):
             #yield self._dispatcherUnSubscribe(user_ooi_id, data_set_id, dispatcher_script_path)
 
             #fixme: interact with mauice's code
-
-        """
-        except ReceivedApplicationError, ex:
-            log.info('ManageDataResourceSubscription.delete(): Error attempting to FIXME: %s' %ex)
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-            Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  ex.msg_content.MessageResponseBody
-            defer.returnValue(Response)
-        """
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()
