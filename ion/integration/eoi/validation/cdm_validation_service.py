@@ -34,7 +34,7 @@ from ion.core.object import object_utils
 
 
 # Imports: ION utils and configuration
-from ion.util.os_process import OSProcess
+from ion.util.os_process import OSProcess, OSProcessError
 from ion.util import ionlog, procutils as pu
 from ion.core import ioninit
 
@@ -105,30 +105,37 @@ class CdmValidationService(ServiceProcess):
         
 
         # Step 2: Validate the URL against the CDM Validator WebService
-        cdm_output = self.validate_cdm(data_url)
-        cdm_resp = yield self.process_cdm_validation_output(cdm_output)
-        
+        try:
+            cdm_output = self.validate_cdm(data_url)
+            cdm_resp = yield self.process_cdm_validation_output(cdm_output)
+        except Exception, ex:
+            log.warn(ex)
+            cdm_resp = {'cdm_result':False, 'exception':'Could not perform CDM Validation.  Please check the CDM Validator configuration.  Inner exception: %s' % ex}
         
         # Step 3: Validate the URL against the CF Checks Script
         cf_resp = {}
         if cdm_resp['cdm_result']:
-            cf_result = yield self.validate_cf(data_url)
-            cf_resp   = self.process_cf_validation_output(cf_result)
+            try:
+                cf_result = yield self.validate_cf(data_url)
+                cf_resp   = self.process_cf_validation_output(cf_result)
+            except Exception, ex:
+                log.warn(ex)
+                cf_resp = {'exception':'Could not perform CF Validation.  Please check the CF Checker configuration.  Inner exception: %s' % ex}
+            
             
             
         # Step 4: Combine outputs and respond to the originating message
         cdm_resp.update(cf_resp)
-        result   = yield self.respond_to_originator(msg, **cdm_resp)
+        response = yield self.build_response_msg(msg, **cdm_resp)
     
 
-        log.debug('op_validate(): Validation complete')
-        defer.returnValue(result)
+        log.info('@@@--->>> (service) Sending OK response to originator')
+        yield self.reply_ok(msg, response)
     
     
     def validate_cdm(self, data_url):
         """
         """
-        log.debug('')
         base_url = self.cdmvalidator_base_url
         command = self.cdmvalidator_command
         
@@ -141,13 +148,10 @@ class CdmValidationService(ServiceProcess):
             result = f.readlines()
             if isinstance(result, list):
                 result = "".join(result)
-        except IOError, ex:
-            pass
         finally:
             if f:
                 f.close()
 
-        log.debug('')
         return result
 
 
@@ -169,23 +173,19 @@ class CdmValidationService(ServiceProcess):
             log.debug('validate_cf(): Requesting validation from CFChecks validation script: \n\n"%s %s"\n\n' % (binary, " ".join([str(item) for item in args])))
             res = yield proc.spawn()
             
-            
         except (AttributeError, ValueError), ex:
-            
             raise RuntimeError("validate_cf(): Received invalid spawn arguments from ionconfig" + str(ex))
-        
+
         except OSError, ex:
-            
-            raise RuntimeError("validate_cf(): Failed to spawn the cfchecks script.  Error: %s" % (str(ex)))
+            raise OSError("validate_cf(): Failed to spawn the cfchecks script.  Error: %s" % (str(ex)))
         
-        except StandardError, ex:
-            
+        except OSProcessError, ex:
             # This is the same result as would be acquired through normal processing via OSProcess
             # ..  a StandardError is thrown when the process terminates with an exit code other than
             #     0. In this case, we still are only concerned with the results (inside ex.message)
             res = ex.message
             
-        log.debug('')
+            
         defer.returnValue(res)
         
 
@@ -225,14 +225,37 @@ class CdmValidationService(ServiceProcess):
         #---------------------------------------#
         log.info('process_cdm_validation_output(): Processing CDM Validator output...')
 
-        # Parse cdm output to determine pass/fail
-        cdm_axis_list = []
-        for m in re.finditer(r'<axis.*?type=\"(?P<axis_type>.*?)\"', cdm_output):
-            cdm_axis_list.append(m.groupdict()['axis_type'])
-        log.debug('Available CDM axis:  %s' % cdm_axis_list)
-        result = 'Time' in cdm_axis_list
+        cdm_result = {}
+
+        # Check for failed HTTP status
+        if re.search('(?m)Error report.*?(?=HTTP Status ([0-9]+))', cdm_output):
+            
+            err_code = re.search('(?m)Error report.*?(?=HTTP Status ([0-9]+))', cdm_output).group(1)
+            exception = ''
+
+            if err_code == '404':
+                exception = 'HTTP Status 404: CDM Validator command may be invalid.  Please check CDM Validator configuration.'
+            elif err_code == '500':
+                exception = 'HTTP Status 500: Internal Server Error.  The given Dataset location may be invalid.'
+            else:
+                exception = 'HTTP Status %s: CDM Validation failed.  Please review the cdm_output' % err_code
+                
+            result = False
+            cdm_result['exception']  = exception
+     
+        else:
+            
+            # Parse cdm output to determine pass/fail
+            cdm_axis_list = []
+            for m in re.finditer(r'<axis.*?type=\"(?P<axis_type>.*?)\"', cdm_output):
+                cdm_axis_list.append(m.groupdict()['axis_type'])
+            log.debug('Available CDM axis:  %s' % cdm_axis_list)
+            result = 'Time' in cdm_axis_list
         
-        cdm_result = {'cdm_result':result, 'cdm_output':cdm_output}
+        
+        cdm_result['cdm_result'] = result
+        cdm_result['cdm_output'] = cdm_output
+        
         
         return cdm_result
 
@@ -247,8 +270,8 @@ class CdmValidationService(ServiceProcess):
         
         # Step 1: Retrieve the output data
         exitcode = cf_output.get('exitcode', 0)
-        outlines = cf_output.get('outlines', None)
-        errlines = cf_output.get('errlines', None)
+        outlines = cf_output.get('outlines', [])
+        errlines = cf_output.get('errlines', [])
 
         outlines.extend(errlines)
         cf_output_string = '\n'.join(outlines)
@@ -261,25 +284,32 @@ class CdmValidationService(ServiceProcess):
         cf_result_dict['cf_exitcode'] = exitcode
         cf_result_dict['cf_output'] = cf_output_string
         
+        if exitcode != 0 and cf_result_dict.get('cf_errors', 0) == 0:
+            # There are no cf_errors because processing terminated with
+            # an exitcode..
+            cf_result_dict['exception'] = 'Recieved failure exitcode during CF Validation.  Please check the CF Checker configuration.  Inner exception: %s' % cf_output_string
+            cf_result_dict['cf_errors'] = 1
         
         return cf_result_dict
     
     
     @defer.inlineCallbacks
-    def respond_to_originator(self, msg, **kwargs):
+    def build_response_msg(self, msg, **kwargs):
         """
         """
-        log.debug('respond_to_originator(): Replying to caller...')
+        log.debug('build_response_msg(): Replying to caller...')
         #---------------------------------------#
         # Produce a response
         #---------------------------------------#
-        log.info('respond_to_originator(): Building a response object for this validation request...')
+        log.info('build_response_msg(): Building a response object for this validation request...')
         
         # Retrieve values from kwargs
-        cdm_result = kwargs.get('cdm_result', False)
-        cdm_output = kwargs.get('cdm_output', '')
-        cf_output  = kwargs.get('cf_output', '')
-        cf_errors  = kwargs.get('cf_errors', 0)
+        exception   = kwargs.get('exception', None)
+        cdm_output  = kwargs.get('cdm_output', '')
+        cdm_result  = kwargs.get('cdm_result', False)
+        cf_output   = kwargs.get('cf_output', '')
+        cf_exitcode = kwargs.get('cf_exitcode', 0) 
+        cf_errors   = kwargs.get('cf_errors', 0)
         cf_warnings = kwargs.get('cf_warnings', 0)
         cf_information = kwargs.get('cf_information', 0)
         cf_exitcode = kwargs.get('cf_exitcode', -1)
@@ -288,21 +318,18 @@ class CdmValidationService(ServiceProcess):
         # Build the response object
         response = yield self.mc.create_instance(VALIDATION_RESPONSE_TYPE)
         R = response.ResponseType
-        response.response_type = R.CDM_FAILURE if not cdm_result else \
+        response.response_type = R.ERROR if exception else \
+                                 R.CDM_FAILURE if not cdm_result else \
                                  R.CF_FAILURE if cf_errors else \
                                  R.PASS
-        response.cf_output        = cf_output
         response.cdm_output       = cdm_output
+        response.cf_output        = cf_output
         response.cf_error_count   = cf_errors
         response.cf_warning_count = cf_warnings
         response.cf_info_count    = cf_information
+        response.err_msg          = exception or ''
 
-            
-        log.info('@@@--->>> (service) Sending OK response to originator')
-        res = yield self.reply_ok(msg, response)
-            
-            
-        defer.returnValue(res)
+        defer.returnValue(response)
         
         
 class CdmValidationClient(ServiceClient):
@@ -350,13 +377,14 @@ class CdmValidationClient(ServiceClient):
         
         log.debug('')
         log.debug('')
-        log.info('%-15s %s' % ('Is Valid:', content.response_type == content.ResponseType.PASS))
-        log.info('%-15s %s' % ('Reason:', response_type_pretty(content)))
-#        log.debug('%-15s \n\n%s\n' % ('CF Output:', content.cf_output))
-#        log.debug('%-15s \n\n%s\n' % ('CDM Output:', content.cdm_output))
-        log.debug('%-15s %i' % ('Error count:',   content.cf_error_count))
-        log.debug('%-15s %i' % ('Warning count:', content.cf_warning_count))
-        log.debug('%-15s %i' % ('Info count:',    content.cf_info_count))
+        log.info('%-25s %s' % ('Passes Validation:', content.response_type == content.ResponseType.PASS))
+        log.info('%-25s %s' % ('Response:', response_type_pretty(content)))
+#        log.debug('%-25s \n\n%s\n' % ('CF Output:', content.cf_output))
+#        log.debug('%-25s \n\n%s\n' % ('CDM Output:', content.cdm_output))
+        log.debug('%-25s %i' % ('CF Error count:',   content.cf_error_count))
+        log.debug('%-25s %i' % ('CF Warning count:', content.cf_warning_count))
+        log.debug('%-25s %i' % ('CF Info count:',    content.cf_info_count))
+        log.info('%-25s %s' % ('Error Message:',     content.err_msg))
         log.debug('')
         log.debug('')
 
@@ -412,8 +440,8 @@ client = cvc()
 
 
 # PICK ONE of the following
-#res_d = client.validate('http://tashtego.marine.rutgers.edu:8080/thredds/dodsC/cool/avhrr/bigbight')
 res_d = client.validate('http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day')
+res_d = client.validate('http://tashtego.marine.rutgers.edu:8080/thredds/dodsC/cool/avhrr/bigbight')
 
 
 
