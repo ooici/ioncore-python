@@ -30,7 +30,7 @@ class InteractionObserver(Process):
         """
         Process.__init__(self, *args, **kwargs)
 
-        self.max_msglog = 10000
+        self.max_msglog = 3000
         self.msg_log = []
         self.write_on_term = True
 
