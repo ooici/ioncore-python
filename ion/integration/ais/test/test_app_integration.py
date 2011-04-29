@@ -44,14 +44,10 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCE_REQUEST_TYPE, \
                                                        GET_RESOURCE_RESPONSE_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-<<<<<<< HEAD
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE
-=======
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
->>>>>>> dd66528c9aaeb804ba2f8479ca5593b7f64896b9
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
