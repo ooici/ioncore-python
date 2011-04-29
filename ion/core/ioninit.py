@@ -173,3 +173,23 @@ def clean_twisted_logging():
     log.removeObserver = remove_nop
 
 clean_twisted_logging()
+
+
+# SIGQUIT stack trace based on:
+# http://stackoverflow.com/questions/132058/getting-stack-trace-from-a-running-python-application/133384#133384
+import code, traceback, signal
+def debug(sig, frame):
+    d = {'_frame':frame}
+    d.update(frame.f_globals)
+    d.update(frame.f_locals)
+
+    i = code.InteractiveConsole(d)
+    message  = "Signal recieved : entering python shell.\nTraceback:\n"
+    message += ''.join(traceback.format_stack(frame))
+    i.interact(message)
+
+try:
+    signal.signal(signal.SIGQUIT, debug)  # Register handler
+except ValueError, ex:
+    # You're on Windows, no fancy debugging for you!!
+    pass
