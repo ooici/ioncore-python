@@ -108,7 +108,7 @@ class RegisterUser(object):
       log.info('RegisterUser.getUser()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -158,7 +158,7 @@ class RegisterUser(object):
       log.info('RegisterUser.updateUserProfile()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -224,7 +224,7 @@ class RegisterUser(object):
       log.debug('RegisterUser.registerUser()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -285,7 +285,7 @@ class RegisterUser(object):
 
 
    @defer.inlineCallbacks
-   def CheckRequest(self, request):
+   def _CheckRequest(self, request):
       # Check for correct request protocol buffer type
       if request.MessageType != AIS_REQUEST_MSG_TYPE:
          # build AIS error response

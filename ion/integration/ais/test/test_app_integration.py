@@ -46,7 +46,8 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE
+                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
+                                                       DELETE_SUBSCRIPTION_REQ_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -223,7 +224,7 @@ class AppIntegrationTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
         
         #
-        # Send a request without a userID to test that the appropriate error
+        # Send a request without a resourceID to test that the appropriate error
         # is returned.
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -940,12 +941,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
-        log.debug('Testing createDataResourceSubscription.')
+        log.debug('Testing createDataResourcesSubscription.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
         #
+        # Send a request without a resourceID to test that the appropriate error
+        # is returned.
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -962,7 +965,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
-
 
     @defer.inlineCallbacks
     def test_findDataResourceSubscriptions(self):
@@ -994,7 +996,87 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to findDataResourceSubscriptions')
 
+    @defer.inlineCallbacks
+    def test_updateDataResourceSubscription(self):
+        log.debug('Testing updateDataResourceSubscription.')
 
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # first create a subscription to be updated
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
+        
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+            
+        # noow update the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path/something_added'
+        
+        log.debug('Calling updateDataResourceSubscription.')
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to updateDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+
+    @defer.inlineCallbacks
+    def test_deleteDataResourceSubscription(self):
+        log.debug('Testing deleteDataResourceSubscriptions.')
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # create a subscription to be deleted
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
+        
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+            
+        # now delete the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
+
+        log.debug('Calling deleteDataResourceSubscriptions.')
+        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to deleteDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
     @defer.inlineCallbacks
     def test_createDataResource_success(self):
