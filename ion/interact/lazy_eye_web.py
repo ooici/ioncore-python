@@ -8,6 +8,19 @@
 and control the generation and viewing of message sequence charts. This module is the web
 interface only. The observer is in lazy_eye.py
 @note "RESTful observer = lazy eye" - get it? Sure ya do.
+
+URL map (Resource, class for same):
+/working CaptureInProgressPage
+/        RootPage (does routing logic, uses NavPage for actual root)
+/stop    StopInProgressPage
+/go      GoPage
+/display DisplayResultsPage
+
+Images are displayed on a static.File server, port WEB_PORT. Could also be
+done via another child if desired.
+
+@note Easily scripted using twisted.web.client.getPage
+@see ion.interact.test.test_lazy_eye_web for scripting code
 """
 
 from twisted.internet import defer, reactor
@@ -43,7 +56,7 @@ msc_inprogress_page = """
 <meta http-equiv="refresh" content="1">
 </head>
 <body>
-Working, %d messages so far...
+Capture in progress, %d messages so far...
 <form action="/stop" method="get">
 <input type="submit" value="Stop"/>
 </form>
@@ -118,7 +131,7 @@ class NavPage(resource.Resource):
         request.write(page_footer)
         return ''
 
-class StopPage(AsyncResource):
+class DisplayResultsPage(AsyncResource):
     """
     Stop the capture, display results
     """
@@ -129,34 +142,53 @@ class StopPage(AsyncResource):
     @defer.inlineCallbacks
     def _do_action(self, request):
         request.write(page_header)
-        request.write('<p>Stopping capture and rendering PNG...')
-
-        # Stop method also does the render before returning, maybe slow
-        yield self.lec.stop()
 
         rc = yield self.lec.get_results()
-        request.write('<br><b>Results:</b> ')
+        request.write('<h3>Metrics</h3> ')
         request.write('%d message(s) in %f seconds for a rate of %f messages per second.' %
                     (rc['num_edges'], rc['elapsed_time'], rc['msg_rate']))
 
         # Lookup image name
         img_file = rc['imagename']
-        request.write('<h3>MSC</h3><img src="http://%s:%d/%s" alt="msc">' %
+        request.write('<h3>Message sequence chart</h3><img src="http://%s:%d/%s" alt="msc">' %
                       (HOSTNAME, IMAGE_PORT, img_file))
 
-        # DDT
-        # dp = yield self.lec.stop()
-        #request.write('<h4>MSC debug output:</h4><pre>')
-        #request.write(dp)
-        #request.write('</pre>')
         request.write(doitagain)
         request.write(page_footer)
 
         defer.returnValue('')
-        
+
+class CaptureInProgressPage(AsyncResource):
+    """
+    Auto-refreshing page that shows message count and the stop button.
+    """
+    def __init__(self, lec):
+        AsyncResource.__init__(self)
+        self.lec = lec
+
+    @defer.inlineCallbacks
+    def _do_action(self, request):
+        rc = yield self.lec.get_current_count()
+        request.write(msc_inprogress_page % rc)
+        defer.returnValue('')
+
+class StopInProgressPage(AsyncResource):
+    def __init__(self, lec):
+        AsyncResource.__init__(self)
+        self.lec = lec
+
+    @defer.inlineCallbacks
+    def _do_action(self, request):
+        # Stop method also does the render before returning, may be slow
+        yield self.lec.stop()
+        request.write('<html><head><meta http-equiv="refresh" content="1;url=/display">')
+        request.write('Done. Redirecting...')
+        request.write(page_footer)
+        defer.returnValue('')
+
 class GoPage(AsyncResource):
     """
-    Bar.
+    Start the capture, redirect to the in-progress page.
     """
     def __init__(self, lec, binding_key='#'):
         AsyncResource.__init__(self)
@@ -165,9 +197,9 @@ class GoPage(AsyncResource):
 
     @defer.inlineCallbacks
     def _do_action(self, request):
-        request.write(page_header)
-        request.write('<p>Starting capture... <a href="/stop/">Click here to stop</a>')
         yield self.lec.start(binding_key=self.binding_key)
+        request.write('<html><head><meta http-equiv="refresh" content="1;url=/working">')
+        request.write('Started capture, redirecting')
         request.write(page_footer)
         defer.returnValue('')
 
@@ -184,9 +216,16 @@ class RootPage(resource.Resource):
         log.debug('got request for "%s"' % request)
 
         if pathstr == 'go':
-            return GoPage(self.lec, binding_key=request.args['binding'][0])
+            if hasattr(request.args, 'binding'):
+                return GoPage(self.lec, binding_key=request.args['binding'][0])
+            else:
+                return GoPage(self.lec)
         elif pathstr == 'stop':
-            return StopPage(self.lec)
+            return StopInProgressPage(self.lec)
+        elif pathstr == 'display':
+            return DisplayResultsPage(self.lec)
+        elif pathstr == 'working':
+            return CaptureInProgressPage(self.lec)
         elif pathstr == '':
             return NavPage()
 
