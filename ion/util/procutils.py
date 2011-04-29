@@ -82,7 +82,8 @@ id_seqs = {}
 def create_unique_id(ns):
     """Creates a unique id for the given name space based on sequence counters.
     """
-    if ns == None: ns = ':'
+    if ns is None:
+        ns = ':'
     nss = str(ns)
     if nss in id_seqs: nsc = int(id_seqs[nss]) +1
     else: nsc = 1
@@ -102,7 +103,7 @@ def get_process_id(some_id):
     @param some_id any form of id, short or long, Id or str
     @retval Id with full process id
     """
-    if some_id == None:
+    if some_id is None:
         return None
     parts = str(some_id).rpartition('.')
     if parts[1] != '':
