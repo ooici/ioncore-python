@@ -110,24 +110,21 @@ class NotificationAlertService(ServiceProcess):
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_offline_event  Rows returned %s " % (rows,))
 
+        subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
+
         #add each result row into the response message
         i = 0
         for key, row in rows.iteritems ( ) :
             log.info("NotificationAlertService.handle_offline_event  First row data set id %s", rows[key]['data_src_id'] )
-
 
             tempTbl = {}
             # get the user information from the Identity Registry
             yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
             log.info('NotificationAlertService.handle_offline_event user email: %s', tempTbl['user_email'] )
 
-            #enum SubscriptionType {EMAIL = 0;  DISPATCHER = 1;  EMAILANDDISPATCHER = 2; }
-            #enum AlertsFilter { UPDATES = 0;  DATASOURCEOFFLINE = 1;  UPDATESANDDATASOURCEOFFLINE = 2; }
-
             #rows[key]['subscription_type'] == SUBSCRIPTION_INFO_TYPE.subscription_type.EMAIL
-
-            if (rows[key]['subscription_type'] == 2 or rows[key]['subscription_type'] == 0 ) \
-                and (rows[key]['email_alerts_filter'] == 1 or  rows[key]['email_alerts_filter'] == 2 ) :
+            if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
+                and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
                 # Send the message via our own SMTP server, but don't include the envelope header.
                 # Create the container (outer) email message.
                 log.info('NotificationAlertService.handle_offline_event CREATE EMAIL')
@@ -171,6 +168,8 @@ class NotificationAlertService(ServiceProcess):
             rows = yield self.index_store.query(query)
             log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
 
+            subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
+
             #add each result row into the response message
             i = 0
             for key, row in rows.iteritems ( ) :
@@ -181,15 +180,11 @@ class NotificationAlertService(ServiceProcess):
                 yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
                 log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
 
-                #enum SubscriptionType {EMAIL = 0;  DISPATCHER = 1;  EMAILANDDISPATCHER = 2; }
-                #enum AlertsFilter { UPDATES = 0;  DATASOURCEOFFLINE = 1;  UPDATESANDDATASOURCEOFFLINE = 2; }
                 log.info('NotificationAlertService.handle_update_event subscription_type %s', rows[key]['subscription_type'])
                 log.info('NotificationAlertService.handle_update_event email_alerts_filter %s', rows[key]['email_alerts_filter'])
 
-                #rows[key]['subscription_type'] == SUBSCRIPTION_INFO_TYPE.subscription_type.EMAIL
-
-                if (rows[key]['subscription_type'] == 2 or rows[key]['subscription_type'] == 0 ) \
-                    and (rows[key]['email_alerts_filter'] == 0 or  rows[key]['email_alerts_filter'] == 2 ) :
+                if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
+                    and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATES  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
                     # Send the message via our own SMTP server, but don't include the envelope header.
                     # Create the container (outer) email message.
                     log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
