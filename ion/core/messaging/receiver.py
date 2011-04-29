@@ -251,29 +251,20 @@ class Receiver(BasicLifecycleObject):
                 request.protocol = protocol
                 request.performative = performative
 
+                """
                 print 'BEFORE YIELD'
-
                 print 'CONVID "%s"' %  convid
                 print 'PERFORMATIVE "%s"' % performative
                 print 'PROTOCOL "%s"' % protocol
+                """
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
-                    print 'SETTING NON RPC CONTEXT'
                     request.workbench_context = convid
 
                 elif performative is 'request':
-
-                    print 'SETTING RPC REQUEST CONTEXT'
                     # if it is an rpc request - set the context
                     request.workbench_context = convid
-
-
-                print '========== DATA RECEIVED:'
-                print data
-                print '==============================='
-
-
 
                 encoding = data.get('encoding', None)
                 if hasattr(self.process, 'workbench') and encoding == ION_R1_GPB:
@@ -303,29 +294,26 @@ class Receiver(BasicLifecycleObject):
 
                         workbench_context = request.get('workbench_context', None)
                         convid = request.get('convid', None)
-                        performative = request.get('performative', None)
-                        protocol = request.get('protocol', None)
+                        #performative = request.get('performative', None)
+                        #protocol = request.get('protocol', None)
 
+                        """
                         print 'AFTER YIELD'
                         print 'CONVID', convid
                         print 'PERFORMATIVE',performative
                         print 'WORKBENCH CONTXT',workbench_context
                         print 'PROTOCOL "%s"' % protocol
+                        """
 
                         if convid == workbench_context:
 
-                            print 'Receiver Process:', self.process, 'Calling workbench clear:'
+                            log.info('Receiver Process: Calling workbench clear:')
                             self.process.workbench.manage_workbench_cache(workbench_context)
 
                             nrepos = len(self.process.workbench._repos)
                             if  nrepos > 0:
                                 # Print a warning if someone else is using the persistence tricks...
                                 log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
-                    else:
-                        print 'No Workbench!'
-                        print 'Receiver Process: ', self.process
-
-                    print 'FINISHED with receiver - after CLEANUP!'
 
 
     @defer.inlineCallbacks
