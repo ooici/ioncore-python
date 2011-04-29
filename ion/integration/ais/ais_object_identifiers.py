@@ -499,6 +499,18 @@ message DataResourceCreateUpdateResponse {
 }
 """
 
+DATA_RESOURCE_SCHEDULED_TASK_TYPE = object_utils.create_type_identifier(object_id=9217, version=1)
+"""
+message DataResourceCreateUpdateResponse {
+    enum _MessageTypeIdentifier {
+        _ID = 9217;
+        _VERSION = 1;
+    }
+
+    optional string task_id = 1;
+}
+"""
+
 
 SUBSCRIBE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9203, version=1)
 """
