@@ -1201,6 +1201,10 @@ class TestInstrumentAgent(IonTestCase):
             def ondata(self, data):
                 log.debug("TestEventSubscriber received a message with name: %s",
                           data['content'].name)
+                content = data['content']
+                if hasattr(content, 'Repository'):
+                    content.Repository.persistent = True
+                
                 self.msgs.append(data)
                 
         subproc = Process()
