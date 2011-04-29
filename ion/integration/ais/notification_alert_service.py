@@ -29,8 +29,9 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 #from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.core.data.store import Query
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber, DatasourceUnavailableEventSubscriber
 
@@ -53,6 +54,11 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 
+
+class NotificationAlertException(ApplicationError):
+    """
+    IdentityRegistryService exception class
+    """
 
 class NotificationAlertService(ServiceProcess):
     """
@@ -229,46 +235,40 @@ class NotificationAlertService(ServiceProcess):
 
         # Check only the type received
         if content.MessageType != AIS_REQUEST_MSG_TYPE:
-            raise NotificationAlertError('Expected message class AIS_REQUEST_MSG_TYPE, received %s')
+            raise NotificationAlertException('Bad message type receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscriptionInfo] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         # check that AisDatasetMetadataType is present in GPB
         if not content.message_parameters_reference.IsFieldSet('datasetMetadata'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [datasetMetadata] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
-        # check that ooi_id is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [user_ooi_id] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [data_src_id] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         # check that subscription type enum is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscription_type] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
+
+        #Check that user ids in both GPBs match
+        if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
+            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
+        #Check that data source ids in both GPBs match
+        if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
+            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         # get the data resource metadata information
         #yield self.GetDatasetInformation(content.message_parameters_reference.data_src_id, attributes)
@@ -368,27 +368,16 @@ class NotificationAlertService(ServiceProcess):
 
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscriptionInfo] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
-        # check that ooi_id is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [user_ooi_id] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
-        # check that data_src_id name is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [data_src_id] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
 
         log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
 
@@ -396,8 +385,6 @@ class NotificationAlertService(ServiceProcess):
         log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
         #rc = yield self.index_store.get(self.keyval)
         yield self.index_store.remove(self.keyval)
-
-        log.info('NotificationAlertService.op_removeSubscription  Removal completed')
 
         # create the AIS response GPB
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
@@ -423,11 +410,8 @@ class NotificationAlertService(ServiceProcess):
 
         # check that ooi_id is present in GPB
         if not content.message_parameters_reference.IsFieldSet('user_ooi_id'):
-             # build AIS error response
-             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [user_ooi_id] not found in message"
-             defer.returnValue(Response)
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)            
 
         #Check that the item is in the store
         query = Query()
@@ -452,6 +436,8 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
 
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.data_resource_id = rows[key]['data_src_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.title = rows[key]['dispatcher_script_path']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.institution = rows[key]['title']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.source = rows[key]['source']
