@@ -231,8 +231,10 @@ class ManageDataResourceSubscription(object):
              Response.error_str = "Required field [subscription_type] not found in message"
              defer.returnValue(Response)
 
+        #if msg.DISPATCHER == msg.subscription_type or msg.EMAILANDDISPATCHER == msg.subscription_type:
+        #    yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
+
         try:
- 
             log.debug("createDataResourceSubscription calling notification alert service")
             reply = yield self.nac.addSubscription(msg)
             log.debug("createDataResourceSubscription notification alert service returned")
@@ -241,17 +243,9 @@ class ManageDataResourceSubscription(object):
             Response.message_parameters_reference.add()
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
         
-            if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-                log.error('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-                Response.message_parameters_reference[0].success  = False
-            else:            
-                Response.message_parameters_reference[0].success  = True
+            Response.message_parameters_reference[0].success  = True
             
             defer.returnValue(Response)
-
-            #if msg.DISPATCHER == msg.subscription_type or msg.EMAILANDDISPATCHER == msg.subscription_type:
-            #    yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
-                
 
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to FIXME: %s' %ex)
@@ -261,14 +255,6 @@ class ManageDataResourceSubscription(object):
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
-
-        Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
-
-        Response.message_parameters_reference.add()
-        Response.message_parameters_reference[0] = Response.SubscribeObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
-        #FIXME
-        defer.returnValue(Response)
 
 
     @defer.inlineCallbacks
