@@ -449,6 +449,30 @@ message SubscriptionInfoListRspMsg {
 }
 """
 
+UPDATE_SUBSCRIPTION_REQ_TYPE  = object_utils.create_type_identifier(object_id=9209, version=1)
+"""
+message SubscriptionUpdateReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9209;
+      _VERSION = 1;
+    }
+
+    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+}
+"""
+
+UPDATE_SUBSCRIPTION_RSP_TYPE  = object_utils.create_type_identifier(object_id=9210, version=1)
+"""
+message SubscriptionUpdateRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9210;
+      _VERSION = 1;
+    }
+
+    optional bool success = 1;
+}
+"""
+
 FIND_DATA_SUBSCRIPTIONS_REQ_TYPE = object_utils.create_type_identifier(object_id=9218, version=1)
 """
 message SubscriptionFindReqMsg {
@@ -474,3 +498,4 @@ message SubscriptionFindRspMsg {
     //repeated net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
 }
 """
+

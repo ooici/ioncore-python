@@ -15,6 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core.messaging.receiver import FanoutReceiver
 from ion.core.process.process import Process, ProcessFactory
 import ion.util.procutils as pu
+import re
 
 class InteractionObserver(Process):
     """
@@ -29,7 +30,7 @@ class InteractionObserver(Process):
         """
         Process.__init__(self, *args, **kwargs)
 
-        self.max_msglog = 10000
+        self.max_msglog = 3000
         self.msg_log = []
         self.write_on_term = True
 
@@ -145,6 +146,8 @@ class InteractionObserver(Process):
             rname = proc_alias.get(rec, rec)
             mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
                 msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
+            # @todo Clean up sender and receiver names - remove host and PID
+            #re.sub('.+:','',sname)
             msc += ' %s -> %s [ label="%s" ];\n' % (sname, rname, mlabel)
         msc += "}\n"
 
