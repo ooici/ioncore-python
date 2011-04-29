@@ -71,6 +71,9 @@ publisher_rtn = 'publisher_resource_type'
 subscriber_rtn = 'subscriber_type'
 queue_rtn = 'queue_type'
 
+datasource_schedule_rtn = 'dataresource_schedule_type'
+
+
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
 ION_RESOURCE_TYPES={
@@ -167,6 +170,22 @@ queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
                           'meta_description':'protomessage?'}
             },
 
+
+datasource_schedule_rtn:{ID_CFG:'3E49B5EF-2D60-4DE1-B554-F30BBF1AD508',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:datasource_schedule_rtn,
+                     DESCRIPTION_CFG:'A resource to hold the schedule task id associated with a datasource',
+                     CONTENT_CFG:{'object_identifier':9217,
+                                  'object_version':1,
+                                  'meta_description':'protomessage?'}
+                     },
+
+
+
+#=======================================
+#========= DEFAULT TYPE ================
+#=======================================
+
 default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
@@ -175,6 +194,8 @@ default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                                   'object_version':-1,
                                   'meta_description':'protomessage?'}
                      },
+
+
 
 }
 

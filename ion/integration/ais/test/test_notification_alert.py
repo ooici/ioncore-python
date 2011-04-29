@@ -16,13 +16,10 @@ from ion.integration.ais.notification_alert_service import NotificationAlertServ
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
-from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.test.iontest import IonTestCase
 from ion.core.messaging import messaging
-from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 
 from ion.core.object import object_utils
-from ion.core.data import store
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -36,7 +33,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_RSP_TYPE
+                                                       DELETE_SUBSCRIPTION_RSP_TYPE, \
+                                                       AIS_DATASET_METADATA_TYPE
 
 
 
@@ -127,14 +125,20 @@ class NotificationAlertTest(IonTestCase):
         yield self.createUser()
 
         # Add a subscription for this user to this data resource
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
-        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -142,20 +146,18 @@ class NotificationAlertTest(IonTestCase):
 
         # Call the Alert service to retrieve the list of subscriptions for a user
         log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = self.user_id
 
-        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
-        log.info('NotificationAlertTest:addSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
-        log.info('NotificationAlertTest:addSubscription complete')
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
+        if numResReturned != 1:
+            self.fail('NotificationAlertTest: test_addSubscription returned incorrect subscription count.')
 
 
     @defer.inlineCallbacks
@@ -168,29 +170,31 @@ class NotificationAlertTest(IonTestCase):
         yield self.createUser()
 
         # Add a subscription for this user to this data resource
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
-        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
         # Call the Alert service to remove this specific subscription based on user id and resource id
-        log.info('NotificationAlertTest:test_removeSubscription call remove subscription service.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Remove Subscription request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-
-        log.info('Calling removeSubscription service')
         reply = yield self.nac.removeSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -198,19 +202,18 @@ class NotificationAlertTest(IonTestCase):
 
         # Call the Alert service to retrieve the list of subscriptions for a user
         log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = self.user_id
 
-        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
-        log.info('NotificationAlertTest:test_removeSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
-        log.info('NotificationAlertTest:test_removeSubscription complete.\n')
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
+        if numResReturned != 0:
+            self.fail('NotificationAlertTest: test_removeSubscription returned incorrect subscription count.')
 
 
     @defer.inlineCallbacks
@@ -224,49 +227,57 @@ class NotificationAlertTest(IonTestCase):
 
 
         # Add a subscription for this user to this data resource
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
-        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            self.fail('NotificationAlertTest: test_getSubscriptionList response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
         # Add a subscription for this user to this data resource
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Add Subscription request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
-        log.info("NotificationAlertTest:test_addSubscription: call the service")
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            self.fail('NotificationAlertTest: test_getSubscriptionList response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
         # Call the Alert service to retrieve the list of subscriptions for a user
         log.info('NotificationAlertTest: test_getSubscriptionList call get subscription list service.\n')
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='NAS Get Subscription List request')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_SUBSCRIPTION_LIST_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = self.user_id
 
-        log.info('NotificationAlertTest:test_getSubscriptionList Calling getSubscriptionList service')
         reply = yield self.nac.getSubscriptionList(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
-            self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
+            self.fail('NotificationAlertTest: test_getSubscriptionList Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
-        log.info('NotificationAlertTest:test_getSubscriptionList Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
-
-        log.info('NotificationAlertTest: test_getSubscriptionList complete.\n')
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
+        if numResReturned != 2:
+            self.fail('NotificationAlertTest: test_getSubscriptionList returned incorrect subscription count.')
 
 
     @defer.inlineCallbacks
@@ -276,7 +287,7 @@ class NotificationAlertTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
 
         # create the register_user request GPBs
-        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
 
         # fill in the certificate and key
