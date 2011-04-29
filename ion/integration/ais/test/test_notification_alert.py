@@ -36,7 +36,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_RSP_TYPE
+                                                       DELETE_SUBSCRIPTION_RSP_TYPE, \
+                                                       AIS_DATASET_METADATA_TYPE
 
 
 
@@ -134,6 +135,15 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+        
+
+
         log.info("NotificationAlertTest:test_addSubscription: call the service")
         reply = yield self.nac.addSubscription(reqMsg)
 
@@ -153,7 +163,7 @@ class NotificationAlertTest(IonTestCase):
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
 
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
         log.info('NotificationAlertTest:addSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
         log.info('NotificationAlertTest:addSubscription complete')
 
@@ -174,6 +184,13 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
 
         log.info("NotificationAlertTest:test_addSubscription: call the service")
         reply = yield self.nac.addSubscription(reqMsg)
@@ -208,7 +225,7 @@ class NotificationAlertTest(IonTestCase):
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
         log.info('NotificationAlertTest:test_removeSubscription Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
         log.info('NotificationAlertTest:test_removeSubscription complete.\n')
 
@@ -231,6 +248,13 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+
         log.info("NotificationAlertTest:test_addSubscription: call the service")
         reply = yield self.nac.addSubscription(reqMsg)
 
@@ -244,6 +268,13 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
 
         log.info("NotificationAlertTest:test_addSubscription: call the service")
         reply = yield self.nac.addSubscription(reqMsg)
@@ -263,7 +294,7 @@ class NotificationAlertTest(IonTestCase):
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('Response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        numResReturned = len(reply.message_parameters_reference[0].subscriptionInfo)
+        numResReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
         log.info('NotificationAlertTest:test_getSubscriptionList Number of subscriptions returned: ' + str(numResReturned) + ' resources.')
 
         log.info('NotificationAlertTest: test_getSubscriptionList complete.\n')
