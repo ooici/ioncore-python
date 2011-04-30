@@ -367,6 +367,10 @@ station_data_source_name = 'sample_station_datasource'
 hycom_dataset_name = 'sample_hycom_dataset'
 hycom_data_source_name = 'sample_hycom_datasource'
 
+### BIG DATASET - A 3D Grid split into pieces (bounded arrays)!
+hycom_split_dataset_name = 'sample_split_hycom_dataset'
+hycom_split_data_source_name = 'sample_split_hycom_datasource'
+
 ntas1_dataset_name = 'samples_ntas_rt_mooring1_dataset'
 ntas1_data_source_name = 'samples_ntas_rt_mooring1_datasource'
 
@@ -405,6 +409,7 @@ whots1_dataset_loc = CONF.getValue(whots1_dataset_name, None)
 whots2_dataset_loc = CONF.getValue(whots2_dataset_name, None)
 
 hycom_dataset_loc = CONF.getValue(hycom_dataset_name, None)
+hycom_split_dataset_loc = CONF.getValue(hycom_split_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -435,6 +440,17 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                       },
 
+hycom_split_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04800',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:hycom_split_dataset_name,
+                      DESCRIPTION_CFG:'An example of a HYCOM 3d grid model dataset split into multiple bounded arrays',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':hycom_split_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+
 hycom_dataset_name:{
                       ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04801',
                       TYPE_CFG:DATASET_TYPE,
@@ -444,6 +460,7 @@ hycom_dataset_name:{
                       CONTENT_ARGS_CFG:{'filename':hycom_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
+
 
 ntas1_dataset_name:{
                       ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04802',
@@ -545,10 +562,19 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
                       },
 
+hycom_split_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04800',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:hycom_split_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for a Hycom model dataset split into multiple bounded arrays',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_hycom_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[hycom_split_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
 hycom_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04801',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:hycom_data_source_name,
-                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+                      DESCRIPTION_CFG:'An example of a data source for a Hycom model dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_hycom_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[hycom_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
@@ -633,6 +659,9 @@ SAMPLE_STATION_DATA_SOURCE_ID = ION_DATA_SOURCES[station_data_source_name][ID_CF
 
 SAMPLE_HYCOM_DATASET_ID = ION_DATASETS[hycom_dataset_name][ID_CFG]
 SAMPLE_HYCOM_DATA_SOURCE_ID = ION_DATA_SOURCES[hycom_data_source_name][ID_CFG]
+
+SAMPLE_SPLIT_HYCOM_DATASET_ID = ION_DATASETS[hycom_split_dataset_name][ID_CFG]
+SAMPLE_SPLIT_HYCOM_DATA_SOURCE_ID = ION_DATA_SOURCES[hycom_split_data_source_name][ID_CFG]
 
 SAMPLE_NTAS1_DATASET_ID = ION_DATASETS[ntas1_dataset_name][ID_CFG]
 SAMPLE_NTAS1_DATA_SOURCE_ID = ION_DATA_SOURCES[ntas1_data_source_name][ID_CFG]
