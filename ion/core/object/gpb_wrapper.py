@@ -494,7 +494,7 @@ class WrapperType(type):
             """
             Specialized method for CDM (dataset) Objects to append a group object with the given name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if self.root_group is not None:
                 raise OOIObjectError('Cannot make the root group when one already exists!')
@@ -564,7 +564,7 @@ class WrapperType(type):
             Specialized method for CDM (group) Objects to append a group object with the given name
             @return: The group being created (as a convenience)
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name":  Please specify a non-empty string')
@@ -682,7 +682,7 @@ class WrapperType(type):
                       different in-memory objects.  This is illegal in this datastructure for dimension objects
                       and should be prevented in further iterations.
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -709,7 +709,7 @@ class WrapperType(type):
             Specialized method for CDM Objects to append a variable object with the given name, data_type, and shape
             @return: The variable being created (as a convenience)
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -748,7 +748,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the group object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -769,7 +769,7 @@ class WrapperType(type):
             Specialized method for CDM Objects to find the attribute object by its name
             """
             # @attention: Should this find operate on the variable's standard_name attribute when avail?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -789,7 +789,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find a dimension object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -817,7 +817,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the variable object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -837,7 +837,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the variable object's index by the variable's name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -859,7 +859,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the attribute object's index by the attribute's name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -881,7 +881,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to check existance of an attribute object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -914,7 +914,7 @@ class WrapperType(type):
                                data_type is not explicitly specified a ValueError will be raised
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -940,7 +940,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to set fields for existing dimensions
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
