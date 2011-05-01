@@ -139,12 +139,16 @@ class EnumType(type):
             clsName = '%s_%s' % (cls.__name__, enum_name)
             clsDict = {}
 
+            lookup = {}
+            clsDict['lookup'] = lookup
 
             for name, val_desc in enum_type_descriptor.values_by_name.items():
                 
                 prop = WrappedEnum(val_desc.number)
-                
+
                 clsDict[name] = prop
+
+                lookup[val_desc.number] = name
 
             clsType = EnumType.__new__(EnumType, clsName, (cls,), clsDict)
 
@@ -2061,7 +2065,39 @@ class Wrapper(object):
         """
         return self.GPBMessage.ByteSize()
 
+    @GPBSource
+    def PPrint(self, offset=''):
 
+        msg = '%s%s\n' % (offset, self.ObjectClass)
+        for name, field in self._Properties.iteritems():
+
+            if isinstance(field, (WrappedMessageProperty)):
+                val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  '), offset)
+
+            elif isinstance(field, WrappedRepeatedCompositeProperty):
+                val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  ',name=name), offset)
+
+            elif isinstance(field, WrappedRepeatedScalarProperty):
+                scalars = field.__get__(self)
+                if len(scalars) > 20:
+                    val = '# of Values - %i: Field Values - "%s"... truncated at 20 values!' % (len(scalars), str(scalars[:20]))
+                else:
+                    val = '# of Values - %i: Field Values - "%s"' % (len(scalars), str(scalars[:]))
+
+            else:
+
+                item = field.__get__(self)
+                if field.field_type == 'TYPE_ENUM':
+                    item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
+
+                val = 'Field Value - "%s"' % str(item)
+
+
+
+
+            msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, val)
+
+        return msg
 
 class ContainerWrapper(object):
     """
@@ -2273,6 +2309,31 @@ class ContainerWrapper(object):
 
         for i in range(len(self)):
             yield self[i]
+
+    @GPBSourceCW
+    def PPrint(self, offset='', name='items'):
+
+        msg = '%s[' % offset
+        length = len(self)
+
+        if length is 0:
+            return '%s[ ]' % offset
+        else:
+            msg = '%s[ # of %s - %i \n' % (offset, name, length)
+
+        n = min(10, length)
+
+        for i in range(n):
+            val = self[i].PPrint(offset=offset + '  ')
+            msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+
+        if length > 10:
+            msg += offset + '... truncated printing list at 10 items!\n'
+
+
+        msg += offset + '] '
+
+        return msg
 
 
 

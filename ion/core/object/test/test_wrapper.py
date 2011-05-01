@@ -9,12 +9,8 @@
 import ion.util.ionlog
 from twisted.trial.unittest import SkipTest
 log = ion.util.ionlog.getLogger(__name__)
-from uuid import uuid4
 
 from twisted.trial import unittest
-#from twisted.internet import defer
-
-from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 
@@ -1298,6 +1294,39 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.assertNotIn(p0_type, self.ab.DerivedWrappers)
         self.assertEqual(len(self.ab.DerivedWrappers),1)
 
+
+    def test_pprint(self):
+
+        self.ab.person.add()
+        p = self.repo.create_object(PERSON_TYPE)
+        p.name = 'David'
+        p.id = 5
+        self.ab.person[0] = p
+        self.ab.owner = p
+
+        self.ab.person.add()
+        p = self.repo.create_object(PERSON_TYPE)
+        p.name = 'John'
+        p.id = 99
+        p.phone.add()
+        p.phone.number = '1234'
+        self.ab.person[1] = p
+
+        # add some scalar stuff to print...
+        self.ab.person.add()
+        simple = self.repo.create_object(TEST_TYPE)
+
+        simple.string = 'abc'
+        simple.integer = 5
+        simple.float = 3.
+
+        simple.strings.extend(['stuff','junk','more'])
+        simple.integers.extend([1,2,3,4])
+        simple.floats.extend([3.,4.,5.,6.])
+
+        self.ab.person[2] = simple
+
+        log.warn(self.ab.PPrint())
         
 
 class NodeLinkTest(unittest.TestCase):
