@@ -5,7 +5,7 @@
 @author Michael Meisinger
 @brief service for data acquisition
 """
-'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -13,15 +13,24 @@ from twisted.internet import defer
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.process.process import ProcessFactory, ProcessDesc
-from ion.data.dataobject import DataObject, ResourceReference, LCStates
-from ion.resources.dm_resource_descriptions import PubSubTopicResource
-from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
-from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
+#from ion.data.dataobject import DataObject, ResourceReference, LCStates
+#from ion.resources.dm_resource_descriptions import PubSubTopicResource
+#from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
+#from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.sa.instrument_registry import InstrumentRegistryClient
-from ion.services.sa.data_product_registry import DataProductRegistryClient
-from ion.services.coi.agent_registry import AgentRegistryClient
+#from ion.services.sa.instrument_registry import InstrumentRegistryClient
+#from ion.services.sa.data_product_registry import DataProductRegistryClient
+#from ion.services.coi.agent_registry import AgentRegistryClient
 import ion.util.procutils as pu
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient, ResourceRegistryError
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
+
+from ion.core.object import object_utils
+
+INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
+INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 class InstrumentManagementService(ServiceProcess):
     """
@@ -38,10 +47,12 @@ class InstrumentManagementService(ServiceProcess):
                                           dependencies=[])
 
     def slc_init(self):
-        self.irc = InstrumentRegistryClient(proc=self)
-        self.dprc = DataProductRegistryClient(proc=self)
-        self.arc = AgentRegistryClient(proc=self)
+        #self.irc = InstrumentRegistryClient(proc=self)
+        #self.dprc = DataProductRegistryClient(proc=self)
+        #self.arc = AgentRegistryClient(proc=self)
         #self.dpsc = DataPubsubClient(proc=self)
+        self.rc = ResourceClient(proc=sup)
+
 
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):
@@ -51,6 +62,32 @@ class InstrumentManagementService(ServiceProcess):
         """
         userInput = content['userInput']
 
+        resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Test Instrument Resource', ResourceDescription='A test instrument resource')
+
+        # Set the attributes
+        if 'name' in userInput:
+            resource_description.name = str(userInput['name'])
+
+        if 'description' in userInput:
+            resource_description.description = str(userInput['description'])
+
+        if 'manufacturer' in userInput:
+            resource_description.manufacturer = str(userInput['manufacturer'])
+
+        if 'model' in userInput:
+            resource_description.model = str(userInput['model'])
+
+        if 'serial_num' in userInput:
+            resource_description.serial_num = str(userInput['serial_num'])
+
+        if 'fw_version' in userInput:
+            resource_description.fw_version = str(userInput['fw_version'])
+
+        yield self.rc.put_instance(resource, 'Testing write...')
+
+
+
+        """
         newinstrument = InstrumentResource.create_new_resource()
 
         if 'name' in userInput:
@@ -71,7 +108,8 @@ class InstrumentManagementService(ServiceProcess):
         if 'fw_version' in userInput:
             newinstrument.fw_version = str(userInput['fw_version'])
 
-        instrument_res = yield self.irc.register_instrument_instance(newinstrument)
+        #instrument_res = yield self.irc.register_instrument_instance(newinstrument)
+        """
 
         yield self.reply_ok(msg, instrument_res.encode())
 
@@ -84,6 +122,7 @@ class InstrumentManagementService(ServiceProcess):
         """
         dataProductInput = content['dataProductInput']
 
+        """
         newdp = DataProductResource.create_new_resource()
         if 'instrumentID' in dataProductInput:
             inst_id = str(dataProductInput['instrumentID'])
@@ -116,6 +155,7 @@ class InstrumentManagementService(ServiceProcess):
         ref = res.reference(head=True)
 
         yield self.reply_ok(msg, res.encode())
+        """
 
     @defer.inlineCallbacks
     def op_execute_command(self, content, headers, msg):
@@ -123,6 +163,7 @@ class InstrumentManagementService(ServiceProcess):
         Service operation: Execute a command on an instrument.
         """
 
+        """
         # Step 1: Extract the arguments from the UI generated message content
         commandInput = content['commandInput']
 
@@ -159,6 +200,7 @@ class InstrumentManagementService(ServiceProcess):
         commandlist = [command,]
         log.info("Sending command to IA: "+str(commandlist))
         cmd_result = yield iaclient.execute_instrument(commandlist)
+        """
 
         yield self.reply_ok(msg, cmd_result)
 
@@ -170,6 +212,7 @@ class InstrumentManagementService(ServiceProcess):
         # Step 1: Extract the arguments from the UI generated message content
         commandInput = content['commandInput']
 
+        """
         if 'instrumentID' in commandInput:
             inst_id = str(commandInput['instrumentID'])
         else:
@@ -193,6 +236,7 @@ class InstrumentManagementService(ServiceProcess):
         resvalues = {}
         if values:
             resvalues = values
+        """
 
         yield self.reply_ok(msg, resvalues)
 
@@ -201,6 +245,7 @@ class InstrumentManagementService(ServiceProcess):
         """
         Service operation: Starts an instrument agent for a type of
         instrument.
+        """
         """
         if 'instrumentID' in content:
             inst_id = str(content['instrumentID'])
@@ -243,6 +288,7 @@ class InstrumentManagementService(ServiceProcess):
         iagent_id = yield self.spawn_child(iapd)
         iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
         yield iaclient.register_resource(inst_id)
+        """
 
         yield self.reply_ok(msg, "OK")
 
@@ -271,6 +317,7 @@ class InstrumentManagementService(ServiceProcess):
     @defer.inlineCallbacks
     def get_agent_desc_for_instrument(self, instrument_id):
         log.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
+        """
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
@@ -281,9 +328,11 @@ class InstrumentManagementService(ServiceProcess):
         agent_pid = agent_res.proc_id
         log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
+        """
 
     @defer.inlineCallbacks
     def get_agent_for_instrument(self, instrument_id):
+        """
         log.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
@@ -296,15 +345,18 @@ class InstrumentManagementService(ServiceProcess):
         if len(agents) > 0:
             agent_res = agents[0]
         defer.returnValue(agent_res)
+        """
 
     @defer.inlineCallbacks
     def get_agent_pid_for_instrument(self, instrument_id):
+        """
         agent_res = yield self.get_agent_for_instrument(instrument_id)
         if not agent_res:
             defer.returnValue(None)
         agent_pid = agent_res.proc_id
         log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
+        """
 
 class InstrumentManagementClient(ServiceClient):
     """
@@ -380,4 +432,3 @@ class InstrumentManagementClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentManagementService)
-'''
