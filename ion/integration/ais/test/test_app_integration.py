@@ -1249,29 +1249,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_success(self):
-        raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_failInputs(self):
-        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_failSource(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create source fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failSet(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create dataset fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failAssociation(self):
-        raise unittest.SkipTest('This will be the test createDataResource when association fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failScheduling(self):
-        raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
+
+
         
     def __validateDataResourceSummary(self, dataResourceSummary):
         log.debug('__validateDataResourceSummary()')
@@ -1405,3 +1386,5 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+
