@@ -1152,40 +1152,53 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     def test_updateDataResourceSubscription(self):
         log.debug('Testing updateDataResourceSubscription.')
 
-        # Create a message client
+        # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
+        yield self.createUser()
         
         # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling createDataResourceSubscription.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to createDataResourceSubscription')
+            self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
             
         # noow update the subscription created above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path/something_added'
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling updateDataResourceSubscription.')
         rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to updateDataResourceSubscription')
+            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
 
@@ -1194,66 +1207,52 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('Testing deleteDataResourceSubscriptions.')
 
 
-        # Create a message client
+        # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
+        yield self.createUser()
         
         # create a subscription to be deleted
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling createDataResourceSubscription.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to createDataResourceSubscription')
+            self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
             
         # now delete the subscription created above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
 
         log.debug('Calling deleteDataResourceSubscriptions.')
         rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to deleteDataResourceSubscription')
+            self.fail('ERROR rspMsg to deleteDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_success(self):
-        raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_failInputs(self):
-        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_failSource(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create source fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failSet(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create dataset fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failAssociation(self):
-        raise unittest.SkipTest('This will be the test createDataResource when association fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failScheduling(self):
-        raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
+
+
         
     def __validateDataResourceSummary(self, dataResourceSummary):
         log.debug('__validateDataResourceSummary()')
@@ -1387,3 +1386,5 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+
