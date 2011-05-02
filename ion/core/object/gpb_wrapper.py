@@ -2069,13 +2069,29 @@ class Wrapper(object):
     def PPrint(self, offset=''):
 
         msg = '%s%s\n' % (offset, self.ObjectClass)
+
         for name, field in self._Properties.iteritems():
 
-            if isinstance(field, (WrappedMessageProperty)):
-                val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  '), offset)
+            field_val = field.__get__(self)
+            if field_val is None:
+                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, field_val)
+                continue
 
+            if isinstance(field, (WrappedMessageProperty)):
+                try:
+                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  '), offset)
+                except Exception, ex:
+                    log.error(ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    continue
+                
             elif isinstance(field, WrappedRepeatedCompositeProperty):
-                val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  ',name=name), offset)
+                try:
+                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  ',name=name), offset)
+                except Exception, ex:
+                    log.error(ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    continue
 
             elif isinstance(field, WrappedRepeatedScalarProperty):
                 scalars = field.__get__(self)
@@ -2091,9 +2107,6 @@ class Wrapper(object):
                     item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
 
                 val = 'Field Value - "%s"' % str(item)
-
-
-
 
             msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, val)
 

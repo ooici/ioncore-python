@@ -1134,13 +1134,17 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            load_result = content(resource_instance, self, **kwargs)
+            set_content_ok = content(resource_instance, self, **kwargs)
 
-            if not load_result:
-                set_content_ok = False
 
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+            ### EXTREMELY VERBOSE LOGGING!
+            #log.warn(description)
+            #log.warn(resource_instance)
+            #log.warn(resource_instance.ResourceObject.PPrint())
+            
             return resource_instance
 
         else:

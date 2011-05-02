@@ -195,10 +195,6 @@ def read_ooicdm_tar_file(resource_instance, filename):
         ba_link = var.content.bounded_arrays.add()
         ba_link.SetLink(ba)
 
-        print var
-        for ba in var.content.bounded_arrays:
-            print ba
-
     result = True
 
     tar.close()
