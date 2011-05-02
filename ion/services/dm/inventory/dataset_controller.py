@@ -22,7 +22,8 @@ from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, \
+    HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
@@ -119,7 +120,7 @@ class DatasetController(ServiceProcess):
 
         # Check only the type received and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != None:
+        if request.MessageType is not None:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise DatasetControllerError('Expected Null message type, received %s'
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
