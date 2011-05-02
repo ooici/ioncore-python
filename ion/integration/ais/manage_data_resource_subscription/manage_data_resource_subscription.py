@@ -108,6 +108,14 @@ class ManageDataResourceSubscription(object):
         """
         log.info('ManageDataResourceSubscription.update()\n')
 
+        # check that subscriptionInfo is present in GPB
+        if not msg.message_parameters_reference.IsFieldSet('subscriptionInfo'):
+             # build AIS error response
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+             Response.error_num = Response.ResponseCodes.BAD_REQUEST
+             Response.error_str = "Required field [subscriptionInfo] not found in message"
+             defer.returnValue(Response)
+
         # check that user_ooi_id is present in GPB
         if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
             # build AIS error response
@@ -124,6 +132,13 @@ class ManageDataResourceSubscription(object):
             Response.error_str = "Required field [data_src_id] not found in message"
             defer.returnValue(Response)
 
+        # check that subscription type enum is present in GPB
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
+             # build AIS error response
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+             Response.error_num = Response.ResponseCodes.BAD_REQUEST
+             Response.error_str = "Required field [subscription_type] not found in message"
+             defer.returnValue(Response)
 
             #FIXME: just delete and re-create
 
@@ -145,6 +160,14 @@ class ManageDataResourceSubscription(object):
         """
         log.info('ManageDataResourceSubscription.delete()\n')
 
+        # check that subscriptionInfo is present in GPB
+        if not msg.message_parameters_reference.IsFieldSet('subscriptionInfo'):
+             # build AIS error response
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+             Response.error_num = Response.ResponseCodes.BAD_REQUEST
+             Response.error_str = "Required field [subscriptionInfo] not found in message"
+             defer.returnValue(Response)
+
         # check that user_ooi_id is present in GPB
         if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
             # build AIS error response
@@ -161,14 +184,18 @@ class ManageDataResourceSubscription(object):
             Response.error_str = "Required field [data_src_id] not found in message"
             defer.returnValue(Response)
 
-            #check that we have GPB for subscription_modify_type
-            #get msg. dispatcher_id, script_path, data_source_resource_id
-            #check that dispatcher_id exists -- look up the resource gpb #7002
+        # check that subscription type enum is present in GPB
+        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
+             # build AIS error response
+             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+             Response.error_num = Response.ResponseCodes.BAD_REQUEST
+             Response.error_str = "Required field [subscription_type] not found in message"
+             defer.returnValue(Response)
 
-            # uncomment when ready
-            #yield self._dispatcherUnSubscribe(user_ooi_id, data_set_id, dispatcher_script_path)
+        # uncomment when ready
+        #yield self._dispatcherUnSubscribe(user_ooi_id, data_set_id, dispatcher_script_path)
 
-            #fixme: interact with mauice's code
+        #fixme: interact with mauice's code
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()
