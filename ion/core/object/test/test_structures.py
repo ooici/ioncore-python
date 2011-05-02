@@ -22,22 +22,22 @@ from ion.core.object import gpb_wrapper
 
 
 #basic_pb2.KeyValue
-keyvalue_type = object_utils.create_type_identifier(object_id=20005, version=1)
+KEYVALUE_TYPE = object_utils.create_type_identifier(object_id=20005, version=1)
 
 #basic_pb2.TestObj
-testobj_type = object_utils.create_type_identifier(object_id=20010, version=1)
+TESTOBJ_TYPE = object_utils.create_type_identifier(object_id=20010, version=1)
 
 #basic_pb2.ListObj
-listobj_type = object_utils.create_type_identifier(object_id=20004, version=1)
+LISTOBJ_TYPE = object_utils.create_type_identifier(object_id=20004, version=1)
 
 class IntegerAndFloatTest(unittest.TestCase):
 
     def test_f_nans(self):
 
-        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple1.float = float('nan')
 
-        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple2.float = float('nan')
 
         # Nans are not equal in Python
@@ -46,10 +46,10 @@ class IntegerAndFloatTest(unittest.TestCase):
 
     def test_f_inf(self):
 
-        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple1.float = float('inf')
 
-        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple2.float = float('inf')
 
         # Nans are not equal in Python
@@ -57,10 +57,10 @@ class IntegerAndFloatTest(unittest.TestCase):
 
     def test_f_ninf(self):
 
-        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple1.float = float('-inf')
 
-        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple2.float = float('-inf')
 
         # Nans are not equal in Python
@@ -69,10 +69,10 @@ class IntegerAndFloatTest(unittest.TestCase):
 
     def test_i(self):
 
-        simple1 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple1 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple1.integer = 1
 
-        simple2 = gpb_wrapper.Wrapper._create_object(testobj_type)
+        simple2 = gpb_wrapper.Wrapper._create_object(TESTOBJ_TYPE)
         simple2.integer = 1
 
         # Nans are not equal in Python
@@ -85,7 +85,7 @@ class SimpleObjectTest(unittest.TestCase):
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         
-        repo, simple = wb.init_repository(testobj_type)
+        repo, simple = wb.init_repository(TESTOBJ_TYPE)
 
         simple.string = 'abc'
         simple.integer = 5
@@ -265,7 +265,7 @@ class ContainerTest(unittest.TestCase):
     def setUp(self):
         self.wb = workbench.WorkBench('No Process Test')
         
-        self.repo, self.listobj = self.wb.init_repository(listobj_type)
+        self.repo, self.listobj = self.wb.init_repository(LISTOBJ_TYPE)
         
         
     def test_factory(self):
@@ -283,7 +283,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container method to set link by index
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -306,7 +306,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container and set the link using the object wrapper
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -331,7 +331,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container method to set link by index
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -355,7 +355,7 @@ class ContainerTest(unittest.TestCase):
         Test the container method GetLink() and check link consistency
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -384,10 +384,10 @@ class ContainerTest(unittest.TestCase):
         Test the container method GetLinks() and check link consistency
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_object(keyvalue_type)
+        kv2 = self.repo.create_object(KEYVALUE_TYPE)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
         
@@ -424,7 +424,7 @@ class ContainerTest(unittest.TestCase):
         Test the private container method __getitem_() by a given index
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -451,13 +451,13 @@ class ContainerTest(unittest.TestCase):
         Test the container method __getslice__() by start and stop indices
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_object(keyvalue_type)
+        kv2 = self.repo.create_object(KEYVALUE_TYPE)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
-        kv3 = self.repo.create_object(keyvalue_type)
+        kv3 = self.repo.create_object(KEYVALUE_TYPE)
         kv3.key = 'foo3'
         kv3.value = 'bar3'
         
@@ -539,13 +539,13 @@ class ContainerTest(unittest.TestCase):
         Test the container method __delitem__() by index
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_object(keyvalue_type)
+        kv1 = self.repo.create_object(KEYVALUE_TYPE)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_object(keyvalue_type)
+        kv2 = self.repo.create_object(KEYVALUE_TYPE)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
-        kv3 = self.repo.create_object(keyvalue_type)
+        kv3 = self.repo.create_object(KEYVALUE_TYPE)
         kv3.key = 'foo3'
         kv3.value = 'bar3'
         
@@ -591,7 +591,7 @@ class ContainerTest(unittest.TestCase):
         items = self.listobj.items
         
         for idx in range(1, 21):
-            kv = self.repo.create_object(keyvalue_type)
+            kv = self.repo.create_object(KEYVALUE_TYPE)
             kv.key = 'foo' + str(idx)
             kv.value = 'bar' + str(idx)
             item = items.add()
@@ -689,7 +689,7 @@ class ContainerTest(unittest.TestCase):
         
         
     #def testsetcontainerlink(self):
-    #    kv1 = self.repo.create_object(keyvalue_type)
+    #    kv1 = self.repo.create_object(KEYVALUE_TYPE)
     #    kv1.key = 'foo1'
     #    kv1.value = 'bar1'
     #    
@@ -708,11 +708,11 @@ class ContainerTest(unittest.TestCase):
         #
         #
         #
-        #kv2 = repo.create_object(keyvalue_type)
+        #kv2 = repo.create_object(KEYVALUE_TYPE)
         #kv2.key = 'foo2'
         #kv2.value = 'bar2'
         #
-        #kv3 = repo.create_object(keyvalue_type)
+        #kv3 = repo.create_object(KEYVALUE_TYPE)
         #kv3.key = 'foo3'
         #kv3.value = 'bar3'
         #

@@ -38,6 +38,10 @@ class DummyClass(object):
             self.args = args
             self.kwargs = kwargs
 
+        def __sizeof__(self):
+
+            return 10
+
 class IndexHashTest(unittest.TestCase):
 
     def setUp(self):
@@ -524,6 +528,54 @@ class RepositoryTest(unittest.TestCase):
         
         self.assertEqual(ab.person[0].name, 'Michael')
 
+
+    def test_size(self):
+
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
+
+        p = repo.create_object(PERSON_TYPE)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '123 456 7890'
+
+        ab.owner = p
+
+        ab.person.add()
+        ab.person[0] = p
+
+        ab.person.add()
+        p = repo.create_object(PERSON_TYPE)
+        p.name='John'
+        p.id = 78
+        p.email = 'J@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '111 222 3333'
+
+        ab.person[1] = p
+
+        # Objects in the workspace don't count for size
+        self.assertEqual(repo.__sizeof__(), 0)
+
+        # Commit the objects and now they are in the index hash
+        cref = repo.commit(comment='testing commit')
+
+        # This number is calculated by running the test - but it should not change!
+        self.assertEqual(repo.__sizeof__(), 404)
+
+        # purging the workspace does not affect the index hash
+        repo.purge_workspace()
+        self.assertEqual(repo.__sizeof__(), 404)
+
+        # Clearing the repo does.
+        repo.clear()
+        self.assertEqual(repo.__sizeof__(), 0)
+
+
+
     @defer.inlineCallbacks
     def test_lost_objects(self):
         repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
@@ -771,14 +823,14 @@ class RepositoryTest(unittest.TestCase):
         repo_refs = closure(self.wb)
 
         for item in repo_refs:
-            self.assertNotEqual(item(),None)
+            self.assertNotIdentical(item(),None)
 
-        self.wb.clear_non_persistent()
+        self.wb.clear()
 
         gc.collect()
 
         for item in repo_refs:
-            self.assertEqual(item(),None)
+            self.assertIdentical(item(),None)
             
             
 class MergeContainerTest(unittest.TestCase):

@@ -254,8 +254,7 @@ class MessageInstance(object):
         """
         message Instance objects are created by the message client
         """
-        self._repository = None
-        
+
         self._repository = message_repository
             
         self._init = True
@@ -284,9 +283,17 @@ class MessageInstance(object):
         
     def __str__(self):
         output  = '============== Message ==============\n'
-        output += str(self.Message) + '\n'
+        try:
+            output += str(self.Message) + '\n'
+        except gpb_wrapper.OOIObjectError, oe:
+            log.error(oe)
+            output += 'Message envelope object in an invalid state!'
         output += '============== Object ==============\n'
-        output += str(self.MessageObject) + '\n'
+        try:
+            output += str(self.MessageObject) + '\n'
+        except gpb_wrapper.OOIObjectError, oe:
+            log.error(oe)
+            output += 'Message content object in an invalid state!'
         output += '============ End Message ============\n'
         return output
         

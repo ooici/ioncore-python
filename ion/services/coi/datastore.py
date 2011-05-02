@@ -70,9 +70,9 @@ class DataStoreWorkBenchError(WorkBenchError):
 class DataStoreWorkbench(WorkBench):
 
 
-    def __init__(self, process, blob_store, commit_store):
+    def __init__(self, process, blob_store, commit_store, cache_size=10**8):
 
-        WorkBench.__init__(self, process)
+        WorkBench.__init__(self, process, cache_size)
 
         self._blob_store = blob_store
         self._commit_store = commit_store
@@ -307,7 +307,7 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
                 #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:
@@ -758,7 +758,7 @@ class DataStoreWorkbench(WorkBench):
         log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
-        self.clear_non_persistent()
+        self.clear()
 
 
     @defer.inlineCallbacks
@@ -813,7 +813,9 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         self._backend_cls_names[COMMIT_CACHE] = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
-        
+
+        self._cache_size = self.spawn_args.get('cache_size', CONF.getValue('cache_size', default=10**8))
+
         self._backend_classes={}
 
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
@@ -903,7 +905,7 @@ class DataStoreService(ServiceProcess):
 
         
         log.info("Created stores")
-        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
         yield self.initialize_datastore()
 
@@ -1132,13 +1134,17 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            load_result = content(resource_instance, self, **kwargs)
+            set_content_ok = content(resource_instance, self, **kwargs)
 
-            if not load_result:
-                set_content_ok = False
 
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+            ### EXTREMELY VERBOSE LOGGING!
+            #log.warn(description)
+            #log.warn(resource_instance)
+            #log.warn(resource_instance.ResourceObject.PPrint())
+            
             return resource_instance
 
         else:

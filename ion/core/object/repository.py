@@ -56,6 +56,8 @@ class IndexHash(dict):
         self._workbench_cache = None
         self._has_cache = False
 
+        self._size = 0
+
     def _set_cache(self,cache):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
         self._workbench_cache = cache
@@ -81,6 +83,10 @@ class IndexHash(dict):
     has_cache = property(_get_has_cache, _set_has_cache)
 
 
+    def __sizeof__(self):
+        return self._size
+
+
     def __getitem__(self, key):
 
         if dict.has_key(self, key):
@@ -100,6 +106,8 @@ class IndexHash(dict):
         dict.__setitem__(self, key, val)
         if self.has_cache:
             self.cache[key]=val
+
+        self._size += val.__sizeof__()
 
 
     def copy(self):
@@ -148,7 +156,24 @@ class IndexHash(dict):
         if self.has_cache:
             self.cache.update(*args, **kwargs)
 
+        # For now - don't bother parsing args just recount
+        size = 0
+        for item in self.itervalues():
+            size += item.__sizeof__()
+        self._size = size
 
+    def clear(self):
+        dict.clear(self)
+
+        self._size=0
+
+    def __delitem__(self, key):
+
+        item = self.get(key)
+        if key is not None:
+            self._size -= item.__sizeof__()
+
+        dict.__delitem__(self,key)
 
 
 
@@ -203,9 +228,32 @@ class ObjectContainer(object):
         The list of currently excluded object types
         """
 
+
     @property
     def root_object(self):
         return self._workspace_root
+
+
+    def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the repository object
+        """
+        output  = '============== %s  ==============\n' % self.__class__.__name__
+
+        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Excluded types:\n'
+
+        try:
+            for type in self.excluded_types:
+                output += str(type)
+        except TypeError, te:
+            output += te
+
+        output += '============== Root Object ==============\n'
+        output += str(self._workspace_root) + '\n'
+        output += '============ End Resource ============\n'
+        return output
 
 
     def clear(self):
@@ -468,10 +516,12 @@ class Repository(ObjectContainer):
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
+    INVALID = 'The repository or its content objects are in an invalid state!'
+
     MERGEREQUIRED = 'This repository is currently being merged!'
 
 
-    def __init__(self, head=None, repository_key=None, persistent=False):
+    def __init__(self, head=None, repository_key=None, persistent=False, cached=False):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -520,6 +570,21 @@ class Repository(ObjectContainer):
         the persistent setting is changed to false
         """
 
+        if not isinstance(cached, bool):
+            raise RepositoryError('Invalid argument type to set the cached property of a repository')
+        self._cached = cached
+        """
+        Set the cached property of this repository. Any repository which is declared cached will not be until the
+        cache memory size of the workbench has been exceeded.
+        """
+
+        self.convid_context = 'DEFAULT'
+        """
+        This context object is used to determine when a repository should be moved from level 1 persistent caching
+        to level 2 LRU caching in the workbench.
+        """
+
+
 
         ### Structures for managing associations to a repository:
 
@@ -542,7 +607,22 @@ class Repository(ObjectContainer):
         """
     
     def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the repository object
+        """
+
         output  = '============== Repository (status: %s) ==============\n' % self.status
+
+        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Excluded types:\n'
+        try:
+            for type in self.excluded_types:
+                output += str(type)
+        except TypeError, te:
+            output += te
+
+        output += '============== .git Object ==============\n'
         output += str(self._dotgit) + '\n'
         output += '============== Root Object ==============\n'
         output += str(self._workspace_root) + '\n'
@@ -571,6 +651,18 @@ class Repository(ObjectContainer):
 
     persistent = property(_get_persistent, _set_persistent )
 
+    def _set_cached(self, value):
+        if not isinstance(value, bool):
+            raise RepositoryError('Invalid argument type to set the cached property of a repository')
+        self._cached = value
+
+    def _get_cached(self):
+        return self._cached
+
+    cached = property(_get_cached, _set_cached )
+
+
+
     def _get_root_object(self):
         return self._workspace_root
         
@@ -590,6 +682,14 @@ class Repository(ObjectContainer):
     root_object = property(_get_root_object, _set_root_object)
     
 
+    def __sizeof__(self):
+        """
+        Treat the index hash of serialized content as the relevant size of the repository for caching
+        """
+
+        return self.index_hash.__sizeof__()
+
+
     def clear(self):
         """
         Clear the repository in preparation for python garbage collection
@@ -601,6 +701,9 @@ class Repository(ObjectContainer):
         for item in self._commit_index.itervalues():
             #print 'ITEM',item
             item.Invalidate()
+
+        self.purge_associations()
+
 
         self._dotgit.Invalidate()
 
@@ -1012,6 +1115,7 @@ class Repository(ObjectContainer):
 
         if self.status == self.MODIFIED:
 
+            #@TODO consider changing this to a warning rather than an exception
             raise RepositoryError('Can not purge repository in a modified state! Data will be lost')
 
         # Do some clean up!
@@ -1022,6 +1126,11 @@ class Repository(ObjectContainer):
         self._workspace_root = None
 
 
+    def purge_associations(self):
+
+        self.associations_as_object.predicate_sorted_associations.clear()
+        self.associations_as_predicate.predicate_sorted_associations.clear()
+        self.associations_as_subject.predicate_sorted_associations.clear()
 
         
     def commit(self, comment=''):
@@ -1191,14 +1300,19 @@ class Repository(ObjectContainer):
     def status(self):
         """
         Check the status of the current workspace - return a status
-          up to date
-          changed
+
+        # Be very careful with this method - it must not raise exceptions!
         """
+        if self._workspace_root is not None:
 
-        retval = None
-        if self._workspace_root:
+            try:
+                modified = self._workspace_root._source._modified
+            except AttributeError, ae:
+                log.error(ae)
+                return self.INVALID
 
-            if self._workspace_root.Modified:
+
+            if modified:
                 retval = self.MODIFIED
             else:
                 retval = self.UPTODATE

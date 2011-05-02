@@ -346,20 +346,21 @@ class DataStoreTest(IonTestCase):
 
         log.info('DataStore1 Push addressbook to DataStore1: complete')
 
-        
 
-        self.wb1.workbench.clear_non_persistent()
+        self.wb1.workbench.clear()
 
-        self.ds1.workbench.clear_non_persistent()
+        self.ds1.workbench.clear()
 
 
         repo = self.wb1.workbench.get_repository(self.repo_key)
         self.assertEqual(repo,None)
 
+        repo = self.ds1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
         result = yield self.wb1.workbench.pull('datastore',self.repo_key)
 
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
-
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo = self.wb1.workbench.get_repository(self.repo_key)
@@ -381,9 +382,9 @@ class DataStoreTest(IonTestCase):
 
 
 
-        self.wb1.workbench.clear_non_persistent()
+        self.wb1.workbench.clear()
 
-        self.ds1.workbench.clear_non_persistent()
+        self.ds1.workbench.clear()
 
 
         repo = self.wb1.workbench.get_repository(self.repo_key)
@@ -402,9 +403,9 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(ab.title,'Datastore Addressbook')
 
         
-        self.wb1.workbench.clear_non_persistent()
+        self.wb1.workbench.clear()
 
-        self.ds1.workbench.clear_non_persistent()
+        self.ds1.workbench.clear()
 
 
         repo = self.wb1.workbench.get_repository(self.repo_key)
@@ -444,9 +445,9 @@ class DataStoreTest(IonTestCase):
 
 
 
-        self.wb1.workbench.clear_non_persistent()
+        self.wb1.workbench.clear()
 
-        self.ds1.workbench.clear_non_persistent()
+        self.ds1.workbench.clear()
 
 
         result = yield self.wb1.workbench.pull('datastore',self.repo_key)
@@ -487,9 +488,9 @@ class DataStoreTest(IonTestCase):
 
 
         # Clear all workbenchs
-        self.wb1.workbench.clear_non_persistent()
+        self.wb1.workbench.clear()
 
-        self.ds1.workbench.clear_non_persistent()
+        self.ds1.workbench.clear()
 
 
 

@@ -44,6 +44,8 @@ SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE = object_utils.create_type_i
 # desired_origins
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
+
+
 class SchedulerTest(IonTestCase):
 
 
@@ -69,7 +71,9 @@ class SchedulerTest(IonTestCase):
         self._notices = []
         self.sub = ScheduleEventSubscriber(process=self.proc,
                                            origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
-        self.sub.ondata = lambda c: self._notices.append(c)
+
+        # you can not keep the received message around after the ondata callback is complete
+        self.sub.ondata = lambda c: self._notices.append(c['content'].additional_data.payload.dataset_id)
 
         # normally we'd register before initialize/activate but let's not bring the PSC/EMS into the mix
         # if we can avoid it.
@@ -192,6 +196,8 @@ class SchedulerTest(IonTestCase):
 
         log.debug(resp_msg.task_id)
         self.failIf(resp_msg.task_id is None)
+
+
         #fixme: also fail if we don't get GPB #2602 back
 
         # Wait for a message to go through the system
@@ -199,14 +205,15 @@ class SchedulerTest(IonTestCase):
         #cc = yield self.client.get_count()
         #self.failUnless(int(cc['value']) >= 1)
         self.failUnless(len(self._notices) > 1, "this may fail intermittently due to messaging")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
-        
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
+        self.failUnlessEquals(self._notices[0], "TESTER")
+
+
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
         msg_r.task_id = resp_msg.task_id
 
         rc = yield sc.rm_task(msg_r)
-
 
         self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)

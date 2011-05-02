@@ -9,12 +9,8 @@
 import ion.util.ionlog
 from twisted.trial.unittest import SkipTest
 log = ion.util.ionlog.getLogger(__name__)
-from uuid import uuid4
 
 from twisted.trial import unittest
-#from twisted.internet import defer
-
-from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 
@@ -350,7 +346,33 @@ class WrapperMethodsTest(unittest.TestCase):
         self.assertEqual(p.IsFieldSet('floats'), True)
 
 
+class TestStructureElementWrapper(unittest.TestCase):
 
+    #@TODO - add other explicit tests for the Structure Element class - currently only transitively tested.
+
+    def test_size(self):
+
+        wb = workbench.WorkBench('no process test')
+
+        repo = wb.create_repository(PERSON_TYPE)
+
+        repo.root_object.name = 'David Stuebe'
+        repo.root_object.id = 1592733398
+
+        repo.root_object.phone.add()
+        repo.root_object.phone[0].number = 'a number'
+        repo.root_object.phone[0].type = repo.root_object.phone[0].PhoneType.WORK
+
+
+        commit_key = repo.commit('committed...')
+
+        key = repo.root_object.MyId
+        se = repo.index_hash.get(key)
+        self.assertEqual(se.__sizeof__(), 68)
+
+
+        se = repo.index_hash.get(commit_key)
+        self.assertEqual(se.__sizeof__(), 127)
 
 
 class TestSpecializedCdmMethods(unittest.TestCase):
@@ -1272,6 +1294,39 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
         self.assertNotIn(p0_type, self.ab.DerivedWrappers)
         self.assertEqual(len(self.ab.DerivedWrappers),1)
 
+
+    def test_pprint(self):
+
+        self.ab.person.add()
+        p = self.repo.create_object(PERSON_TYPE)
+        p.name = 'David'
+        p.id = 5
+        self.ab.person[0] = p
+        self.ab.owner = p
+
+        self.ab.person.add()
+        p = self.repo.create_object(PERSON_TYPE)
+        p.name = 'John'
+        p.id = 99
+        p.phone.add()
+        p.phone.number = '1234'
+        self.ab.person[1] = p
+
+        # add some scalar stuff to print...
+        self.ab.person.add()
+        simple = self.repo.create_object(TEST_TYPE)
+
+        simple.string = 'abc'
+        simple.integer = 5
+        simple.float = 3.
+
+        simple.strings.extend(['stuff','junk','more'])
+        simple.integers.extend([1,2,3,4])
+        simple.floats.extend([3.,4.,5.,6.])
+
+        self.ab.person[2] = simple
+
+        log.warn(self.ab.PPrint())
         
 
 class NodeLinkTest(unittest.TestCase):

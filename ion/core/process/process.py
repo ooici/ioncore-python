@@ -35,6 +35,11 @@ from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
 
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+from ion.core.ioninit import request
+
+
 CONF = ioninit.config(__name__)
 CF_fail_fast = CONF['fail_fast']
 CF_rpc_timeout = CONF['rpc_timeout']
@@ -45,11 +50,6 @@ processes = {}
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 procRegistry.kvs = {} # Give this instance its own backend...
-
-
-# Static entry point for "thread local" context storage during request
-# processing, eg. to retaining user-id from request message
-request = StackLocal()
 
 
 class IProcess(Interface):
@@ -170,7 +170,8 @@ class Process(BasicLifecycleObject):
         self.child_procs = []
 
         #The data object Workbench for all object repositories used by this process
-        self.workbench = workbench.WorkBench(self)
+        cache_size = int(spawnargs.get('cache_size', 10**7))
+        self.workbench = workbench.WorkBench(self, cache_size=cache_size)
 
         # Create a message Client
         self.message_client = MessageClient(proc=self)
@@ -567,6 +568,8 @@ class Process(BasicLifecycleObject):
             convid = payload.get('conv-id', None)
             protocol = payload.get('protocol', None)
 
+            #CONVID is already added to the process.request
+
             # Conversation handling.
             conv = None
             if convid and protocol != CONV_TYPE_NONE:
@@ -675,6 +678,7 @@ class Process(BasicLifecycleObject):
                 log.debug("<<< ACK msg")
                 yield msg.ack()
 
+
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
             op = payload['op']
@@ -698,6 +702,7 @@ class Process(BasicLifecycleObject):
         elif hasattr(self,'op_none'):
             yield defer.maybeDeferred(self.op_none, content, payload, msg)
         else:
+            # Change to Raise?
             assert False, "Cannot dispatch to operation"
 
     def op_none(self, content, headers, msg):
