@@ -25,14 +25,11 @@ file_template = """
 
 from os import path, environ
 
-from twisted.internet import defer, reactor
+from twisted.internet import reactor
 from twisted.internet.protocol import ProcessProtocol
 
 import ion.util.ionlog
 from ion.core import ioninit
-from ion.services.dm.inventory.dataset_controller import DatasetControllerClient, \
-    FINDDATASETREQUEST_TYPE
-from ion.core.messaging.message_client import MessageClient
 
 # Globals and config file variables
 log = ion.util.ionlog.getLogger(__name__)
@@ -61,7 +58,7 @@ def create_ncml(id_ref, filepath=""):
     return file_template % id_ref
 
 
-class RsyncProto(ProcessProtocol):
+class _RsyncProto(ProcessProtocol):
     """
     Wrapper class to run rsync
     """
@@ -79,45 +76,12 @@ def rsync_ncml(local_filepath, server_url):
     """
     Method to perform a bidirectional sync with a remote server, probably via rsync, unison
     or similar. Should be called after generating all local ncml files.
+    @bug Need to figure out how to have a deferred on the processprotocol...
     """
-    rpp = RsyncProto()
+    rpp = _RsyncProto()
     args = [RSYNC_CMD, '', '-r', '--include', '"*.ncml"',
             '-v', '--stats', '--delete', local_filepath + '/', server_url]
     log.debug('Command is "%s %s"'% (RSYNC_CMD, args))
 
     # Adding environ.data uses the parent environment, otherwise empty
     reactor.spawnProcess(rpp, RSYNC_CMD, args, env=environ.data)
-    
-
-@defer.inlineCallbacks
-def _get_guid_list(proc):
-    """
-    Pull list of GUIDs from the resource registry/association service.
-    """
-    dc = DatasetControllerClient(proc=proc)
-    mc = MessageClient(proc=proc)
-
-    msg = yield mc.create_instance(FINDDATASETREQUEST_TYPE)
-    msg.only_mine = False
-
-    glist = yield dc.find_dataset_resources(msg)
-
-    defer.returnValue(glist)
-
-@defer.inlineCallbacks
-def create_ncml_and_sync(proc, filepath='', server_url=None):
-    log.debug('Starting NcML generation')
-
-    g_list = yield _get_guid_list(proc)
-
-    for entry in g_list:
-        create_ncml(entry, filepath=filepath)
-
-    log.debug('Generation complete, calling sync')
-
-    rsync_ncml(filepath, server_url=server_url)
-
-    log.debug('Done')
-
-
-        
