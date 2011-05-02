@@ -183,6 +183,9 @@ def read_ooicdm_tar_file(resource_instance, filename):
 
     # Now add any bounded arrays that we need....
     for var_container in vars:
+
+        #print 'Tar Content: \n',var_container.PPrint()
+
         ba = var_container.bounded_array
 
         log.debug('Adding content to variable name: %s' % var_container.variable_name)
@@ -198,6 +201,9 @@ def read_ooicdm_tar_file(resource_instance, filename):
     result = True
 
     tar.close()
+
+    #print 'Complete Group:',group.PPrint()
+
 
     return result
 
