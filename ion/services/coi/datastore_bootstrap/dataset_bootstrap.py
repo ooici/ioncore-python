@@ -28,6 +28,9 @@ from ion.util import procutils as pu
 from ion.core.object import object_utils, codec, gpb_wrapper
 
 
+ION_MSG_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
+SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
+
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
 dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
@@ -81,25 +84,34 @@ def read_ooicdm_file(resource_instance, filename):
     f = None
     try:
 
-       # Get an absolute path to the file
-       filename = pu.get_ion_path(filename)
+        # Get an absolute path to the file
+        filename = pu.get_ion_path(filename)
 
-       f = open(filename, 'r')
-       result = True
+        f = open(filename, 'r')
+        result = True
 
     except IOError, e:
-       log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
 
     if f is not None:
-       head_elm, obj_dict = codec._unpack_container(f.read())
-       resource_instance.Repository.index_hash.update(obj_dict)
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
 
-       root_obj = resource_instance.Repository._load_element(head_elm)
-       resource_instance.ResourceObject = root_obj
+        root_obj = resource_instance.Repository._load_element(head_elm)
 
-       resource_instance.Repository.load_links(root_obj)
+        resource_instance.Repository.load_links(root_obj)
 
-       f.close()
+
+        if root_obj.ObjectType == ION_MSG_TYPE:
+            dataset = root_obj.message_object
+        else:
+            dataset = root_obj
+            
+        resource_instance.ResourceObject = root_obj
+
+
+
+        f.close()
 
     return result
 
@@ -145,6 +157,10 @@ def read_ooicdm_tar_file(resource_instance, filename):
 
         head_obj = resource_instance.Repository._load_element(head_elm)
 
+        # Get rid of the ION Message object if present...
+        if head_obj.ObjectType == ION_MSG_TYPE:
+            head_obj = head_obj.message_object
+
         if head_obj.ObjectType == dataset_type:
             root_obj = head_obj
         else:
@@ -184,6 +200,10 @@ def read_ooicdm_tar_file(resource_instance, filename):
     # Now add any bounded arrays that we need....
     for var_container in vars:
 
+
+        if var_container.ObjectType != SUPPLEMENT_MSG_TYPE:
+            raise IOError('Invalid variable supplement component found in the tar file dataset - "%s"' % filename)
+
         #print 'Tar Content: \n',var_container.PPrint()
 
         ba = var_container.bounded_array
@@ -193,7 +213,7 @@ def read_ooicdm_tar_file(resource_instance, filename):
             var = group.FindVariableByName(var_container.variable_name)
         except gpb_wrapper.OOIObjectError, oe:
             log.error(str(oe))
-            raise IOError('Expected variable name %s not found in tar file dataset %s' % (var_container.variable_name, filename))
+            raise IOError('Expected variable name %s not found in tar file dataset - "%s"' % (var_container.variable_name, filename))
 
         ba_link = var.content.bounded_arrays.add()
         ba_link.SetLink(ba)

@@ -216,6 +216,13 @@ class FindDataResources(object):
             log.debug('Working on dataset: ' + dSetResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
+            if dSet is None:
+                log.error('dSet is None')
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                      MessageName='AIS findDataResources error response')
+                Response.error_num = Response.ResponseCodes.NOT_FOUND
+                Response.error_str = "Dataset not found."
+                defer.returnValue(Response)        
 
             minMetaData = {}
             self.__loadMinMetaData(dSet, minMetaData)
@@ -248,7 +255,7 @@ class FindDataResources(object):
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Dataset not found."
+                    Response.error_str = "Datasource not found."
                     defer.returnValue(Response)        
 
                 try:
