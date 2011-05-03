@@ -19,14 +19,12 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.python import reflect
 
-from ion.services.coi import datastore
 
-from ion.core.object import gpb_wrapper
 
 from net.ooici.services.coi import resource_framework_pb2
 from net.ooici.core.type import type_pb2
 
-from ion.core.process.process import ProcessFactory, Process
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
@@ -79,9 +77,9 @@ class IngestionService(ServiceProcess):
         #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.push = self.workbench.push
-        self.pull = self.workbench.pull
-        self.fetch_blobs = self.workbench.fetch_blobs
+        #self.push = self.workbench.push
+        #self.pull = self.workbench.pull
+        #self.fetch_blobs = self.workbench.fetch_blobs
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
@@ -92,41 +90,6 @@ class IngestionService(ServiceProcess):
         self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self)
 
         log.info('IngestionService.__init__()')
-
-    @defer.inlineCallbacks
-    def op_ingest(self, content, headers, msg):
-        """
-        Push this dataset to the datastore
-        """
-        log.debug('op_ingest recieved content:'+ str(content))
-
-       
-        msg_repo = content.Repository
-        
-        result = yield self.push('datastore', msg_repo)
-        
-        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
-        
-        yield self.reply(msg, content=msg_repo.repository_key)
-        
-
-
-    @defer.inlineCallbacks
-    def op_retrieve(self, content, headers, msg):
-        """
-        Return the root group of the dataset
-        Content is the unique ID for a particular dataset
-        """
-        log.debug('op_retrieve: recieved content:'+ str(content))
-        result = yield self.pull('datastore', str(content))
-        
-        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
-        
-        repo = self.workbench.get_repository(content)
-        
-        head = yield repo.checkout('master')
-        
-        yield self.reply(msg, content=head)
         
 
     @defer.inlineCallbacks
@@ -180,9 +143,9 @@ class IngestionService(ServiceProcess):
         return True
 
     @defer.inlineCallbacks
-    def op_perform_ingest(self, content, headers, msg):
+    def op_ingest(self, content, headers, msg):
         """
-        Start the ingestion process by setting up neccessary
+        Start the ingestion process by setting up necessary
         @TODO NO MORE MAGNET.TOPIC
         """
         log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
@@ -294,52 +257,10 @@ class IngestionClient(ServiceClient):
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self.proc)
 #        self.rc = ResourceClient(proc=self.proc)
-
-    @defer.inlineCallbacks
-    def ingest(self):
-        """
-        No argument needed - just send a simple object....
-        """
-        yield self._check_init()
-        
-        repo, ab = self.proc.workbench.init_repository(addresslink_type)
-        
-        ab.person.add()
-
-        p = repo.create_object(person_type)
-        p.name = 'david'
-        p.id = 59
-        p.email = 'stringgggg'
-        ab.person[0] = p
-        
-        #print 'AdressBook!',ab
-        
-        (content, headers, msg) = yield self.rpc_send('ingest', ab)
-        
-        defer.returnValue(content)
-        
-        
-
-    @defer.inlineCallbacks
-    def retrieve(self,dataset_id):
-        """
-        @brief Client method to Register a Resource Instance
-        This method is used to generate a new resource instance of type
-        Resource Type
-        @param resource_type
-        """
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('retrieve', dataset_id)
-        
-        
-        log.info('EOI Ingestion Service; Retrieve replied: '+str(content))
-        # Return value should be a resource identity
-        defer.returnValue(content)
-        
         
         
     @defer.inlineCallbacks
-    def perform_ingest(self, dataset_id, reply_to, ingest_service_timeout):
+    def ingest(self, msg):
         """
         Start the ingest process by passing the Service a topic to communicate on, a
         routing key for intermediate replies (signaling that the ingest is ready), and
@@ -350,18 +271,12 @@ class IngestionClient(ServiceClient):
         # Ensure a Process instance exists to send messages FROM...
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
-        
-        # Create the PerformIngestMessage
-        begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
-        begin_msg.dataset_id                = dataset_id
-        begin_msg.reply_to                  = reply_to
-        begin_msg.ingest_service_timeout    = ingest_service_timeout
+
+        ingest_service_timeout = msg.ingest_service_timeout
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
-        content = ""
-        (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
-        
+        (content, headers, msg) = yield self.rpc_send('perform_ingest', msg, timeout=ingest_service_timeout+30)
 
         defer.returnValue(content)
 

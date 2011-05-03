@@ -34,6 +34,7 @@ import uuid
 # Imports: Message object creation
 DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
 CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
+PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -375,7 +376,14 @@ class JavaAgentWrapper(ServiceProcess):
         ingest_timeout  = context.max_ingest_millis
         
         log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
-        perform_ingest_deferred = self.__ingest_client.perform_ingest(content.dataset_id, reply_to, ingest_timeout)
+
+        # Create the PerformIngestMessage
+        begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
+        begin_msg.dataset_id                = content.dataset_id
+        begin_msg.reply_to                  = reply_to
+        begin_msg.ingest_timeout            = ingest_timeout
+
+        perform_ingest_deferred = self.__ingest_client.ingest(msg)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
