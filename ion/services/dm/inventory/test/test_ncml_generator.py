@@ -55,9 +55,7 @@ class PSAT(IonTestCase):
         create_ncml(str(uuid4()), filedir)
         create_ncml(str(uuid4()), filedir)
 
-        rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')
-
-        yield asleep(0.1)
+        yield rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')
 
     @itv(CONF)
     @defer.inlineCallbacks
@@ -70,6 +68,4 @@ class PSAT(IonTestCase):
         create_ncml(str(uuid4()), filedir)
         create_ncml(str(uuid4()), filedir)
 
-        rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')
-
-        yield asleep(2.0)
+        yield rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')

@@ -25,8 +25,9 @@ file_template = """
 
 from os import path, environ
 
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 from twisted.internet.protocol import ProcessProtocol
+import twisted
 
 import ion.util.ionlog
 from ion.core import ioninit
@@ -62,11 +63,23 @@ class _RsyncProto(ProcessProtocol):
     """
     Wrapper class to run rsync
     """
+    def __init__(self, completion_deferred):
+        self.cbd = completion_deferred
+
     def connectionMade(self):
         log.debug('Rsync is running')
 
+    def processEnded(self, reason):
+        pass
+    
     def processExited(self, reason):
-        log.debug('rsync exited, "%s"' % reason.value)
+        # let the caller know we're done
+        if isinstance(reason, twisted.internet.error.ProcessTerminated):
+            log.error('rsync failed, %s' % reason.value)
+            self.cbd.errback(reason)
+        else:
+            log.debug('Return value from rsync, %s' % reason.value)
+            self.cbd.callback('Done')
 
     def outReceived(self, data):
         log.debug('rsync says: "%s"' % data)
@@ -78,10 +91,13 @@ def rsync_ncml(local_filepath, server_url):
     or similar. Should be called after generating all local ncml files.
     @bug Need to figure out how to have a deferred on the processprotocol...
     """
-    rpp = _RsyncProto()
+    d = defer.Deferred()
+    rpp = _RsyncProto(d)
     args = [RSYNC_CMD, '', '-r', '--include', '"*.ncml"',
             '-v', '--stats', '--delete', local_filepath + '/', server_url]
     log.debug('Command is "%s %s"'% (RSYNC_CMD, args))
 
     # Adding environ.data uses the parent environment, otherwise empty
     reactor.spawnProcess(rpp, RSYNC_CMD, args, env=environ.data)
+
+    return d
