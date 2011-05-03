@@ -30,7 +30,7 @@ from ion.agents.instrumentagents.instrument_constants import *
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[0]
+DEBUG_PRINT = (True,False)[1]
 
 """
 Instrument agent observatory metadata.

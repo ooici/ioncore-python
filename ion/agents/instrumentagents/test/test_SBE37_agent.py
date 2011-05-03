@@ -27,7 +27,7 @@ from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 log = ion.util.ionlog.getLogger(__name__)
 
-    
+
 """
 List of mac addresses for machines which should run these tests. If no
 mac address of a NIC on the machine running the tests matches one in this
@@ -51,7 +51,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    #'test_execute_instrument',
+    'test_execute_instrument',
     'dummy'
 ]    
 

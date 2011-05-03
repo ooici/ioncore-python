@@ -49,6 +49,7 @@ class TestInstrumentAgent(IonTestCase):
 
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,target=self.svc_id)
         
+        
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
@@ -104,7 +105,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test that transactions expire after the appropriate time.
         """
-        raise unittest.SkipTest("Temp skip.")
+        raise unittest.SkipTest("Long running test.")
         
         
         # Set the expire timeout to a high value.
@@ -244,7 +245,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test lifetime of an asynchronous transaction request.
         """
-        raise unittest.SkipTest("Temp skip.")
+        raise unittest.SkipTest("Long running test.")
         
         
         
