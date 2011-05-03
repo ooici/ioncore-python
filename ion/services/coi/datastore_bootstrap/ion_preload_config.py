@@ -229,21 +229,23 @@ default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
 }
 
 # Extract Resource ID_CFGs for use in services and tests
-TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
-EXCHANGE_SPACE_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
-EXCHANGE_POINT_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
-PUBLISHER_RES_TYPE_ID = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
-SUBSCRIBER_RES_TYPE_ID = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
-QUEUE_RES_TYPE_ID = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
-SUBSCRIPTION_RES_TYPE_ID = ION_RESOURCE_TYPES[subscription_res_type_name][ID_CFG]
-INSTRUMENT_RES_TYPE_ID = ION_RESOURCE_TYPES[instrument_res_type_name][ID_CFG]
-INSTRUMENT_AGENT_RES_TYPE_ID = ION_RESOURCE_TYPES[instrument_agent_res_type_name][ID_CFG]
-DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
-IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
-DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
-RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
+TOPIC_RESOURCE_TYPE_ID         = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
+EXCHANGE_SPACE_RES_TYPE_ID     = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
+EXCHANGE_POINT_RES_TYPE_ID     = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
+PUBLISHER_RES_TYPE_ID          = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
+SUBSCRIBER_RES_TYPE_ID         = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
+QUEUE_RES_TYPE_ID              = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
+SUBSCRIPTION_RES_TYPE_ID       = ION_RESOURCE_TYPES[subscription_res_type_name][ID_CFG]
+INSTRUMENT_RES_TYPE_ID         = ION_RESOURCE_TYPES[instrument_res_type_name][ID_CFG]
+INSTRUMENT_AGENT_RES_TYPE_ID   = ION_RESOURCE_TYPES[instrument_agent_res_type_name][ID_CFG]
+DATASET_RESOURCE_TYPE_ID       = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
+IDENTITY_RESOURCE_TYPE_ID      = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
+DATASOURCE_RESOURCE_TYPE_ID    = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
+RESOURCE_TYPE_TYPE_ID          = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
-DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
+DATARESOURCE_SCHEDULE_TYPE_ID  = ION_RESOURCE_TYPES[datasource_schedule_rtn][ID_CFG]
+
+DEFAULT_RESOURCE_TYPE_ID       = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
 
 ##### Define Predicates #####:
 

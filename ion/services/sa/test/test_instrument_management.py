@@ -34,8 +34,8 @@ class InstrumentManagementTest(IonTestCase):
         services = [
             {
                 'name':'instmgmt',
-                'module':'ion.services.coi.agent_registry',
-                'class':'AgentRegistryService'
+                'module':'ion.services.sa.instrument_management',
+                'class':'InstrumentManagementService'
             },
             {
                 'name':'ds1',
@@ -43,6 +43,11 @@ class InstrumentManagementTest(IonTestCase):
                 'class':'DataStoreService',
                 'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
 
+            },
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
             },
             {
                 'name':'resource_registry1',
@@ -67,19 +72,31 @@ class InstrumentManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def Xtest_create_instrument(self):
+    def test_create_instrument(self):
         """
         Accepts an dictionary containing updates to the instrument registry.
         Updates are made to the registries.
         """
 
-        log.info("******* Now testing: Create instrument from UI")
+        log.info("IMSSRVC test_create_instrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
                  'model' : "unknown model",
                  'serial_num' : "1234",
                  'fw_version' : "1"}
 
-        instrument = yield self.imc.create_new_instrument(userUpdate)
+        result = yield self.imc.create_new_instrument(userUpdate)
+        log.info("IMSSRVC test_create_instrument  instrument id: %s ", result['instrument_id'] )
+
+
+        #now create a instrument agent and associate
+        instAgentParams = {'instrumentID' : "SeaBird Electronics",
+            'instrumentResourceID' : result['instrument_id'],
+            'model' : "SBE49"}
+        result = yield self.imc.start_instrument_agent("SeaBird Electronics", result['instrument_id'], "SBE49")
+        #result = yield self.imc.start_instrument_agent(instAgentParams)
+        #start_instrument_agent(self, instrumentID, instrumentResourceID, model):
+        log.info("IMSSRVC test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] ) 
+
 
         #self.assertEqual(instrument.manufacturer, "SeaBird Electronics")
         #self.assertEqual(instrument.model, "unknown model") #change made
@@ -99,7 +116,7 @@ class InstrumentManagementTest(IonTestCase):
         #self.assertEqual(dataproduct.dataformat, "binary")
         #self.assertEqual(dataproduct.instrument_ref.RegistryIdentity, instrument_id)
 
-        log.info("******* Finished testing: Create instrument from UI")
+        log.info("IMSSRVC test_create_instrument Finished testing: Create instrument from UI")
 
 
     #@defer.inlineCallbacks
