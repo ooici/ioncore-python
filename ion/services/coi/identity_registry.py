@@ -53,9 +53,12 @@ message UserIdentity {
    optional string subject=1;
    optional string certificate=2;
    optional string rsa_private_key=3;
-   optional string dispatcher_queue=4
-   optional string email=5
-   optional string life_cycle_state=7;
+   optional string name=4;
+   optional string institution=5;
+   optional string email=6;
+   optional string authenticating_organization=7;
+   repeated net.ooici.services.coi.identity.NameValuePairType profile=8;
+   optional string life_cycle_state=9;
 }
 """""
 
@@ -383,6 +386,11 @@ class IdentityRegistryService(ServiceProcess):
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
         identity.subject = cert_info['subject']
+
+        identity.name = ""
+        identity.institution = ""
+        identity.email = ""
+        identity.authenticating_organization = cert_info['subject_items']['O']
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
@@ -445,7 +453,10 @@ class IdentityRegistryService(ServiceProcess):
             Response.resource_reference.subject = identity.subject
             Response.resource_reference.certificate = identity.certificate
             Response.resource_reference.rsa_private_key = identity.rsa_private_key
+            Response.resource_reference.name = identity.name
+            Response.resource_reference.institution = identity.institution
             Response.resource_reference.email = identity.email
+            Response.resource_reference.authenticating_organization = identity.authenticating_organization
             if identity.IsFieldSet('profile'):
                i = 0
                for item in identity.profile:
@@ -540,9 +551,23 @@ class IdentityRegistryService(ServiceProcess):
         if identity != None:
            log.info('update_user_profile: identity = '+str(identity))
                        
+           if request.configuration.IsFieldSet('name'):
+              log.debug('update_user_profile: setting name to %s'%request.configuration.name)
+              identity.name = request.configuration.name
+           else:
+               log.debug('update_user_profile: name not set')
+                       
+           if request.configuration.IsFieldSet('institution'):
+              log.debug('update_user_profile: setting institution to %s'%request.configuration.institution)
+              identity.institution = request.configuration.institution
+           else:
+               log.debug('update_user_profile: institution not set')
+                       
            if request.configuration.IsFieldSet('email'):
               log.debug('update_user_profile: setting email to %s'%request.configuration.email)
               identity.email = request.configuration.email
+           else:
+               log.debug('update_user_profile: email not set')
 
            if request.configuration.IsFieldSet('profile'):
               i = 0
@@ -552,6 +577,8 @@ class IdentityRegistryService(ServiceProcess):
                   identity.profile[i].name = item.name
                   identity.profile[i].value = item.value
                   i = i + 1
+           else:
+               log.debug('update_user_profile: profile not set')
               
            # now save user's info
            yield self.rc.put_instance(identity, 'Updated user profile information')
