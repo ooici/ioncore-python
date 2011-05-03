@@ -1179,7 +1179,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
             
-        # noow update the subscription created above
+        # now update the subscription created above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1249,77 +1249,55 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_success(self):
-        raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_failInputs(self):
-        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
-
-    @defer.inlineCallbacks
-    def test_createDataResource_failSource(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create source fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failSet(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create dataset fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failAssociation(self):
-        raise unittest.SkipTest('This will be the test createDataResource when association fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failScheduling(self):
-        raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
-        
     def __validateDataResourceSummary(self, dataResourceSummary):
         log.debug('__validateDataResourceSummary()')
         
         i = 0
         while i < len(dataResourceSummary):
+            dsResourceID = dataResourceSummary[i].data_resource_id
             if not dataResourceSummary[i].IsFieldSet('user_ooi_id'):
-                self.fail('response to findDataResources has no user_ooi_id field')
+                self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
             if not dataResourceSummary[i].IsFieldSet('data_resource_id'):
-                self.fail('response to findDataResources has no resource_id field')
+                self.fail('dataset: ' +  dsResourceID + ' has no resource_id field')
             if not dataResourceSummary[i].IsFieldSet('title'):
                 #self.fail('response to findDataResources has no title field')
-                log.error('response to findDataResources has no title field')
+                log.error('dataset: ' +  dsResourceID + ' has no title field')
             if not dataResourceSummary[i].IsFieldSet('institution'):
                 #self.fail('response to findDataResources has no institution field')
-                log.error('response to findDataResources has no institution field')
+                log.error('dataset: ' +  dsResourceID + ' has no institution field')
             if not dataResourceSummary[i].IsFieldSet('source'):
                 #self.fail('response to findDataResources has no source field')
-                log.error('response to findDataResources has no source field')
+                log.error('dataset: ' +  dsResourceID + ' has no source field')
             if not dataResourceSummary[i].IsFieldSet('references'):
                 #self.fail('response to findDataResources has no references field')
-                log.error('response to findDataResources has no references field')
+                log.error('dataset: ' +  dsResourceID + ' has no references field')
             if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
-                self.fail('response to findDataResources has no ion_time_coverage_start field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_start field')
             if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
-                self.fail('response to findDataResources has no ion_time_coverage_end field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_end field')
             if not dataResourceSummary[i].IsFieldSet('summary'):
                 #self.fail('response to findDataResources has no summary field')
-                log.error('response to findDataResources has no summary field')
+                log.error('dataset: ' +  dsResourceID + ' has no summary field')
             if not dataResourceSummary[i].IsFieldSet('comment'):
                 #self.fail('response to findDataResources has no comment field')
-                log.error('response to findDataResources has no comment field')
+                log.error('dataset: ' +  dsResourceID + ' has no comment field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_min field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_max field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lon_min field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
+                self.fail('dataset: ' +  dsResourceID + ' no ion_geospatial_lon_max field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_min field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_max field')
             if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
             if not dataResourceSummary[i].IsFieldSet('download_url'):
-                self.fail('response to findDataResources has no download_url field')
+                self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
             i = i + 1                
 
 
@@ -1405,3 +1383,5 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+

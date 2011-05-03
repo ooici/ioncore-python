@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.id import Id
 import ion.util.procutils as pu
-from ion.core.process.process import ProcessDesc
+from ion.core.process.process import ProcessDesc, Process
 
 # The shell namespace
 namespace = None
@@ -29,6 +29,7 @@ def info():
     print "  send(to,op,content): Send a message"
     print "  rpc_send(to,op,content): Send an RPC message"
     print "  spawn(module): Spawn a process from a module"
+    print "  makeprocess(): Returns a new Process object (spawn is called but may not be done yet)"
     print "Variables:"
     print "  control: shell control"
     print "  procs: dict of local process names -> pid"
@@ -229,3 +230,9 @@ def _update():
 
     except Exception:
         log.exception("Error updating CC shell namespace")
+
+def makeprocess():
+    p = Process()
+    p.spawn()
+
+    return p
