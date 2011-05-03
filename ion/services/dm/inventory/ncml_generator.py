@@ -69,9 +69,6 @@ class _RsyncProto(ProcessProtocol):
     def connectionMade(self):
         log.debug('Rsync is running')
 
-    def processEnded(self, reason):
-        pass
-    
     def processExited(self, reason):
         # let the caller know we're done
         if isinstance(reason, twisted.internet.error.ProcessTerminated):
