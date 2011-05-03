@@ -11,6 +11,7 @@ import os
 import tempfile
 from uuid import uuid4
 
+from twisted.trial import unittest
 from twisted.internet import defer
 from ion.core import ioninit
 import ion.util.ionlog
@@ -60,6 +61,8 @@ class PSAT(IonTestCase):
     @itv(CONF)
     @defer.inlineCallbacks
     def test_with_rsync(self):
+        raise unittest.SkipTest('Does not work without account on amoeba')
+        
         filedir = tempfile.mkdtemp()
 
         create_ncml(str(uuid4()), filedir)

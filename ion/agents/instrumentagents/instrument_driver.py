@@ -150,7 +150,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'channels':channels,'command':command,'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('execute',content_outgoing,timeout=rpc_timeout)            
             
@@ -178,7 +178,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('get',content_outgoing,timeout=rpc_timeout)            
             
@@ -208,7 +208,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('set',content_outgoing,timeout=rpc_timeout)            
             
@@ -238,7 +238,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('get_status',content_outgoing,timeout=rpc_timeout)            
             
@@ -262,7 +262,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('initialize',content_outgoing,timeout=rpc_timeout)            
             
@@ -288,7 +288,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('configure',content_outgoing,timeout=rpc_timeout)            
             
@@ -313,7 +313,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('connect',content_outgoing,timeout=rpc_timeout)            
             
@@ -338,7 +338,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('disconnect',content_outgoing,timeout=rpc_timeout)            
             
@@ -365,7 +365,7 @@ class InstrumentDriverClient(ProcessClient):
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
-            rpc_timeout = timeout + 10
+            rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
             (content, headers, message) = yield self.rpc_send('get_state',content_outgoing,timeout=rpc_timeout)            
             
