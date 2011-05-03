@@ -717,6 +717,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -799,6 +801,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -838,7 +842,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('getUser returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
+        self.assertEqual(reply.message_parameters_reference[0].name, "some_person")
+        self.assertEqual(reply.message_parameters_reference[0].institution, "some_place")
         self.assertEqual(reply.message_parameters_reference[0].email_address, "some_person@some_place.some_domain")
+        self.assertEqual(reply.message_parameters_reference[0].authenticating_organization, "ProtectNetwork")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].name, "ProfileItem_1_Name")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].value, "ProfileItem_1_Value")
         self.assertEqual(reply.message_parameters_reference[0].profile[1].name, "ProfileItem_2_Name")
