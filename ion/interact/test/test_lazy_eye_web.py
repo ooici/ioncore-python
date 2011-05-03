@@ -7,21 +7,17 @@
 @test Test lazy eye web service. Uses simple REST URLs to start/stop/display
 the service.
 """
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
-
 from twisted.internet import defer
 from twisted.web.client import getPage
 
+import ion.util.ionlog
 from ion.test.iontest import IonTestCase
-
 from ion.util.procutils import asleep
-
 from ion.util.itv_decorator import itv
 from ion.core import ioninit
 
+log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
-
 BASE_URL = 'http://dyn137-110-115-239.ucsd.edu:4114/'
 GO_URL = BASE_URL + 'go'
 STOP_URL = BASE_URL + 'stop'

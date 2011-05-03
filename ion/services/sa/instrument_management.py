@@ -18,6 +18,8 @@ from ion.core.process.process import ProcessFactory, ProcessDesc
 #from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 #from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClientError
 #from ion.services.sa.instrument_registry import InstrumentRegistryClient
 #from ion.services.sa.data_product_registry import DataProductRegistryClient
 #from ion.services.coi.agent_registry import AgentRegistryClient
@@ -27,6 +29,8 @@ from ion.services.coi.resource_registry.resource_registry import ResourceRegistr
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
 
 from ion.core.object import object_utils
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
 INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
@@ -51,7 +55,8 @@ class InstrumentManagementService(ServiceProcess):
         #self.dprc = DataProductRegistryClient(proc=self)
         #self.arc = AgentRegistryClient(proc=self)
         #self.dpsc = DataPubsubClient(proc=self)
-        self.rc = ResourceClient(proc=sup)
+        self.rc = ResourceClient(proc=self)
+        self.ac    = AssociationClient(proc=self)
 
 
     @defer.inlineCallbacks
@@ -64,54 +69,34 @@ class InstrumentManagementService(ServiceProcess):
 
         resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Test Instrument Resource', ResourceDescription='A test instrument resource')
 
+        log.info("IMSSRVC op_create_new_instrument created resource")
+
         # Set the attributes
         if 'name' in userInput:
-            resource_description.name = str(userInput['name'])
+            resource.name = str(userInput['name'])
 
         if 'description' in userInput:
-            resource_description.description = str(userInput['description'])
+            resource.description = str(userInput['description'])
 
         if 'manufacturer' in userInput:
-            resource_description.manufacturer = str(userInput['manufacturer'])
+            resource.manufacturer = str(userInput['manufacturer'])
 
         if 'model' in userInput:
-            resource_description.model = str(userInput['model'])
+            resource.model = str(userInput['model'])
 
         if 'serial_num' in userInput:
-            resource_description.serial_num = str(userInput['serial_num'])
+            resource.serial_num = str(userInput['serial_num'])
 
         if 'fw_version' in userInput:
-            resource_description.fw_version = str(userInput['fw_version'])
+            resource.fw_version = str(userInput['fw_version'])
 
         yield self.rc.put_instance(resource, 'Testing write...')
+        res_id = resource.ResourceIdentity
+        log.info("IMSSRVC op_create_new_instrument stored resource. identity: %s ", res_id)
 
+        res_value = {'instrument_id':res_id }
 
-
-        """
-        newinstrument = InstrumentResource.create_new_resource()
-
-        if 'name' in userInput:
-            newinstrument.name = str(userInput['name'])
-
-        if 'description' in userInput:
-            newinstrument.description = str(userInput['description'])
-
-        if 'manufacturer' in userInput:
-            newinstrument.manufacturer = str(userInput['manufacturer'])
-
-        if 'model' in userInput:
-            newinstrument.model = str(userInput['model'])
-
-        if 'serial_num' in userInput:
-            newinstrument.serial_num = str(userInput['serial_num'])
-
-        if 'fw_version' in userInput:
-            newinstrument.fw_version = str(userInput['fw_version'])
-
-        #instrument_res = yield self.irc.register_instrument_instance(newinstrument)
-        """
-
-        yield self.reply_ok(msg, instrument_res.encode())
+        yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_create_new_data_product(self, content, headers, msg):
@@ -246,11 +231,17 @@ class InstrumentManagementService(ServiceProcess):
         Service operation: Starts an instrument agent for a type of
         instrument.
         """
-        """
+
+        log.info("IMSSRVC op_start_instrument_agent start")
         if 'instrumentID' in content:
             inst_id = str(content['instrumentID'])
         else:
             raise ValueError("Input for instrumentID not present")
+
+        if 'instrumentResourceID' in content:
+            inst_resource_id = str(content['instrumentResourceID'])
+        else:
+            raise ValueError("Input for instrumentResourceID not present")
 
         if 'model' in content:
             model = str(content['model'])
@@ -259,20 +250,22 @@ class InstrumentManagementService(ServiceProcess):
 
         if model != 'SBE49':
             raise ValueError("Only SBE49 supported!")
+        log.info("IMSSRVC op_start_instrument_agent good input")
 
-        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
-        if agent_pid:
-            raise StandardError("Agent already started for instrument "+str(inst_id))
+        #agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
+        #if agent_pid:
+        #    raise StandardError("Agent already started for instrument "+str(inst_id))
 
         simulator = Simulator(inst_id)
-        simulator.start()
+        #simulator.start()
 
-        topicname = "Inst/RAW/"+inst_id
-        topic = PubSubTopicResource.create(topicname,"")
+        #topicname = "Inst/RAW/"+inst_id
+        #topic = PubSubTopicResource.create(topicname,"")
 
         # Use the service to create a queue and register the topic
-        topic = yield self.dpsc.define_topic(topic)
+        #topic = yield self.dpsc.define_topic(topic)
 
+        """
         iagent_args = {}
         iagent_args['instrument-id'] = inst_id
         driver_args = {}
@@ -286,11 +279,37 @@ class InstrumentManagementService(ServiceProcess):
                   'spawnargs':iagent_args})
 
         iagent_id = yield self.spawn_child(iapd)
-        iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
-        yield iaclient.register_resource(inst_id)
         """
 
-        yield self.reply_ok(msg, "OK")
+        #store the new instrument agent in the resource registry
+        instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Test Instrument Agent Resource', ResourceDescription='A test instrument resource')
+
+        # Set the attributes
+        instrumentAgentResource.name = 'SBE49IA'
+        instrumentAgentResource.description = 'Seabird Sensor'
+        #instrumentAgentResource.version = str(userInput['manufacturer'])
+        instrumentAgentResource.class_name = 'SBE49InstrumentAgent'
+        instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE49_IA'
+
+        #Store the resource in the registry
+        yield self.rc.put_instance(instrumentAgentResource, 'Testing write...')
+        inst_agnt_id = instrumentAgentResource.ResourceIdentity
+        log.info("IMSSRVC op_start_instrument_agent stored agent resource. identity: %s ", inst_agnt_id)
+
+        #Associate this agent to the instrument
+        instrument_resource = yield self.rc.get_instance(inst_resource_id)
+        association = yield self.ac.create_association(instrument_resource, HAS_A_ID, instrumentAgentResource)
+        # Put the association and the resources in the datastore
+        self.rc.put_resource_transaction([instrument_resource, instrumentAgentResource])
+        log.info("IMSSRVC op_start_instrument_agent created association %s", association)
+
+        #iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
+        #yield iaclient.register_resource(inst_id)
+
+
+        #yield self.reply_ok(msg, "OK")
+        res_value = {'instrument_agent_id':inst_agnt_id }
+        yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_stop_instrument_agent(self, content, headers, msg):
@@ -331,7 +350,25 @@ class InstrumentManagementService(ServiceProcess):
         """
 
     @defer.inlineCallbacks
-    def get_agent_for_instrument(self, instrument_id):
+    def get_agent_for_instrument(self, inst_resource_id):
+
+        result = None
+        instrument_resource = yield self.rc.get_instance(inst_resource_id)
+        try:
+            results = yield self.ac.find_associations(subject=instrument_resource, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('AssociationError')
+            defer.returnValue(result)
+
+        for association in results:
+            log.info('Associated Source for Instrument: ' + \
+                      association.ObjectReference.key + \
+                      ' is: ' + association.SubjectReference.key)
+
+        instrument_agent_resource = yield self.rc.get_instance(association.ObjectReference.key)
+
+
         """
         log.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
@@ -373,23 +410,25 @@ class InstrumentManagementClient(ServiceClient):
         reqcont['userInput'] = userInput
 
         (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
-        defer.returnValue(DataObject.decode(cont['value']))
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def create_new_data_product(self, dataProductInput):
         reqcont = {}
         reqcont['dataProductInput'] = dataProductInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('create_new_data_product', reqcont)
-        defer.returnValue(DataObject.decode(cont['value']))
+        result = yield self.rpc_send('create_new_data_product', reqcont)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def start_instrument_agent(self, instrumentID, model):
+    def start_instrument_agent(self, instrumentID, instrumentResourceID, model):
         reqcont = {}
         reqcont['instrumentID'] = instrumentID
+        reqcont['instrumentResourceID'] = instrumentResourceID
         reqcont['model'] = model
-        result = yield self._base_command('start_instrument_agent', reqcont)
-        defer.returnValue(result)
+        #result = yield self._base_command('start_instrument_agent', reqcont)
+        (cont, hdrs, msg)  = yield self.rpc_send('start_instrument_agent', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def stop_instrument_agent(self, instrumentID):

@@ -37,7 +37,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
-from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE, StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -334,6 +334,53 @@ class DataStoreTest(IonTestCase):
             for blobkey in difflist:
                 retval = does_blob_have_parent_of_type(repo, repo.index_hash[objroot.MyId], [], blobkey, excludetypes)
                 self.failUnless(retval)
+
+
+    @defer.inlineCallbacks
+    def test_get_object(self):
+        from ion.core.process.process import Process
+        p = Process()
+        yield p.spawn()
+
+        msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
+
+        idref = msg.CreateObject(IDREF_TYPE)
+        idref.key = SAMPLE_PROFILE_DATASET_ID
+
+        msg.object_id = idref
+
+        dsc = DataStoreClient()
+        obj = yield dsc.get_object(msg)
+
+        # test object, make sure it is what we expect
+        self.failUnlessEquals(obj.retrieved_object.ObjectType.object_id, 1102)
+
+        # test excluded types!
+        msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
+
+        idref = msg.CreateObject(IDREF_TYPE)
+        idref.key = SAMPLE_PROFILE_DATASET_ID
+
+        msg.object_id = idref
+
+        exobj = msg.excluded_object_types.add()
+        typer = msg.CreateObject(GPBTYPE_TYPE)
+
+        typer.object_id = CDM_ARRAY_FLOAT32_TYPE.object_id
+        typer.version = CDM_ARRAY_FLOAT32_TYPE.version
+
+        exobj.SetLink(typer)
+
+        obj2 = yield dsc.get_object(msg)
+
+        # is obj2 the right object type?
+        self.failUnlessEquals(obj.retrieved_object.ObjectType.object_id, 1102)
+
+        # is the index_hash of obj2 less than obj due to exclusions?
+        self.failUnless(len(obj2.Repository.index_hash) < len(obj.Repository.index_hash))
+
+        # make sure we see the correct things in our repo's excluded types
+        self.failUnless(CDM_ARRAY_FLOAT32_TYPE in obj2.Repository.excluded_types)
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):
