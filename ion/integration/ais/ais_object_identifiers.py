@@ -213,8 +213,10 @@ message UpdateUserProfileRequest {
    }
    // objects in a protofile are called messages
    optional string user_ooi_id=1;
-   optional string email_address=2;
-   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=3;
+   optional string name=2;
+   optional string institution=3;
+   optional string email_address=4;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=5;
 }
 """
 
