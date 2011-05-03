@@ -4,6 +4,7 @@
 @file ion/services/coi/datastore.py
 @author David Stuebe
 @author Matt Rodriguez
+@author Dave Foster <dfoster@asascience.com>
 @TODO
 
 """
@@ -23,7 +24,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -775,11 +776,53 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(len(rows)>0)
 
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def op_get_object(self, request, headers, message):
-        pass
+        log.info('op_get_object')
 
+        if not hasattr(request, 'MessageType') or request.MessageType != GET_OBJECT_REQUEST_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid get_object request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        response = yield self._process.message_client.create_instance(GET_OBJECT_REPLY_MESSAGE_TYPE)
+
+        key = request.object_id.key
+        repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
+        assert repo
+
+        # @TODO: use first head for now
+        comms = repo.current_heads()
+        commit = repo.current_heads()[0]
+
+        link = commit.GetLink('objectroot')
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_object_types list of the passed in message.
+            """
+            return x.type not in request.excluded_object_types
+
+        # get blobs, update into response repository so we don't have to copy
+        blobs = yield self._get_blobs(response.Repository, [link.key], filtermethod)
+        response.Repository.index_hash.update(blobs)
+
+        # load root object + links
+        element = response.Repository.index_hash[link.key]
+        root_obj = response.Repository._load_element(element)
+
+        response.Repository.load_links(root_obj, [x.GPBMessage for x in request.excluded_object_types])
+
+        # fill in response, respond
+        response.retrieved_object = root_obj
+        for ex_type in request.excluded_object_types:
+            link = response.excluded_object_types.add()
+            newex = response.CreateObject(GPBTYPE_TYPE)
+            newex.object_id = ex_type.object_id
+            newex.version = ex_type.version
+            link.SetLink(newex)
+
+        yield self._process.reply_ok(message, response)
+
+        log.debug("/op_get_object")
 
 class DataStoreError(ApplicationError):
     """
@@ -918,6 +961,7 @@ class DataStoreService(ServiceProcess):
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
         self.op_put_blobs = self.workbench.op_put_blobs
+        self.op_get_object = self.workbench.op_get_object
 
 
     @defer.inlineCallbacks
@@ -1235,6 +1279,7 @@ class DataStoreClient(ServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_object', content)
+        defer.returnValue(content)
 
 #    @defer.inlineCallbacks
 #    def get_preloaded_datasets_dict(self):
@@ -1257,5 +1302,3 @@ class DataStoreClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)
-
-
