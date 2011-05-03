@@ -1250,10 +1250,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
 
-
-
-
-        
     def __validateDataResourceSummary(self, dataResourceSummary):
         log.debug('__validateDataResourceSummary()')
         
