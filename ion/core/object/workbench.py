@@ -289,7 +289,7 @@ class WorkBench(object):
         Completely clean the state or the workbench, wipe any repositories and delete references to them.
         """
 
-        log.warn('CLEARING THE WORKBENCH - IGNORING PERSISTENCE SETTINGS')
+        log.info('CLEARING THE WORKBENCH - IGNORING PERSISTENCE SETTINGS')
 
         for repo in self._repos.itervalues():
             repo.clear()

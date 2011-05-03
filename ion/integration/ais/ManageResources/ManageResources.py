@@ -142,10 +142,16 @@ class ManageResources(object):
 
         
    def __PrintDatasetAttributes(self, ds):
+      return   # TODO: turned off until problem with dataset fixed
       log.debug("Dataset = \n"+str(ds))
-      for atrib in ds.root_group.attributes:
-         log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
-    
+      for var in ds.root_group.variables:
+         log.debug('Root Variable: %s' % str(var.name))
+         for atrib in var.attributes:
+            log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
+         print "....Dimensions:"
+         for dim in var.shape:
+            log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+     
 
    def __PrintIdentityAttributes(self, ds):
       log.debug("Identity = \n"+str(ds))
