@@ -1503,13 +1503,27 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
-        try:                    
-                    
-            dvr_result = yield self.driver_client.execute(channels,command)
+        try:
             
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
-        
+            
+            while True:
+                    
+                dvr_result = yield self.driver_client.execute(channels,command)
+                reply['success'] = dvr_result['success']
+                reply['result'] = dvr_result['result']
+                
+                # Command successful, break.
+                if InstErrorCode.is_ok(reply['success']):
+                    break
+                
+                # Timeout occurred, retry.
+                elif reply['success'] == InstErrorCode.TIMEOUT:
+                    pass
+                
+                # Some other error occurred, return that error.
+                else:
+                    break
+                    
         # Transaction clean up. End implicit or expired transactions.        
         finally:
             if (tid == 'create') or (self._transaction_timed_out == True):

@@ -31,7 +31,7 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[1]
+DEBUG_PRINT = (True,False)[0]
 IO_LOG = (True,False)[1]
 IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
 
