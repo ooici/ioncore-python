@@ -16,13 +16,18 @@ from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 
 import ion.util.ionlog
-import ion.agents.instrumentagents.instrument_agent as instrument_agent
-from ion.core.exception import ReceivedError
 import ion.util.procutils as pu
+from ion.core.exception import ReceivedError
+import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.agents.instrumentagents.instrument_constants import AgentCommand
+from ion.agents.instrumentagents.instrument_constants import AgentEvent
+from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 log = ion.util.ionlog.getLogger(__name__)
 
-    
+
 """
 List of mac addresses for machines which should run these tests. If no
 mac address of a NIC on the machine running the tests matches one in this
@@ -117,14 +122,12 @@ class TestSBE37Agent(IonTestCase):
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,
                                                                 target=self.svc_id)        
         
-        
 
     @defer.inlineCallbacks
     def tearDown(self):
         
         pu.asleep(1)
         yield self._stop_container()
-        
         
         
     @defer.inlineCallbacks
@@ -139,12 +142,11 @@ class TestSBE37Agent(IonTestCase):
         if 'test_execute_instrument' in SKIP_TESTS:
             raise unittest.SkipTest('Skipping during development.')
 
-
         # Begin an explicit transaction.
         reply = yield self.ia_client.start_transaction(0)
         success = reply['success']
         transaction_id = reply['transaction_id']
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(type(transaction_id),str)
         self.assertEqual(len(transaction_id),36)
 
@@ -152,7 +154,7 @@ class TestSBE37Agent(IonTestCase):
         # observatory mode.
         
         # Initialize the agent.
-        cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_INITIALIZE']
+        cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
@@ -160,10 +162,10 @@ class TestSBE37Agent(IonTestCase):
         #print 'init reply:'
         #print reply
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         
         # Connect to the device.
-        cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_GO_ACTIVE']
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
@@ -171,10 +173,10 @@ class TestSBE37Agent(IonTestCase):
         #print 'go active reply:'
         #print reply
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         
         # Clear the driver state.
-        cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_CLEAR']
+        cmd = [AgentCommand.TRANSITION,AgentEvent.CLEAR]
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
@@ -182,10 +184,10 @@ class TestSBE37Agent(IonTestCase):
         #print 'clear reply:'
         #print reply
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         # Start observatory mode.
-        cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_RUN']
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
@@ -193,7 +195,7 @@ class TestSBE37Agent(IonTestCase):
         #print 'run reply:'
         #print reply
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         
         # Get driver parameters.
         params = [('all','all')]
@@ -209,17 +211,17 @@ class TestSBE37Agent(IonTestCase):
         #print reply
         #print orig_config
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         # Set a few parameters. This will test the device set functions
         # and set up the driver for sampling commands. 
         params = {}
-        params[('CHAN_INSTRUMENT','NAVG')] = 1
-        params[('CHAN_INSTRUMENT','INTERVAL')] = 5
-        params[('CHAN_INSTRUMENT','OUTPUTSV')] = True
-        params[('CHAN_INSTRUMENT','OUTPUTSAL')] = True
-        params[('CHAN_INSTRUMENT','TXREALTIME')] = True
-        params[('CHAN_INSTRUMENT','STORETIME')] = True
+        params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
+        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 5
+        params[(DriverChannel.INSTRUMENT,'OUTPUTSV')] = True
+        params[(DriverChannel.INSTRUMENT,'OUTPUTSAL')] = True
+        params[(DriverChannel.INSTRUMENT,'TXREALTIME')] = True
+        params[(DriverChannel.INSTRUMENT,'STORETIME')] = True
         
         reply = yield self.ia_client.set_device(params,transaction_id)
         success = reply['success']
@@ -229,7 +231,7 @@ class TestSBE37Agent(IonTestCase):
         #print 'set device reply:'
         #print reply
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the set changes were made.
         params = [('all','all')]
@@ -237,26 +239,26 @@ class TestSBE37Agent(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','NAVG')],
-                         result[('CHAN_INSTRUMENT','NAVG')][1])
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','INTERVAL')],
-                         result[('CHAN_INSTRUMENT','INTERVAL')][1])
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','OUTPUTSV')],
-                         result[('CHAN_INSTRUMENT','OUTPUTSV')][1])
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','OUTPUTSAL')],
-                         result[('CHAN_INSTRUMENT','OUTPUTSAL')][1])
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','TXREALTIME')],
-                         result[('CHAN_INSTRUMENT','TXREALTIME')][1])
-        self.assertEqual(setparams[('CHAN_INSTRUMENT','STORETIME')],
-                         result[('CHAN_INSTRUMENT','STORETIME')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'NAVG')],
+                         result[(DriverChannel.INSTRUMENT,'NAVG')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'INTERVAL')],
+                         result[(DriverChannel.INSTRUMENT,'INTERVAL')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSV')],
+                         result[(DriverChannel.INSTRUMENT,'OUTPUTSV')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSAL')],
+                         result[(DriverChannel.INSTRUMENT,'OUTPUTSAL')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'TXREALTIME')],
+                         result[(DriverChannel.INSTRUMENT,'TXREALTIME')][1])
+        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'STORETIME')],
+                         result[(DriverChannel.INSTRUMENT,'STORETIME')][1])
         
         #print 'acquisition parameters successfully set'
         
         # Acquire sample.
-        chans = ['CHAN_INSTRUMENT']
-        cmd = ['DRIVER_CMD_ACQUIRE_SAMPLE']
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [DriverCommand.ACQUIRE_SAMPLE]
         reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         success = reply['success']
         result = reply['result']        
@@ -264,7 +266,7 @@ class TestSBE37Agent(IonTestCase):
         #print 'acquisition result'
         #print result
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
         self.assertIsInstance(result.get('sound velocity',None),float)
@@ -272,16 +274,15 @@ class TestSBE37Agent(IonTestCase):
         self.assertIsInstance(result.get('conductivity',None),float)
         self.assertIsInstance(result.get('time',None),tuple)
         self.assertIsInstance(result.get('date',None),tuple)
-                
         
         # Start autosampling.
-        chans = ['CHAN_INSTRUMENT']
-        cmd = ['DRIVER_CMD_START_AUTO_SAMPLING']
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [DriverCommand.START_AUTO_SAMPLING]
         reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         #print 'autosampling started'
         
@@ -289,28 +290,27 @@ class TestSBE37Agent(IonTestCase):
         yield pu.asleep(30)
         
         # Stop autosampling.
-        chans = ['CHAN_INSTRUMENT']
-        cmd = ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
             reply = yield self.ia_client.execute_device(chans,cmd,
                                                         transaction_id)
             success = reply['success']
             result = reply['result']
             
-            if success[0] == 'OK':
+            if InstErrorCode.is_ok(success):
                 break
             
-            elif success[1] == 'TIMEOUT':
+            elif success == InstErrorCode.TIMEOUT:
                 pass
             
             else:
                 self.fail('Stop autosample failed with error: '+str(success))
             
-
         #print 'autosample result'
         #print result
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         for sample in result:
             self.assertIsInstance(sample.get('temperature'),float)
             self.assertIsInstance(sample.get('salinity'),float)
@@ -320,13 +320,12 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)
         
-        
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,transaction_id)
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the original configuration was restored.
         
@@ -339,7 +338,7 @@ class TestSBE37Agent(IonTestCase):
         # restore original config later.
         final_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         for (key,val) in orig_config.iteritems():
             if isinstance(val,float):
                 self.assertAlmostEqual(val,final_config[key],4)
@@ -349,11 +348,11 @@ class TestSBE37Agent(IonTestCase):
         #print 'original configuration restored'
                 
         # Disconnect from device.
-        cmd = ['CI_CMD_STATE_TRANSITION','CI_TRANS_GO_INACTIVE']
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_INACTIVE]
         reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
         success = reply['success']
         result = reply['result']
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         #print 'go inactive reply:'
         #print reply
@@ -361,9 +360,5 @@ class TestSBE37Agent(IonTestCase):
         # Close the transaction.
         reply = yield self.ia_client.end_transaction(transaction_id)
         success = reply['success']
-        self.assertEqual(success[0],'OK')        
+        self.assert_(InstErrorCode.is_ok(success))
 
-        
-        
-
-        

@@ -9,7 +9,6 @@
 
 from twisted.internet import defer
 
-import time
 from ion.core.data.cassandra_bootstrap import CassandraSchemaProvider, IndexType
 from ion.core.process.process import Process
 from ion.core.object import object_utils
@@ -21,6 +20,7 @@ from ion.core.data.storage_configuration_utility import STORAGE_PROVIDER, PERSIS
 
 from ion.test.iontest import IonTestCase
 import ion.util.ionlog
+from ion.util.iontime import IonTime
 from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -254,7 +254,7 @@ class SchedulerTest(IonTestCase):
         msg_a.payload.datasource_id = "IS NOW"
 
         # calc a start time 5 sec in the future
-        starttime = int(float(time.time() * 1000)) + 5000
+        starttime = IonTime().time_ms + 5000
         msg_a.start_time        = starttime
 
         yield sc.add_task(msg_a)
@@ -282,7 +282,7 @@ class SchedulerTest(IonTestCase):
         msg_a.payload.datasource_id = "IS A WHILE AGO"
 
         # calc a start time 25 sec in the past
-        starttime = int(float(time.time() * 1000)) - 25000
+        starttime = IonTime().time_ms - 25000
         msg_a.start_time        = starttime
 
         yield sc.add_task(msg_a)
