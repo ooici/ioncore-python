@@ -80,11 +80,14 @@ def run_cassload():
         traceback.print_exc(file=sys.stdout)
         yield finish_test(1)
 
-if __name__ == '__main__':
+def main():
     global exit_status
     exit_status = 4
     run_cassload()
     reactor.run()
     sys.exit(exit_status)
+    
+if __name__ == '__main__':
+    main()
 else:
     assert __name__ == CONF_NAME, 'Surprise - you moved me but did not change my CONF name'
