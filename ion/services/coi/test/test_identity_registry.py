@@ -406,5 +406,4 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
         log.info('user2 = '+str(user2.resource_reference.profile))
         self.assertEqual(user2.resource_reference.profile.__len__(), 1)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
-        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value")
-        
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value") 
