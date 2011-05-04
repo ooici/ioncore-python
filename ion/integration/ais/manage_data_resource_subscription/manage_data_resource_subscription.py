@@ -337,6 +337,9 @@ class ManageDataResourceSubscription(object):
                 log.info('Got resource instance: ' + self.userRes.ResourceIdentity)
                     
                 try:
+                    #
+                    # Now make an association between the user and this dispatcher
+                    #
                     association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
                     if association not in self.userRes.ResourceAssociationsAsSubject:
                         log.error('Error: subject not in association!')
@@ -344,13 +347,14 @@ class ManageDataResourceSubscription(object):
                         log.error('Error: object not in association')
                     
                     #
-                    # Do I need to do this????
+                    # Put the association in datastore
                     #
-                    # Put the association and the resources in the datastore ????
                     #self.rc.put_resource_transaction([self.userRes, self.dispatcherRes])
+                    log.debug('Storing association: ' + str(association))
+                    yield self.rc.put_instance(association)
 
                 except AssociationClientError, ex:
-                    errString = 'Error creating assocation between userID: ' + userID + ' and dispatcherID: ' + self.dispatcherID
+                    errString = 'Error creating assocation between userID: ' + userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex
                     log.error(errString)
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -358,10 +362,9 @@ class ManageDataResourceSubscription(object):
                     Response.error_str = errString
                     defer.returnValue(Response)
 
-                
-                #
-                # Now make an association between the user and this dispatcher
-                #
+
+                """
+                #COMMENTING THIS OUT UNTIL I FIND A WAY TO FIND THE ASSOCIATED DISPATCHER
                 #dispatcherID = yield self.__findDispatcher(userID)
                 dispatcherID = yield self.__findDispatcher(self.userRes)
                 if (dispatcherID is None):
@@ -374,10 +377,11 @@ class ManageDataResourceSubscription(object):
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
+                """                    
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
-            
+
             defer.returnValue(Response)
 
         except ReceivedApplicationError, ex:
@@ -573,12 +577,19 @@ class ManageDataResourceSubscription(object):
         #                                        predicate_or_predicates=HAS_A_ID)
         found = yield self.ac.find_associations(subject=userRes)
         
+        """
+        FIXME
+        This does not work; the assocatiation_exists call below can't find by
+        type!!!
+        """
 
-        log.error('TEMPTEMPTEMPTEMP Found ' + str(len(found)) + ' associations.')
+        log.debug('HAS_A_ID is: ' + HAS_A_ID)
+        log.debug('Found ' + str(len(found)) + ' associations.')
         association = None
         for a in found:
-            log.error('FOUNDFOUNDFOUND: ' + str(a))
-            exists = yield self.ac.association_exists(a.ObjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
+            log.debug('FOUND: ' + str(a))
+            #exists = yield self.ac.association_exists(a.ObjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
+            exists = yield self.ac.association_exists(a.SubjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
             if exists:
                 association = a
 
@@ -638,7 +649,7 @@ class ManageDataResourceSubscription(object):
         rc = yield self.rc
         disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         disp_res.dispatcher_name = name
-        yield rc.put_instance(disp_res, 'Commiting new dispatcher resource for registration')
+        yield rc.put_instance(disp_res, 'Committing new dispatcher resource for registration')
         
         #defer.returnValue(str(disp_res.ResourceIdentity))
         defer.returnValue(disp_res)
