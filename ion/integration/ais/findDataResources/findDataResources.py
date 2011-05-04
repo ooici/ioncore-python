@@ -92,7 +92,7 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "DatasetIDs not found."
+            Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
             
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
@@ -145,7 +145,7 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "DatasetIDs not found."
+            Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
@@ -277,7 +277,7 @@ class FindDataResources(object):
                 ownerID = yield self.__findOwner(dSetResID)
 
                 self.__createDownloadURL(dSetResID)
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, ownerID, dSetResID)
+                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
 
                 #self.__printRootAttributes(dSet)
                 #self.__printRootVariables(dSet)
