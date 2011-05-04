@@ -398,13 +398,4 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
         self.assertEqual(user2.resource_reference.profile.__len__(), 1)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
         self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value")
-            
-        """
-        # Test if we can set the life cycle state
-        result = yield self.irc.set_identity_lcstate_retired(ooi_id1) # Wishful thinking Roger!
-        try:
-            user2 = yield self.irc.get_user(OoiIdRequest)
-        except ReceivedApplicationError, ex:
-            self.fail("get_user failed to find a registered user")
-        self.assertEqual(user2.resource_reference.life_cycle_state, 'Retired') # Should be retired now
-        """
+        
