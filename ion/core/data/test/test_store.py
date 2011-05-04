@@ -55,6 +55,8 @@ class IStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        store.Store.kvs.clear()
+
         self.timeout = 10
         self.ds = yield self._setup_backend()
 
@@ -294,6 +296,10 @@ class IndexStoreTest(IStoreTest):
 
     @defer.inlineCallbacks
     def setUp(self):
+        store.Store.kvs.clear()
+        store.IndexStore.kvs.clear()
+        store.IndexStore.indices.clear()
+
         yield IStoreTest.setUp(self)
         yield self.put_stuff_for_tests()
         defer.returnValue(None)
@@ -307,7 +313,7 @@ class IndexStoreTest(IStoreTest):
         return defer.succeed(ds)
 
     def tearDown(self):
-
+        store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
 

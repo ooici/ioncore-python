@@ -89,7 +89,7 @@ class AssociationClientTest(IonTestCase):
         self.assertIn(association, type_resource.ResourceAssociationsAsObject)
 
         # Put the association and the resources in the datastore
-        rc.put_resource_transaction([ds_resource, type_resource])
+        yield rc.put_resource_transaction([ds_resource, type_resource])
 
         ### Now get these from a completely separate process!
 
@@ -109,6 +109,59 @@ class AssociationClientTest(IonTestCase):
 
         p_type_resource = yield rc.get_associated_resource_object(p_association)
         self.assertEqual(p_type_resource.Resource, type_resource.Resource)
+
+
+    @defer.inlineCallbacks
+    def test_create_and_find_association(self):
+        '''
+        Create a nonsense association and test the get methods of the association client
+        '''
+
+        proc = Process()
+        yield proc.spawn()
+
+        rc = ResourceClient(proc=proc)
+        ac = AssociationClient(proc=proc)
+
+
+        ds_resource = yield rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
+        ds_resource.ResourceName = 'Make junk'
+
+        type_resource = yield rc.get_instance(RESOURCE_TYPE_TYPE_ID)
+        type_resource.ResourceName = 'Make more junk'
+
+        association = yield ac.create_association(ds_resource, HAS_A_ID, type_resource)
+
+
+        self.assertIn(association, ds_resource.ResourceAssociationsAsSubject)
+        self.assertIn(association, type_resource.ResourceAssociationsAsObject)
+
+        # Put the association and the resources in the datastore
+        yield rc.put_resource_transaction([ds_resource, type_resource])
+
+        # Get all associations to the ds_resource
+        association_manager = yield ac.find_associations(ds_resource)
+
+        self.assertIn(HAS_A_ID, association_manager.predicate_sorted_associations)
+        self.assertIn(OWNED_BY_ID, association_manager.predicate_sorted_associations)
+
+        # Assert that we actually got back the correct associations - a wrapper around the same association object
+        association_keys = [item.AssociationIdentity for item in association_manager.get_associations_by_predicate(HAS_A_ID)]
+
+        self.assertIn(association.AssociationIdentity, association_keys)
+
+
+        # Get one association to the ds_resource
+        association_manager = yield ac.find_associations(ds_resource, HAS_A_ID)
+
+        self.assertIn(HAS_A_ID, association_manager.predicate_sorted_associations)
+        self.assertNotIn(OWNED_BY_ID, association_manager.predicate_sorted_associations)
+
+        # Assert that we actually got back the correct associations - a wrapper around the same association object
+        association_keys = [item.AssociationIdentity for item in association_manager.get_associations_by_predicate(HAS_A_ID)]
+
+        self.assertIn(association.AssociationIdentity, association_keys)
+
 
 
 

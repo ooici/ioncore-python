@@ -206,22 +206,11 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.minLatitude  = 30
-        #reqMsg.message_parameters_reference.maxLatitude  = 45
-        #reqMsg.message_parameters_reference.minLongitude = -75
-        #reqMsg.message_parameters_reference.maxLongitude = -70
-        #reqMsg.message_parameters_reference.minVertical  = 20
-        #reqMsg.message_parameters_reference.maxVertical  = 30
-        #reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
-        #reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
-
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
-
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -478,7 +467,7 @@ class AppIntegrationTest(IonTestCase):
 
         if len(rspMsg.message_parameters_reference) > 0:
             if len(rspMsg.message_parameters_reference[0].dataResourceSummary) > 0:
-                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
+                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
         
                 #
                 # Now create a request message to get the metadata details about the
@@ -1257,53 +1246,54 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
 
-    def __validateDataResourceSummary(self, dataResourceSummary):
+    def __validateDataResourceSummary(self, dataResourceSummaries):
         log.debug('__validateDataResourceSummary()')
         
         i = 0
-        while i < len(dataResourceSummary):
-            dsResourceID = dataResourceSummary[i].data_resource_id
-            if not dataResourceSummary[i].IsFieldSet('user_ooi_id'):
+        while i < len(dataResourceSummaries):
+            datasetMetadata = dataResourceSummaries[i].datasetMetadata
+            dsResourceID = datasetMetadata.data_resource_id
+            if not datasetMetadata.IsFieldSet('user_ooi_id'):
                 self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
-            if not dataResourceSummary[i].IsFieldSet('data_resource_id'):
+            if not datasetMetadata.IsFieldSet('data_resource_id'):
                 self.fail('dataset: ' +  dsResourceID + ' has no resource_id field')
-            if not dataResourceSummary[i].IsFieldSet('title'):
+            if not datasetMetadata.IsFieldSet('title'):
                 #self.fail('response to findDataResources has no title field')
                 log.error('dataset: ' +  dsResourceID + ' has no title field')
-            if not dataResourceSummary[i].IsFieldSet('institution'):
+            if not datasetMetadata.IsFieldSet('institution'):
                 #self.fail('response to findDataResources has no institution field')
                 log.error('dataset: ' +  dsResourceID + ' has no institution field')
-            if not dataResourceSummary[i].IsFieldSet('source'):
+            if not datasetMetadata.IsFieldSet('source'):
                 #self.fail('response to findDataResources has no source field')
                 log.error('dataset: ' +  dsResourceID + ' has no source field')
-            if not dataResourceSummary[i].IsFieldSet('references'):
+            if not datasetMetadata.IsFieldSet('references'):
                 #self.fail('response to findDataResources has no references field')
                 log.error('dataset: ' +  dsResourceID + ' has no references field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_start'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_start field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_end'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_end field')
-            if not dataResourceSummary[i].IsFieldSet('summary'):
+            if not datasetMetadata.IsFieldSet('summary'):
                 #self.fail('response to findDataResources has no summary field')
                 log.error('dataset: ' +  dsResourceID + ' has no summary field')
-            if not dataResourceSummary[i].IsFieldSet('comment'):
+            if not datasetMetadata.IsFieldSet('comment'):
                 #self.fail('response to findDataResources has no comment field')
                 log.error('dataset: ' +  dsResourceID + ' has no comment field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_max'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lon_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_max'):
                 self.fail('dataset: ' +  dsResourceID + ' no ion_geospatial_lon_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_max'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_positive'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
-            if not dataResourceSummary[i].IsFieldSet('download_url'):
+            if not datasetMetadata.IsFieldSet('download_url'):
                 self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
             i = i + 1                
 
