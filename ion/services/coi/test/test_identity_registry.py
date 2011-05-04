@@ -297,7 +297,6 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
             Response = yield self.irc.register_user(IdentityRequest)
             ooi_id1 = Response.resource_reference.ooi_id
             log.debug('OOI_ID1 = ' + ooi_id1)
-            print "OOI_ID = " + ooi_id1
         except ReceivedApplicationError, ex:
             self.fail("register_user failed")
         
@@ -309,6 +308,16 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
             self.assertEqual(ooi_id1, Response.resource_reference.ooi_id)
         except ReceivedApplicationError, ex:
             self.fail("Authenticate_user failed to find a registered user")
+        
+        # test that user1 is found when calling get_ooiid_for_user
+        log.info("testing get_ooiid_for_user")
+        try:
+            IdentityRequest.configuration.subject = self.user1_subject
+            Response = yield self.irc.get_ooiid_for_user(IdentityRequest)
+            log.debug('OOI_ID2 = ' + Response.resource_reference.ooi_id)
+            self.assertEqual(ooi_id1, Response.resource_reference.ooi_id)
+        except ReceivedApplicationError, ex:
+            self.fail("get_ooiid_for_user failed to find a registered user")
         
         # load the user back
         log.info("testing get_user")
