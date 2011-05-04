@@ -24,7 +24,6 @@ from ion.core.object import workbench
 from ion.core.object import repository
 from ion.core.object import association_manager
 
-
 from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
 from ion.services.coi.datastore_bootstrap import ion_preload_config
 
@@ -59,7 +58,6 @@ class ResourceClient(object):
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
     type_map = ion_preload_config.TypeMap()
-
 
 
     def __init__(self, proc=None, datastore_service='datastore'):
@@ -198,7 +196,8 @@ class ResourceClient(object):
             result = yield self.workbench.pull(self.datastore_service, reference)
         except workbench.WorkBenchError, ex:
             log.warn(ex)
-            raise ResourceClientError('Could not pull the requested resource from the datastore. Workbench exception: \n %s' % ex)
+            raise ResourceClientError(
+                'Could not pull the requested resource from the datastore. Workbench exception: \n %s' % ex)
 
         # Get the repository
         repo = self.workbench.get_repository(reference)
@@ -267,15 +266,16 @@ class ResourceClient(object):
             # Check to make sure they are valid resource instances
             for instance in instances:
                 if not hasattr(instance, 'Repository'):
-                    raise ResourceClientError('Invalid object in list of instances argument to put_resource_transaction. Must be an Instance, received: "%s"' % str(instance))
+                    raise ResourceClientError(
+                        'Invalid object in list of instances argument to put_resource_transaction. Must be an Instance, received: "%s"' % str(
+                            instance))
         else:
-            raise ResourceClientError('Invalid argument to put_resource_transaction: instances must be a resource instance or a list of them')
-
+            raise ResourceClientError(
+                'Invalid argument to put_resource_transaction: instances must be a resource instance or a list of them')
 
         transaction_repos = []
 
         for instance in instances:
-
             repo = instance.Repository
             if repo.status != repo.UPTODATE:
                 repo.commit(comment=comment)
@@ -294,7 +294,8 @@ class ResourceClient(object):
         @param association is an association instance
         """
         if not isinstance(association, association_manager.AssociationInstance):
-            raise ResourceClientError('Invalid argument to get_associated_resource_object: argument must be an association instance')
+            raise ResourceClientError(
+                'Invalid argument to get_associated_resource_object: argument must be an association instance')
 
         obj_ref = association.ObjectReference
 
@@ -312,7 +313,8 @@ class ResourceClient(object):
         @param association is an association instance
         """
         if not isinstance(association, association_manager.AssociationInstance):
-            raise ResourceClientError('Invalid argument to get_associated_resource_subject: argument must be an association instance')
+            raise ResourceClientError(
+                'Invalid argument to get_associated_resource_subject: argument must be an association instance')
 
         subject_ref = association.SubjectReference
 
@@ -321,8 +323,6 @@ class ResourceClient(object):
         resource_instance.ResourceAssociationsAsSubject.add(association)
 
         defer.returnValue(resource_instance)
-
-
 
 
     def reference_instance(self, instance, current_state=False):
@@ -377,7 +377,6 @@ class MergeResourceFieldProperty(object):
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Resource Instance property')
-
 
 
 class ResourceEnumProperty(object):
@@ -457,6 +456,7 @@ class MergeResourceInstanceType(type):
         # Finally allow the instantiation to occur, but slip in our new class type
         obj = super(MergeResourceInstanceType, clsType).__call__(merge_repository, *args, **kwargs)
         return obj
+
 
 class MergeResourceInstance(object):
     """
@@ -567,16 +567,13 @@ class MergeResourceInstance(object):
 
 
 class MergeResourceContainer(object):
-
     def __init__(self):
-
         self.parent = None
 
         self._merge_commits = {}
         self.merge_repos = []
 
-    def _append(self,item):
-
+    def _append(self, item):
         mri = MergeResourceInstance(item)
 
         self.merge_repos.append(mri)
@@ -584,7 +581,6 @@ class MergeResourceContainer(object):
         self._merge_commits[item.commit] = mri
 
     def __iter__(self):
-
         return self.merge_repos.__iter__()
 
 
@@ -593,10 +589,7 @@ class MergeResourceContainer(object):
 
 
     def __getitem__(self, index):
-
         return self.merge_repos[index]
-
-    
 
 
 class ResourceInstanceType(type):
@@ -747,7 +740,10 @@ class ResourceInstance(object):
         output += 'Resource Repository State:\n'
         output += str(self.Repository) + '\n'
         output += '============== Object ==============\n'
-        output += str(self.ResourceObject) + '\n'
+        try:
+            output += str(self.ResourceObject) + '\n'
+        except AttributeError, ae:
+            output += 'Resource Object in an invalid state!'
         output += '============ End Resource ============\n'
         return output
 
@@ -769,9 +765,7 @@ class ResourceInstance(object):
             self._merge = MergeResourceContainer()
 
         for commit, mr in self.Repository.merge._merge_commits.iteritems():
-
             if commit not in self._merge._merge_commits:
-
                 self._merge._append(mr)
 
         return self._merge
@@ -787,20 +781,18 @@ class ResourceInstance(object):
         return self.Repository.branch()
 
 
-
     def CreateUpdateBranch(self, update=None):
-
         branch_key = self.Repository.branch()
 
         # Set the LCS in the resource branch to UPDATE and the object to the update
         self.ResourceLifeCycleState = self.UPDATE
 
         if update is not None:
-
             if update.ObjectType != self.ResourceObjectType:
                 log.error('Resource Type does not match update Type!')
                 log.error('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceObjectType)))
-                raise ResourceInstanceError('CreateUpdateBranch argument "update" must be of the same type as the resource to be updated!')
+                raise ResourceInstanceError(
+                    'CreateUpdateBranch argument "update" must be of the same type as the resource to be updated!')
 
             # Copy the update object into resource as the current state object.
             self.Resource.resource_object = update
@@ -809,18 +801,14 @@ class ResourceInstance(object):
 
 
     def CurrentBranchKey(self):
-
         return self.Repository.current_branch_key()
 
     @defer.inlineCallbacks
     def MergeWith(self, branchname, parent_branch=None):
-
         if parent_branch is not None:
             yield self.Repository.checkout(branchname=parent_branch)
 
-
         yield self.Repository.merge_with(branchname=branchname)
-
 
 
     @defer.inlineCallbacks

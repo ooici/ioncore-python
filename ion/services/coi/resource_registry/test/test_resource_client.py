@@ -403,7 +403,9 @@ class ResourceClientTest(IonTestCase):
 
 
 class ResourceInstanceTest(unittest.TestCase):
-
+    '''
+    Base clase for tests - do not actually put tests in this class!
+    '''
     res_type = None
 
     def setUp(self):
@@ -420,6 +422,29 @@ class ResourceInstanceTest(unittest.TestCase):
         res_repo.commit('Message object instantiated')
 
         self.res = ResourceInstance(res_repo)
+
+
+
+
+class ResourceInstanceObject(ResourceInstanceTest):
+    res_type = ADDRESSLINK_TYPE
+
+    def test_str(self):
+
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.purge_workspace()
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.purge_associations()
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.clear()
+        s = str(self.res)
+        #print s
 
 
 class AddressbookMessageTest(ResourceInstanceTest):
@@ -482,6 +507,8 @@ class InstrumentMessageTest(ResourceInstanceTest):
     def test_field_enum(self):
         """
         """
+        print 'RTYPE',self.res_type
+        print self.res._Properties
         self.failUnlessEqual(self.res._Properties['type'].field_type, "TYPE_ENUM")
         self.failIf(self.res._Properties['type'].field_enum is None)
         self.failUnless(hasattr(self.res._Properties['type'].field_enum, 'ADCP'))
