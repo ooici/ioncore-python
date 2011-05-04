@@ -278,9 +278,17 @@ class FindDataResources(object):
                 self.__createDownloadURL(dSetResID)
 
                 if userID is None:
+                    #
+                    # This was a findDataResources request
+                    #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.date_registered = dSource.registration_datetime_millis
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
-                else:                    
+                else:
+                    #
+                    # This was a findDataResourcesByUser request
+                    #
                     rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
                     self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSetResID)
 
