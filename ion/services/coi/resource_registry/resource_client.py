@@ -744,7 +744,8 @@ class ResourceInstance(object):
 
     def __str__(self):
         output = '============== Resource ==============\n'
-        output += str(self.Resource) + '\n'
+        output += 'Resource Repository State:\n'
+        output += str(self.Repository) + '\n'
         output += '============== Object ==============\n'
         output += str(self.ResourceObject) + '\n'
         output += '============ End Resource ============\n'

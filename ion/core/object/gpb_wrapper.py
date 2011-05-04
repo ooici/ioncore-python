@@ -1868,7 +1868,11 @@ class Wrapper(object):
         else:
             msg = '\n' +self._gpbMessage.__str__()
         '''
-        msg = '\n %s \n'  % str(self._gpbMessage)
+        if self._source is self:
+            msg = '\n %s \n'  % str(self._gpbMessage)
+        else:
+            msg = '\n %s \n'  % str(self._source._gpbMessage)
+
         return msg
 
     def Debug(self):

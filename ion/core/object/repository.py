@@ -613,6 +613,7 @@ class Repository(ObjectContainer):
 
         output += 'Number of current workspace objects: %d \n' % len(self._workspace)
         output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Current context identifier for repository: %s \n' % self.convid_context
         output += 'Excluded types:\n'
         try:
             for type in self.excluded_types:

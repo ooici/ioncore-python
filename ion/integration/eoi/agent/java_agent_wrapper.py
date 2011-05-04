@@ -28,13 +28,12 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 # Imports: Builtin
-import time, datetime
-import uuid
+import datetime
 
 # Imports: Message object creation
 DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
 CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
-PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
+PERFORM_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -160,7 +159,8 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.debug(" -[]- Entered slc_init(); state=%s" % (str(self._get_state())))
         # Step 1: Delegate initialization to parent class
-        yield defer.maybeDeferred(ServiceProcess.slc_init, self)
+        # The scl_init method of ServiceProcess is empty - it is there only to be over ridden in sub classes
+        #yield defer.maybeDeferred(ServiceProcess.slc_init, self)
         
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self)
@@ -178,7 +178,8 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.debug(" -[]- Entered slc_activate(); state=%s" % (str(self._get_state())))
         # Step 1: Delegate initialization to parent class
-        yield defer.maybeDeferred(ServiceProcess.slc_activate, self)
+        # slc_activate is only for over ride in subclasses - no need to callit!
+        #yield defer.maybeDeferred(ServiceProcess.slc_activate, self)
         
         # Step 2: Suspend execution until receipt of the external child process's binding key
         def _recieve_binding_key(self):

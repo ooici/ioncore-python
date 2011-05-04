@@ -85,6 +85,28 @@ class AssociationInstanceTest(unittest.TestCase):
         self.assertEqual(len(self.obj.associations_as_subject), 0)
 
 
+    def test_print_after_clear(self):
+        """
+        Make sure that STR never raises an exception!
+        """
+        a = str(self.association)
+        #print a
+
+        self.association.Repository.purge_workspace()
+
+        a = str(self.association)
+        #print a
+
+        self.association.Repository.purge_associations()
+
+        a = str(self.association)
+        #print a
+
+        self.association.Repository.clear()
+
+        a = str(self.association)
+        #print a
+
 
     def test_in_managers(self):
 

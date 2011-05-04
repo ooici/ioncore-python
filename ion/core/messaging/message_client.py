@@ -283,17 +283,10 @@ class MessageInstance(object):
         
     def __str__(self):
         output  = '============== Message ==============\n'
-        try:
-            output += str(self.Message) + '\n'
-        except gpb_wrapper.OOIObjectError, oe:
-            log.error(oe)
-            output += 'Message envelope object in an invalid state!'
+        output += 'Message Repository State:\n'
+        output += str(self.Repository) + '\n'
         output += '============== Object ==============\n'
-        try:
-            output += str(self.MessageObject) + '\n'
-        except gpb_wrapper.OOIObjectError, oe:
-            log.error(oe)
-            output += 'Message content object in an invalid state!'
+        output += str(self.MessageObject) + '\n'
         output += '============ End Message ============\n'
         return output
         
