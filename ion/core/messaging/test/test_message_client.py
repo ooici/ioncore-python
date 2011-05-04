@@ -45,6 +45,8 @@ class MessageInstanceTest(unittest.TestCase):
 
         self.msg = message_client.MessageInstance(msg_repo)
 
+class AddressbookMessageTest(MessageInstanceTest):
+    msg_type = ADDRESSLINK_TYPE
 
 class AddressbookMessageTest(MessageInstanceTest):
     msg_type = ADDRESSLINK_TYPE
@@ -100,6 +102,25 @@ class AddressbookMessageTest(MessageInstanceTest):
         self.failUnlessEqual(self.msg._Properties['title'].field_type, "TYPE_STRING")
         self.failUnless(self.msg._Properties['title'].field_enum is None)
 
+    def test_str(self):
+        '''
+        should raise no exceptions!
+        '''
+        s = str(self.msg)
+        #print s
+
+        self.msg.Repository.purge_workspace()
+        s = str(self.msg)
+        #print s
+
+        self.msg.Repository.purge_associations()
+        s = str(self.msg)
+        #print s
+
+        self.msg.Repository.clear()
+        s = str(self.msg)
+        #print s
+
 class InstrumentMessageTest(MessageInstanceTest):
     msg_type = INSTRUMENT_TYPE
 
@@ -112,6 +133,7 @@ class InstrumentMessageTest(MessageInstanceTest):
         self.failUnless(self.msg._Enums.has_key('InstrumentType'))
         self.failUnless(hasattr(self.msg._Enums['InstrumentType'], 'ADCP'))
         self.failUnlessEqual(self.msg._Enums['InstrumentType'].ADCP, 1)
+
 
 
 

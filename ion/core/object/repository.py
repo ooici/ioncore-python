@@ -1115,7 +1115,7 @@ class Repository(ObjectContainer):
         if self.status == self.MODIFIED:
 
             #@TODO consider changing this to a warning rather than an exception
-            raise RepositoryError('Can not purge repository in a modified state! Data will be lost')
+            log.warn('Called purge repository in a modified state! The current workspace is being lost!')
 
         # Do some clean up!
         for item in self._workspace.itervalues():

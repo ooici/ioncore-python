@@ -423,30 +423,6 @@ class ResourceInstanceTest(unittest.TestCase):
 
         self.res = ResourceInstance(res_repo)
 
-
-
-
-class ResourceInstanceObject(ResourceInstanceTest):
-    res_type = ADDRESSLINK_TYPE
-
-    def test_str(self):
-
-        s = str(self.res)
-        #print s
-
-        self.res.Repository.purge_workspace()
-        s = str(self.res)
-        #print s
-
-        self.res.Repository.purge_associations()
-        s = str(self.res)
-        #print s
-
-        self.res.Repository.clear()
-        s = str(self.res)
-        #print s
-
-
 class AddressbookMessageTest(ResourceInstanceTest):
     res_type = ADDRESSLINK_TYPE
 
@@ -501,6 +477,26 @@ class AddressbookMessageTest(ResourceInstanceTest):
         self.failUnlessEqual(self.res._Properties['title'].field_type, "TYPE_STRING")
         self.failUnless(self.res._Properties['title'].field_enum is None)
 
+
+    def test_str(self):
+        '''
+        should raise no exceptions!
+        '''
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.purge_workspace()
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.purge_associations()
+        s = str(self.res)
+        #print s
+
+        self.res.Repository.clear()
+        s = str(self.res)
+        #print s
+
 class InstrumentMessageTest(ResourceInstanceTest):
     res_type = INSTRUMENT_TYPE
 
@@ -515,3 +511,4 @@ class InstrumentMessageTest(ResourceInstanceTest):
         self.failUnless(self.res._Enums.has_key('InstrumentType'))
         self.failUnless(hasattr(self.res._Enums['InstrumentType'], 'ADCP'))
         self.failUnlessEqual(self.res._Enums['InstrumentType'].ADCP, 1)
+
