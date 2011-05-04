@@ -333,11 +333,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with temporal bounds that covers data time
@@ -362,11 +362,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds minTime covered by data time, but
@@ -390,11 +390,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds maxTime covered by data time, but
@@ -418,11 +418,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
-
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
 
     @defer.inlineCallbacks
@@ -1246,6 +1246,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
 
+    def __validateDatasetByOwnerMetadata(self, metadata):
+        log.debug('__validateDataResourceSummary()')
+        
+        i = 0
+        while i < len(metadata):
+            data = metadata[i]
+            if not data.IsFieldSet('data_resource_id'):
+                self.fail('FindDataResourcesByOwner response has no data_resource_id field')
+            else:                
+                dsResourceID = data.data_resource_id
+            i = i + 1                
+
     def __validateDataResourceSummary(self, dataResourceSummaries):
         log.debug('__validateDataResourceSummary()')
         
@@ -1253,8 +1265,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         while i < len(dataResourceSummaries):
             datasetMetadata = dataResourceSummaries[i].datasetMetadata
             dsResourceID = datasetMetadata.data_resource_id
-            if not datasetMetadata.IsFieldSet('user_ooi_id'):
-                self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
+            #if not datasetMetadata.IsFieldSet('user_ooi_id'):
+            #    self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
             if not datasetMetadata.IsFieldSet('data_resource_id'):
                 self.fail('dataset: ' +  dsResourceID + ' has no resource_id field')
             if not datasetMetadata.IsFieldSet('title'):

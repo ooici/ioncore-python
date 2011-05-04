@@ -311,8 +311,7 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                                        'name':'',
                                        'institution':'',
                                        'email':'',
-                                       'authenticating_organization':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 myooici_name:{ID_CFG:'A7B44115-34BC-4553-B51E-1D87617F12E0',
@@ -366,8 +365,7 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL''',
                                        'name':'myooici',
                                        'institution':'OOICI',
                                        'email':'myooici@gmail.com',
-                                       'authenticating_organization':'Google',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':'Google'}
                         },
 
 
@@ -381,8 +379,7 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                                        'name':'',
                                        'institution':'',
                                        'email':'',
-                                       'authenticating_organization':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 
