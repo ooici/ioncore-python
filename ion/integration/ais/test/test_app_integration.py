@@ -1137,11 +1137,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
         numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
 
-        log.debug('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
+        log.info('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
         if numSubsReturned != 2:
             errString = 'findDataResourcesByUser returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 2'
             #self.fail('findDataResourcesByUser returned " + numResReturned + " subscriptions.  Should have been 2')
             self.fail(errString)
+        else:
+            i = 0
+            while i < numSubsReturned:
+                log.info('Date of subscription registration: ' + str(rspMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered))
+                i = i + 1
+
 
             
     @defer.inlineCallbacks
@@ -1265,6 +1271,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         while i < len(dataResourceSummaries):
             datasetMetadata = dataResourceSummaries[i].datasetMetadata
             dsResourceID = datasetMetadata.data_resource_id
+
+            if not dataResourceSummaries[i].IsFieldSet('notificationSet'):
+                self.fail('dataset: ' +  dsResourceID + ' has no notificationSet field')
+            log.info('notificationSet: ' + str(dataResourceSummaries[i].notificationSet))
+            if not dataResourceSummaries[i].IsFieldSet('date_registered'):
+                self.fail('dataset: ' +  dsResourceID + ' has no date_registered field')
+            log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
+
             #if not datasetMetadata.IsFieldSet('user_ooi_id'):
             #    self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
             if not datasetMetadata.IsFieldSet('data_resource_id'):
