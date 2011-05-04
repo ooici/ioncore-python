@@ -149,11 +149,10 @@ class DatasetController(ServiceProcess):
         # Set a response code in the message envelope
         response.MessageResponseCode = response.ResponseCodes.OK
 
-        # pfh create ncml file as well
-        #create_ncml(response.key, NCML_PATH)
+        # pfh - create local ncml file as well
+        create_ncml(response.key, NCML_PATH)
         # Push to server
-        # @bug Returns before rsync completes
-        #yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
+        yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)

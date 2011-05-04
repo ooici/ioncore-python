@@ -45,9 +45,8 @@ def create_ncml(id_ref, filepath=""):
     @retval File contents, as a string, or None if error
     """
 
-    full_filename = path.join(filepath, id_ref+'.ncml')
+    full_filename = path.join(filepath, id_ref + '.ncml')
     log.debug('Generating NcML file %s' % full_filename)
-
     try:
         fh = open(full_filename, 'w')
         fh.write(file_template % id_ref)
@@ -84,9 +83,11 @@ class _RsyncProto(ProcessProtocol):
 
 def rsync_ncml(local_filepath, server_url):
     """
-    Method to perform a bidirectional sync with a remote server, probably via rsync, unison
+    @brief Method to perform a bidirectional sync with a remote server, probably via rsync, unison
     or similar. Should be called after generating all local ncml files.
-    @bug Need to figure out how to have a deferred on the processprotocol...
+    @param local_filepath Local directory for writing ncml file(s)
+    @param server_url rsync URL of the server
+    @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
     d = defer.Deferred()
     rpp = _RsyncProto(d)
