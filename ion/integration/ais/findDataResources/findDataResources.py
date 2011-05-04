@@ -282,8 +282,8 @@ class FindDataResources(object):
                     # This was a findDataResources request
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.notificationSet = False
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.date_registered = dSource.registration_datetime_millis
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
                 else:
                     #

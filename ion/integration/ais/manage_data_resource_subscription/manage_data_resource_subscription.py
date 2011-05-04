@@ -182,6 +182,8 @@ class ManageDataResourceSubscription(object):
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
+        msg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
+
         try:
             log.debug("update: calling notification alert service addSubscription()")
             reply = yield self.nac.addSubscription(msg)

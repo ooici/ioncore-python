@@ -1269,9 +1269,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         i = 0
         while i < len(dataResourceSummaries):
-            log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
             datasetMetadata = dataResourceSummaries[i].datasetMetadata
             dsResourceID = datasetMetadata.data_resource_id
+
+            if not dataResourceSummaries[i].IsFieldSet('notificationSet'):
+                self.fail('dataset: ' +  dsResourceID + ' has no notificationSet field')
+            log.info('notificationSet: ' + str(dataResourceSummaries[i].notificationSet))
+            if not dataResourceSummaries[i].IsFieldSet('date_registered'):
+                self.fail('dataset: ' +  dsResourceID + ' has no date_registered field')
+            log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
+
             #if not datasetMetadata.IsFieldSet('user_ooi_id'):
             #    self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
             if not datasetMetadata.IsFieldSet('data_resource_id'):
