@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID
@@ -316,23 +316,64 @@ class ManageDataResourceSubscription(object):
                 #
 
                 #
-                # TEMPORARY
+                # TEMPORARY TEMPORARY TEMPORARY!!!
                 #
                 log.info("Creating dispatcher for test")
-                self.dispatcherID = yield self.__register_dispatcher('DispatcherResource')
+                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource')
+                self.dispatcherID = self.dispatcherRes.ResourceIdentity
+                log.info('Created Dispatcher ID: ' + self.dispatcherID)
+                log.info('Getting resource instance')
+                try:
+                    self.userRes = yield self.rc.get_instance(userID)
+                except ResourceClientError:
+                    errString = 'Error getting instance of userID: ' + userID
+                    log.error(errString)
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                    Response.error_str = errString
+                    defer.returnValue(Response)
 
-                """
-                dispatcherID = yield self.__findDispatcher(userID)
+                log.info('Got resource instance: ' + self.userRes.ResourceIdentity)
+                    
+                try:
+                    association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+                    if association not in self.userRes.ResourceAssociationsAsSubject:
+                        log.error('Error: subject not in association!')
+                    if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                        log.error('Error: object not in association')
+                    
+                    #
+                    # Do I need to do this????
+                    #
+                    # Put the association and the resources in the datastore ????
+                    #self.rc.put_resource_transaction([self.userRes, self.dispatcherRes])
+
+                except AssociationClientError, ex:
+                    errString = 'Error creating assocation between userID: ' + userID + ' and dispatcherID: ' + self.dispatcherID
+                    log.error(errString)
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+
+                
+                #
+                # Now make an association between the user and this dispatcher
+                #
+                #dispatcherID = yield self.__findDispatcher(userID)
+                dispatcherID = yield self.__findDispatcher(self.userRes)
                 if (dispatcherID is None):
+                    errString = 'Dispatcher not found for userID' + userID
+                    log.error(errString)
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    errString = 'Dispatcher not found for userID' + userID
                     Response.error_str = errString
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
-                """
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
@@ -526,7 +567,31 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
-    def __findDispatcher(self, userID):
+    def __findDispatcher(self, userRes):
+
+        #found = yield self.ac.find_associations(subject=userRes, \
+        #                                        predicate_or_predicates=HAS_A_ID)
+        found = yield self.ac.find_associations(subject=userRes)
+        
+
+        log.error('TEMPTEMPTEMPTEMP Found ' + str(len(found)) + ' associations.')
+        association = None
+        for a in found:
+            log.error('FOUNDFOUNDFOUND: ' + str(a))
+            exists = yield self.ac.association_exists(a.ObjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
+            if exists:
+                association = a
+
+        if association is None:
+            log.error('No associations found!!!')
+            defer.returnValue(None)
+        else:            
+            the_resource = yield self.rc.get_associated_resource_object(association)
+            defer.returnValue(the_resource)
+
+
+    @defer.inlineCallbacks
+    def __findDispatcherOld(self, userID):
 
         request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
 
@@ -575,7 +640,8 @@ class ManageDataResourceSubscription(object):
         disp_res.dispatcher_name = name
         yield rc.put_instance(disp_res, 'Commiting new dispatcher resource for registration')
         
-        defer.returnValue(str(disp_res.ResourceIdentity))
+        #defer.returnValue(str(disp_res.ResourceIdentity))
+        defer.returnValue(disp_res)
 
 
     @defer.inlineCallbacks
