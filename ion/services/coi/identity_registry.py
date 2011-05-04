@@ -301,6 +301,7 @@ class IdentityRegistryService(ServiceProcess):
                   Response.resource_reference.profile[i].name = item.name
                   Response.resource_reference.profile[i].value = item.value
                   i = i + 1
+            log.debug('get_user: lcs = '+identity._get_life_cycle_state())
             Response.result = "OK"
             defer.returnValue(Response)
         except ApplicationError, ex:
