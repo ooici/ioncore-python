@@ -40,6 +40,50 @@ class WrapperMethodsTest(unittest.TestCase):
         self.failUnlessEqual(ab._Properties['title'].field_type, "TYPE_STRING")
         self.failUnless(ab._Properties['title'].field_enum is None)
 
+
+    def test_str_debug(self):
+        """
+        Make sure you can call print and debug without exception in any state.
+        """
+        ab1 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+        ab2 = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
+
+        s = str(ab1)
+        #print s
+
+        s = ab1.Debug()
+        #print s
+
+        ab1.Invalidate(other=ab2)
+
+        s = str(ab1)
+        #print s
+
+        s = ab1.Debug()
+        #print s
+
+        ab2.Invalidate()
+
+        s = str(ab1)
+        #print s
+
+        s = ab1.Debug()
+        #print s
+
+        s = str(ab2)
+        #print s
+
+        s = ab2.Debug()
+        #print s
+
+        ab1.Invalidate()
+        s = str(ab1)
+        #print s
+
+        s = ab1.Debug()
+        #print s
+
+
     def test_field_enum(self):
         """
         """
