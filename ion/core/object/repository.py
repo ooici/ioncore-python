@@ -367,17 +367,22 @@ class ObjectContainer(object):
 
         return obj
 
-    def load_links(self, obj, excluded_types=None):
+    def load_links(self, obj, excluded_types=None, recursed=False):
         """
         Load the child objects into the work space recursively
         """
         excluded_types = excluded_types or []
-
         for link in obj.ChildLinks:
             if not link.type.GPBMessage in excluded_types:
                 child = self.get_linked_object(link)
-                self.load_links(child, excluded_types)
+                self.load_links(child, excluded_types, True)
 
+        # load excluded_types, but only on the main call.
+        # this is meh, we could improve by making self.excluded_types a set...
+        if not recursed:
+            for extype in excluded_types:
+                if extype not in self.excluded_types:
+                    self.excluded_types.append(extype)
 
     def _checkout_local_commit(self, commit, excluded_types):
 
@@ -1502,7 +1507,6 @@ class Repository(ObjectContainer):
         
         # if this value is from another repository... you need to load it from the hashed objects into this repository
         if not value.Repository is self:
-            
             value = self.copy_object(value)
         
         

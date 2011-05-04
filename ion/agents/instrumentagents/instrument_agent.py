@@ -24,6 +24,7 @@ from ion.services.dm.distribution.events import BusinessStateModificationEventPu
 from ion.services.dm.distribution.events import DataBlockEventPublisher
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriverClient
+from ion.agents.instrumentagents.instrument_fsm import InstrumentFSM
 from ion.agents.instrumentagents.instrument_constants import *
 
 
@@ -36,52 +37,52 @@ Instrument agent observatory metadata.
 """
 ci_param_metadata = {
     
-    'CI_PARAM_EVENT_PUBLISHER_ORIGIN' :
-        {'META_DATATYPE':'CI_PUBSUB_ORIGIN',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'Event Publisher Origin'},
-    'CI_PARAM_DRIVER_ADDRESS' :
-        {'META_DATATYPE':'CI_TYPE_ADDRESS',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'Driver Address'},
-    'CI_PARAM_RESOURCE_ID' :
-        {'META_DATATYPE':'CI_TYPE_RESOURCE_ID',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_FRIENDLY_NAME':'Resource ID'},
-    'CI_PARAM_TIME_SOURCE' :
-        {'META_DATATYPE':'CI_TYPE_ENUM',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_VALID_VALUES':time_sources,
-         'META_FRIENDLY_NAME':'Time Source'},
-    'CI_PARAM_CONNECTION_METHOD' :
-        {'META_DATATYPE':'CI_TYPE_ENUM',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_VALID_VALUES':connection_methods,
-         'META_FRIENDLY_NAME':'Connection Method'},
-    'CI_PARAM_DEFAULT_EXP_TIMEOUT' :
-        {'META_DATATYPE':'CI_TYPE_INT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_MINIMUM_VALUE':0,
-         'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Default Transaction Expire Timeout'},
-    'CI_PARAM_MAX_EXP_TIMEOUT' :
-        {'META_DATATYPE':'CI_TYPE_INT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_MINIMUM_VALUE':0,
-         'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Max Transaction Expire Timeout'},
-    'CI_PARAM_MAX_ACQ_TIMEOUT' :
-        {'META_DATATYPE':'CI_TYPE_INT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_MINIMUM_VALUE':0,
-         'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Max Transaction Acquire Timeout'},
-    'CI_PARAM_DEFAULT_ACQ_TIMEOUT' :
-        {'META_DATATYPE':'CI_TYPE_INT',
-         'META_LAST_CHANGE_TIMESTAMP':(0,0),
-         'META_MINIMUM_VALUE':0,
-         'META_UNITS':'Seconds',
-         'META_FRIENDLY_NAME':'Default Transaction Acquire Timeout'}    
+    AgentParameter.EVENT_PUBLISHER_ORIGIN :
+        {MetadataParameter.DATATYPE : Datatype.PUBSUB_ORIGIN,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.FRIENDLY_NAME : 'Event Publisher Origin'},
+    AgentParameter.DRIVER_ADDRESS :
+        {MetadataParameter.DATATYPE : Datatype.ADDRESS,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.FRIENDLY_NAME : 'Driver Address'},
+    AgentParameter.RESOURCE_ID :
+        {MetadataParameter.DATATYPE : Datatype.RESOURCE_ID,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.FRIENDLY_NAME : 'Resource ID'},
+    AgentParameter.TIME_SOURCE :
+        {MetadataParameter.DATATYPE : Datatype.ENUM,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.VALID_VALUES : TimeSource,
+         MetadataParameter.FRIENDLY_NAME : 'Time Source'},
+    AgentParameter.CONNECTION_METHOD :
+        {MetadataParameter.DATATYPE : Datatype.ENUM,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.VALID_VALUES : ConnectionMethod,
+         MetadataParameter.FRIENDLY_NAME : 'Connection Method'},
+    AgentParameter.DEFAULT_EXP_TIMEOUT :
+        {MetadataParameter.DATATYPE : Datatype.INT,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.MINIMUM_VALUE : 0,
+         MetadataParameter.UNITS : 'Seconds',
+         MetadataParameter.FRIENDLY_NAME : 'Default Transaction Expire Timeout'},
+    AgentParameter.MAX_EXP_TIMEOUT :
+        {MetadataParameter.DATATYPE : Datatype.INT,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.MINIMUM_VALUE : 0,
+         MetadataParameter.UNITS : 'Seconds',
+         MetadataParameter.FRIENDLY_NAME : 'Max Transaction Expire Timeout'},
+    AgentParameter.MAX_ACQ_TIMEOUT :
+        {MetadataParameter.DATATYPE : Datatype.INT,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.MINIMUM_VALUE : 0,
+         MetadataParameter.UNITS : 'Seconds',
+         MetadataParameter.FRIENDLY_NAME : 'Max Transaction Acquire Timeout'},
+    AgentParameter.DEFAULT_ACQ_TIMEOUT :
+        {MetadataParameter.DATATYPE : Datatype.INT,
+         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
+         MetadataParameter.MINIMUM_VALUE : 0,
+         MetadataParameter.UNITS : 'Seconds',
+         MetadataParameter.FRIENDLY_NAME : 'Default Transaction Acquire Timeout'}    
 }
 
         
@@ -271,13 +272,13 @@ class InstrumentAgent(Process):
         String indicating the source of time being used for the instrument.
         See time_sources list for available values.
         """
-        self.time_source = 'TIME_NOT_SPECIFIED'
+        self.time_source = TimeSource.NOT_SPECIFIED
     
         """
         String describing how the device is connected to the observatory.
         See connection_methods list for available values.
         """
-        self.connection_method = 'CONNECTION_NOT_SPECIFIED'
+        self.connection_method = ConnectionMethod.NOT_SPECIFIED
         
         """
         Buffer to hold instrument data for periodic transmission.
@@ -299,8 +300,52 @@ class InstrumentAgent(Process):
         }
        
 
+    ############################################################################
+    #   State handlers.
+    ############################################################################
 
 
+    def state_handler_powered_down(self,event,params):
+        """
+        """
+        pass
+    
+    
+    def state_handler_uninitialized(self,event,params):
+        """
+        """
+        pass
+
+
+    def state_handler_inactive(self,event,params):
+        """
+        """
+        pass
+
+
+    def state_handler_stopped(self,event,params):
+        """
+        """
+        pass
+
+
+    def state_handler_idle(self,event,params):
+        """
+        """
+        pass
+
+
+    def state_handler_abservatory_mode(self,event,params):
+        """
+        """
+        pass
+
+
+    def state_handler_direct_access_mode(self,event,params):
+        """
+        """
+        pass
+    
 
     ############################################################################
     #   Transaction Management
@@ -382,13 +427,12 @@ class InstrumentAgent(Process):
 
             self._transaction_timeout_call = reactor.callLater(exp_timeout,
                                                             transaction_expired)
-            return (['OK'],self.transaction_id)
+            return (InstErrorCode.OK,self.transaction_id)
         
         # Otherwise return locked resource error.
         else:
             
-            return (errors['LOCKED_RESOURCE'],None)
-            
+            return (InstErrorCode.LOCKED_RESOURCE,None)
 
 
     def _request_transaction(self,acq_timeout,exp_timeout):
@@ -437,7 +481,7 @@ class InstrumentAgent(Process):
             # If resourse not free and no acquisition timeout, return
             # locked error immediately.
             if acq_timeout == 0:
-                d.callback((errors['LOCKED_RESOURCE'],None))
+                d.callback((InstErrorCode.LOCKED_RESOURCE,None))
                 return d
 
             # If resource not free and there is a valid acquisition timeout,
@@ -453,7 +497,7 @@ class InstrumentAgent(Process):
                 for item in self._pending_transactions:
                     if item[0] == d:
                         self._pending_transactions.remove(item)
-                        d.callback((errors['TIMEOUT'],None))
+                        d.callback((InstErrorCode.TIMEOUT,None))
             
             acq_timeout_call = reactor.callLater(acq_timeout,acquisition_timeout)
             
@@ -493,7 +537,6 @@ class InstrumentAgent(Process):
                         
             self._debug_print('ending transaction',self.transaction_id)
 
-            
             # Remove the current transaction.
             self.transaction_id = None
             
@@ -512,19 +555,18 @@ class InstrumentAgent(Process):
                 d.callback((success,tid))
 
             # Return success.
-            result['success'] = ['OK']
+            result['success'] = InstErrorCode.OK
             
         # If there is no transaction to end, return not locked error.
         elif self.transaction_id == None:
-            result['success'] = errors['RESOURCE_NOT_LOCKED']
+            result['success'] = InstErrorCode.RESOURCE_NOT_LOCKED
             
         # If the tid does not match the current trasaction, return
         # locked error.
         else:
-            result['success'] = errors['LOCKED_RESOURCE']
+            result['success'] = InstErrorCode.LOCKED_RESOURCE
 
         return result
-        
 
     
     def _verify_transaction(self,tid,optype):
@@ -539,15 +581,16 @@ class InstrumentAgent(Process):
             created, False otherwise.
         """
 
-
         assert(isinstance(tid,str)), 'Expected transaction ID str.'
         assert(isinstance(optype,str)), 'Expected str optype.'
 
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
             (success,tid) = self._start_transaction(self.default_exp_timeout)
-            if success[0]=='OK':
+
+            if InstErrorCode.is_ok(success):
                 return True
+
             else:
                 return False
         
@@ -560,12 +603,10 @@ class InstrumentAgent(Process):
         return (tid == self.transaction_id)
 
     
-    
     ############################################################################
     #   Observatory Facing Interface
     ############################################################################
     
-
 
     @defer.inlineCallbacks
     def op_execute_observatory(self, content, headers, msg):
@@ -592,45 +633,45 @@ class InstrumentAgent(Process):
         assert(isinstance(cmd,(tuple,list))), 'Expected a command list or tuple.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
     
-    
         reply = {'success':None,'result':None,'transaction_id':None}
     
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'execute')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
           
-                                     
         reply['transaction_id'] = self.transaction_id    
         
         try:
                      
-            if  cmd[0] == 'CI_CMD_STATE_TRANSITION':
-                #output = self.agent_fsm.state_transition(cmd[1])
-                if cmd[1] not in ci_transition_list:
-                    reply['success'] = errors['UNKNOWN_TRANSITION']
+            if  cmd[0] == AgentCommand.TRANSITION:
+                if not AgentEvent.has(cmd[1]):
+                    reply['success'] = InstErrorCode.UNKNOWN_TRANSITION
+
                 else:
                     # output = self.agent_fsm.state_transition(cmd[1])
                     # TODO FSM and driver integration
                     # The following are stubs for driver integration prior to
                     # state machine integration.
-                    if cmd[1] == 'CI_TRANS_INITIALIZE':
-                        reply['success'] = ['OK']
+                    if cmd[1] == AgentEvent.INITIALIZE:
+                        reply['success'] = InstErrorCode.OK
                     
-                    elif cmd[1] == 'CI_TRANS_GO_ACTIVE':
+                    elif cmd[1] == AgentEvent.GO_ACTIVE:
                         driver_config = self.spawn_args.get('driver-config',None)
                         if driver_config != None:
                             config_reply = yield \
@@ -638,7 +679,7 @@ class InstrumentAgent(Process):
                             config_success = config_reply['success']
                             
                             # Could not configure driver.
-                            if config_success[0] != 'OK':
+                            if InstErrorCode.is_error(config_success):
                                 reply['success'] = config_success
                             
                             # Driver correctly configured.
@@ -652,61 +693,62 @@ class InstrumentAgent(Process):
                                 # Could not connect, exception raised.
                                 except:
                                     reply['success'] = \
-                                        errors['INSTRUMENT_UNREACHABLE']
+                                        InstErrorCode.INSTRUMENT_UNREACHABLE
                                     
                                 # Driver responded to connect request.
                                 else:
-                                    
                                     # Check driver success.
                                     connect_success = connect_reply['success']
-                                    if connect_success[0] != 'OK':
+                                    if InstErrorCode.is_error(connect_success):
                                         reply['success'] = connect_success
                                         
                                     # Driver connection successful.
                                     else:
-                                        reply['success'] = ['OK']
+                                        reply['success'] = InstErrorCode.OK
                                     
                         else:                        
-                            reply['success'] = errors['DRIVER_NOT_CONFIGURED']
+                            reply['success'] = InstErrorCode.DRIVER_NOT_CONFIGURED
     
-                    elif cmd[1] == 'CI_TRANS_GO_INACTIVE':
+                    elif cmd[1] == AgentEvent.GO_INACTIVE :
                         disconnect_reply = yield self.driver_client.disconnect()
                         disconnect_success = disconnect_reply['success']
                         if disconnect_success[0] != 'OK':
-                            reply['success'] = errors['DISCONNECT_FAILED']
+                            reply['success'] = InstErrorCode.DISCONNECT_FAILED
                             
                         else:
-                            reply['success'] = ['OK']
-                        
-                        reply['success'] = ['OK']
+                            reply['success'] = InstErrorCode.OK
+                            
+                        reply['success'] = InstErrorCode.OK
                     
-                    elif cmd[1] == 'CI_TRANS_CLEAR':
-                        reply['success'] = ['OK']
+                    elif cmd[1] == AgentEvent.CLEAR :
+                        reply['success'] = InstErrorCode.OK
                     
-                    elif cmd[1] == 'CI_TRANS_RUN':
-                        reply['success'] = ['OK']
+                    elif cmd[1] == AgentEvent.RUN :
+                        reply['success'] = InstErrorCode.OK
     
                     else:
-                        reply['success'] = errors['INCORRECT_STATE']
-                                       
+                        reply['success'] = InstErrorCode.INCORRECT_STATE
                         
-            elif cmd[0] == 'CI_CMD_TRANSMIT_DATA':
-                reply['success'] = errors['NOT_IMPLEMENTED']
-            elif cmd[0] == 'CI_CMD_SLEEP':
+            elif cmd[0] == AgentCommand.TRANSMIT_DATA:
+                reply['success'] = InstErrorCode.NOT_IMPLEMENTED
+                
+            elif cmd[0] == AgentCommand.SLEEP:
                 if len(cmd) < 2:
-                    reply['success'] = errors['REQUIRED_PARAMETER']
+                    reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+                    
                 else:
                     time = cmd[1]
                     if not isinstance(time,int):
-                        reply['success'] = errors['INVALID_PARAM_VALUE']
+                        reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
+
                     elif time <=0:
-                        reply['success'] = errors['INVALID_PARAM_VALUE']
+                        reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
                     else:
                         yield pu.asleep(time)
-                        reply['success'] = ['OK']
+                        reply['success'] = InstErrorCode.OK
                 
             else:
-                reply['success'] = errors['UNKNOWN_COMMAND']
+                reply['success'] = InstErrorCode.UNKNOWN_COMMAND
 
         # Transaction clean up. End implicit or expired transactions.        
         finally:
@@ -743,9 +785,8 @@ class InstrumentAgent(Process):
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
 
@@ -753,11 +794,14 @@ class InstrumentAgent(Process):
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -770,57 +814,60 @@ class InstrumentAgent(Process):
                     
             # Add each observatory parameter given in params list.
             for arg in params:
-                if arg not in ci_param_list and arg != 'all':
-                    result[arg] = (errors['INVALID_PARAMETER'], None)
+                if (not AgentParameter.has(arg)) and arg != 'all':
+                    result[arg] = (InstErrorCode.INVALID_PARAMETER, None)
                     get_errors = True                
                     continue
-                if arg == 'CI_PARAM_EVENT_PUBLISHER_ORIGIN' or arg=='all':                            
+                if arg == AgentParameter.EVENT_PUBLISHER_ORIGIN or arg=='all':                            
                     if self.event_publisher_origin == None:
-                        result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = (['OK'],None)
+                        result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
+                            (InstErrorCode.OK,None)
                     else:
-                        result['CI_PARAM_EVENT_PUBLISHER_ORIGIN'] = \
-                            self.event_publisher_origin
+                        result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
+                            (InstErrorCode.OK,self.event_publisher_origin)
                 
-                if arg == 'CI_PARAM_DRIVER_ADDRESS' or arg=='all':
+                if arg == AgentParameter.DRIVER_ADDRESS or arg=='all':
                     if self.driver_client:
-                        result['CI_PARAM_DRIVER_ADDRESS'] = \
-                            (['OK'],str(self.driver_client.target))
+                        result[AgentParameter.DRIVER_ADDRESS] = \
+                            (InstErrorCode.OK,str(self.driver_client.target))
                     else:
                         get_errors = True
-                        result['CI_PARAM_DRIVER_ADDRESS'] = \
-                            (errors['INVALID_DRIVER'],None)
+                        result[AgentParameter.DRIVER_ADDRESS] = \
+                            (InstErrorCode.INVALID_DRIVER,None)
                         
-                if arg == 'CI_PARAM_RESOURCE_ID' or arg=='all':
+                if arg == AgentParameter.RESOURCE_ID or arg=='all':
                     # TODO: how do we access this?
-                    result['CI_PARAM_RESOURCE_ID'] = (['OK'],None)
+                    result[AgentParameter.RESOURCE_ID] = (InstErrorCode.OK,None)
                 
-                if arg == 'CI_PARAM_TIME_SOURCE' or arg=='all':
-                    result['CI_PARAM_TIME_SOURCE'] = (['OK'],self.time_source)
+                if arg == AgentParameter.TIME_SOURCE or arg=='all':
+                    result[AgentParameter.TIME_SOURCE] = \
+                        (InstErrorCode.OK,self.time_source)
                     
-                if arg == 'CI_PARAM_CONNECTION_METHOD' or arg=='all':
-                    result['CI_PARAM_CONNECTION_METHOD'] = \
-                        (['OK'],self.connection_method)
+                if arg == AgentParameter.CONNECTION_METHOD or arg=='all':
+                    result[AgentParameter.CONNECTION_METHOD] = \
+                        (InstErrorCode.OK,self.connection_method)
                     
-                if arg == 'CI_PARAM_DEFAULT_ACQ_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = \
-                        (['OK'],self.default_acq_timeout)
+                if arg == AgentParameter.DEFAULT_ACQ_TIMEOUT or arg=='all':
+                     result[AgentParameter.DEFAULT_ACQ_TIMEOUT] = \
+                        (InstErrorCode.OK,self.default_acq_timeout)
                     
-                if arg == 'CI_PARAM_MAX_ACQ_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_MAX_ACQ_TIMEOUT'] = \
-                        (['OK'],self.max_acq_timeout)
+                if arg == AgentParameter.MAX_ACQ_TIMEOUT or arg=='all':
+                    result[AgentParameter.MAX_ACQ_TIMEOUT] = \
+                        (InstErrorCode.OK,self.max_acq_timeout)
                     
-                if arg == 'CI_PARAM_DEFAULT_EXP_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_DEFAULT_EXP_TIMEOUT'] = \
-                        (['OK'],self.default_exp_timeout)
+                if arg == AgentParameter.DEFAULT_EXP_TIMEOUT or arg=='all':
+                    result[AgentParameter.DEFAULT_EXP_TIMEOUT] = \
+                        (InstErrorCode.OK,self.default_exp_timeout)
 
-                if arg == 'CI_PARAM_MAX_EXP_TIMEOUT' or arg=='all':
-                    result['CI_PARAM_MAX_EXP_TIMEOUT'] = \
-                        (['OK'],self.max_exp_timeout)
+                if arg == AgentParameter.MAX_EXP_TIMEOUT or arg=='all':
+                    result[AgentParameter.MAX_EXP_TIMEOUT] = \
+                        (InstErrorCode.OK,self.max_exp_timeout)
                     
             if get_errors:
-                success = errors['GET_OBSERVATORY_ERR']
+                success = InstErrorCode.GET_OBSERVATORY_ERR
+                
             else:
-                success = ['OK']
+                success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
@@ -861,28 +908,28 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
         
-        
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-        
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'set')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
-                    
-        reply['transaction_id'] = self.transaction_id
 
-        
+        reply['transaction_id'] = self.transaction_id
+ 
         try:
             
             result = {}
@@ -892,101 +939,119 @@ class InstrumentAgent(Process):
             # Note: it seems like all the current params should be read only by
             # general agent users. 
             for arg in params.keys():
-                if arg not in ci_param_list:
-                    result[arg] = errors['INVALID_PARAMETER']
+                if not AgentParameter.has(arg):
+                    result[arg] = InstErrorCode.INVALID_PARAMETER
                     set_errors = True
                     continue
                 
                 val = params[arg]
                 
-                if arg == 'CI_PARAM_DRIVER_ADDRESS':
-                    result[arg] = errors['NOT_IMPLEMENTED']
+                if arg == AgentParameter.DRIVER_ADDRESS :
+                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
                     set_errors = True
                 
-                elif arg == 'CI_PARAM_RESOURCE_ID':
-                    result[arg] = errors['NOT_IMPLEMENTED']
+                elif arg == AgentParameter.RESOURCE_ID :
+                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
                     set_errors = True
                 
-                elif arg == 'CI_PARAM_TIME_SOURCE':
-                    if val in time_sources:
+                elif arg == AgentParameter.TIME_SOURCE :
+                    if TimeSource.has(val):
                         if val != self.time_source:
                             self.time_source = val
                             # Logic here when new time source set.
                             # And test for successful switch.
-                            success = ['OK']
+                            success = InstErrorCode.OK
+                            
                         else:
-                            success = ['OK']
+                            success = InstErrorCode.OK
+                            
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+                        
                     result[arg] = success
                     
-                elif arg == 'CI_PARAM_CONNECTION_METHOD':
-                    if val in connection_methods:
+                elif arg == AgentParameter.CONNECTION_METHOD :
+                    if ConnectionMethod.has(val):
                         if val != self.connection_method:
                             self.connection_method = val
                             # Logic here when new connection method set.
                             # And test for successful switch.
-                            success = ['OK']
+                            success = InstErrorCode.OK
+
                         else:
-                            success = ['OK']
+                            success = InstErrorCode.OK
+
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+
                     result[arg] = success
                     
-                elif arg == 'CI_PARAM_DEFAULT_ACQ_TIMEOUT':
+                elif arg == AgentParameter.DEFAULT_ACQ_TIMEOUT :
                     if isinstance(val,int) and val >= 0:
                         self.default_acq_timeout = val
-                        success = ['OK']
+                        success = InstErrorCode.OK
+                        
                         if self.max_acq_timeout < val:
                             self.max_acq_timeout = val
-                            result['CI_PARAM_MAX_ACQ_TIMEOUT'] = ['OK']
+                            result[AgentParameter.MAX_ACQ_TIMEOUT] = \
+                                InstErrorCode.OK
+                            
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+                        
                     result[arg] = success
                     
-                elif arg == 'CI_PARAM_MAX_ACQ_TIMEOUT':
+                elif arg == AgentParameter.MAX_ACQ_TIMEOUT :
                     if isinstance(val,int) and val >= 0:
                         self.max_acq_timeout = val
-                        success = ['OK']
+                        success = InstErrorCode.OK
+
                         if self.default_acq_timeout > val:
                             self.default_acq_timeout = val
-                            result['CI_PARAM_DEFAULT_ACQ_TIMEOUT'] = ['OK']
+                            result[AgentParameter.DEFAULT_ACQ_TIMEOUT] = \
+                                InstErrorCode.OK
+
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE                        
+                        
                     result[arg] = success
     
-                elif arg == 'CI_PARAM_DEFAULT_EXP_TIMEOUT':
+                elif arg == AgentParameter.DEFAULT_EXP_TIMEOUT :
                     if isinstance(val,int) and val >= self.min_exp_timeout \
                         and val <= self.max_exp_timeout:
                         self.default_exp_timeout = val
-                        success = ['OK']
+                        success = InstErrorCode.OK
+                        
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+                        
                     result[arg] = success
 
-                elif arg == 'CI_PARAM_MAX_EXP_TIMEOUT':
+                elif arg == AgentParameter.MAX_EXP_TIMEOUT :
                     if isinstance(val,int) and val > self.min_exp_timeout:
                         self.max_exp_timeout = val
-                        success = ['OK']
+                        success = InstErrorCode.OK
+
                     else:
                         set_errors = True
-                        success = errors['INVALID_PARAM_VALUE']
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+
                     result[arg] = success
     
             if set_errors:
-                success = errors['SET_OBSERVATORY_ERR']
+                success = InstErrorCode.SET_OBSERVATORY_ERR
+                
             else:
-                success = ['OK']
+                success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
             
-        
         # Transaction clean up. End implicit or expired transactions.        
         finally:
             if (tid == 'create') or (self._transaction_timed_out == True):
@@ -1020,24 +1085,26 @@ class InstrumentAgent(Process):
         
         assert(isinstance(params,(tuple,list))), 'Expected a parameter list or tuple.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
-
+        
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1047,7 +1114,8 @@ class InstrumentAgent(Process):
                     
             get_errors = False
             result = {}
-                                    
+
+            """                                    
             for (param_arg,meta_arg) in params:
                 
                 
@@ -1114,12 +1182,13 @@ class InstrumentAgent(Process):
                             result[param_arg].update({meta_arg:(errors['INVALID_METADATA'],None)})    
                         else:
                             result[param_arg].update({meta_arg:(['OK'],val)})
-            
+            """
             
             if get_errors:
-                success = errors['GET_OBSERVATORY_ERR']
+                success = InstErrorCode.GET_OBSERVATORY_ERR
+                
             else:
-                success = ['OK']
+                success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
@@ -1159,28 +1228,28 @@ class InstrumentAgent(Process):
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
 
-                    
         try:
             
             get_errors = False
@@ -1189,54 +1258,58 @@ class InstrumentAgent(Process):
             # Do the work here.
             # Set up the result message.
             for arg in params:
-                if arg not in ci_status_list and arg != 'all':
-                    result[arg] = (errors['INVALID_STATUS'],None)
+                if not AgentStatus.has(arg) and arg != 'all':
+                    result[arg] = (InstErrorCode.INVALID_STATUS,None)
                     get_errors = True
                     continue
                 
-                if arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
+                if arg == AgentStatus.AGENT_STATE or arg == 'all':
                     # TODO FSM integration.
-                    #result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
-                    result['CI_STATUS_AGENT_STATE'] = (['OK'],'CI_STATE_UNKNOWN')
-                if arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
+                    result[AgentStatus.AGENT_STATE] = \
+                        (InstErrorCode.OK,AgentState.UNKNOWN)
+
+                if arg == AgentStatus.CHANNEL_NAMES or arg == 'all':
                     # TODO driver integration.
-                    #dvr_msg_content = {'params':[('instrument','channel_names')]}
-                    #dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
-                    #dvr_success = dvr_result['success']
-                    #dvr_val = dvr_result['params'][('instrument','channel_names')]
-                    dvr_val = [['OK'],['CHAN_1','CHAN_2','CHAN_3']]
+                    dvr_val = [InstErrorCode.OK,['CHAN_1','CHAN_2','CHAN_3']]
                     result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                
-                    if dvr_val[0][0] != 'OK':
+
+                    if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
-                if arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
+                        
+                if arg == AgentStatus.CONNECTION_STATE or arg == 'all':
                     #TODO driver integration.
-                    #dvr_msg_content = {'params':[('instrument','connection_status')]}
-                    #dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
-                    #dvr_success = dvr_result['success']
-                    #dvr_val = dvr_result['params'][('instrument','connection_status')]
-                    dvr_val=[['OK'],'DRIVER_CONNECTION_STATE']
-                    result['CI_STATUS_INSTRUMENT_CONNECTION_STATE'] = (dvr_val[0],dvr_val[1])                    
-                    if dvr_val[0][0] != 'OK':
+                    dvr_val=[InstErrorCode.OK,'DRIVER_CONNECTION_STATE']
+                    result[AgentStatus.CONNECTION_STATE] = (dvr_val[0],dvr_val[1])                    
+
+                    if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
-                if arg == 'CI_STATUS_ALARMS' or arg == 'all':
-                    result['CI_STATUS_ALARMS'] = (['OK'],self.alarms)
-                if arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
-                    result['CI_STATUS_TIME_STATUS'] = (['OK'],self.time_status)
-                if arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
-                    result['CI_STATUS_BUFFER_SIZE'] = (['OK'],self._get_buffer_size())
-                if arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
-                    result['CI_STATUS_AGENT_VERSION'] = (['OK'],self.get_version())
-                if arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
+                        
+                if arg == AgentStatus.ALARMS or arg == 'all':
+                    result[AgentStatus.ALARMS] = (InstErrorCode.OK,self.alarms)
+
+                if arg == AgentStatus.TIME_STATUS or arg == 'all':
+                    result[AgentStatus.TIME_STATUS] = \
+                        (InstErrorCode.OK,self.time_status)
+
+                if arg == AgentStatus.BUFFER_SIZE or arg == 'all':
+                    result[AgentStatus.BUFFER_SIZE] = \
+                        (InstErrorCode.OK,self._get_buffer_size())
+
+                if arg == AgentStatus.AGENT_VERSION or arg == 'all':
+                    result[AgentStatus.AGENT_VERSION] = \
+                        (InstErrorCode.OK,self.get_version())
+
+                if arg == AgentStatus.DRIVER_VERSION or arg == 'all':
                     #TODO driver integration.
-                    #version = yield self.driver_client.get_version()
                     version = '0.1'
-                    result['CI_STATUS_DRIVER_VERSION'] = (['OK'],version)
-                    
+                    result[AgentStatus.DRIVER_VERSION] = (InstErrorCode.OK,version)
+                
                     
             if get_errors:
-                success = errors['GET_OBSERVATORY_ERR']
+                success = InstErrorCode.GET_OBSERVATORY_ERR
+
             else:
-                success = ['OK']
+                success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
@@ -1249,7 +1322,6 @@ class InstrumentAgent(Process):
                     
         yield self.reply_ok(msg,reply)
         
-
 
     @defer.inlineCallbacks
     def op_get_capabilities(self,content,headers,msg):
@@ -1279,20 +1351,22 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1306,61 +1380,57 @@ class InstrumentAgent(Process):
             # Do the work here.
             # Set up the result message.
             for arg in params:
-                if arg not in capabilities_list and arg != 'all':
-                    result[arg] = (errors['INVALID_CAPABILITY'],None)
+                if not AgentCapability.has(arg) and arg != 'all':
+                    result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
                     get_errors = True
                     continue
                 
-                if arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
-                    result['CAP_OBSERVATORY_COMMANDS'] = (['OK'],ci_command_list)
+                if arg == AgentCapability.OBSERVATORY_COMMANDS or arg == 'all':
+                    result[AgentCapability.OBSERVATORY_COMMANDS] = \
+                        (InstErrorCode.OK,AgentCommand.list())
                     
-                if arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
-                    result['CAP_OBSERVATORY_PARAMS'] = (['OK'],ci_param_list)
+                if arg == AgentCapability.OBSERVATORY_PARAMS or arg == 'all':
+                    result[AgentCapability.OBSERVATORY_PARAMS] = \
+                        (InstErrorCode.OK,AgentParameter.list())
                     
-                if arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
-                    result['CAP_OBSERVATORY_STATUSES'] = (['OK'],ci_status_list)
+                if arg == AgentCapability.OBSERVATORY_STATUSES or arg == 'all':
+                    result[AgentCapability.OBSERVATORY_STATUSES] = \
+                        (InstErrorCode.OK,AgentStatus.list())
                     
-                if arg == 'CAP_METADATA' or arg == 'all':
-                    result['CAP_METADATA'] = (['OK'],metadata_list)
+                if arg == AgentCapability.METADATA or arg == 'all':
+                    result[AgentCapability.METADATA] = \
+                        (InstErrorCode.OK,MetadataParameter.list())
                     
-                if arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
+                if arg == AgentCapability.DEVICE_COMMANDS or arg == 'all':
                     #TDOD driver integration.
-                    #dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
-                    #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                    #dvr_success = dvr_result[0]
-                    #dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
-                    dvr_val = (['OK'],['device_command_1','device_command_2'])
-                    result['CAP_DEVICE_COMMANDS'] = dvr_val
-                    if dvr_val[0][0] != 'OK':
+                    dvr_val = (InstErrorCode.OK,['device_command_1','device_command_2'])
+                    result[AgentCapability.DEVICE_COMMANDS] = dvr_val
+
+                    if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
+                if arg == AgentCapability.DEVICE_PARAMS or arg == 'all':
                     #TDOD driver integration.
-                    #dvr_content = {'params':'CAP_DEVICE_PARAMS'}
-                    #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                    #dvr_success = dvr_result[0]
-                    #dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
-                    dvr_val = (['OK'],['device_param_1','device_param_2','device_param_3'])
-                    result['CAP_DEVICE_PARAMS'] = dvr_val
-                    if dvr_val[0][0] != 'OK':
+                    dvr_val = (InstErrorCode.OK,['device_param_1','device_param_2','device_param_3'])
+                    result[AgentCapability.DEVICE_PARAMS] = dvr_val
+
+                    if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
+                if arg == AgentCapability.DEVICE_STATUSES or arg == 'all':
                     #TODO driver integration.
-                    #dvr_content = {'params':'CAP_DEVICE_STATUSES'}
-                    #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                    #dvr_success = dvr_result[0]
-                    #dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
-                    dvr_val = (['OK'],['device_status_1','device_status_2','device_status_3'])
-                    result['CAP_DEVICE_STATUSES'] = dvr_val
-                    if dvr_val[0][0] != 'OK':
+                    dvr_val = (InstErrorCode.OK,['device_status_1','device_status_2','device_status_3'])
+                    result[AgentCapability.DEVICE_STATUSES] = dvr_val
+
+                    if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
-     
+
             
             if get_errors:
-                success = errors['GET_OBSERVATORY_ERR']
+                success = InstErrorCode.GET_OBSERVATORY_ERR
+
             else:
-                success = ['OK']
+                success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
@@ -1373,7 +1443,6 @@ class InstrumentAgent(Process):
                     
         yield self.reply_ok(msg,reply)
         
-
 
     ############################################################################
     #   Instrument Facing Interface
@@ -1413,33 +1482,36 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'execute')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
+
+        timeout = 20
                     
-        try:                    
-                    
-            dvr_result = yield self.driver_client.execute(channels,command)
+        try:
             
+            dvr_result = yield self.driver_client.execute(channels,command,
+                                                          timeout)
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
-        
-        
+                                    
         # Transaction clean up. End implicit or expired transactions.        
         finally:
             if (tid == 'create') or (self._transaction_timed_out == True):
@@ -1475,23 +1547,23 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        
-
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1511,7 +1583,6 @@ class InstrumentAgent(Process):
             self._in_protected_function = False
                     
         yield self.reply_ok(msg,reply)
-
 
 
     @defer.inlineCallbacks
@@ -1540,20 +1611,22 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'set')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1573,7 +1646,6 @@ class InstrumentAgent(Process):
             self._in_protected_function = False
                     
         yield self.reply_ok(msg,reply)
-
 
 
     @defer.inlineCallbacks
@@ -1604,25 +1676,26 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
-                    
                     
         try:
             
@@ -1632,7 +1705,6 @@ class InstrumentAgent(Process):
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
         
-        
         # Transaction clean up. End implicit or expired transactions.        
         finally:
             if (tid == 'create') or (self._transaction_timed_out == True):
@@ -1640,7 +1712,6 @@ class InstrumentAgent(Process):
             self._in_protected_function = False
                     
         yield self.reply_ok(msg,reply)
-
 
 
     @defer.inlineCallbacks
@@ -1670,20 +1741,22 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1731,24 +1804,25 @@ class InstrumentAgent(Process):
         # expect a byte string?
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
-        
         reply = {'success':None,'result':None,'transaction_id':None}
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = errors['INVALID_TRANSACTION_ID']
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
             yield self.reply_ok(msg,reply)
             return
-
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'execute')
         if not result:
             if tid == 'none':
-                reply['success'] = errors['TRANSACTION_REQUIRED']        
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
             elif tid=='create':
-                reply['success'] = errors['LOCKED_RESOURCE']
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
             else:
-                reply['success'] = errors['INVALID_TRANSACTION_ID']
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
             yield self.reply_ok(msg,reply)
             return
 
@@ -1802,7 +1876,6 @@ class InstrumentAgent(Process):
                         'driver event occured evoked from a non-child process')
             return
         
-        
         self._debug_print_driver_event(type,transducer,value)
         
                 
@@ -1839,6 +1912,7 @@ class InstrumentAgent(Process):
             yield self.reply_err(msg,
                                  "publish invoked from non-child process")
         # return something...like maybe result?
+
     
     @defer.inlineCallbacks
     def _self_publish(self, type, value):
@@ -1865,11 +1939,10 @@ class InstrumentAgent(Process):
                     origin=self.event_publisher_origin, description=value)
         
         
-        
-        
     ############################################################################
     #   Other.
     ############################################################################
+
         
     def _is_child_process(self, name):
         """
@@ -1885,6 +1958,7 @@ class InstrumentAgent(Process):
                 found = True
                 break
         return found        
+
         
     def _get_buffer_size(self):
         """
@@ -1912,6 +1986,7 @@ class InstrumentAgent(Process):
             else:
                 print 'driver event: '+ type + ',  '+ transducer
                 print value
+
         
     def _debug_print(self,event=None,value=None):
         """
@@ -1922,7 +1997,6 @@ class InstrumentAgent(Process):
         if DEBUG_PRINT:
             print event, ' ', value
     
-
 
 class InstrumentAgentClient(ProcessClient):
     """
@@ -1935,6 +2009,7 @@ class InstrumentAgentClient(ProcessClient):
     ############################################################################
     #   Transaction Management.
     ############################################################################
+
 
     @defer.inlineCallbacks
     def start_transaction(self,acq_timeout=None,exp_timeout=None):
@@ -1979,13 +2054,14 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         (content,headers,message) = yield self.rpc_send('end_transaction',tid)
         #yield pu.asleep(1)
-        #content = {'success':['OK']}
         assert(isinstance(content,dict)), 'Expected dict result'
         defer.returnValue(content)
+
 
     ############################################################################
     #   Observatory Facing Interface.
     ############################################################################
+
 
     @defer.inlineCallbacks
     def execute_observatory(self,command,transaction_id):
@@ -2034,7 +2110,6 @@ class InstrumentAgentClient(ProcessClient):
         defer.returnValue(content)
         
         
-
     @defer.inlineCallbacks
     def set_observatory(self,params,transaction_id='none'):
         """
@@ -2057,6 +2132,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def get_observatory_metadata(self,params,transaction_id='none'):
@@ -2081,6 +2157,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(content,dict))
         defer.returnValue(content)
 
+
     @defer.inlineCallbacks
     def get_observatory_status(self,params,transaction_id='none'):
         """
@@ -2102,6 +2179,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def get_capabilities(self,params,transaction_id='none'):
@@ -2129,6 +2207,7 @@ class InstrumentAgentClient(ProcessClient):
     #   Instrument Facing Interface.
     ############################################################################
 
+
     @defer.inlineCallbacks
     def execute_device(self,channels,command,transaction_id='none'):
         """
@@ -2147,7 +2226,6 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(command,list)), 'Expected a command list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
-        
         content = {'channels':channels,'command':command,
                    'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
@@ -2156,6 +2234,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def get_device(self,params,transaction_id='none'):
@@ -2177,6 +2256,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def set_device(self,params,transaction_id='none'):
@@ -2200,6 +2280,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(content,dict))
         defer.returnValue(content)
 
+
     @defer.inlineCallbacks
     def get_device_metadata(self,params,transaction_id='none'):
         """
@@ -2221,6 +2302,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def get_device_status(self,params,transaction_id='none'):
@@ -2244,6 +2326,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(content,dict))
         defer.returnValue(content)
 
+
     @defer.inlineCallbacks
     def execute_device_direct(self,bytes,transaction_id='none'):
         """
@@ -2264,6 +2347,7 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
+
 
     ############################################################################
     #   Publishing interface.
@@ -2297,10 +2381,6 @@ class InstrumentAgentClient(ProcessClient):
         defer.returnValue(result)
         """
         pass
-    
-        
-        
-
         
     
     
