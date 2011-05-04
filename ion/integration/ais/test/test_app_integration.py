@@ -1137,11 +1137,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
         numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
 
-        log.debug('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
+        log.info('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
         if numSubsReturned != 2:
             errString = 'findDataResourcesByUser returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 2'
             #self.fail('findDataResourcesByUser returned " + numResReturned + " subscriptions.  Should have been 2')
             self.fail(errString)
+        else:
+            i = 0
+            while i < numSubsReturned:
+                log.info('Date of subscription registration: ' + str(rspMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered))
+                i = i + 1
+
 
             
     @defer.inlineCallbacks
@@ -1263,6 +1269,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         i = 0
         while i < len(dataResourceSummaries):
+            log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
             datasetMetadata = dataResourceSummaries[i].datasetMetadata
             dsResourceID = datasetMetadata.data_resource_id
             #if not datasetMetadata.IsFieldSet('user_ooi_id'):

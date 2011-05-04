@@ -27,6 +27,7 @@ from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
+from ion.util.iontime import IonTime
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
@@ -350,7 +351,7 @@ class ManageDataResourceSubscription(object):
         #    yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
 
         userID = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
-
+        msg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         try:
             log.debug("create: calling notification alert service addSubscription()")
