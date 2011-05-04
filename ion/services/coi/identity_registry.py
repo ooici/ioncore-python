@@ -570,6 +570,7 @@ class IdentityRegistryService(ServiceProcess):
                log.debug('update_user_profile: email not set')
 
            if request.configuration.IsFieldSet('profile'):
+              identity.profile.__delslice__(0, identity.profile.__len__())
               i = 0
               for item in request.configuration.profile:
                   log.debug('update_user_profile: setting profile to '+str(item))
