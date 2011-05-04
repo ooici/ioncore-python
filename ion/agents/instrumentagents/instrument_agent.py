@@ -712,14 +712,15 @@ class InstrumentAgent(Process):
                     elif cmd[1] == AgentEvent.GO_INACTIVE :
                         disconnect_reply = yield self.driver_client.disconnect()
                         disconnect_success = disconnect_reply['success']
-                        if disconnect_success[0] != 'OK':
-                            reply['success'] = InstErrorCode.DISCONNECT_FAILED
-                            
-                        else:
-                            reply['success'] = InstErrorCode.OK
-                            
-                        reply['success'] = InstErrorCode.OK
-                    
+                        #if disconnect_success[0] != 'OK':
+                        #    reply['success'] = InstErrorCode.DISCONNECT_FAILED
+                        #    
+                        #else:
+                        #    reply['success'] = InstErrorCode.OK
+                        #    
+                        #reply['success'] = InstErrorCode.OK
+                        reply['success'] = disconnect_success
+                        
                     elif cmd[1] == AgentEvent.CLEAR :
                         reply['success'] = InstErrorCode.OK
                     

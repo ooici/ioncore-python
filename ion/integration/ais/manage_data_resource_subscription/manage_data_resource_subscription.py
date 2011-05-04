@@ -151,6 +151,29 @@ class ManageDataResourceSubscription(object):
             log.debug("update: calling notification alert service removeSubscription()")
             reply = yield self.nac.removeSubscription(msg)
 
+            # Now determine if subscription type includes a dispatcher.  If so, we need to delete
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Finding the dispatcher workflow associated with this subscription.
+            #   3. Deleting the dispatcher workflow.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: deleting dispatcher workflow")
+
+                """
+                dispatcherID = yield self.__findDispatcher(userID)
+                if (dispatcherID is None):
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    errString = 'Dispatcher not found for userID' + userID
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+                else:
+                    log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
+                """
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.updateDataResourceSubscription(): Error attempting to removeSubscription(): %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -161,6 +184,17 @@ class ManageDataResourceSubscription(object):
         try:
             log.debug("update: calling notification alert service addSubscription()")
             reply = yield self.nac.addSubscription(msg)
+
+            # Now determine if subscription type includes a dispatcher.  If so, we need to create
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Creating the dispatcher workflow associated with this subscription.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: creating dispatcher workflow")
+                
             Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
             Response.message_parameters_reference.add()
             Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_SUBSCRIPTION_RSP_TYPE)      
@@ -221,6 +255,30 @@ class ManageDataResourceSubscription(object):
         try:
             log.debug("delete: calling notification alert service removeSubscription()")
             reply = yield self.nac.removeSubscription(msg)
+
+            # Now determine if subscription type includes a dispatcher.  If so, we need to delete
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Finding the dispatcher workflow associated with this subscription.
+            #   3. Deleting the dispatcher workflow.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: deleting dispatcher workflow")
+
+                """
+                dispatcherID = yield self.__findDispatcher(userID)
+                if (dispatcherID is None):
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    errString = 'Dispatcher not found for userID' + userID
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+                else:
+                    log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
+                """
             Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
             Response.message_parameters_reference.add()
             Response.message_parameters_reference[0] = Response.CreateObject(DELETE_SUBSCRIPTION_RSP_TYPE)      

@@ -58,7 +58,6 @@ message UserIdentity {
    optional string email=6;
    optional string authenticating_organization=7;
    repeated net.ooici.services.coi.identity.NameValuePairType profile=8;
-   optional string life_cycle_state=9;
 }
 """""
 
@@ -163,126 +162,6 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue(content)
 
         
-    @defer.inlineCallbacks
-    def set_identity_lcstate(self, ooi_id, lcstate):
-        """
-        """
-        log.debug("in set_identity_lcstate client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': lcstate
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_new(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_new client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'New'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_active(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_active client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Active'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-        
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_inactive(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_inactive client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Inactive'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_decommissioned(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_decommissioned client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Decommissioned'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_retired(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_retired client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Retired'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_developed(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_developed client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Developed'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-
-
-    @defer.inlineCallbacks
-    def set_identity_lcstate_commissioned(self, ooi_id):
-        """
-        """
-        log.debug("in set_identity_lcstate_commissioned client")
-        
-        cont = {
-            'ooi_id': ooi_id,
-            'lcstate': 'Commissioned'
-        }
-
-        (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
-        defer.returnValue( content )
-    
-
 class IdentityRegistryException(ApplicationError):
     """
     IdentityRegistryService exception class
@@ -304,49 +183,6 @@ class IdentityRegistryService(ServiceProcess):
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
         
         self.instance_counter = 1
-
-
-    @defer.inlineCallbacks
-    def op_set_lcstate(self, request, headers, msg):
-        """
-        """
-        log.debug('in op_get_user')
-        identity = yield self.rc.get_instance(request['ooi_id'])
-
-        if request['lcstate'] == 'New':
-          identity.ResourceLifeCycleState = identity.NEW
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Active':
-          identity.ResourceLifeCycleState = identity.ACTIVE
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Inactive':
-          identity.ResourceLifeCycleState = identity.INACTIVE
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Commissioned':
-          identity.ResourceLifeCycleState = identity.COMMISSIONED
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Decommissioned':
-          identity.ResourceLifeCycleState = identity.DECOMMISSIONED
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Retired':
-          identity.ResourceLifeCycleState = identity.RETIRED
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Developed':
-          identity.ResourceLifeCycleState = identity.DEVELOPED
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        elif request['lcstate'] == 'Update':
-          identity.ResourceLifeCycleState = identity.UPDATE
-          yield self.rc.put_instance(identity, 'updating LCSTATE to %s' % request['lcstate'])
-          yield self.reply_ok(msg, True)
-        else:
-          yield self.reply_ok(msg, False)
 
 
     @defer.inlineCallbacks
@@ -465,7 +301,7 @@ class IdentityRegistryService(ServiceProcess):
                   Response.resource_reference.profile[i].name = item.name
                   Response.resource_reference.profile[i].value = item.value
                   i = i + 1
-            Response.resource_reference.life_cycle_state = identity.ResourceLifeCycleState
+            log.debug('get_user: lcs = '+identity._get_life_cycle_state())
             Response.result = "OK"
             defer.returnValue(Response)
         except ApplicationError, ex:
@@ -570,6 +406,7 @@ class IdentityRegistryService(ServiceProcess):
                log.debug('update_user_profile: email not set')
 
            if request.configuration.IsFieldSet('profile'):
+              identity.profile.__delslice__(0, identity.profile.__len__())
               i = 0
               for item in request.configuration.profile:
                   log.debug('update_user_profile: setting profile to '+str(item))

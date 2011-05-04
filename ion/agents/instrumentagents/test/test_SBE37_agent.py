@@ -51,7 +51,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    #'test_execute_instrument',
+    'test_execute_instrument',
     'dummy'
 ]    
 
@@ -301,7 +301,8 @@ class TestSBE37Agent(IonTestCase):
             if InstErrorCode.is_ok(success):
                 break
             
-            elif success == InstErrorCode.TIMEOUT:
+            #elif success == InstErrorCode.TIMEOUT:
+            elif InstErrorCode.is_equal(success,InstErrorCode.TIMEOUT):
                 pass
             
             else:
