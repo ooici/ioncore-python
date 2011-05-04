@@ -4,6 +4,7 @@
 @file ion/services/coi/datastore.py
 @author David Stuebe
 @author Matt Rodriguez
+@author Dave Foster <dfoster@asascience.com>
 @TODO
 
 """
@@ -23,7 +24,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -70,9 +71,9 @@ class DataStoreWorkBenchError(WorkBenchError):
 class DataStoreWorkbench(WorkBench):
 
 
-    def __init__(self, process, blob_store, commit_store):
+    def __init__(self, process, blob_store, commit_store, cache_size=10**8):
 
-        WorkBench.__init__(self, process)
+        WorkBench.__init__(self, process, cache_size)
 
         self._blob_store = blob_store
         self._commit_store = commit_store
@@ -150,41 +151,29 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(blobs)
 
     @defer.inlineCallbacks
-    def op_pull(self,request, headers, msg):
+    def _resolve_repo_state(self, repository_key):
         """
-        The operation which responds to a pull request
-
-        The pull is much higher heat that I would like - it requires decoding the serialized blobs.
-        We should consider storing the child links of each element external to the element - but then the put is
-        high heat... Not sure what to do.
+        @returns Repo.
         """
 
-        log.info('op_pull!')
-
-        if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
-
-
-        repo = self.get_repository(request.repository_key)
+        repo = self.get_repository(repository_key)
         if repo is None:
             #if it does not exist make a new one
-            repo = repository.Repository(repository_key=request.repository_key)
+            repo = repository.Repository(repository_key=repository_key)
             self.put_repository(repo)
 
         # Must reconstitute the head and merge with existing
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
         new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
-        new_head.repositorykey = request.repository_key
-
+        new_head.repositorykey = repository_key
 
         q = Query()
-        q.add_predicate_eq(REPOSITORY_KEY, request.repository_key)
+        q.add_predicate_eq(REPOSITORY_KEY, repository_key)
 
         rows = yield self._commit_store.query(q)
 
         if len(rows) == 0:
-            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % request.repository_key, request.ResponseCodes.NOT_FOUND)
-
+            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
 
         for key, columns in rows.items():
 
@@ -222,6 +211,26 @@ class DataStoreWorkbench(WorkBench):
 
         # Do the update!
         self._update_repo_to_head(repo, new_head)
+
+        # return repository
+        defer.returnValue(repo)
+
+    @defer.inlineCallbacks
+    def op_pull(self,request, headers, msg):
+        """
+        The operation which responds to a pull request
+
+        The pull is much higher heat that I would like - it requires decoding the serialized blobs.
+        We should consider storing the child links of each element external to the element - but then the put is
+        high heat... Not sure what to do.
+        """
+
+        log.info('op_pull!')
+
+        if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        repo = yield self._resolve_repo_state(request.repository_key)
 
         ####
         # Back to boiler plate op_pull
@@ -299,7 +308,7 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
                 #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:
@@ -750,7 +759,7 @@ class DataStoreWorkbench(WorkBench):
         log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
-        self.clear_non_persistent()
+        self.clear()
 
 
     @defer.inlineCallbacks
@@ -767,8 +776,53 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(len(rows)>0)
 
 
+    @defer.inlineCallbacks
+    def op_get_object(self, request, headers, message):
+        log.info('op_get_object')
 
+        if not hasattr(request, 'MessageType') or request.MessageType != GET_OBJECT_REQUEST_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid get_object request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        response = yield self._process.message_client.create_instance(GET_OBJECT_REPLY_MESSAGE_TYPE)
+
+        key = request.object_id.key
+        repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
+        assert repo
+
+        # @TODO: use first head for now
+        comms = repo.current_heads()
+        commit = repo.current_heads()[0]
+
+        link = commit.GetLink('objectroot')
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_object_types list of the passed in message.
+            """
+            return x.type not in request.excluded_object_types
+
+        # get blobs, update into response repository so we don't have to copy
+        blobs = yield self._get_blobs(response.Repository, [link.key], filtermethod)
+        response.Repository.index_hash.update(blobs)
+
+        # load root object + links
+        element = response.Repository.index_hash[link.key]
+        root_obj = response.Repository._load_element(element)
+
+        response.Repository.load_links(root_obj, [x.GPBMessage for x in request.excluded_object_types])
+
+        # fill in response, respond
+        response.retrieved_object = root_obj
+        for ex_type in request.excluded_object_types:
+            link = response.excluded_object_types.add()
+            newex = response.CreateObject(GPBTYPE_TYPE)
+            newex.object_id = ex_type.object_id
+            newex.version = ex_type.version
+            link.SetLink(newex)
+
+        yield self._process.reply_ok(message, response)
+
+        log.debug("/op_get_object")
 
 class DataStoreError(ApplicationError):
     """
@@ -802,7 +856,9 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         self._backend_cls_names[COMMIT_CACHE] = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
-        
+
+        self._cache_size = self.spawn_args.get('cache_size', CONF.getValue('cache_size', default=10**8))
+
         self._backend_classes={}
 
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
@@ -892,7 +948,7 @@ class DataStoreService(ServiceProcess):
 
         
         log.info("Created stores")
-        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
         yield self.initialize_datastore()
 
@@ -905,6 +961,7 @@ class DataStoreService(ServiceProcess):
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
         self.op_put_blobs = self.workbench.op_put_blobs
+        self.op_get_object = self.workbench.op_get_object
 
 
     @defer.inlineCallbacks
@@ -1121,13 +1178,17 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            load_result = content(resource_instance, self, **kwargs)
+            set_content_ok = content(resource_instance, self, **kwargs)
 
-            if not load_result:
-                set_content_ok = False
 
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+            ### EXTREMELY VERBOSE LOGGING!
+            #log.warn(description)
+            #log.warn(resource_instance)
+            #log.warn(resource_instance.ResourceObject.PPrint())
+            
             return resource_instance
 
         else:
@@ -1213,6 +1274,13 @@ class DataStoreClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('put_blobs', content)
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def get_object(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_object', content)
+        defer.returnValue(content)
+
 #    @defer.inlineCallbacks
 #    def get_preloaded_datasets_dict(self):
 #        """
@@ -1234,5 +1302,3 @@ class DataStoreClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)
-
-

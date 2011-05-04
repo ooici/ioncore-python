@@ -13,14 +13,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.trial import unittest
 from twisted.internet import defer
 
-import weakref
-import gc
-
-
 from net.ooici.play import addressbook_pb2
 
 from ion.core.object import gpb_wrapper
-from ion.core.object import repository
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
@@ -164,9 +159,12 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(self.wb.get_repository(key), self.repo)
 
 
-        self.wb.clear_non_persistent()
+        self.assertIn(key, self.wb._repos)
+
+        self.wb.manage_workbench_cache()
 
         # make sure it is gone!
+        self.assertNotIn(key, self.wb._repos)
         self.assertEqual(self.wb.get_repository(key), None)
 
 
@@ -181,10 +179,87 @@ class WorkBenchTest(unittest.TestCase):
 
         self.repo.persistent = True
 
-        self.wb.clear_non_persistent()
+        self.wb.manage_workbench_cache()
 
+        self.assertIn(key, self.wb._repos)
 
         self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
+    def test_cache_non_persistent(self):
+
+        self.repo.commit('junk')
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.cached = True
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Move it to the cache
+        self.wb.manage_workbench_cache()
+
+        # Make sure it is in the right place
+        self.assertNotIn(key, self.wb._repos)
+        self.assertIn(key, self.wb._repo_cache)
+
+        # Get it back again
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        # back again...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+
+    def test_manage_cache_context(self):
+
+        self.repo.commit('junk')
+
+        self.repo.convid_context = 'mine!'
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.cached = True
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage without context
+        self.wb.manage_workbench_cache()
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage other context
+        self.wb.manage_workbench_cache('Not Mine')
+
+        # Still there...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
+        # Call manage with context
+        self.wb.manage_workbench_cache('mine!')
+
+
+        # Make sure it is in the right place
+        self.assertNotIn(key, self.wb._repos)
+        self.assertIn(key, self.wb._repo_cache)
+
+        # Get it back again
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        # back again...
+        self.assertIn(key, self.wb._repos)
+        self.assertNotIn(key, self.wb._repo_cache)
+
 
 
 class WorkBenchProcess(Process):
@@ -212,8 +287,6 @@ factory = ProcessFactory(WorkBenchProcess)
 
 
 class WorkBenchProcessTest(IonTestCase):
-
-
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -275,6 +348,9 @@ class WorkBenchProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pull(self):
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -295,15 +371,19 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def test_pull_invalid(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
+        yield self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
 
 
     @defer.inlineCallbacks
     def test_pull_latest(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
 
         # Get the current head object key - it will not be sent in the pull
         old_key = self.repo1.root_object.MyId
@@ -340,6 +420,9 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_pull_latest_checkout(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
 
         # Get the current head object key - it will not be sent in the pull
         old_key = self.repo1.root_object.MyId
@@ -384,6 +467,9 @@ class WorkBenchProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pull_twice(self):
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -408,6 +494,9 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_pull_update(self):
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
@@ -442,6 +531,9 @@ class WorkBenchProcessTest(IonTestCase):
     def test_pull_branch(self):
 
 
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         self.branch_key = self.repo1.branch()
 
         self.repo1.root_object.title = 'branch'
@@ -474,6 +566,10 @@ class WorkBenchProcessTest(IonTestCase):
         """
         Test that we can have more than one branch point to the same commit!
         """
+
+        # Must make the repo persistent to compare the result
+        self.repo1.persistent = True
+
         self.first_branch_key = self.repo1.current_branch_key()
         self.second_branch_key = self.repo1.branch()
 

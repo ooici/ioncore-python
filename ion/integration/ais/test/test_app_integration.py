@@ -46,7 +46,8 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE
+                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
+                                                       DELETE_SUBSCRIPTION_REQ_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -81,20 +82,80 @@ class AppIntegrationTest(IonTestCase):
         store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
+        
+        self.dispatcher_id = None
 
         services = [
-            {'name':'app_integration','module':'ion.integration.ais.app_integration_service','class':'AppIntegrationService'},
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                          COMMIT_CACHE:'ion.core.data.store.IndexStore'}},
-            {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
-            {'name':'dataset_controller', 'module':'ion.services.dm.inventory.dataset_controller', 'class':'DatasetControllerClient'},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
-             'spawnargs':{'datastore_service':'datastore'}},
-            {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
-        ]
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                'spawnargs':
+                    {
+                        PRELOAD_CFG:
+                            {
+                                ION_DATASETS_CFG:True,
+                                ION_AIS_RESOURCES_CFG:True
+                            },
+                        COMMIT_CACHE:'ion.core.data.store.IndexStore'
+                    }
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry.resource_registry',
+                'class':'ResourceRegistryService',
+                'spawnargs':
+                    {
+                        'datastore_service':'datastore'}
+                    },
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
+            },
+            {
+                'name':'attributestore',
+                'module':'ion.services.coi.attributestore',
+                'class':'AttributeStoreService'
+            },
+            {
+                'name':'identity_registry',
+                'module':'ion.services.coi.identity_registry',
+                'class':'IdentityRegistryService'
+            },
+            {
+                'name':'store_service',
+                'module':'ion.core.data.store_service',
+                'class':'StoreService'
+            },
+            {
+                'name':'app_integration',
+                'module':'ion.integration.ais.app_integration_service',
+                'class':'AppIntegrationService'
+            },
+            {
+                'name':'notification_alert',
+                'module':'ion.integration.ais.notification_alert_service',
+                'class':'NotificationAlertService'
+            },
+            {
+                'name':'dataset_controller',
+                'module':'ion.services.dm.inventory.dataset_controller',
+                'class':'DatasetControllerClient'
+            },
+
+            ]
+
         log.debug('AppIntegrationTest.setUp(): spawning processes')
         sup = yield self._spawn_processes(services)
         log.debug('AppIntegrationTest.setUp(): spawned processes')
@@ -102,6 +163,22 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
+
+        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
+        f = None
+        id = None
+
+        """        
+        try:
+            f = open('dispatcher.id', 'r')
+            id = f.read().strip()
+            # @todo: ensure this resource exists in the ResourceRepo
+        except IOError:
+             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
+        finally:
+            if f is not None:
+                f.close()
+        """
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -129,22 +206,11 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.minLatitude  = 30
-        #reqMsg.message_parameters_reference.maxLatitude  = 45
-        #reqMsg.message_parameters_reference.minLongitude = -75
-        #reqMsg.message_parameters_reference.maxLongitude = -70
-        #reqMsg.message_parameters_reference.minVertical  = 20
-        #reqMsg.message_parameters_reference.maxVertical  = 30
-        #reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
-        #reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
-
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
-
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -223,7 +289,7 @@ class AppIntegrationTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
         
         #
-        # Send a request without a userID to test that the appropriate error
+        # Send a request without a resourceID to test that the appropriate error
         # is returned.
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -267,11 +333,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with temporal bounds that covers data time
@@ -296,11 +362,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds minTime covered by data time, but
@@ -324,11 +390,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds maxTime covered by data time, but
@@ -352,11 +418,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
-
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
 
     @defer.inlineCallbacks
@@ -401,7 +467,7 @@ class AppIntegrationTest(IonTestCase):
 
         if len(rspMsg.message_parameters_reference) > 0:
             if len(rspMsg.message_parameters_reference[0].dataResourceSummary) > 0:
-                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
+                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
         
                 #
                 # Now create a request message to get the metadata details about the
@@ -640,6 +706,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -722,6 +790,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -761,7 +831,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('getUser returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
+        self.assertEqual(reply.message_parameters_reference[0].name, "some_person")
+        self.assertEqual(reply.message_parameters_reference[0].institution, "some_place")
         self.assertEqual(reply.message_parameters_reference[0].email_address, "some_person@some_place.some_domain")
+        self.assertEqual(reply.message_parameters_reference[0].authenticating_organization, "ProtectNetwork")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].name, "ProfileItem_1_Name")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].value, "ProfileItem_1_Value")
         self.assertEqual(reply.message_parameters_reference[0].profile[1].name, "ProfileItem_2_Name")
@@ -940,22 +1013,36 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
-        log.debug('Testing createDataResourceSubscription.')
+        log.debug('Testing createDataResourcesSubscription.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
         #
+        # Send a request without a resourceID to test that the appropriate error
+        # is returned.
         #
+        yield self.createUser()
+
+       # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = 'Dr. Chew'
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'TestDataSourceID'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path  = '/home/test_path'
-        
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+
+        #
+        #
         log.debug('Calling createDataResourceSubscription.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
@@ -963,29 +1050,83 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 
-
     @defer.inlineCallbacks
     def test_findDataResourceSubscriptions(self):
         log.debug('Testing findDataResourceSubscriptions.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
+
+        yield self.createUser()
+
+        #
+        # Add a couple of subscriptions to find later...
+        #
         
         #
+        # Add a subscription for this user to this data resource
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+
+        #
+        # Call AIS to create the subscription
+        #
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+
+        #
+        # Add another subscription for this user to this data resource
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+    
+        #
+        # Call AIS to create the subscription
+        #
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+
+        #
+        # Now call AIS to find the subscriptions
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
-        reqMsg.message_parameters_reference.dataBounds.minLatitude  = -50
-        reqMsg.message_parameters_reference.dataBounds.maxLatitude  = -40
-        reqMsg.message_parameters_reference.dataBounds.minLongitude = 20
-        reqMsg.message_parameters_reference.dataBounds.maxLongitude = 30
-        reqMsg.message_parameters_reference.dataBounds.cminVertical  = 20
-        reqMsg.message_parameters_reference.dataBounds.maxVertical  = 30
-        reqMsg.message_parameters_reference.dataBounds.posVertical  = 'down'
-        reqMsg.message_parameters_reference.dataBounds.minTime      = '2008-08-1T10:00:00Z'
-        reqMsg.message_parameters_reference.dataBounds.maxTime      = '2008-08-1T11:00:00Z'
-
+        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
         
         log.debug('Calling findDataResourceSubscriptions.')
         rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
@@ -993,81 +1134,263 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to findDataResourceSubscriptions')
         else:
             log.debug('POSITIVE rspMsg to findDataResourceSubscriptions')
+            
+        numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
 
+        log.debug('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
+        if numSubsReturned != 2:
+            errString = 'findDataResourcesByUser returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 2'
+            #self.fail('findDataResourcesByUser returned " + numResReturned + " subscriptions.  Should have been 2')
+            self.fail(errString)
 
+            
+    @defer.inlineCallbacks
+    def test_updateDataResourceSubscription(self):
+        log.debug('Testing updateDataResourceSubscription.')
 
-    @defer.inlineCallbacks
-    def test_createDataResource_success(self):
-        raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
-
-    @defer.inlineCallbacks
-    def test_createDataResource_failInputs(self):
-        raise unittest.SkipTest('This will be the test createDataResource when bad inputs are supplied')
-
-    @defer.inlineCallbacks
-    def test_createDataResource_failSource(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create source fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failSet(self):
-        raise unittest.SkipTest('This will be the test createDataResource when create dataset fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failAssociation(self):
-        raise unittest.SkipTest('This will be the test createDataResource when association fails')
-    
-    @defer.inlineCallbacks
-    def test_createDataResource_failScheduling(self):
-        raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
+        # Create a message client and user
+        mc = MessageClient(proc=self.test_sup)
+        yield self.createUser()
         
-    def __validateDataResourceSummary(self, dataResourceSummary):
+        # first create a subscription to be updated
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+            
+        # now update the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling updateDataResourceSubscription.')
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+
+    @defer.inlineCallbacks
+    def test_deleteDataResourceSubscription(self):
+        log.debug('Testing deleteDataResourceSubscriptions.')
+
+
+        # Create a message client and user
+        mc = MessageClient(proc=self.test_sup)
+        yield self.createUser()
+        
+        # create a subscription to be deleted
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+            
+        # now delete the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        log.debug('Calling deleteDataResourceSubscriptions.')
+        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to deleteDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
+
+
+    def __validateDatasetByOwnerMetadata(self, metadata):
         log.debug('__validateDataResourceSummary()')
         
         i = 0
-        while i < len(dataResourceSummary):
-            if not dataResourceSummary[i].IsFieldSet('user_ooi_id'):
-                self.fail('response to findDataResources has no user_ooi_id field')
-            if not dataResourceSummary[i].IsFieldSet('data_resource_id'):
-                self.fail('response to findDataResources has no resource_id field')
-            if not dataResourceSummary[i].IsFieldSet('title'):
-                #self.fail('response to findDataResources has no title field')
-                log.error('response to findDataResources has no title field')
-            if not dataResourceSummary[i].IsFieldSet('institution'):
-                #self.fail('response to findDataResources has no institution field')
-                log.error('response to findDataResources has no institution field')
-            if not dataResourceSummary[i].IsFieldSet('source'):
-                #self.fail('response to findDataResources has no source field')
-                log.error('response to findDataResources has no source field')
-            if not dataResourceSummary[i].IsFieldSet('references'):
-                #self.fail('response to findDataResources has no references field')
-                log.error('response to findDataResources has no references field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
-                self.fail('response to findDataResources has no ion_time_coverage_start field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
-                self.fail('response to findDataResources has no ion_time_coverage_end field')
-            if not dataResourceSummary[i].IsFieldSet('summary'):
-                #self.fail('response to findDataResources has no summary field')
-                log.error('response to findDataResources has no summary field')
-            if not dataResourceSummary[i].IsFieldSet('comment'):
-                #self.fail('response to findDataResources has no comment field')
-                log.error('response to findDataResources has no comment field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lat_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
-                self.fail('response to findDataResources has no ion_geospatial_lon_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
-                self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
-            if not dataResourceSummary[i].IsFieldSet('download_url'):
-                self.fail('response to findDataResources has no download_url field')
+        while i < len(metadata):
+            data = metadata[i]
+            if not data.IsFieldSet('data_resource_id'):
+                self.fail('FindDataResourcesByOwner response has no data_resource_id field')
+            else:                
+                dsResourceID = data.data_resource_id
             i = i + 1                
 
+    def __validateDataResourceSummary(self, dataResourceSummaries):
+        log.debug('__validateDataResourceSummary()')
+        
+        i = 0
+        while i < len(dataResourceSummaries):
+            datasetMetadata = dataResourceSummaries[i].datasetMetadata
+            dsResourceID = datasetMetadata.data_resource_id
+            #if not datasetMetadata.IsFieldSet('user_ooi_id'):
+            #    self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
+            if not datasetMetadata.IsFieldSet('data_resource_id'):
+                self.fail('dataset: ' +  dsResourceID + ' has no resource_id field')
+            if not datasetMetadata.IsFieldSet('title'):
+                #self.fail('response to findDataResources has no title field')
+                log.error('dataset: ' +  dsResourceID + ' has no title field')
+            if not datasetMetadata.IsFieldSet('institution'):
+                #self.fail('response to findDataResources has no institution field')
+                log.error('dataset: ' +  dsResourceID + ' has no institution field')
+            if not datasetMetadata.IsFieldSet('source'):
+                #self.fail('response to findDataResources has no source field')
+                log.error('dataset: ' +  dsResourceID + ' has no source field')
+            if not datasetMetadata.IsFieldSet('references'):
+                #self.fail('response to findDataResources has no references field')
+                log.error('dataset: ' +  dsResourceID + ' has no references field')
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_start'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_start field')
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_end'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_end field')
+            if not datasetMetadata.IsFieldSet('summary'):
+                #self.fail('response to findDataResources has no summary field')
+                log.error('dataset: ' +  dsResourceID + ' has no summary field')
+            if not datasetMetadata.IsFieldSet('comment'):
+                #self.fail('response to findDataResources has no comment field')
+                log.error('dataset: ' +  dsResourceID + ' has no comment field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_min'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_min field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_max'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_max field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_min'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lon_min field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_max'):
+                self.fail('dataset: ' +  dsResourceID + ' no ion_geospatial_lon_max field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_min'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_min field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_max'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_max field')
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_positive'):
+                self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
+            if not datasetMetadata.IsFieldSet('download_url'):
+                self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
+            i = i + 1                
+
+
+    @defer.inlineCallbacks
+    def createUser(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+
+        # create the register_user request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
+
+        # fill in the certificate and key
+        msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
+MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
+MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRsw
+GQYDVQQDExJDSUxvZ29uIEJhc2ljIENBIDEwHhcNMTAxMTE4MjIyNTA2WhcNMTAxMTE5MTAzMDA2
+WjBvMRMwEQYKCZImiZPyLGQBGRMDb3JnMRcwFQYKCZImiZPyLGQBGRMHY2lsb2dvbjELMAkGA1UE
+BhMCVVMxFzAVBgNVBAoTDlByb3RlY3ROZXR3b3JrMRkwFwYDVQQDExBSb2dlciBVbndpbiBBMjU0
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6QhsWxhUXbIxg+1ZyEc7d+hIGvchVmtb
+g0kKLmivgoVsA4U7swNDRH6svW242THta0oTf6crkRx7kOKg6jma2lcAC1sjOSddqX7/92ChoUPq
+7LWt2T6GVVA10ex5WAeB/o7br/Z4U8/75uCBis+ru7xEDl09PToK20mrkcz9M4HqIv1eSoPkrs3b
+2lUtQc6cjuHRDU4NknXaVMXTBHKPM40UxEDHJueFyCiZJFg3lvQuSsAl4JL5Z8pC02T8/bODBuf4
+dszsqn2SC8YDw1xrujvW2Bd7Q7BwMQ/gO+dZKM1mLJFpfEsR9WrjMeg6vkD2TMWLMr0/WIkGC8u+
+6M6SMQIDAQABo4HdMIHaMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgSwMBMGA1UdJQQMMAoG
+CCsGAQUFBwMCMBgGA1UdIAQRMA8wDQYLKwYBBAGCkTYBAgEwagYDVR0fBGMwYTAuoCygKoYoaHR0
+cDovL2NybC5jaWxvZ29uLm9yZy9jaWxvZ29uLWJhc2ljLmNybDAvoC2gK4YpaHR0cDovL2NybC5k
+b2Vncmlkcy5vcmcvY2lsb2dvbi1iYXNpYy5jcmwwHwYDVR0RBBgwFoEUaXRzYWdyZWVuMUB5YWhv
+by5jb20wDQYJKoZIhvcNAQEFBQADggEBAEYHQPMY9Grs19MHxUzMwXp1GzCKhGpgyVKJKW86PJlr
+HGruoWvx+DLNX75Oj5FC4t8bOUQVQusZGeGSEGegzzfIeOI/jWP1UtIjzvTFDq3tQMNvsgROSCx5
+CkpK4nS0kbwLux+zI7BWON97UpMIzEeE05pd7SmNAETuWRsHMP+x6i7hoUp/uad4DwbzNUGIotdK
+f8b270icOVgkOKRdLP/Q4r/x8skKSCRz1ZsRdR+7+B/EgksAJj7Ut3yiWoUekEMxCaTdAHPTMD/g
+Mh9xL90hfMJyoGemjJswG5g3fAdTP/Lv0I6/nWeH/cLjwwpQgIEjEAVXl7KHuzX5vPD/wqQ=
+-----END CERTIFICATE-----"""
+        msg.message_parameters_reference.rsa_private_key = """-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA6QhsWxhUXbIxg+1ZyEc7d+hIGvchVmtbg0kKLmivgoVsA4U7swNDRH6svW24
+2THta0oTf6crkRx7kOKg6jma2lcAC1sjOSddqX7/92ChoUPq7LWt2T6GVVA10ex5WAeB/o7br/Z4
+U8/75uCBis+ru7xEDl09PToK20mrkcz9M4HqIv1eSoPkrs3b2lUtQc6cjuHRDU4NknXaVMXTBHKP
+M40UxEDHJueFyCiZJFg3lvQuSsAl4JL5Z8pC02T8/bODBuf4dszsqn2SC8YDw1xrujvW2Bd7Q7Bw
+MQ/gO+dZKM1mLJFpfEsR9WrjMeg6vkD2TMWLMr0/WIkGC8u+6M6SMQIDAQABAoIBAAc/Ic97ZDQ9
+tFh76wzVWj4SVRuxj7HWSNQ+Uzi6PKr8Zy182Sxp74+TuN9zKAppCQ8LEKwpkKtEjXsl8QcXn38m
+sXOo8+F1He6FaoRQ1vXi3M1boPpefWLtyZ6rkeJw6VP3MVG5gmho0VaOqLieWKLP6fXgZGUhBvFm
+yxUPoNgXJPLjJ9pNGy4IBuQDudqfJeqnbIe0GOXdB1oLCjAgZlTR4lFA92OrkMEldyVp72iYbffN
+4GqoCEiHi8lX9m2kvwiQKRnfH1dLnnPBrrwatu7TxOs02HpJ99wfzKRy4B1SKcB0Gs22761r+N/M
+oO966VxlkKYTN+soN5ID9mQmXJkCgYEA/h2bqH9mNzHhzS21x8mC6n+MTyYYKVlEW4VSJ3TyMKlR
+gAjhxY/LUNeVpfxm2fY8tvQecWaW3mYQLfnvM7f1FeNJwEwIkS/yaeNmcRC6HK/hHeE87+fNVW/U
+ftU4FW5Krg3QIYxcTL2vL3JU4Auu3E/XVcx0iqYMGZMEEDOcQPcCgYEA6sLLIeOdngUvxdA4KKEe
+qInDpa/coWbtAlGJv8NueYTuD3BYJG5KoWFY4TVfjQsBgdxNxHzxb5l9PrFLm9mRn3iiR/2EpQke
+qJzs87K0A/sxTVES29w1PKinkBkdu8pNk10TxtRUl/Ox3fuuZPvyt9hi5c5O/MCKJbjmyJHuJBcC
+gYBiAJM2oaOPJ9q4oadYnLuzqms3Xy60S6wUS8+KTgzVfYdkBIjmA3XbALnDIRudddymhnFzNKh8
+rwoQYTLCVHDd9yFLW0d2jvJDqiKo+lV8mMwOFP7GWzSSfaWLILoXcci1ZbheJ9607faxKrvXCEpw
+xw36FfbgPfeuqUdI5E6fswKBgFIxCu99gnSNulEWemL3LgWx3fbHYIZ9w6MZKxIheS9AdByhp6px
+lt1zeKu4hRCbdtaha/TMDbeV1Hy7lA4nmU1s7dwojWU+kSZVcrxLp6zxKCy6otCpA1aOccQIlxll
+Vc2vO7pUIp3kqzRd5ovijfMB5nYwygTB4FwepWY5eVfXAoGBAIqrLKhRzdpGL0Vp2jwtJJiMShKm
+WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
+c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
+-----END RSA PRIVATE KEY-----"""
+
+        # try to register this user for the first time
+        reply = yield self.aisc.registerUser(msg)
+        log.debug('registerUser returned:\n'+str(reply))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
+            self.fail('response does not contain an OOI_ID GPB')
+        if reply.message_parameters_reference[0].user_is_early_adopter != True:
+            self.fail("response does not indicate user is an early adopter")
+        self.user_id = reply.message_parameters_reference[0].ooi_id
+        log.info("NotificationAlertTest:createUser id = "+str(self.user_id))
+
+
+        # Give our test user an email address
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
+        msg.message_parameters_reference.user_ooi_id = self.user_id
+        msg.message_parameters_reference.email_address = "mmmanning@ucsd.edu"
+        try:
+            reply = yield self.aisc.updateUserProfile(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
+        log.debug('updateUserProfile returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
 

@@ -15,6 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import bootstrap
 from ion.core import ioninit
+from ion.core.ioninit import request
 from ion.core.cc import service
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
@@ -215,6 +216,7 @@ class IonTestCase(unittest.TestCase):
         # as well as force certain policy enforcement failures, etc.
         #request.user_id = 'MYUSERID'
         #request.expiry = '999999999'
+        request.workbench_context = 'Test runner context!'
         unittest.TestCase.run(self, result)
 
 

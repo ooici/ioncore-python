@@ -139,12 +139,16 @@ class EnumType(type):
             clsName = '%s_%s' % (cls.__name__, enum_name)
             clsDict = {}
 
+            lookup = {}
+            clsDict['lookup'] = lookup
 
             for name, val_desc in enum_type_descriptor.values_by_name.items():
                 
                 prop = WrappedEnum(val_desc.number)
-                
+
                 clsDict[name] = prop
+
+                lookup[val_desc.number] = name
 
             clsType = EnumType.__new__(EnumType, clsName, (cls,), clsDict)
 
@@ -494,7 +498,7 @@ class WrapperType(type):
             """
             Specialized method for CDM (dataset) Objects to append a group object with the given name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if self.root_group is not None:
                 raise OOIObjectError('Cannot make the root group when one already exists!')
@@ -564,7 +568,7 @@ class WrapperType(type):
             Specialized method for CDM (group) Objects to append a group object with the given name
             @return: The group being created (as a convenience)
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name":  Please specify a non-empty string')
@@ -682,7 +686,7 @@ class WrapperType(type):
                       different in-memory objects.  This is illegal in this datastructure for dimension objects
                       and should be prevented in further iterations.
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -709,7 +713,7 @@ class WrapperType(type):
             Specialized method for CDM Objects to append a variable object with the given name, data_type, and shape
             @return: The variable being created (as a convenience)
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -748,7 +752,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the group object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -769,7 +773,7 @@ class WrapperType(type):
             Specialized method for CDM Objects to find the attribute object by its name
             """
             # @attention: Should this find operate on the variable's standard_name attribute when avail?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -789,7 +793,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find a dimension object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -817,7 +821,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the variable object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -837,7 +841,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the variable object's index by the variable's name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -859,7 +863,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the attribute object's index by the attribute's name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -881,7 +885,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to check existance of an attribute object by its name
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -914,7 +918,7 @@ class WrapperType(type):
                                data_type is not explicitly specified a ValueError will be raised
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -940,7 +944,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to set fields for existing dimensions
             """
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -1395,7 +1399,7 @@ class Wrapper(object):
             for item in self.DerivedWrappers.values():
                 item.Invalidate()
 
-
+        # Source must always be set to self or another gpb_wrapper object!
         self._source = other
 
         self._derived_wrappers = None
@@ -1847,7 +1851,12 @@ class Wrapper(object):
         return not self == other
 
     def __str__(self):
+        """
+        Since str is used in debugging it should never return an exception - no matter the state of the wrapper object
+        """
 
+        '''
+        # Too complex - don't do things that might raise errors in str method!
         if self._gpb_type == LINK_TYPE:
             key = self._gpbMessage.key
             try:
@@ -1857,11 +1866,15 @@ class Wrapper(object):
             msg = '\nkey: %s \ntype { %s }' % (key, self._gpbMessage.type)
         else:
             msg = '\n' +self._gpbMessage.__str__()
-
+        '''
+        msg = '\n %s \n'  % str(self._gpbMessage)
         return msg
 
     def Debug(self):
-        output  = '================== Wrapper ====================\n'
+        """
+        Since Debug is for debugging it should never return an exception - no matter the state of the wrapper object
+        """
+        output  = '================== GPB Wrapper ====================\n'
 
         key = self._myid
         try:
@@ -1874,7 +1887,8 @@ class Wrapper(object):
         output += 'Wrapper Invalid: %s \n' % self._invalid
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
-        if hasattr(self._repository,'repository_key'):
+        # This is dangerous - this can result in an exception loop!
+        if hasattr(self._repository,'_dotgit') and not self._repository._dotgit.Invalid:
             output += 'Repository: %s \n' % str(self._repository.repository_key)
         else:
             output += 'Repository: %s \n' % str(self._repository)
@@ -2051,7 +2065,52 @@ class Wrapper(object):
         """
         return self.GPBMessage.ByteSize()
 
+    @GPBSource
+    def PPrint(self, offset=''):
 
+        msg = '%s%s\n' % (offset, self.ObjectClass)
+
+        for name, field in self._Properties.iteritems():
+
+            field_val = field.__get__(self)
+            if field_val is None:
+                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, field_val)
+                continue
+
+            if isinstance(field, (WrappedMessageProperty)):
+                try:
+                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  '), offset)
+                except Exception, ex:
+                    log.error(ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    continue
+                
+            elif isinstance(field, WrappedRepeatedCompositeProperty):
+                try:
+                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  ',name=name), offset)
+                except Exception, ex:
+                    log.error(ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    continue
+
+            elif isinstance(field, WrappedRepeatedScalarProperty):
+                scalars = field.__get__(self)
+                if len(scalars) > 20:
+                    val = '# of Values - %i: Field Values - "%s"... truncated at 20 values!' % (len(scalars), str(scalars[:20]))
+                else:
+                    val = '# of Values - %i: Field Values - "%s"' % (len(scalars), str(scalars[:]))
+
+            else:
+
+                item = field.__get__(self)
+                if field.field_type == 'TYPE_ENUM':
+                    item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
+
+                val = 'Field Value - "%s"' % str(item)
+
+            msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, val)
+
+        return msg
 
 class ContainerWrapper(object):
     """
@@ -2263,6 +2322,31 @@ class ContainerWrapper(object):
 
         for i in range(len(self)):
             yield self[i]
+
+    @GPBSourceCW
+    def PPrint(self, offset='', name='items'):
+
+        msg = '%s[' % offset
+        length = len(self)
+
+        if length is 0:
+            return '%s[ ]' % offset
+        else:
+            msg = '%s[ # of %s - %i \n' % (offset, name, length)
+
+        n = min(10, length)
+
+        for i in range(n):
+            val = self[i].PPrint(offset=offset + '  ')
+            msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+
+        if length > 10:
+            msg += offset + '... truncated printing list at 10 items!\n'
+
+
+        msg += offset + '] '
+
+        return msg
 
 
 
@@ -2560,3 +2644,11 @@ class StructureElement(object):
     def serialize(self):
         return self._element.SerializeToString()
 
+
+    def __sizeof__(self):
+
+        #size = len(self._element.value) + 34
+        #print 'Esimtate: ', size
+        #print 'GPB Size: ', self._element.ByteSize()
+
+        return self._element.ByteSize()

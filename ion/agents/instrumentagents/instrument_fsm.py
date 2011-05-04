@@ -16,7 +16,7 @@ class InstrumentFSM():
     """
 
 
-    def __init__(self, states, events, state_handlers):
+    def __init__(self, states, events, state_handlers,enter_event,exit_event):
         """
         Initialize states, events, handlers.
         """
@@ -25,7 +25,8 @@ class InstrumentFSM():
         self.state_handlers = state_handlers
         self.current_state = None
         self.previous_state = None
-
+        self.enter_event = enter_event
+        self.exit_event = exit_event
 
     def get_current_state(self):
         """
@@ -40,11 +41,14 @@ class InstrumentFSM():
         EVENT_ENTER event.
         """
         
-        if state not in self.states:
+        #if state not in self.states:
+        #    return False
+        
+        if not self.states.has(state):
             return False
         
         self.current_state = state
-        self.state_handlers[self.current_state]('EVENT_ENTER',params)
+        self.state_handlers[self.current_state](self.enter_event,params)
         return True
 
     def on_event(self,event,params=None):
@@ -60,7 +64,8 @@ class InstrumentFSM():
         (success,next_state) = self.state_handlers[self.current_state](event,params)
         
         
-        if next_state in self.states:
+        #if next_state in self.states:
+        if self.states.has(next_state):
             self._on_transition(next_state,params)
                 
         return success
@@ -75,10 +80,10 @@ class InstrumentFSM():
         @param params Opional parameters passed from on_event
         """
         
-        self.state_handlers[self.current_state]('EVENT_EXIT',params)
+        self.state_handlers[self.current_state](self.exit_event,params)
         self.previous_state = self.current_state
         self.current_state = next_state
-        self.state_handlers[self.current_state]('EVENT_ENTER',params)
+        self.state_handlers[self.current_state](self.enter_event,params)
 
         
 

@@ -142,10 +142,16 @@ class ManageResources(object):
 
         
    def __PrintDatasetAttributes(self, ds):
+      return   # TODO: turned off until problem with dataset fixed
       log.debug("Dataset = \n"+str(ds))
-      for atrib in ds.root_group.attributes:
-         log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
-    
+      for var in ds.root_group.variables:
+         log.debug('Root Variable: %s' % str(var.name))
+         for atrib in var.attributes:
+            log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
+         print "....Dimensions:"
+         for dim in var.shape:
+            log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+     
 
    def __PrintIdentityAttributes(self, ds):
       log.debug("Identity = \n"+str(ds))
@@ -241,7 +247,7 @@ class ManageResources(object):
       log.debug('ManageResources.getResourcesOfType()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -329,8 +335,6 @@ class ManageResources(object):
          To.resource[2].name = 'email'
          To.resource[2].value = From.email
          To.resource.add()
-         To.resource[3].name = 'life_cycle_state'
-         To.resource[3].value = From.life_cycle_state
       
       except:
          estr = 'Object ERROR!'
@@ -443,7 +447,7 @@ class ManageResources(object):
       log.debug('ManageResources.getResource()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
-      result = yield self.CheckRequest(msg)
+      result = yield self._CheckRequest(msg)
       if result != None:
          defer.returnValue(result)
          
@@ -492,13 +496,13 @@ class ManageResources(object):
 
 
    @defer.inlineCallbacks
-   def CheckRequest(self, request):
+   def _CheckRequest(self, request):
       # Check for correct request protocol buffer type
       if request.MessageType != AIS_REQUEST_MSG_TYPE:
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = 'Bad message type receieved, ignoring'
+         Response.error_str = 'Bad message type receieved, ignoring (AIS)'
          defer.returnValue(Response)
 
       # Check payload in message
@@ -506,7 +510,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [message_parameters_reference] not found in message"
+         Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
          defer.returnValue(Response)
   
       defer.returnValue(None)

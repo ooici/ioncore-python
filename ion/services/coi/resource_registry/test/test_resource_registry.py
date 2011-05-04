@@ -82,13 +82,14 @@ class ResourceRegistryTest(IonTestCase):
         else:
             res_id = str(result.MessageResponseBody)
 
-        # Check the result!
+        # Check the resulting resource is in the datastore process
         new_repo = proc_ds1.workbench.get_repository(res_id)
 
         resource = yield new_repo.checkout('master')
 
         self.assertEqual(resource.identity, res_id)
 
+        
         self.assertEqual(resource.object_type, resource_description.object_type)
 
 

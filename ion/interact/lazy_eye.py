@@ -39,6 +39,7 @@ class MscProcessProtocol(protocol.ProcessProtocol):
         self.running = False
         self.cb = callback
         self.msg = msg
+        self.start_time = time.time()
 
     def connectionMade(self):
         log.debug('mscgen started ok')
@@ -48,7 +49,9 @@ class MscProcessProtocol(protocol.ProcessProtocol):
         pass
     
     def processExited(self, reason):
-        log.debug('mscgen exited, "%s"' % reason.value)
+        self.end_time = time.time()
+        log.debug('mscgen exited, %f seconds, "%s"' %
+                  ((self.end_time - self.start_time), reason.value))
         self.cb(self.msg, str(self.output))
         self.running = False
 
@@ -187,6 +190,12 @@ class LazyEye(InteractionObserver):
         log.debug('%s started' % BINARY_NAME)
 
     #noinspection PyUnusedLocal
+    def op_get_current_count(self, request, headers, msg):
+        rc = len(self.msg_log)
+        log.debug('%d messages in the buffer right now' % rc)
+        self.reply_ok(msg, rc)
+
+    #noinspection PyUnusedLocal
     def op_get_results(self, request, headers, msg):
         """
         Return imagename, elapsed time, number of messages and rate as a
@@ -194,10 +203,15 @@ class LazyEye(InteractionObserver):
         """
         log.debug('Returning results')
         delta_t = self.end_time - self.start_time
+        if delta_t <= 0.0:
+            msg_rate = 0.0;
+        else:
+            msg_rate = self.last_graph_size / delta_t
+
         payload = {'imagename': self.imagename,
                    'num_edges' : self.last_graph_size,
                    'elapsed_time' : delta_t,
-                   'msg_rate' : self.last_graph_size / delta_t}
+                   'msg_rate' : msg_rate}
         self.reply_ok(msg, json.dumps(payload))
 
 class LazyEyeClient(ProcessClient):
@@ -215,6 +229,12 @@ class LazyEyeClient(ProcessClient):
     def stop(self):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('stop', '')
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_current_count(self):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('get_current_count', '')
         defer.returnValue(content)
 
     @defer.inlineCallbacks

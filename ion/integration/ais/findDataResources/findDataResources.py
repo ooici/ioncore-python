@@ -22,8 +22,8 @@ from ion.services.coi.datastore import DataStoreWorkBenchError
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
-from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
 
@@ -36,7 +36,8 @@ LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE, \
+                                                       FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE
 
 DNLD_BASE_THREDDS_URL = 'http://localhost:8081/thredds'
 DNLD_DIR_PATH = '/dodsC/scanData/'
@@ -92,12 +93,12 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "DatasetIDs not found."
+            Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
             
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg, userID)
+        yield self.__getDataResources(msg, dSetResults, rspMsg)
 
         defer.returnValue(rspMsg)
 
@@ -136,7 +137,7 @@ class FindDataResources(object):
         #
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
-        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE)
 
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
@@ -145,7 +146,7 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "DatasetIDs not found."
+            Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
@@ -187,7 +188,7 @@ class FindDataResources(object):
                       
 
     @defer.inlineCallbacks
-    def __getDataResources(self, msg, dSetResults, rspMsg, userID):
+    def __getDataResources(self, msg, dSetResults, rspMsg, userID = None):
         """
         Given the list of datasetIDs, determine in the data represented by
         the dataset is within the given spatial and temporal bounds, and
@@ -216,6 +217,13 @@ class FindDataResources(object):
             log.debug('Working on dataset: ' + dSetResID)
             
             dSet = yield self.rc.get_instance(dSetResID)
+            if dSet is None:
+                log.error('dSet is None')
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                      MessageName='AIS findDataResources error response')
+                Response.error_num = Response.ResponseCodes.NOT_FOUND
+                Response.error_str = "Dataset not found."
+                defer.returnValue(Response)        
 
             minMetaData = {}
             self.__loadMinMetaData(dSet, minMetaData)
@@ -248,7 +256,7 @@ class FindDataResources(object):
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Dataset not found."
+                    Response.error_str = "Datasource not found."
                     defer.returnValue(Response)        
 
                 try:
@@ -262,10 +270,28 @@ class FindDataResources(object):
                     Response.error_str = "Datasource not found."
                     defer.returnValue(Response)        
 
-                rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+                #
+                # Added this for Tim and Tom; not sure we need it yet...
+                #
+                ownerID = yield self.__findOwner(dSetResID)
 
                 self.__createDownloadURL(dSetResID)
-                self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[j], minMetaData, userID, dSetResID)
+
+                if userID is None:
+                    #
+                    # This was a findDataResources request
+                    #
+                    rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.date_registered = dSource.registration_datetime_millis
+                    self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
+                else:
+                    #
+                    # This was a findDataResourcesByUser request
+                    #
+                    rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
+                    self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSetResID)
+
 
                 #self.__printRootAttributes(dSet)
                 #self.__printRootVariables(dSet)
@@ -325,7 +351,7 @@ class FindDataResources(object):
         try:
             result = yield self.asc.get_subjects(request)
 
-        except AssociationClientError:
+        except AssociationServiceError:
             log.error('__findResourcesOfType: association error!')
             defer.returnValue(None)
 
@@ -380,11 +406,54 @@ class FindDataResources(object):
         try:
             result = yield self.asc.get_subjects(request)
         
-        except AssociationClientError:
+        except AssociationServiceError:
             log.error('__findResourcesOfTypeAndOwner: association error!')
             defer.returnValue(None)
         
         defer.returnValue(result)
+
+
+    @defer.inlineCallbacks
+    def __findOwner(self, dsID):
+
+        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        #
+        # Set up an owned_by_id search term using:
+        # - OWNED_BY_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # ..(subject)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = dsID
+        
+        pair.subject = type_ref
+
+        log.info('Calling get_objects with dsID: ' + dsID)
+
+        try:
+            result = yield self.asc.get_objects(request)
+        
+        except AssociationServiceError:
+            log.error('__findOwner: association error!')
+            defer.returnValue(None)
+
+        if len(result.idrefs) == 0:
+            log.error('Owner not found!')
+            defer.returnValue('OWNER NOT FOUND!')
+        elif len(result.idrefs) == 1:
+            defer.returnValue(result.idrefs[0].key)
+        else:
+            log.error('More than 1 owner found!')
+            defer.returnValue('MULTIPLE OWNERS!')
 
 
     def __loadMinMetaData(self, dSet, minMetaData):
@@ -700,7 +769,7 @@ class FindDataResources(object):
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
 
-    def __loadRootAttributes(self, rootAttributes, minMetaData, userID, dSetResID):
+    def __loadRspPayload(self, rootAttributes, minMetaData, userID, dSetResID):
         rootAttributes.user_ooi_id = userID
         rootAttributes.data_resource_id = dSetResID
         rootAttributes.download_url = self.__createDownloadURL(dSetResID)
@@ -753,6 +822,8 @@ class FindDataResources(object):
         
         return self.downloadURL
 
+    def __loadRspByOwnerPayload(self, rspPayload, minMetaData, userID, dSetResID):
+        rspPayload.data_resource_id = dSetResID
 
 
 

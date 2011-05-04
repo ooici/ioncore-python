@@ -5,8 +5,9 @@
 @author Matt Rodriguez
 @brief Workbench for operating on GPB backed object structures
 
-TODO
-Add persistent store to the work bench. Use it fetch linked objects
+@TODO
+Caching mechanisms are now in place. Consider changing the cache size test to look at the size of the _workbench_cache
+but throw out repositories from the _repo_cache to clear it - that would be better!
 """
 
 from twisted.internet import defer
@@ -25,10 +26,17 @@ from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
 
 import weakref
+
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+from ion.core.ioninit import request
+from net.ooici.core.container import container_pb2
+
+
+from ion.util.cache import LRUDict
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from net.ooici.core.container import container_pb2
 
 STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
 STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=2, version=1)
@@ -60,7 +68,10 @@ PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1
 BLOBS_REQUSET_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=51, version=1)
 BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
 
-
+DATA_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=53, version=1)
+DATA_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=54, version=1)
+GET_OBJECT_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=55, version=1)
+GET_OBJECT_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=56, version=1)
 
 class WorkBenchError(ApplicationError):
     """
@@ -69,14 +80,20 @@ class WorkBenchError(ApplicationError):
 
 class WorkBench(object):
     
-    def __init__(self, process):
+    def __init__(self, process, cache_size=10**7):
     
         self._process = process
-        
+
+        # For storage of repositories which are deterministically held in memory
         self._repos = {}
         
         self._repository_nicknames = {}
-        
+
+
+        # A Cache of repositories that holds upto a certain size between op message calls.
+        self._repo_cache = LRUDict(cache_size, use_size=True)
+
+
         """
         A cache - shared between repositories for hashed objects
         """  
@@ -184,14 +201,23 @@ class WorkBench(object):
         
     def get_repository(self,key):
         """
-        Simple getter for the repository dictionary
+        Getter for the repository dictionary and cache
         """
-        
-        rkey = self._repository_nicknames.get(key, None)
-        if not rkey:
-            rkey = key
-            
-        return self._repos.get(rkey,None)
+
+        # Get the nickname if it exists
+        rkey = self._repository_nicknames.get(key, key)
+
+        repo = self._repos.get(rkey,None)
+
+        if repo is None:
+
+            try:
+                repo = self._repo_cache.pop(rkey)
+                self.put_repository(repo)
+            except KeyError, ke:
+                log.debug('Repository key "%s" not found in cache' % rkey)
+
+        return repo
         
     def list_repositories(self):
         """
@@ -218,20 +244,80 @@ class WorkBench(object):
                 del self._repository_nicknames[k]
 
 
-    def clear_non_persistent(self):
+    def cache_repository(self, repo):
 
-        for repo in self._repos.values():
+        key = repo.repository_key
+        # Get rid of the nick name - this is a PITA
+        for k,v in self._repository_nicknames.items():
+            if v == key:
+                del self._repository_nicknames[k]
 
-            if repo.persistent is False:
-                self.clear_repository(repo)
+        # Delete it from the deterministically held repo dictionary
+        del self._repos[key]
+
+        repo.purge_workspace()
+
+        repo.purge_associations()
+
+        # Move it to the cached repositories
+        self._repo_cache[key] = repo
+
+
+    def manage_workbench_cache(self, convid_context=None):
+        """
+        @Brief Move repositories from the level 1 persistent cache to the level two LRU cache
+        @param convid_context if not None, move only objects in a particular context
+        """
+
+        # Can't use iter here - it is actually deleting keys in the dict object.
+        for key, repo in self._repos.items():
+
+            if repo.persistent is True:
+                continue
+
+            if repo.convid_context == convid_context or repo.convid_context is None:
+
+                if repo.cached is False:
+                    self.clear_repository(repo)
+
+                else:
+                    self.cache_repository(repo)
+
+
+    def clear(self):
+        """
+        Completely clean the state or the workbench, wipe any repositories and delete references to them.
+        """
+
+        log.info('CLEARING THE WORKBENCH - IGNORING PERSISTENCE SETTINGS')
+
+        for repo in self._repos.itervalues():
+            repo.clear()
+
+        self._repos.clear()
+
+        #The cache knows to clear its content objects
+        self._repo_cache.clear()
+
+        # these are just strings
+        self._repository_nicknames.clear()
+
+        # This one is now safe to clear
+        self._workbench_cache.clear()
 
 
 
     def put_repository(self,repo):
-        
+
+        if repo.repository_key in self._repo_cache:
+            raise WorkBenchError('This repository already exists in the workbench cache - that should not happen!')
+
         self._repos[repo.repository_key] = repo
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
+
+        repo.convid_context = request.get('workbench_context',None)
+
        
     def reference_repository(self, repo_key, current_state=False):
 
@@ -317,6 +403,8 @@ class WorkBench(object):
             """
             return (x.type not in content.excluded_types)
 
+        # this is inherited by DatastoreWorkbench, which requires the _get_blobs call be a deferred, whereas here it is not.
+        # tldr; maybeDeferred necessary.
         blobs = yield defer.maybeDeferred(self._get_blobs, response.Repository, [content.commit_root_object], filtermethod)
 
         for element in blobs.values():
@@ -333,12 +421,8 @@ class WorkBench(object):
         """
         Pull the current state of the repository
         """
-
-        if excluded_types is None:
-            excluded_types = repository.Repository.DefaultExcludedTypes
-        elif not hasattr(excluded_types, '__iter__'):
+        if excluded_types is not None and not hasattr(excluded_types, '__iter__'):
             raise WorkBenchError('Invalid excluded_types argument passed to checkout')
-
 
         # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
@@ -354,12 +438,16 @@ class WorkBench(object):
         if repo is None:
             #if it does not exist make a new one
             cloning = True
-            repo = repository.Repository(repository_key=repo_name)
+            repo = repository.Repository(repository_key=repo_name, cached=True)
             self.put_repository(repo)
         else:
             cloning = False
             # If we have a current version - get the list of commits
             commit_list = self.list_repository_commits(repo)
+
+        # set excluded types on this repository
+        if excluded_types is not None:
+            repo.excluded_types = excluded_types
 
         # Create pull message
         pullmsg = yield self._process.message_client.create_instance(PULL_MESSAGE_TYPE)
@@ -368,7 +456,7 @@ class WorkBench(object):
         pullmsg.commit_keys.extend(commit_list)
 
         if get_head_content:
-            for extype in excluded_types:
+            for extype in repo.excluded_types:
                 exobj = pullmsg.excluded_types.add()
                 exobj.object_id = extype.object_id
                 exobj.version = extype.version
@@ -479,31 +567,22 @@ class WorkBench(object):
             link.SetLink(obj)
 
 
+
+
+
         if request.get_head_content:
-            blobs=set()
-            for commit in repo.current_heads():
 
-                root_object_link = commit.GetLink('objectroot')
+            keys = [x.GetLink('objectroot').key for x in repo.current_heads()]
 
-                element = repo.index_hash.get(root_object_link.key, None)
-                if element is None:
-                    raise WorkBenchError('Repository root object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+            def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in request.excluded_types)
 
-                new_elements = set([element,])
+            blobs = self._get_blobs(response.Repository, keys, filtermethod)
 
-                while len(new_elements) > 0:
-                    children = set()
-                    for element in new_elements:
-                        blobs.add(element)
-                        for child_key in element.ChildLinks:
-                            child = repo.index_hash.get(child_key,None)
-                            if child is None:
-                                raise WorkBenchError('Repository object not found in op_pull', request.ResponseCodes.NOT_FOUND)
-                            elif child not in blobs:
-                                children.add(child)
-                    new_elements = children
-
-            for element in blobs:
+            for element in blobs.itervalues():
                 link = response.blob_elements.add()
                 obj = response.Repository._wrap_message_object(element._element)
 
@@ -614,6 +693,7 @@ class WorkBench(object):
         # Create push message
         pushmsg = yield self._process.message_client.create_instance(PUSH_MESSAGE_TYPE)
 
+
         #Iterate the list and build the message to send
         for instance in instances:
 
@@ -648,6 +728,7 @@ class WorkBench(object):
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
 
+        
         defer.returnValue(result)
         # @TODO - check results?
 
@@ -664,12 +745,13 @@ class WorkBench(object):
         if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
             raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
 
+
         for repostate in pushmsg.repositories:
 
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
-                #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                #if it does not exist make a new one - set it to cached for the time being...
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:

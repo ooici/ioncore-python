@@ -9,7 +9,6 @@
 
 from twisted.internet import defer
 
-import time
 from ion.core.data.cassandra_bootstrap import CassandraSchemaProvider, IndexType
 from ion.core.process.process import Process
 from ion.core.object import object_utils
@@ -21,6 +20,7 @@ from ion.core.data.storage_configuration_utility import STORAGE_PROVIDER, PERSIS
 
 from ion.test.iontest import IonTestCase
 import ion.util.ionlog
+from ion.util.iontime import IonTime
 from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -43,6 +43,8 @@ SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE_PAYLOAD_TYPE = object_utils.create_type_i
 
 # desired_origins
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+
+
 
 class SchedulerTest(IonTestCase):
 
@@ -69,7 +71,9 @@ class SchedulerTest(IonTestCase):
         self._notices = []
         self.sub = ScheduleEventSubscriber(process=self.proc,
                                            origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
-        self.sub.ondata = lambda c: self._notices.append(c)
+
+        # you can not keep the received message around after the ondata callback is complete
+        self.sub.ondata = lambda c: self._notices.append(c['content'].additional_data.payload.dataset_id)
 
         # normally we'd register before initialize/activate but let's not bring the PSC/EMS into the mix
         # if we can avoid it.
@@ -192,6 +196,8 @@ class SchedulerTest(IonTestCase):
 
         log.debug(resp_msg.task_id)
         self.failIf(resp_msg.task_id is None)
+
+
         #fixme: also fail if we don't get GPB #2602 back
 
         # Wait for a message to go through the system
@@ -199,14 +205,15 @@ class SchedulerTest(IonTestCase):
         #cc = yield self.client.get_count()
         #self.failUnless(int(cc['value']) >= 1)
         self.failUnless(len(self._notices) > 1, "this may fail intermittently due to messaging")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
-        self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
-        
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.dataset_id, "TESTER")
+        #self.failUnlessEquals(self._notices[0]['content'].additional_data.payload.datasource_id, "TWO")
+        self.failUnlessEquals(self._notices[0], "TESTER")
+
+
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
         msg_r.task_id = resp_msg.task_id
 
         rc = yield sc.rm_task(msg_r)
-
 
         self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)
@@ -247,7 +254,7 @@ class SchedulerTest(IonTestCase):
         msg_a.payload.datasource_id = "IS NOW"
 
         # calc a start time 5 sec in the future
-        starttime = int(float(time.time() * 1000)) + 5000
+        starttime = IonTime().time_ms + 5000
         msg_a.start_time        = starttime
 
         yield sc.add_task(msg_a)
@@ -275,7 +282,7 @@ class SchedulerTest(IonTestCase):
         msg_a.payload.datasource_id = "IS A WHILE AGO"
 
         # calc a start time 25 sec in the past
-        starttime = int(float(time.time() * 1000)) - 25000
+        starttime = IonTime().time_ms - 25000
         msg_a.start_time        = starttime
 
         yield sc.add_task(msg_a)

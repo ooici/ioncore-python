@@ -70,6 +70,12 @@ exchange_point_rtn = 'exchange_point_resource_type'
 publisher_rtn = 'publisher_resource_type'
 subscriber_rtn = 'subscriber_type'
 queue_rtn = 'queue_type'
+subscription_res_type_name = 'subscription_resource_type'
+instrument_res_type_name = 'instrument_resource_type'
+instrument_agent_res_type_name = 'instrument_agent_resource_type'
+
+datasource_schedule_rtn = 'dataresource_schedule_type'
+
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
@@ -167,6 +173,48 @@ queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
                           'meta_description':'protomessage?'}
             },
 
+subscription_res_type_name:{ID_CFG:'94989414-3BD1-4688-ADC7-B942F04E2997',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:subscription_res_type_name,
+                       DESCRIPTION_CFG:'A subscription resource links a user to a data source',
+                       CONTENT_CFG:{'object_identifier':10001,
+                                    'object_version':1,
+                                  'meta_description':'protomessage?'}
+                    },
+
+instrument_res_type_name:{ID_CFG:'403D63E5-8B22-4766-9B19-54AC26639C27',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:instrument_res_type_name,
+                       DESCRIPTION_CFG:'A instrument resource represents an instance of scientific equipment',
+                       CONTENT_CFG:{'object_identifier':10001,
+                                    'object_version':1,
+                                  'meta_description':'protomessage?'}
+                    },
+
+instrument_agent_res_type_name:{ID_CFG:'4D8487E5-5937-4B1E-BFA5-39113C9A323C',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:instrument_agent_res_type_name,
+                       DESCRIPTION_CFG:'A instrument agent resource represents a controller for an instance of scientific equipment',
+                       CONTENT_CFG:{'object_identifier':10001,
+                                    'object_version':1,
+                                  'meta_description':'protomessage?'}
+                    },
+
+datasource_schedule_rtn:{ID_CFG:'3E49B5EF-2D60-4DE1-B554-F30BBF1AD508',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:datasource_schedule_rtn,
+                     DESCRIPTION_CFG:'A resource to hold the schedule task id associated with a datasource',
+                     CONTENT_CFG:{'object_identifier':9217,
+                                  'object_version':1,
+                                  'meta_description':'protomessage?'}
+                     },
+
+
+
+#=======================================
+#========= DEFAULT TYPE ================
+#=======================================
+
 default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:default_resource_type_name,
@@ -176,21 +224,28 @@ default_resource_type_name:{ID_CFG:'422ADE3C-D820-437F-8BD3-7D8793591EB0',
                                   'meta_description':'protomessage?'}
                      },
 
+
+
 }
 
 # Extract Resource ID_CFGs for use in services and tests
-TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
-EXCHANGE_SPACE_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
-EXCHANGE_POINT_RES_TYPE_ID = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
-PUBLISHER_RES_TYPE_ID = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
-SUBSCRIBER_RES_TYPE_ID = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
-QUEUE_RES_TYPE_ID = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
-DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
-IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
-DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
-RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
+TOPIC_RESOURCE_TYPE_ID         = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
+EXCHANGE_SPACE_RES_TYPE_ID     = ION_RESOURCE_TYPES[exchange_space_rtn][ID_CFG]
+EXCHANGE_POINT_RES_TYPE_ID     = ION_RESOURCE_TYPES[exchange_point_rtn][ID_CFG]
+PUBLISHER_RES_TYPE_ID          = ION_RESOURCE_TYPES[publisher_rtn][ID_CFG]
+SUBSCRIBER_RES_TYPE_ID         = ION_RESOURCE_TYPES[subscriber_rtn][ID_CFG]
+QUEUE_RES_TYPE_ID              = ION_RESOURCE_TYPES[queue_rtn][ID_CFG]
+SUBSCRIPTION_RES_TYPE_ID       = ION_RESOURCE_TYPES[subscription_res_type_name][ID_CFG]
+INSTRUMENT_RES_TYPE_ID         = ION_RESOURCE_TYPES[instrument_res_type_name][ID_CFG]
+INSTRUMENT_AGENT_RES_TYPE_ID   = ION_RESOURCE_TYPES[instrument_agent_res_type_name][ID_CFG]
+DATASET_RESOURCE_TYPE_ID       = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
+IDENTITY_RESOURCE_TYPE_ID      = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
+DATASOURCE_RESOURCE_TYPE_ID    = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
+RESOURCE_TYPE_TYPE_ID          = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
-DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
+DATARESOURCE_SCHEDULE_TYPE_ID  = ION_RESOURCE_TYPES[datasource_schedule_rtn][ID_CFG]
+
+DEFAULT_RESOURCE_TYPE_ID       = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
 
 ##### Define Predicates #####:
 
@@ -253,8 +308,10 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                           CONTENT_CFG:{'subject':'ss',
                                        'certificate':'',
                                        'rsa_private_key':'',
+                                       'name':'',
+                                       'institution':'',
                                        'email':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 myooici_name:{ID_CFG:'A7B44115-34BC-4553-B51E-1D87617F12E0',
@@ -305,8 +362,10 @@ JwrrGzIQ+Mne1Q7OADjjOokCgYABgHbOJ9XcMFM+/KGjlzlmqqcRZa9k3zqcZB+xSzZevR6Ka24/
 6TpHi8QS2mqu2A5tZmFNbYDzv3i4rc05l0HnvJKZP6yLBQKBgERpUxpX4r5Obi8PNIECZ4ucTlhT
 KJpn8B+9GrIjTqs+ae0oRfbSo1Jt/SDts/c6DYaT2RZma7JVosWd2aOAw9k69zMObHlJrcHGmb3l
 eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL''',
+                                       'name':'myooici',
+                                       'institution':'OOICI',
                                        'email':'myooici@gmail.com',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':'Google'}
                         },
 
 
@@ -317,8 +376,10 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                           CONTENT_CFG:{'subject':'aa',
                                        'certificate':'',
                                        'rsa_private_key':'',
+                                       'name':'',
+                                       'institution':'',
                                        'email':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 
@@ -345,6 +406,10 @@ station_data_source_name = 'sample_station_datasource'
 ### BIG DATASET - A 3D Grid!
 hycom_dataset_name = 'sample_hycom_dataset'
 hycom_data_source_name = 'sample_hycom_datasource'
+
+### BIG DATASET - A 3D Grid split into pieces (bounded arrays)!
+hycom_split_dataset_name = 'sample_split_hycom_dataset'
+hycom_split_data_source_name = 'sample_split_hycom_datasource'
 
 ntas1_dataset_name = 'samples_ntas_rt_mooring1_dataset'
 ntas1_data_source_name = 'samples_ntas_rt_mooring1_datasource'
@@ -384,6 +449,7 @@ whots1_dataset_loc = CONF.getValue(whots1_dataset_name, None)
 whots2_dataset_loc = CONF.getValue(whots2_dataset_name, None)
 
 hycom_dataset_loc = CONF.getValue(hycom_dataset_name, None)
+hycom_split_dataset_loc = CONF.getValue(hycom_split_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -414,6 +480,17 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
                       },
 
+hycom_split_dataset_name:{
+                      ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04800',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:hycom_split_dataset_name,
+                      DESCRIPTION_CFG:'An example of a HYCOM 3d grid model dataset split into multiple bounded arrays',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':hycom_split_dataset_loc},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
+
 hycom_dataset_name:{
                       ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04801',
                       TYPE_CFG:DATASET_TYPE,
@@ -423,6 +500,7 @@ hycom_dataset_name:{
                       CONTENT_ARGS_CFG:{'filename':hycom_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
                       },
+
 
 ntas1_dataset_name:{
                       ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E04802',
@@ -524,10 +602,19 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
                       },
 
+hycom_split_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04800',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:hycom_split_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for a Hycom model dataset split into multiple bounded arrays',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_hycom_data_source,
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[hycom_split_dataset_name][ID_CFG]},
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      },
+
 hycom_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04801',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:hycom_data_source_name,
-                      DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
+                      DESCRIPTION_CFG:'An example of a data source for a Hycom model dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_hycom_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[hycom_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
@@ -612,6 +699,9 @@ SAMPLE_STATION_DATA_SOURCE_ID = ION_DATA_SOURCES[station_data_source_name][ID_CF
 
 SAMPLE_HYCOM_DATASET_ID = ION_DATASETS[hycom_dataset_name][ID_CFG]
 SAMPLE_HYCOM_DATA_SOURCE_ID = ION_DATA_SOURCES[hycom_data_source_name][ID_CFG]
+
+SAMPLE_SPLIT_HYCOM_DATASET_ID = ION_DATASETS[hycom_split_dataset_name][ID_CFG]
+SAMPLE_SPLIT_HYCOM_DATA_SOURCE_ID = ION_DATA_SOURCES[hycom_split_data_source_name][ID_CFG]
 
 SAMPLE_NTAS1_DATASET_ID = ION_DATASETS[ntas1_dataset_name][ID_CFG]
 SAMPLE_NTAS1_DATA_SOURCE_ID = ION_DATA_SOURCES[ntas1_data_source_name][ID_CFG]

@@ -176,9 +176,12 @@ class TestPublisher(IonTestCase):
 
             self.add_handler(self.blab)
 
-        def blab(self, content, msg):
+        def blab(self, data, msg):
             msg.ack()
-            self.msgs.append(content['content'])
+            content = data['content']
+            if hasattr(content, 'Repository'):
+                content.Repository.persistent = True
+            self.msgs.append(content)
 
     @defer.inlineCallbacks
     def test_publish(self):

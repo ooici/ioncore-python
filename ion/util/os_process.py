@@ -10,6 +10,11 @@ from twisted.internet import defer, protocol, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+class OSProcessError(Exception):
+    """
+    An exception class thrown when OSProcess spawning fails
+    """
+
 class OSProcess(protocol.ProcessProtocol):
     """
     An operating system process wrapper for twisted.
@@ -206,7 +211,7 @@ class OSProcess(protocol.ProcessProtocol):
                 'errlines' : self.errlines }
 
         if ec != 0:
-            self.deferred_exited.errback(StandardError(cba))
+            self.deferred_exited.errback(OSProcessError(cba))
             return
 
         self.deferred_exited.callback(cba)
