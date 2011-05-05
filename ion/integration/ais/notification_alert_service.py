@@ -260,10 +260,10 @@ class NotificationAlertService(ServiceProcess):
             raise NotificationAlertException('date_registered (provided by AIS) missing, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
-        #Check that user ids in both GPBs match
-        if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
-            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
-                                            content.ResponseCodes.BAD_REQUEST)
+        #Check that user ids in both GPBs match - decided not to do this check as one id is for the user requesting the subscription and the other is for the user who owns the data source
+        #if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
+        #   raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
             raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',

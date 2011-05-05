@@ -16,6 +16,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.test.iontest import IonTestCase
 from ion.core.exception import ReceivedApplicationError
 from ion.core.process.process import Process
+from ion.util.iontime import IonTime
 
 import ion.util.procutils as pu
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
@@ -118,6 +119,7 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataresrc123'

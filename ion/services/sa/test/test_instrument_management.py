@@ -88,6 +88,7 @@ class InstrumentManagementTest(IonTestCase):
         log.info("IMSSRVC test_create_instrument  instrument id: %s ", result['instrument_id'] )
 
 
+        """
         #now create a instrument agent and associate
         instAgentParams = {'instrumentID' : "SeaBird Electronics",
             'instrumentResourceID' : result['instrument_id'],
@@ -95,26 +96,9 @@ class InstrumentManagementTest(IonTestCase):
         result = yield self.imc.start_instrument_agent("SeaBird Electronics", result['instrument_id'], "SBE49")
         #result = yield self.imc.start_instrument_agent(instAgentParams)
         #start_instrument_agent(self, instrumentID, instrumentResourceID, model):
-        log.info("IMSSRVC test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] ) 
+        log.info("IMSSRVC test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] )
+        """
 
-
-        #self.assertEqual(instrument.manufacturer, "SeaBird Electronics")
-        #self.assertEqual(instrument.model, "unknown model") #change made
-        #self.assertEqual(instrument.serial_num, "1234")
-        #self.assertEqual(instrument.fw_version, "1")
-
-        #instrument_ref = instrument.reference(head=True)
-        #instrument_id = instrument_ref.RegistryIdentity
-        #self.assertTrue(instrument_id)
-
-        #log.info("******* Now testing: Create data product from UI")
-        #dataProductInput = {'dataformat' : "binary",
-        #                    'instrumentID' : instrument_id}
-
-        #dataproduct = yield self.imc.create_new_data_product(dataProductInput)
-
-        #self.assertEqual(dataproduct.dataformat, "binary")
-        #self.assertEqual(dataproduct.instrument_ref.RegistryIdentity, instrument_id)
 
         log.info("IMSSRVC test_create_instrument Finished testing: Create instrument from UI")
 
@@ -125,7 +109,7 @@ class InstrumentManagementTest(IonTestCase):
         Switches direct_access mode to ON in the instrument registry.
         """
 
-"""
+
 class TestInstMgmtRT(IonTestCase):
 
     #Testing instrument management service in end-to-end roundtrip mode
@@ -135,61 +119,74 @@ class TestInstMgmtRT(IonTestCase):
         yield self._start_container()
 
         services = [
-            {'name':'instreg','module':'ion.services.coi.agent_registry','class':'AgentRegistryService'},
-            {'name':'instreg','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'},
-            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
-            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
-            {'name':'dprodreg','module':'ion.services.sa.data_product_registry','class':'DataProductRegistryService'},
-            {'name':'instmgmt','module':'ion.services.sa.instrument_management','class':'InstrumentManagementService'},
+            {
+                'name':'instmgmt',
+                'module':'ion.services.sa.instrument_management',
+                'class':'InstrumentManagementService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
 
-            {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent'},
+            },
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry.resource_registry',
+                'class':'ResourceRegistryService',
+                'spawnargs':{'datastore_service':'datastore'}
+            },
         ]
 
+
         sup = yield self._spawn_processes(services)
+        self.sup = sup
 
-        #self.agreg_client = AgentRegistryClient(proc=sup)
-        #yield self.agreg_client.clear_registry()
-
-        self.ia_pid = sup.get_child_id('SBE49IA')
-        self.iaclient = InstrumentAgentClient(proc=sup, target=self.ia_pid)
-
+        self.rrc = ResourceRegistryClient(proc=sup)
+        self.rc = ResourceClient(proc=sup)
         self.imc = InstrumentManagementClient(proc=sup)
 
-        self.newInstrument = {'manufacturer' : "SeaBird Electronics",
-                 'model' : "unknown model",
-                 'serial_num' : "1234",
-                 'fw_version' : "1"}
-
-        instrument = yield self.imc.create_new_instrument(self.newInstrument)
-        self.inst_id = instrument.RegistryIdentity
-        log.info("*** Instrument created with ID="+str(self.inst_id))
-
-        self.simulator = Simulator(self.inst_id, 9000)
-        self.simulator.start()
-
-        yield self.iaclient.register_resource(self.inst_id)
 
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.simulator.stop()
-        yield Simulator.stop_all_simulators()
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_get_status(self):
+    def Xtest_get_status(self):
         #Get status back from instrument agent associated with instrument id
-        res = yield self.imc.get_instrument_state(self.inst_id)
-        self.assertNotEqual(res, None)
-        log.info("Instrument status: " +str(res))
+        #res = yield self.imc.get_instrument_state(self.inst_id)
+        #self.assertNotEqual(res, None)
+        #log.info("Instrument status: " +str(res))
+        log.info("IMSSRVC test_get_status completed")
 
     @defer.inlineCallbacks
-    def test_execute_command(self):
+    def Xtest_execute_command(self):
         #Execute command through instrument agent associated with instrument id
-        res = yield self.imc.execute_command(self.inst_id, 'start', [1])
-        log.info("Command result 1" +str(res))
+
+        #res = yield self.imc.execute_command(self.inst_id, 'start', [1])
+        #log.info("Command result 1" +str(res))
+    
+        log.info("IMSSRVC test_execute_command completed")
 
     @defer.inlineCallbacks
     def test_start_agent(self):
         #Start the agent with all
-"""
+
+        log.info("IMSSRVC test_create_instrument Now testing: Create instrument from UI")
+        userUpdate = {'manufacturer' : "SeaBird Electronics",
+                 'model' : "SBE37",
+                 'serial_num' : "1234",
+                 'fw_version' : "1"}
+
+        result = yield self.imc.create_new_instrument(userUpdate)
+        log.info("IMSSRVC test_create_instrument  instrument id: %s ", result['instrument_id'] )
+
+        result = yield self.imc.start_instrument_agent("SeaBird Electronics", result['instrument_id'], "SBE37")
+        log.info("IMSSRVC test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] )
