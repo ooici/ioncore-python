@@ -36,6 +36,7 @@ CDM_ATTRIBUTE_TYPE = create_type_identifier(object_id=10017, version=1)
 CDM_ARRAY_INT32_TYPE = create_type_identifier(object_id=10009, version=1)
 CDM_ARRAY_UINT32_TYPE = create_type_identifier(object_id=10010, version=1)
 CDM_ARRAY_INT64_TYPE = create_type_identifier(object_id=10011, version=1)
+CDM_ARRAY_UINT64_TYPE = create_type_identifier(object_id=10012, version=1)
 CDM_ARRAY_FLOAT32_TYPE = create_type_identifier(object_id=10013, version=1)
 CDM_ARRAY_FLOAT64_TYPE = create_type_identifier(object_id=10014, version=1)
 CDM_ARRAY_STRING_TYPE = create_type_identifier(object_id=10015, version=1)
@@ -330,7 +331,7 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
         return ContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Composite in ION Object')
+        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Composite in ION Object' % self.name)
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
