@@ -163,8 +163,8 @@ class GetDataResourceDetail(object):
         GPBSource.ion_description = dSource.ion_description
 
         GPBSource.ion_name = userProfile.resource_reference.name
-        GPBSource.ion_email = userProfile.resource_reference.institution
-        GPBSource.ion_institution = userProfile.resource_reference.email
+        GPBSource.ion_email = userProfile.resource_reference.email
+        GPBSource.ion_institution = userProfile.resource_reference.institution
         
         
     def __printSourceMetadata(self, dSource):
