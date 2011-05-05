@@ -162,6 +162,14 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue(content)
 
         
+    @defer.inlineCallbacks
+    def get_ooiid_for_user(self, Identity):
+        log.debug("in get_ooiid_for_user client")
+        yield self._check_init()       
+        (content, headers, msg) = yield self.rpc_send('get_ooiid_for_user', Identity)
+        defer.returnValue(content)
+
+
 class IdentityRegistryException(ApplicationError):
     """
     IdentityRegistryService exception class
@@ -301,6 +309,7 @@ class IdentityRegistryService(ServiceProcess):
                   Response.resource_reference.profile[i].name = item.name
                   Response.resource_reference.profile[i].value = item.value
                   i = i + 1
+            log.debug('get_user: lcs = '+identity._get_life_cycle_state())
             Response.result = "OK"
             defer.returnValue(Response)
         except ApplicationError, ex:
@@ -341,7 +350,7 @@ class IdentityRegistryService(ServiceProcess):
         authentication = Authentication()
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
-        identity = yield self._findUser(cert_info['subject'])
+        identity, ooi_id = yield self._findUser(cert_info['subject'])
         if identity != None:
            log.info('authenticate_user_credentials: Registration VERIFIED')
            identity.certificate = request.configuration.certificate
@@ -357,6 +366,46 @@ class IdentityRegistryService(ServiceProcess):
         else:
            log.debug('authenticate_user_credentials: no match')
            raise IdentityRegistryException("user [%s] not found"%cert_info['subject'],
+                                           request.ResponseCodes.NOT_FOUND)
+  
+ 
+    @defer.inlineCallbacks
+    def op_get_ooiid_for_user(self, request, headers, msg):
+        """
+        This looks for a user based on a 'subject', and if it finds them an ooi_id is returned. If not, NOT_FOUND is returned.
+        """
+        # Check for correct protocol buffer type
+        self._CheckRequest(request)
+        
+        # check for required fields
+        if not request.configuration.IsFieldSet('subject'):
+            raise IdentityRegistryException("Required field [subject] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+ 
+        log.debug('in op_get_ooiid_for_user:\n'+str(request))
+        log.debug('in op_get_ooiid_for_user: request.configuration\n'+str(request.configuration))
+
+        response = yield self.get_ooiid_for_user(request)
+
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def get_ooiid_for_user(self, request):
+        log.info('in get_ooiid_for_user')
+
+        identity, ooi_id = yield self._findUser(request.configuration.subject)
+        if ooi_id != None:
+           log.debug('get_ooiid_for_user: ooi_id = '+ooi_id.key)
+           # Create the response object...
+           Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+           Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
+           Response.resource_reference.ooi_id = ooi_id.key
+           Response.result = "OK"
+           defer.returnValue(Response)
+        else:
+           log.debug('get_ooiid_for_user: user with subject %s not found'%request.configuration.subject)
+           raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
                                            request.ResponseCodes.NOT_FOUND)
   
  
@@ -382,7 +431,7 @@ class IdentityRegistryService(ServiceProcess):
     def update_user_profile(self, request):
         log.info('in update_user_profile')
         
-        identity = yield self._findUser(request.configuration.subject)
+        identity, ooi_id = yield self._findUser(request.configuration.subject)
         if identity != None:
            log.info('update_user_profile: identity = '+str(identity))
                        
@@ -455,10 +504,10 @@ class IdentityRegistryService(ServiceProcess):
             Resource = yield self.rc.get_instance(ooi_id)
             if Subject == getattr(Resource, 'subject'):
                 log.debug('subject %s found'%Subject)
-                defer.returnValue(Resource)
+                defer.returnValue([Resource, ooi_id])
 
         log.debug('subject %s not found'%Subject)
-        defer.returnValue(None)
+        defer.returnValue([None, None])
 
 
     def _CheckRequest(self, request):

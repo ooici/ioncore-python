@@ -382,6 +382,7 @@ class ResourceInstance(object):
     RETIRED='Retired'
     DEVELOPED='Developed'
     UPDATE = 'Update'
+    PUBLISHED = 'Published'
     
     # Resource update mode
     APPEND = 'Appending new update'
@@ -582,6 +583,8 @@ class ResourceInstance(object):
             self.Resource.lcs = self.Resource.LifeCycleState.DEVELOPED
         elif state == self.UPDATE:
             self.Resource.lcs = self.Resource.LifeCycleState.UPDATE
+        elif state == self.PUBLISHED:
+            self.Resource.lcs = self.Resource.LifeCycleState.PUBLISHED
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -614,6 +617,9 @@ class ResourceInstance(object):
         
         elif self.Resource.lcs == self.Resource.LifeCycleState.UPDATE:
             state = self.UPDATE
+        
+        elif self.Resource.lcs == self.Resource.LifeCycleState.PUBLISHED:
+            state = self.PUBLISHED
         
         return state
         

@@ -73,6 +73,8 @@ queue_rtn = 'queue_type'
 subscription_res_type_name = 'subscription_resource_type'
 instrument_res_type_name = 'instrument_resource_type'
 instrument_agent_res_type_name = 'instrument_agent_resource_type'
+dispatcher_res_type_name = 'dispatcher_resource_type'
+dispatcher_workflow_res_type_name = 'dispatcher_workflow_resource_type'
 
 datasource_schedule_rtn = 'dataresource_schedule_type'
 
@@ -177,7 +179,7 @@ subscription_res_type_name:{ID_CFG:'94989414-3BD1-4688-ADC7-B942F04E2997',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:subscription_res_type_name,
                        DESCRIPTION_CFG:'A subscription resource links a user to a data source',
-                       CONTENT_CFG:{'object_identifier':10001,
+                       CONTENT_CFG:{'object_identifier':9201,
                                     'object_version':1,
                                   'meta_description':'protomessage?'}
                     },
@@ -186,7 +188,7 @@ instrument_res_type_name:{ID_CFG:'403D63E5-8B22-4766-9B19-54AC26639C27',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:instrument_res_type_name,
                        DESCRIPTION_CFG:'A instrument resource represents an instance of scientific equipment',
-                       CONTENT_CFG:{'object_identifier':10001,
+                       CONTENT_CFG:{'object_identifier':4301,
                                     'object_version':1,
                                   'meta_description':'protomessage?'}
                     },
@@ -195,10 +197,29 @@ instrument_agent_res_type_name:{ID_CFG:'4D8487E5-5937-4B1E-BFA5-39113C9A323C',
                        TYPE_CFG:resource_type_type,
                        NAME_CFG:instrument_agent_res_type_name,
                        DESCRIPTION_CFG:'A instrument agent resource represents a controller for an instance of scientific equipment',
-                       CONTENT_CFG:{'object_identifier':10001,
+                       CONTENT_CFG:{'object_identifier':4302,
                                     'object_version':1,
                                   'meta_description':'protomessage?'}
                     },
+
+dispatcher_res_type_name:{ID_CFG:'2E92128B-3EB5-4D07-A3DC-E2AD64504835',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:dispatcher_res_type_name,
+                       DESCRIPTION_CFG:'A dispatcher represents local software component',
+                       CONTENT_CFG:{'object_identifier':7002,
+                                    'object_version':1,
+                                  'meta_description':'protomessage?'}
+                    },
+
+dispatcher_workflow_res_type_name:{ID_CFG:'B2296B26-75F0-4E70-BD01-CB8887BCD714',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:dispatcher_workflow_res_type_name,
+                       DESCRIPTION_CFG:'A dispatcher workflow represents a script for the dispatcher resource',
+                       CONTENT_CFG:{'object_identifier':7003,
+                                    'object_version':1,
+                                  'meta_description':'protomessage?'}
+                    },
+
 
 datasource_schedule_rtn:{ID_CFG:'3E49B5EF-2D60-4DE1-B554-F30BBF1AD508',
                      TYPE_CFG:resource_type_type,
@@ -311,8 +332,7 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                                        'name':'',
                                        'institution':'',
                                        'email':'',
-                                       'authenticating_organization':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 myooici_name:{ID_CFG:'A7B44115-34BC-4553-B51E-1D87617F12E0',
@@ -366,8 +386,7 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL''',
                                        'name':'myooici',
                                        'institution':'OOICI',
                                        'email':'myooici@gmail.com',
-                                       'authenticating_organization':'Google',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':'Google'}
                         },
 
 
@@ -381,8 +400,7 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                                        'name':'',
                                        'institution':'',
                                        'email':'',
-                                       'authenticating_organization':'',
-                                       'life_cycle_state':''}
+                                       'authenticating_organization':''}
                         },
 
 
