@@ -149,8 +149,8 @@ class ManageDataResource(object):
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                     dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
                 else:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
 
 
             yield self.rc.put_instance(datasrc_resource)
@@ -378,8 +378,8 @@ class ManageDataResource(object):
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                 dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
             else:
-                datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+                datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
+                dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
