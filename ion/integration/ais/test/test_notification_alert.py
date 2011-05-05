@@ -18,6 +18,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.test.iontest import IonTestCase
 from ion.core.messaging import messaging
+from ion.util.iontime import IonTime
 
 from ion.core.object import object_utils
 
@@ -131,6 +132,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
@@ -140,7 +142,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
-
+        
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -178,6 +180,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
@@ -237,6 +240,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
@@ -258,6 +262,7 @@ class NotificationAlertTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'

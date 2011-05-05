@@ -85,7 +85,7 @@ class NotificationAlertService(ServiceProcess):
 
         #initialize index store for subscription information
         SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path', \
-                                        'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
+                                        'date_registered', 'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
                                         'ion_time_coverage_start', 'ion_time_coverage_end', 'ion_geospatial_lat_min', 'ion_geospatial_lat_max', \
                                         'ion_geospatial_lon_min', 'ion_geospatial_lon_max', \
                                         'ion_geospatial_vertical_min', 'ion_geospatial_vertical_max', 'ion_geospatial_vertical_positive', 'download_url']
@@ -256,10 +256,14 @@ class NotificationAlertService(ServiceProcess):
             raise NotificationAlertException('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
-        #Check that user ids in both GPBs match
-        if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
-            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('date_registered'):
+            raise NotificationAlertException('date_registered (provided by AIS) missing, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
+
+        #Check that user ids in both GPBs match - decided not to do this check as one id is for the user requesting the subscription and the other is for the user who owns the data source
+        #if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
+        #   raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
             raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
@@ -277,6 +281,7 @@ class NotificationAlertService(ServiceProcess):
                    'email_alerts_filter': content.message_parameters_reference.subscriptionInfo.email_alerts_filter,
                    'dispatcher_alerts_filter':content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter,
                    'dispatcher_script_path': content.message_parameters_reference.subscriptionInfo.dispatcher_script_path,
+                   'date_registered': content.message_parameters_reference.subscriptionInfo.date_registered,
 
                    'title' : content.message_parameters_reference.datasetMetadata.title,
                    'institution' : content.message_parameters_reference.datasetMetadata.institution,
@@ -433,6 +438,7 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.email_alerts_filter = rows[key]['email_alerts_filter']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered = rows[key]['date_registered']
 
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.data_resource_id = rows[key]['data_src_id']

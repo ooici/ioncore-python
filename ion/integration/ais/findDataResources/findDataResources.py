@@ -161,7 +161,7 @@ class FindDataResources(object):
         """
         Worker class method to get the data source that associated with a given
         data set.  This is a public method because it can be called from the
-        findDataResourceDetail service.
+        findDataResourceDetail worker class.
         """
         log.debug('getAssociatedSource()')
 
@@ -185,7 +185,56 @@ class FindDataResources(object):
                       ' is: ' + association.SubjectReference.key)
 
         defer.returnValue(association.SubjectReference.key)
+
                       
+    @defer.inlineCallbacks
+    def getAssociatedOwner(self, dsID):
+        """
+        Worker class method to find the owner associated with a data set.
+        This is a public method because it can be called from the
+        findDataResourceDetail worker class.
+        """
+        log.debug('getAssociatedOwner()')
+
+        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        #
+        # Set up an owned_by_id search term using:
+        # - OWNED_BY_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # ..(subject)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = dsID
+        
+        pair.subject = type_ref
+
+        log.info('Calling get_objects with dsID: ' + dsID)
+
+        try:
+            result = yield self.asc.get_objects(request)
+        
+        except AssociationServiceError:
+            log.error('getAssociatedOwner: association error!')
+            defer.returnValue(None)
+
+        if len(result.idrefs) == 0:
+            log.error('Owner not found!')
+            defer.returnValue('OWNER NOT FOUND!')
+        elif len(result.idrefs) == 1:
+            defer.returnValue(result.idrefs[0].key)
+        else:
+            log.error('More than 1 owner found!')
+            defer.returnValue('MULTIPLE OWNERS!')
+
 
     @defer.inlineCallbacks
     def __getDataResources(self, msg, dSetResults, rspMsg, userID = None):
@@ -273,7 +322,7 @@ class FindDataResources(object):
                 #
                 # Added this for Tim and Tom; not sure we need it yet...
                 #
-                ownerID = yield self.__findOwner(dSetResID)
+                ownerID = yield self.getAssociatedOwner(dSetResID)
 
                 self.__createDownloadURL(dSetResID)
 
@@ -282,8 +331,8 @@ class FindDataResources(object):
                     # This was a findDataResources request
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.notificationSet = False
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata.date_registered = dSource.registration_datetime_millis
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
                 else:
                     #
@@ -411,49 +460,6 @@ class FindDataResources(object):
             defer.returnValue(None)
         
         defer.returnValue(result)
-
-
-    @defer.inlineCallbacks
-    def __findOwner(self, dsID):
-
-        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
-
-        #
-        # Set up an owned_by_id search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(subject)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = dsID
-        
-        pair.subject = type_ref
-
-        log.info('Calling get_objects with dsID: ' + dsID)
-
-        try:
-            result = yield self.asc.get_objects(request)
-        
-        except AssociationServiceError:
-            log.error('__findOwner: association error!')
-            defer.returnValue(None)
-
-        if len(result.idrefs) == 0:
-            log.error('Owner not found!')
-            defer.returnValue('OWNER NOT FOUND!')
-        elif len(result.idrefs) == 1:
-            defer.returnValue(result.idrefs[0].key)
-        else:
-            log.error('More than 1 owner found!')
-            defer.returnValue('MULTIPLE OWNERS!')
 
 
     def __loadMinMetaData(self, dSet, minMetaData):

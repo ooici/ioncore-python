@@ -83,16 +83,4 @@ class InstrumentFSM():
         self.state_handlers[self.current_state](self.exit_event,params)
         self.previous_state = self.current_state
         self.current_state = next_state
-        self.state_handlers[self.current_state](self.enter_event,params)
-
-        
-
-
-
-
-
-
-    
-    
-    
-    
+        self.state_handlers[self.current_state](self.enter_event,params) 
