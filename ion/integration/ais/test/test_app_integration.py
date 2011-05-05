@@ -495,6 +495,11 @@ class AppIntegrationTest(IonTestCase):
                 log.debug('  RequestType: ' + str(dSource.request_type))
                 log.debug('  Base URL: ' + dSource.base_url)
                 log.debug('  Max Ingest Millis: ' + str(dSource.max_ingest_millis))
+                log.debug('  ion_title: ' + dSource.ion_title)
+                log.debug('  ion_description: ' + dSource.ion_description)
+                log.debug('  ion_name: ' + dSource.ion_name)
+                log.debug('  ion_email: ' + dSource.ion_email)
+                log.debug('  ion_institution: ' + dSource.ion_institution)
 
                 if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('title'):
                     #self.fail('response to findDataResources has no title field')
