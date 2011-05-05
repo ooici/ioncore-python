@@ -392,7 +392,7 @@ class ManageDataResourceSubscription(object):
                     Response.error_str = errString
                     defer.returnValue(Response)
 
-                log.info('Got resource instance: ' + self.userRes.ResourceIdentity)
+                log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                     
                 try:
                     #
@@ -704,10 +704,9 @@ class ManageDataResourceSubscription(object):
 
     @defer.inlineCallbacks
     def __register_dispatcher(self, name):
-        rc = yield self.rc
-        disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
+        disp_res = yield self.rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         disp_res.dispatcher_name = name
-        yield rc.put_instance(disp_res, 'Committing new dispatcher resource for registration')
+        yield self.rc.put_instance(disp_res, 'Committing new dispatcher resource for registration')
         
         #defer.returnValue(str(disp_res.ResourceIdentity))
         defer.returnValue(disp_res)
