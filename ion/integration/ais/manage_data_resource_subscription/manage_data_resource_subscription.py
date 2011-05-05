@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID
@@ -27,6 +27,7 @@ from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
+from ion.util.iontime import IonTime
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
@@ -151,6 +152,29 @@ class ManageDataResourceSubscription(object):
             log.debug("update: calling notification alert service removeSubscription()")
             reply = yield self.nac.removeSubscription(msg)
 
+            # Now determine if subscription type includes a dispatcher.  If so, we need to delete
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Finding the dispatcher workflow associated with this subscription.
+            #   3. Deleting the dispatcher workflow.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: deleting dispatcher workflow")
+
+                """
+                dispatcherID = yield self.__findDispatcher(userID)
+                if (dispatcherID is None):
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    errString = 'Dispatcher not found for userID' + userID
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+                else:
+                    log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
+                """
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.updateDataResourceSubscription(): Error attempting to removeSubscription(): %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -158,9 +182,22 @@ class ManageDataResourceSubscription(object):
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
+        msg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
+
         try:
             log.debug("update: calling notification alert service addSubscription()")
             reply = yield self.nac.addSubscription(msg)
+
+            # Now determine if subscription type includes a dispatcher.  If so, we need to create
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Creating the dispatcher workflow associated with this subscription.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: creating dispatcher workflow")
+                
             Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
             Response.message_parameters_reference.add()
             Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_SUBSCRIPTION_RSP_TYPE)      
@@ -221,6 +258,30 @@ class ManageDataResourceSubscription(object):
         try:
             log.debug("delete: calling notification alert service removeSubscription()")
             reply = yield self.nac.removeSubscription(msg)
+
+            # Now determine if subscription type includes a dispatcher.  If so, we need to delete
+            # the dispatcher workflow by:
+            #   1. Finding the dispatcher associated with this user.
+            #   2. Finding the dispatcher workflow associated with this subscription.
+            #   3. Deleting the dispatcher workflow.
+
+            SubscriptionInfo = msg.message_parameters_reference.subscriptionInfo
+            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                log.info("delete: deleting dispatcher workflow")
+
+                """
+                dispatcherID = yield self.__findDispatcher(userID)
+                if (dispatcherID is None):
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    errString = 'Dispatcher not found for userID' + userID
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+                else:
+                    log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
+                """
             Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
             Response.message_parameters_reference.add()
             Response.message_parameters_reference[0] = Response.CreateObject(DELETE_SUBSCRIPTION_RSP_TYPE)      
@@ -292,7 +353,7 @@ class ManageDataResourceSubscription(object):
         #    yield self._dispatcherSubscribe(user_ooi_id, data_source_id, msg.dispatcher_script_path)
 
         userID = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
-
+        msg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         try:
             log.debug("create: calling notification alert service addSubscription()")
@@ -316,27 +377,72 @@ class ManageDataResourceSubscription(object):
                 #
 
                 #
-                # TEMPORARY
+                # TEMPORARY TEMPORARY TEMPORARY!!!
                 #
                 log.info("Creating dispatcher for test")
-                self.dispatcherID = yield self.__register_dispatcher('DispatcherResource')
+                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource')
+                self.dispatcherID = self.dispatcherRes.ResourceIdentity
+                log.info('Created Dispatcher ID: ' + self.dispatcherID)
+                log.info('Getting resource instance')
+                try:
+                    self.userRes = yield self.rc.get_instance(userID)
+                except ResourceClientError:
+                    errString = 'Error getting instance of userID: ' + userID
+                    log.error(errString)
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+
+                log.info('Got resource instance: ' + self.userRes.ResourceIdentity)
+                    
+                try:
+                    #
+                    # Now make an association between the user and this dispatcher
+                    #
+                    association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+                    if association not in self.userRes.ResourceAssociationsAsSubject:
+                        log.error('Error: subject not in association!')
+                    if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                        log.error('Error: object not in association')
+                    
+                    #
+                    # Put the association in datastore
+                    #
+                    #self.rc.put_resource_transaction([self.userRes, self.dispatcherRes])
+                    log.debug('Storing association: ' + str(association))
+                    yield self.rc.put_instance(association)
+
+                except AssociationClientError, ex:
+                    errString = 'Error creating assocation between userID: ' + userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex
+                    log.error(errString)
+                    # build AIS error response
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                    Response.error_str = errString
+                    defer.returnValue(Response)
+
 
                 """
-                dispatcherID = yield self.__findDispatcher(userID)
+                #COMMENTING THIS OUT UNTIL I FIND A WAY TO FIND THE ASSOCIATED DISPATCHER
+                #dispatcherID = yield self.__findDispatcher(userID)
+                dispatcherID = yield self.__findDispatcher(self.userRes)
                 if (dispatcherID is None):
+                    errString = 'Dispatcher not found for userID' + userID
+                    log.error(errString)
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    errString = 'Dispatcher not found for userID' + userID
                     Response.error_str = errString
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
-                """
+                """                    
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
-            
+
             defer.returnValue(Response)
 
         except ReceivedApplicationError, ex:
@@ -526,7 +632,38 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
-    def __findDispatcher(self, userID):
+    def __findDispatcher(self, userRes):
+
+        #found = yield self.ac.find_associations(subject=userRes, \
+        #                                        predicate_or_predicates=HAS_A_ID)
+        found = yield self.ac.find_associations(subject=userRes)
+        
+        """
+        FIXME
+        This does not work; the assocatiation_exists call below can't find by
+        type!!!
+        """
+
+        log.debug('HAS_A_ID is: ' + HAS_A_ID)
+        log.debug('Found ' + str(len(found)) + ' associations.')
+        association = None
+        for a in found:
+            log.debug('FOUND: ' + str(a))
+            #exists = yield self.ac.association_exists(a.ObjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
+            exists = yield self.ac.association_exists(a.SubjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
+            if exists:
+                association = a
+
+        if association is None:
+            log.error('No associations found!!!')
+            defer.returnValue(None)
+        else:            
+            the_resource = yield self.rc.get_associated_resource_object(association)
+            defer.returnValue(the_resource)
+
+
+    @defer.inlineCallbacks
+    def __findDispatcherOld(self, userID):
 
         request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
 
@@ -573,9 +710,10 @@ class ManageDataResourceSubscription(object):
         rc = yield self.rc
         disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         disp_res.dispatcher_name = name
-        yield rc.put_instance(disp_res, 'Commiting new dispatcher resource for registration')
+        yield rc.put_instance(disp_res, 'Committing new dispatcher resource for registration')
         
-        defer.returnValue(str(disp_res.ResourceIdentity))
+        #defer.returnValue(str(disp_res.ResourceIdentity))
+        defer.returnValue(disp_res)
 
 
     @defer.inlineCallbacks

@@ -335,8 +335,6 @@ class ManageResources(object):
          To.resource[2].name = 'email'
          To.resource[2].value = From.email
          To.resource.add()
-         To.resource[3].name = 'life_cycle_state'
-         To.resource[3].value = From.life_cycle_state
       
       except:
          estr = 'Object ERROR!'

@@ -297,10 +297,10 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
             Response = yield self.irc.register_user(IdentityRequest)
             ooi_id1 = Response.resource_reference.ooi_id
             log.debug('OOI_ID1 = ' + ooi_id1)
-            print "OOI_ID = " + ooi_id1
         except ReceivedApplicationError, ex:
             self.fail("register_user failed")
         
+        # test that user1 is found when calling authenticate_user
         log.info("testing authentication")
         try:
             Response = yield self.irc.authenticate_user(IdentityRequest)
@@ -308,6 +308,16 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
             self.assertEqual(ooi_id1, Response.resource_reference.ooi_id)
         except ReceivedApplicationError, ex:
             self.fail("Authenticate_user failed to find a registered user")
+        
+        # test that user1 is found when calling get_ooiid_for_user
+        log.info("testing get_ooiid_for_user")
+        try:
+            IdentityRequest.configuration.subject = self.user1_subject
+            Response = yield self.irc.get_ooiid_for_user(IdentityRequest)
+            log.debug('OOI_ID2 = ' + Response.resource_reference.ooi_id)
+            self.assertEqual(ooi_id1, Response.resource_reference.ooi_id)
+        except ReceivedApplicationError, ex:
+            self.fail("get_ooiid_for_user failed to find a registered user")
         
         # load the user back
         log.info("testing get_user")
@@ -363,20 +373,37 @@ eCc/SSPAJvor9B8dBoTQZbaAF4js/wffMl2Qg1WuFfyRQIAhHYO1I9aibqcJmSwDKmsL
         IdentityRequest.configuration.profile.add()
         IdentityRequest.configuration.profile[0].name = "profile item 1 name"
         IdentityRequest.configuration.profile[0].value = "profile item 1 value"
+        IdentityRequest.configuration.profile.add()
+        IdentityRequest.configuration.profile[1].name = "profile item 2 name"
+        IdentityRequest.configuration.profile[1].value = "profile item 2 value"
         log.info('IR.C = '+str(IdentityRequest.configuration))
         try:
             response = yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
-        log.info('user2 = '+str(user2.resource_reference))
+        log.info('user2 = '+str(user2.resource_reference.profile))
+        self.assertEqual(user2.resource_reference.profile.__len__(), 2)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 1 name")
         self.assertEqual(user2.resource_reference.profile[0].value, "profile item 1 value")
-            
-        # Test if we can set the life cycle state
-        result = yield self.irc.set_identity_lcstate_retired(ooi_id1) # Wishful thinking Roger!
+        self.assertEqual(user2.resource_reference.profile[1].name, "profile item 2 name")
+        self.assertEqual(user2.resource_reference.profile[1].value, "profile item 2 value")
+
+        # reset the user's profile to something else
+        log.info('resetting profile')
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR update user profile request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        IdentityRequest.configuration.profile.add()
+        IdentityRequest.configuration.profile[0].name = "profile item 3 name"
+        IdentityRequest.configuration.profile[0].value = "profile item 3 value"
+        log.info('IR.C = '+str(IdentityRequest.configuration))
         try:
-            user2 = yield self.irc.get_user(OoiIdRequest)
+            response = yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
-            self.fail("get_user failed to find a registered user")
-        self.assertEqual(user2.resource_reference.life_cycle_state, 'Retired') # Should be retired now
+            self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        log.info('user2 = '+str(user2.resource_reference.profile))
+        self.assertEqual(user2.resource_reference.profile.__len__(), 1)
+        self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value") 

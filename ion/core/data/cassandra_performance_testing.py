@@ -28,9 +28,9 @@ class CassandraPerformanceTester:
         self.index = index
         self.blob_size = blob_size
         if self.index:
-            self.store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
+            self.store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11", {"host":"localhost", "port":9160}, "sysname", "commits")
         else:
-            self.store = CassandraStoreBootstrap("ooiuser", "oceans11")
+            self.store = CassandraStoreBootstrap("ooiuser", "oceans11", {"host":"localhost", "port":9160}, "sysname", "blobs")
         
         self.num_rows = num_rows
         self.blobs = {}
@@ -254,9 +254,12 @@ class CassandraPerformanceTester:
     @defer.inlineCallbacks
     def tearDown(self):
         keys = self.blobs.keys()
+        dl = []
         t1 = time.time()
         for k in keys:
-            yield self.store.remove(k)
+            remove_def = self.store.remove(k)
+            dl.append(remove_def)
+        yield defer.DeferredList(dl)
         t2 = time.time()
         diff = t2 - t1
         print "Time to do %s removes %s " % (len(keys),diff)
@@ -273,11 +276,11 @@ class CassandraBenchmarkTests(CassandraPerformanceTester):
     def runBenchMarks(self):
         yield self.setUp()
         
-        yield self.get_benchmark(50)
-        yield self.has_key_benchmark(50)
-        yield self.put_benchmark(50)
+        yield self.get_benchmark(100)
+        yield self.has_key_benchmark(100)
+        yield self.put_benchmark(100)
         if self.index:
-            yield self.update_index_benchmark(50)
+            yield self.update_index_benchmark(100)
         yield self.tearDown()     
  
         
@@ -292,13 +295,19 @@ class CassandraBenchmarkTests(CassandraPerformanceTester):
             key = sha.sha(blob).digest()
             d.update({key:blob})
         
+        dl = []
+        t1 = time.time()
         for k,v in d.items():
-            t1 = time.time()
-            yield self.store.put(k,v)
-            t2 = time.time()
-            diff = t2 - t1
-            print "Time to do put %s " % (diff,)  
             
+            put_def =  self.store.put(k,v)
+            dl.append(put_def)
+             
+        
+        yield defer.DeferredList(dl)    
+        t2 = time.time()
+        diff = t2 - t1
+        print "Time to do put %s " % (diff,) 
+        
         for k in d.keys():
             yield self.store.remove(k)      
             
@@ -306,25 +315,33 @@ class CassandraBenchmarkTests(CassandraPerformanceTester):
     @defer.inlineCallbacks
     def update_index_benchmark(self, ops):
         update_requests_dict = self.setup_update_index()
+        dl = []
+        t1 = time.time()
         for i in range(ops):
             k,v = update_requests_dict.popitem()
-            t1 = time.time()
-            yield self.store.update_index(k,v)
-            t2 = time.time()
-            diff = t2 - t1
-            print "Update index time: %s " % (diff,)
+            update_def =  self.store.update_index(k,v)
+            dl.append(update_def)
+            
+        yield defer.DeferredList(dl)    
+        
+        t2 = time.time()
+        diff = t2 - t1
+        print "Update index time: %s " % (diff,)    
     
 
                 
     @defer.inlineCallbacks
     def has_key_benchmark(self, ops):
         test_keys = self.get_key_number(ops)
+        dl = []
+        t1 = time.time()
         for key in test_keys:
-            t1 = time.time()
-            yield self.store.has_key(key)  
-            t2 = time.time()
-            diff = t2 - t1
-            print "Has key time: %s " % (diff,) 
+            hk_def =  self.store.has_key(key)  
+            dl.append(hk_def)
+        yield defer.DeferredList(dl)
+        t2 = time.time()
+        diff = t2 - t1
+        print "Has key time: %s " % (diff,) 
                      
 
     
@@ -332,12 +349,15 @@ class CassandraBenchmarkTests(CassandraPerformanceTester):
     def get_benchmark(self, ops):
         test_keys = self.get_key_number(ops)
         
+        dl = []
+        t1 = time.time()
         for k in test_keys:
-            t1 = time.time()
-            val = yield self.store.get(k)
-            t2 = time.time()
-            diff = t2 - t1
-            print "Time to do a get: %s " % ( diff,)
+            get_def = self.store.get(k)
+            dl.append(get_def)
+        yield defer.DeferredList(dl)    
+        t2 = time.time()
+        diff = t2 - t1
+        print "Time to do a get: %s " % ( diff,)
         
 class CassandraQueryBenchmarks(CassandraPerformanceTester):
     
@@ -376,12 +396,18 @@ class CassandraQueryBenchmarks(CassandraPerformanceTester):
     
     @defer.inlineCallbacks
     def runQuery(self, q, pred_type):
+        dl = []
+        t1 = time.time()
         for i in range(50):
-            t1 = time.time()
-            rows = yield self.store.query(q,row_count=1000)
-            t2 = time.time()
-            diff = t2 - t1
-            print "Returns %s_rows in %s query %s " % (len(rows), diff, pred_type)
+            query_def =  self.store.query(q,row_count=1000)
+            dl.append(query_def)
+        yield defer.DeferredList(dl)    
+        t2 = time.time()
+        diff = t2 - t1
+        rows = dl[0]
+        #print len(rows.result)
+        #print diff
+        print "Returns %s_rows in %s query %s " % (len(rows.result), diff, pred_type)
             
     
     @defer.inlineCallbacks
