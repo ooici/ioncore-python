@@ -496,6 +496,10 @@ class JavaAgentWrapper(ServiceProcess):
         msg.dataset_url = datasource.dataset_url
         msg.ncml_mask = datasource.ncml_mask
         msg.max_ingest_millis = datasource.max_ingest_millis
+
+        if datasource.FieldIsSet('authentication'):
+            msg.authentication = datasource.authentication
+
         
         defer.returnValue(msg)
 
