@@ -37,7 +37,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
-from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE, StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -355,6 +355,12 @@ class DataStoreTest(IonTestCase):
         # test object, make sure it is what we expect
         self.failUnlessEquals(obj.retrieved_object.ObjectType.object_id, 1102)
 
+        # daf: this is only for pulling out keys to be able to test extract_data, leaving it in for ease
+        #for k,v in obj.Repository.index_hash.iteritems():
+        #    if v.type.object_id == 10025:
+        #        print "an array!", base64.encodestring(k)
+        #self.failUnless(0)
+        
         # test excluded types!
         msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
 
@@ -381,6 +387,38 @@ class DataStoreTest(IonTestCase):
 
         # make sure we see the correct things in our repo's excluded types
         self.failUnless(CDM_ARRAY_FLOAT32_TYPE in obj2.Repository.excluded_types)
+
+    @defer.inlineCallbacks
+    def test_extract_data(self):
+        """
+        @TODO: daf: this is not a full test yet, just test code.
+        """
+        from ion.core.process.process import Process
+        p = Process()
+        yield p.spawn()
+
+        #keylist = ['Ue+mAFyoKxcRjaH9trKNc/ROk/4=', 'Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
+        #keylist = ['Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
+
+        # this key is from an array in SAMPLE_PROFILE_DATASET
+        keylist=['npIXn/VT1fNMIQeMxW4E0f0S+lA=']
+
+        for key in keylist:
+            msg = yield p.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+
+            print "REQUESTING", key
+            import base64
+            msg.structure_array_ref = base64.decodestring(key)
+            bounds = msg.request_bounds.add()
+            bounds.origin = 1
+            bounds.size = 2
+
+            dsc = DataStoreClient()
+
+            ret = yield dsc.extract_data(msg)
+
+            print "GOT A RET: ", str(ret)
+
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):
