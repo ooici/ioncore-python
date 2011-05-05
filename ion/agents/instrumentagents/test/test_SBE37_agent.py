@@ -21,6 +21,8 @@ from ion.core.exception import ReceivedError
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
+from ion.agents.instrumentagents.instrument_constants import AgentStatus
+from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
@@ -52,13 +54,15 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # automatically. 
 SKIP_TESTS = [
     'test_execute_instrument',
+    'test_agent_states',
     'dummy'
 ]    
 
 class TestSBE37Agent(IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 180
+    timeout = 180    
+    
 
 
     @defer.inlineCallbacks
@@ -74,9 +78,9 @@ class TestSBE37Agent(IonTestCase):
         sbe_host = '137.110.112.119'
         sbe_port = 4001    
         driver_config = {
-            'ipport':sbe_port, 
-            'ipaddr':sbe_host            
-        }        
+            'ipport':sbe_port,
+            'ipaddr':sbe_host
+        }
         agent_config = {}
         
         # Process description for the SBE37 driver.
@@ -129,6 +133,139 @@ class TestSBE37Agent(IonTestCase):
         pu.asleep(1)
         yield self._stop_container()
         
+
+    @defer.inlineCallbacks
+    def test_state_transitions(self):
+        """
+        Test cases for exectuing device commands through the instrument
+        agent.
+        """
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_agent_states' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        # Check agent state upon creation. No transaction needed for
+        # get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
+
+        # Check that the driver and client descriptions were set by
+        # spawnargs, and save them for later restore.
+        
+        
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        tid = reply['transaction_id']
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(type(tid),str)
+        self.assertEqual(len(tid),36)
+        
+        # Initialize with a bad process desc. value. This should fail
+        # and leave us in the uninitialized state with null driver and client.
+        
+        
+        # Initialize with a bad client desc. value. This should fail and
+        # leave us in the uninitialized state with null driver and client.
+        
+        
+        # Restore the good process and client desc. values.
+        
+
+        # Initialize the agent to bring up the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.INACTIVE)
+
+        # Connect to the driver.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.IDLE)
+        
+        # Enter observatory mode.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))        
+    
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
+        
+        """
+        # Discnnect from the driver.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_INACTIVE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+        
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.INACTIVE)
+        """
+        
+        # Reset the agent to disconnect and bring down the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)        
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
+        success = reply['success']
+        self.assert_(InstErrorCode.is_ok(success))
+        
         
     @defer.inlineCallbacks
     def test_execute_instrument(self):
@@ -142,74 +279,81 @@ class TestSBE37Agent(IonTestCase):
         if 'test_execute_instrument' in SKIP_TESTS:
             raise unittest.SkipTest('Skipping during development.')
 
-        # Begin an explicit transaction.
+        # Check agent state upon creation. No transaction needed for
+        # get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
+
+        # Begin an explicit transaciton.
         reply = yield self.ia_client.start_transaction(0)
         success = reply['success']
-        transaction_id = reply['transaction_id']
+        tid = reply['transaction_id']
         self.assert_(InstErrorCode.is_ok(success))
-        self.assertEqual(type(transaction_id),str)
-        self.assertEqual(len(transaction_id),36)
-
-        # Issue state transition commands to bring the agent into
-        # observatory mode.
+        self.assertEqual(type(tid),str)
+        self.assertEqual(len(tid),36)
         
-        # Initialize the agent.
+        # Initialize the agent to bring up the driver and client.
         cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
-        reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
         result = reply['result']
-        
-        #print 'init reply:'
-        #print reply
-        
         self.assert_(InstErrorCode.is_ok(success))
-        
-        # Connect to the device.
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.INACTIVE)
+
+        # Connect to the driver.
         cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
-        reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
         result = reply['result']
-
-        #print 'go active reply:'
-        #print reply
-
         self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.IDLE)
         
-        # Clear the driver state.
-        cmd = [AgentCommand.TRANSITION,AgentEvent.CLEAR]
-        reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
-        success = reply['success']
-        result = reply['result']
-
-        #print 'clear reply:'
-        #print reply
-
-        self.assert_(InstErrorCode.is_ok(success))
-
-        # Start observatory mode.
+        # Enter observatory mode.
         cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
-        reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
         result = reply['result']
-
-        #print 'run reply:'
-        #print reply
-
-        self.assert_(InstErrorCode.is_ok(success))
+        self.assert_(InstErrorCode.is_ok(success))        
+    
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
         
         # Get driver parameters.
         params = [('all','all')]
-        reply = yield self.ia_client.get_device(params,transaction_id)
+        reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']
 
         # Strip off individual success vals to create a set params to
         # restore original config later.
         orig_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
-
-        #print 'get device reply:'
-        #print reply
-        #print orig_config
 
         self.assert_(InstErrorCode.is_ok(success))
 
@@ -223,7 +367,7 @@ class TestSBE37Agent(IonTestCase):
         params[(DriverChannel.INSTRUMENT,'TXREALTIME')] = True
         params[(DriverChannel.INSTRUMENT,'STORETIME')] = True
         
-        reply = yield self.ia_client.set_device(params,transaction_id)
+        reply = yield self.ia_client.set_device(params,tid)
         success = reply['success']
         result = reply['result']
         setparams = params
@@ -235,7 +379,7 @@ class TestSBE37Agent(IonTestCase):
 
         # Verify the set changes were made.
         params = [('all','all')]
-        reply = yield self.ia_client.get_device(params,transaction_id)
+        reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']
 
@@ -259,7 +403,7 @@ class TestSBE37Agent(IonTestCase):
         # Acquire sample.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.ACQUIRE_SAMPLE]
-        reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
+        reply = yield self.ia_client.execute_device(chans,cmd,tid)
         success = reply['success']
         result = reply['result']        
 
@@ -278,7 +422,7 @@ class TestSBE37Agent(IonTestCase):
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.START_AUTO_SAMPLING]
-        reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
+        reply = yield self.ia_client.execute_device(chans,cmd,tid)
         success = reply['success']
         result = reply['result']
         
@@ -293,8 +437,7 @@ class TestSBE37Agent(IonTestCase):
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
-            reply = yield self.ia_client.execute_device(chans,cmd,
-                                                        transaction_id)
+            reply = yield self.ia_client.execute_device(chans,cmd,tid)
             success = reply['success']
             result = reply['result']
             
@@ -322,16 +465,15 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('date',None),tuple)
         
         # Restore original configuration.
-        reply = yield self.ia_client.set_device(orig_config,transaction_id)
+        reply = yield self.ia_client.set_device(orig_config,tid)
         success = reply['success']
         result = reply['result']
 
         self.assert_(InstErrorCode.is_ok(success))
 
-        # Verify the original configuration was restored.
-        
+        # Verify the original configuration was restored.    
         params = [('all','all')]
-        reply = yield self.ia_client.get_device(params,transaction_id)
+        reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']
 
@@ -345,21 +487,25 @@ class TestSBE37Agent(IonTestCase):
                 self.assertAlmostEqual(val,final_config[key],4)
             else:
                 self.assertEqual(val,final_config[key])
-
-        #print 'original configuration restored'
                 
-        # Disconnect from device.
-        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_INACTIVE]
-        reply = yield self.ia_client.execute_observatory(cmd,transaction_id) 
+        # Reset the agent to disconnect and bring down the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
         success = reply['success']
         result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
 
-        #print 'go inactive reply:'
-        #print reply
-                
-        # Close the transaction.
-        reply = yield self.ia_client.end_transaction(transaction_id)
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)        
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
         success = reply['success']
         self.assert_(InstErrorCode.is_ok(success))
 

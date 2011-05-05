@@ -30,7 +30,7 @@ from ion.agents.instrumentagents.instrument_constants import *
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[1]
+DEBUG_PRINT = (True,False)[0]
 
 """
 Instrument agent observatory metadata.
@@ -110,6 +110,9 @@ class InstrumentAgent(Process):
         # Initialize base class.
         Process.plc_init(self)
                         
+        # We need a yield in a inlineCallback.
+        yield
+                        
         """
         The ID of the instrument this agent represents.
         """
@@ -120,52 +123,28 @@ class InstrumentAgent(Process):
         used to launch driver processes, and dynamically construct driver
         client objects. 
         """
-        self.driver_desc = self.spawn_args.get('driver-desc',None)
-        self.client_desc = self.spawn_args.get('client-desc',None)
-        
-        """
-        The ProcessDesc object for the driver process.
-        """
-        self.driver_process_description = None
-        if self.driver_desc:
-            self.driver_process_description = ProcessDesc(**(self.driver_desc))
-
+        self._driver_desc = self.spawn_args.get('driver-desc',None)
+        self._client_desc = self.spawn_args.get('client-desc',None)
 
         """
-        The driver process ID. Attempt to launch the process if the process
-        description is set.
+        The driver config dictionary. Default passed as a spawn arg.
         """
-        self.driver_pid = None
-        if self.driver_process_description:
-            self.driver_pid = yield \
-                self.spawn_child(self.driver_process_description)
-        else:
-            yield
-
+        self._driver_config = self.spawn_args.get('driver-config',None)
 
         """
-        The pubsub client.
+        The driver process ID. 
         """
-        #self.pubsub_client = PubSubClient(proc=self)
-        self.pubsub_client = None
-
+        self._driver_pid = None
 
         """
-        The driver client to communicate with the child driver. Attempt to
-        construct this object if there is a driver PID and a client description
-        dict containing module and class attributes.
+        List of old driver processes to be cleaned up.
         """
-        self.driver_client = None
-        if self.driver_pid and self.client_desc and \
-            self.client_desc.has_key('module') and \
-            self.client_desc.has_key('class'):
-            import_str = 'from ' + self.client_desc['module'] + \
-                ' import ' + self.client_desc['class']
-            ctor_str = 'self.driver_client = ' + self.client_desc['class'] + \
-                '(proc=self,target=self.driver_pid)'
-            exec import_str
-            exec ctor_str
+        self._condemned_drivers = []
 
+        """
+        The driver client to communicate with the child driver. 
+        """
+        self._driver_client = None
         
         """
 	The PubSub origin for the event publisher that this instrument agent uses to
@@ -261,13 +240,7 @@ class InstrumentAgent(Process):
         completion of a protected operation.
         """
         self._in_protected_function = False
-    
-        """
-        A finite state machine to track and manage agent state according to
-        the general instrument state model.
-        """
-        self.agent_fsm = None
-    
+        
         """
         String indicating the source of time being used for the instrument.
         See time_sources list for available values.
@@ -299,52 +272,428 @@ class InstrumentAgent(Process):
             'Peers' : None
         }
        
+        """
+        Agent state handlers
+        """
+        self.state_handlers = {
+            AgentState.POWERED_DOWN : self.state_handler_powered_down,
+            AgentState.UNINITIALIZED : self.state_handler_uninitialized,
+            AgentState.INACTIVE : self.state_handler_inactive,
+            AgentState.IDLE : self.state_handler_idle,
+            AgentState.STOPPED : self.state_handler_stopped,
+            AgentState.OBSERVATORY_MODE : self.state_handler_abservatory_mode,
+            AgentState.DIRECT_ACCESS_MODE : self.state_handler_direct_access_mode
+        }
+        
+        """
+        A finite state machine to track and manage agent state according to
+        the general instrument state model.
+        """
+        self.fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
+                                 AgentEvent.ENTER,AgentEvent.EXIT)
+       
+        # Set initial state.
+        self.fsm.start(AgentState.UNINITIALIZED)
+
 
     ############################################################################
     #   State handlers.
     ############################################################################
 
 
+    @defer.inlineCallbacks
     def state_handler_powered_down(self,event,params):
         """
+        State handler for AgentState.POWERED_DOWN.
+        This is a major state.
+        TODO: Need to investigate use models of POWERED_DOWN.
         """
-        pass
-    
-    
+
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            pass
+
+        elif event == AgentEvent.EXIT:
+            pass
+        
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
+
+
+    @defer.inlineCallbacks
     def state_handler_uninitialized(self,event,params):
         """
+        State handler for AgentState.UNINITIALIZED.
+        Substate of major state AgentState.POWERED_UP.
         """
-        pass
+
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            # Low level agent initialization beyond construction and plc.
+            pass
+        
+        elif event == AgentEvent.EXIT:
+            pass
+
+        elif event == AgentEvent.INITIALIZE:
+            
+            # Initialize: start driver and client and switch to INACTIVE
+            # if successful.
+            self._stop_condemned_drivers()
+            yield self._start_driver()
+            if self._driver_pid:
+                next_state = AgentState.INACTIVE
+            
+            else:
+                # Could not initialize error. Set error return value.
+                success = InstErrorCode.AGENT_INIT_FAILED
+            
+            pass
+        
+        elif event == AgentEvent.RESET:
+            next_state = AgentState.UNINITIALIZED
+        
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+        
+
+        defer.returnValue((success,next_state))
 
 
+    @defer.inlineCallbacks
     def state_handler_inactive(self,event,params):
         """
+        State handler for AgentState.INACTIVE.
+        Substate of major state AgentState.POWERED_UP.
         """
-        pass
+
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            # Agent initialization beyond driver spawn.
+            pass
+
+        elif event == AgentEvent.EXIT:
+            pass
+
+        elif event == AgentEvent.RESET:
+            self._stop_driver()
+            if self._driver_pid == None:
+                next_state = AgentState.UNINITIALIZED
+                
+            else:
+                success = InstErrorCode.AGENT_DEINIT_FAILED
+        
+        elif event == AgentEvent.INITIALIZE:
+            next_state = AgentState.INACTIVE
+
+        elif event == AgentEvent.GO_ACTIVE:
+            # Attempt to configure driver.
+            reply = yield self._driver_client.configure(self._driver_config)        
+            success = reply['success']
+            
+            # If successful, attempt to connect.
+            if InstErrorCode.is_ok(success):
+                try:
+                    success = None
+                    reply = yield self._driver_client.connect()
+                    success = reply['success']
+                    
+                # Exception raised, reply error.
+                except:
+                    success = InstErrorCode.DRIVER_CONNECT_FAILED
+                
+                # Command returned, if successful switch state to IDLE.
+                else:
+                    if InstErrorCode.is_ok(success):
+                        next_state = AgentState.IDLE
+            
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
 
 
+    @defer.inlineCallbacks
     def state_handler_stopped(self,event,params):
         """
+        State handler for AgentState.STOPPED.
+        Substate of major state AgentState.ACTIVE.
         """
-        pass
+
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            # Save agent and driver running state.
+            pass
+
+        elif event == AgentEvent.EXIT:
+            pass
+        
+        elif event == AgentEvent.CLEAR:
+            next_state = AgentState.IDLE
+
+        elif event == AgentEvent.RESUME:
+            # Restore agent and driver running state.
+            next_state = AgentState.OBSERVATORY_MODE
+
+        elif event == AgentEvent.GO_INACTIVE:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, if successful switch state to IDLE.
+            else:
+                if InstErrorCode.is_ok(success):
+                    next_state = AgentState.INACTIVE
+        
+        elif event == AgentEvent.RESET:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, shut down driver.
+            else:
+                if InstErrorCode.is_ok(success):
+                    self._condemn_driver()
+                    
+                    # If successful, switch to UNINITIALIZED.
+                    if self._driver_pid == None:
+                        next_state = AgentState.UNINITIALIZED
+                        
+                    # If unsuccessful, switch to inactive.
+                    else:
+                        success = InstErrorCode.AGENT_DEINIT_FAILED                        
+                        next_state = AgentState.INACTIVE
+        
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
 
 
+    @defer.inlineCallbacks
     def state_handler_idle(self,event,params):
         """
+        State handler for AgentState.IDLE.
+        Substate of major state AgentState.ACTIVE.
         """
-        pass
+        
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            # Clear agent and driver running state.
+            pass
+        
+
+        elif event == AgentEvent.EXIT:
+            pass
+        
+        elif event == AgentEvent.GO_INACTIVE:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, if successful switch state to IDLE.
+            else:
+                if InstErrorCode.is_ok(success):
+                    next_state = AgentState.INACTIVE
+
+        elif event == AgentEvent.RESET:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, shut down driver.
+            else:
+                if InstErrorCode.is_ok(success):
+                    self._condemn_driver()
+                    
+                    # If successful, switch to UNINITIALIZED.
+                    if self._driver_pid == None:
+                        next_state = AgentState.UNINITIALIZED
+                        
+                    # If unsuccessful, switch to inactive.
+                    else:
+                        success = InstErrorCode.AGENT_DEINIT_FAILED                        
+                        next_state = AgentState.INACTIVE
+
+        elif event == AgentEvent.RUN:
+            next_state = AgentState.OBSERVATORY_MODE
+
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
 
 
+    @defer.inlineCallbacks
     def state_handler_abservatory_mode(self,event,params):
         """
+        State handler for AgentState.OBSERVATORY_MODE.
+        Substate of major state AgentState.ACTIVE.RUNNING.
         """
-        pass
+        
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            pass
+
+        elif event == AgentEvent.EXIT:
+            pass
+        
+        elif event == AgentEvent.CLEAR:
+            next_state = AgentState.IDLE
+
+        elif event == AgentEvent.PAUSE:
+            next_state = AgentState.STOPPED
+
+        elif event == AgentEvent.GO_DIRECT_ACCESS_MODE:
+            next_state = AgentState.DIRECT_ACCESS_MODE
+
+        elif event == AgentEvent.GO_INACTIVE:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, if successful switch state to IDLE.
+            else:
+                if InstErrorCode.is_ok(success):
+                    next_state = AgentState.INACTIVE
+
+        elif event == AgentEvent.RESET:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_DISCONNECT_FAILED
+            
+            # Command returned, shut down driver.
+            else:
+                if InstErrorCode.is_ok(success):
+                    #yield pu.asleep(5)
+                    self._condemn_driver()
+                    # If successful, switch to UNINITIALIZED.
+                    if self._driver_pid == None:
+                        next_state = AgentState.UNINITIALIZED
+                        
+                    # If unsuccessful, switch to inactive.
+                    else:
+                        success = InstErrorCode.AGENT_DEINIT_FAILED                        
+                        next_state = AgentState.INACTIVE
+
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
 
 
+    @defer.inlineCallbacks
     def state_handler_direct_access_mode(self,event,params):
         """
+        State handler for AgentState.DIRECT_ACCESS_MODE.
+        Substate of major state AgentState.ACTIVE.RUNNING.
         """
-        pass
+        
+        yield
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(self.fsm.get_current_state(),event)
+
+        if event == AgentEvent.ENTER:
+            pass
+
+        elif event == AgentEvent.EXIT:
+            pass
+        
+        elif event == AgentEvent.GO_OBSERVATORY_MODE:
+            next_state = AgentState.OBSERVATORY_MODE
+
+        elif event == AgentEvent.GO_INACTIVE:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, if successful switch state to IDLE.
+            else:
+                if InstErrorCode.is_ok(success):
+                    next_state = AgentState.INACTIVE
+
+        elif event == AgentEvent.RESET:
+            try:
+                reply = yield self._driver_client.disconnect()
+                success = reply['success']
+                
+            # Exception raised, reply error.
+            except:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+            
+            # Command returned, shut down driver.
+            else:
+                if InstErrorCode.is_ok(success):
+                    self._condemn_driver()
+                    
+                    # If successful, switch to UNINITIALIZED.
+                    if self._driver_pid == None:
+                        next_state = AgentState.UNINITIALIZED
+                        
+                    # If unsuccessful, switch to inactive.
+                    else:
+                        success = InstErrorCode.AGENT_DEINIT_FAILED                        
+                        next_state = AgentState.INACTIVE
+
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        defer.returnValue((success,next_state))
     
 
     ############################################################################
@@ -658,81 +1007,25 @@ class InstrumentAgent(Process):
         reply['transaction_id'] = self.transaction_id    
         
         try:
-                     
+            # TRANSITION command.
             if  cmd[0] == AgentCommand.TRANSITION:
-                if not AgentEvent.has(cmd[1]):
-                    reply['success'] = InstErrorCode.UNKNOWN_TRANSITION
+
+                # Verify required parameter present.
+                if len(cmd) < 2:
+                    reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+                
+                # Verify required parameter valid.
+                elif not AgentEvent.has(cmd[1]):
+                    reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
 
                 else:
-                    # output = self.agent_fsm.state_transition(cmd[1])
-                    # TODO FSM and driver integration
-                    # The following are stubs for driver integration prior to
-                    # state machine integration.
-                    if cmd[1] == AgentEvent.INITIALIZE:
-                        reply['success'] = InstErrorCode.OK
-                    
-                    elif cmd[1] == AgentEvent.GO_ACTIVE:
-                        driver_config = self.spawn_args.get('driver-config',None)
-                        if driver_config != None:
-                            config_reply = yield \
-                                self.driver_client.configure(driver_config)
-                            config_success = config_reply['success']
-                            
-                            # Could not configure driver.
-                            if InstErrorCode.is_error(config_success):
-                                reply['success'] = config_success
-                            
-                            # Driver correctly configured.
-                            else:
-                                
-                                # Attempt connect.
-                                try:
-                                    connect_reply = yield \
-                                                    self.driver_client.connect()
-                                    
-                                # Could not connect, exception raised.
-                                except:
-                                    reply['success'] = \
-                                        InstErrorCode.INSTRUMENT_UNREACHABLE
-                                    
-                                # Driver responded to connect request.
-                                else:
-                                    # Check driver success.
-                                    connect_success = connect_reply['success']
-                                    if InstErrorCode.is_error(connect_success):
-                                        reply['success'] = connect_success
-                                        
-                                    # Driver connection successful.
-                                    else:
-                                        reply['success'] = InstErrorCode.OK
-                                    
-                        else:                        
-                            reply['success'] = InstErrorCode.DRIVER_NOT_CONFIGURED
-    
-                    elif cmd[1] == AgentEvent.GO_INACTIVE :
-                        disconnect_reply = yield self.driver_client.disconnect()
-                        disconnect_success = disconnect_reply['success']
-                        #if disconnect_success[0] != 'OK':
-                        #    reply['success'] = InstErrorCode.DISCONNECT_FAILED
-                        #    
-                        #else:
-                        #    reply['success'] = InstErrorCode.OK
-                        #    
-                        #reply['success'] = InstErrorCode.OK
-                        reply['success'] = disconnect_success
+                    reply['success'] = yield self.fsm.on_event_async(cmd[1])
                         
-                    elif cmd[1] == AgentEvent.CLEAR :
-                        reply['success'] = InstErrorCode.OK
-                    
-                    elif cmd[1] == AgentEvent.RUN :
-                        reply['success'] = InstErrorCode.OK
-    
-                    else:
-                        reply['success'] = InstErrorCode.INCORRECT_STATE
-                        
+            # TRANSMIT DATA command.
             elif cmd[0] == AgentCommand.TRANSMIT_DATA:
                 reply['success'] = InstErrorCode.NOT_IMPLEMENTED
-                
+            
+            # SLEEP command.
             elif cmd[0] == AgentCommand.SLEEP:
                 if len(cmd) < 2:
                     reply['success'] = InstErrorCode.REQUIRED_PARAMETER
@@ -828,14 +1121,26 @@ class InstrumentAgent(Process):
                             (InstErrorCode.OK,self.event_publisher_origin)
                 
                 if arg == AgentParameter.DRIVER_ADDRESS or arg=='all':
-                    if self.driver_client:
+                    if self._driver_client:
                         result[AgentParameter.DRIVER_ADDRESS] = \
-                            (InstErrorCode.OK,str(self.driver_client.target))
+                            (InstErrorCode.OK,str(self._driver_client.target))
                     else:
                         get_errors = True
                         result[AgentParameter.DRIVER_ADDRESS] = \
                             (InstErrorCode.INVALID_DRIVER,None)
-                        
+                
+                if arg == AgentParameter.DRIVER_DESC or arg == 'all':
+                    result[AgentParameter.DRIVER_DESC] = \
+                        (InstErrorCode.OK,self._driver_desc)
+                
+                if arg == AgentParameter.DRIVER_CLIENT_DESC or arg == 'all':
+                    result[AgentParameter.DRIVER_CLIENT_DESC] = \
+                        (InstErrorCode.OK,self._client_desc)                
+                
+                if arg == AgentParameter.DRIVER_CONFIG or arg == 'all':
+                    result[AgentParameter.DRIVER_CONFIG] = \
+                        (InstErrorCode.OK,self._driver_config)                
+
                 if arg == AgentParameter.RESOURCE_ID or arg=='all':
                     # TODO: how do we access this?
                     result[AgentParameter.RESOURCE_ID] = (InstErrorCode.OK,None)
@@ -950,6 +1255,36 @@ class InstrumentAgent(Process):
                 if arg == AgentParameter.DRIVER_ADDRESS :
                     result[arg] = InstErrorCode.NOT_IMPLEMENTED
                     set_errors = True
+                    
+                if arg == AgentParameter.DRIVER_DESC:
+                    if not isinstance(val,dict):
+                        # Better checking here.
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
+                        set_errors = True
+                        
+                    else:
+                        self._driver_desc = val
+                        result[arg] = InstErrorCode.OK
+
+                if arg == AgentParameter.DRIVER_CLIENT_DESC:
+                    if not isinstance(val,dict):
+                        # Better checking here.
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
+                        set_errors = True
+                        
+                    else:
+                        self._client_desc = val
+                        result[arg] = InstErrorCode.OK
+
+                if arg == AgentParameter.DRIVER_CONFIG:
+                    if not isinstance(val,dict):
+                        # Better checking here.
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
+                        set_errors = True
+                        
+                    else:
+                        self._driver_config = val
+                        result[arg] = InstErrorCode.OK
                 
                 elif arg == AgentParameter.RESOURCE_ID :
                     result[arg] = InstErrorCode.NOT_IMPLEMENTED
@@ -1214,7 +1549,7 @@ class InstrumentAgent(Process):
             {'success':success,'result':{status_arg:(success,val),...,
             status_arg:(success,val)},'transaction_id':transaction_id}
         """
-        
+
         self._in_protected_function = True        
         
         assert(isinstance(content,dict)), 'Expected a dict content.'
@@ -1265,9 +1600,8 @@ class InstrumentAgent(Process):
                     continue
                 
                 if arg == AgentStatus.AGENT_STATE or arg == 'all':
-                    # TODO FSM integration.
                     result[AgentStatus.AGENT_STATE] = \
-                        (InstErrorCode.OK,AgentState.UNKNOWN)
+                        (InstErrorCode.OK,self.fsm.get_current_state())
 
                 if arg == AgentStatus.CHANNEL_NAMES or arg == 'all':
                     # TODO driver integration.
@@ -1504,11 +1838,17 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
 
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.OBSERVATORY_MODE:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+
         timeout = 20
                     
         try:
             
-            dvr_result = yield self.driver_client.execute(channels,command,
+            dvr_result = yield self._driver_client.execute(channels,command,
                                                           timeout)
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1570,9 +1910,17 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.OBSERVATORY_MODE and \
+                          agent_state != AgentState.IDLE and \
+                          agent_state != AgentState.STOPPED:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+
         try:
             
-            dvr_result = yield self.driver_client.get(params)
+            dvr_result = yield self._driver_client.get(params)
             
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1633,9 +1981,15 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.OBSERVATORY_MODE:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+
         try:
             
-            dvr_result = yield self.driver_client.set(params)
+            dvr_result = yield self._driver_client.set(params)
             
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1667,7 +2021,7 @@ class InstrumentAgent(Process):
         assert(isinstance(content,dict)), 'Expected a dict content.'
         assert(content.has_key('params')), 'Expected params.'
         assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
-        
+
         params = content['params']
         tid = content['transaction_id']
         
@@ -1698,10 +2052,18 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.OBSERVATORY_MODE and \
+                          agent_state != AgentState.IDLE and \
+                          agent_state != AgentState.STOPPED:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+        
         try:
             
             dvr_content = {'params':params}
-            dvr_result = yield self.driver_client.rpc_send('get_metadata',dvr_content)
+            dvr_result = yield self._driver_client.get_metadata(dvr_content)
             
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1763,10 +2125,18 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.OBSERVATORY_MODE and \
+                          agent_state != AgentState.IDLE and \
+                          agent_state != AgentState.STOPPED:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+
         try:
             
             dvr_content = {'params':params}
-            dvr_result = yield self.driver_client.rpc_send('get_status',dvr_content)
+            dvr_result = yield self._driver_client.get_status(dvr_content)
         
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1828,11 +2198,17 @@ class InstrumentAgent(Process):
             return
 
         reply['transaction_id'] = self.transaction_id
+
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.DIRECT_ACCESS_MODE:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
                     
         try:                    
                     
             dvr_content = {'bytes':bytes}
-            dvr_result = yield self.driver_client.rpc_send('execute_direct',dvr_content)
+            dvr_result = yield self._driver_client.get_status(dvr_content)
         
             reply['success'] = dvr_result['success']
             reply['result'] = dvr_result['result']
@@ -1938,8 +2314,114 @@ class InstrumentAgent(Process):
         if (type == publish_msg_type["StateChange"]):
                 yield self._state_publisher.create_and_publish_event( \
                     origin=self.event_publisher_origin, description=value)
+
+
+    ############################################################################
+    #   Driver lifecycle.
+    ############################################################################
+        
+    
+    @defer.inlineCallbacks
+    def _start_driver(self):
+        """
+        Spawn the driver and dynamically construct the client from the
+        current description dictionaries.
+        @retval True if both the client and driver were successfully
+            created, False otherwise.
+        """
+        
+        if self._client_desc and self._client_desc.has_key('module') and \
+            self._client_desc.has_key('class') and self._driver_desc and \
+            self._driver_desc.has_key('module') and \
+            self._driver_desc.has_key('class') and \
+            self._driver_desc.has_key('name'):
+            import_str =  'from ' + self._client_desc['module'] + \
+            ' import ' + self._client_desc['class']
+            
+            # Spawn the driver process.
+            try:
+                proc_desc = ProcessDesc(**(self._driver_desc))
+                self.temp_proc_desc = proc_desc
+                self._driver_pid = yield self.spawn_child(proc_desc)
+        
+            # If the process desc is bad, trap the error and proceed.
+            # Do not construct client or set member objects.
+            except ImportError:
+                pass
+        
+            # Process spawn successful, start client, set member objects.
+            else:
+                self._debug_print('started driver',str(self._driver_pid))
+                
+        
+                # Dynamically construct the client object
+                ctor_str = 'driver_client = ' + self._client_desc['class'] + \
+                    '(proc=self,target=self._driver_pid)'
+            
+                try:
+                    exec import_str
+                    exec ctor_str
+                
+                # Client import is bad, shutdown driver and exit.
+                except ImportError, NameError:
+                    self._stop_driver()
+                
+                # Other error, shutdown driver and raise.
+                except:
+                    self._stop_driver()
+                    raise
+                
+                # Driver and client constructed. Set client object.
+                else:
+                    self._driver_client = driver_client
+                    self._debug_print('constructed driver client',str(self._driver_client))
+                    
+
+    def _condemn_driver(self):
+        """
+        Add current driver to a list to be shutdown at a convenient time.
+        Destroy the client object.
+        """
+        
+        if self._driver_pid != None:
+            self._condemned_drivers.append(self._driver_pid)
+            self._driver_pid = None
+            self._driver_client = None
+        
+    def _stop_condemned_drivers(self):
+        """
+        Shutdown any old driver processes.
+        """
+        
+        new_children = []
+        for item in self.child_procs:
+            if item.proc_id in self._condemned_drivers:
+                self._debug_print('shutting down driver',str(item.proc_id))
+                self.shutdown_child(item)
+            else:
+                new_children.append(item)
+        self.child_procs = new_children                    
         
         
+    def _stop_driver(self):
+        """
+        Shutdown the driver and driver client processes.
+        """
+        
+        # Shutdown the driver process and remove its reference.
+        if self._driver_pid != None:
+            
+            # Add code to correctly shut down the child proc.
+            for item in self.child_procs:
+                if item.proc_id == self._driver_pid:
+                    self._debug_print('shutting down driver',str(self._driver_pid))
+                    self.shutdown_child(item)
+                    self.child_procs.remove(item)
+                    
+            self._driver_pid = None
+            self._driver_client = None
+    
+    
     ############################################################################
     #   Other.
     ############################################################################
