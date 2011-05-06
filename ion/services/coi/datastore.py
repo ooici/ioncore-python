@@ -8,6 +8,7 @@
 @TODO
 
 """
+import math
 from ion.core.object.gpb_wrapper import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE
 from ion.core.object.repository import ARRAY_STRUCTURE_TYPE
 
@@ -26,7 +27,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -842,12 +843,17 @@ class DataStoreWorkbench(WorkBench):
         ndlink = obj.bounded_arrays[0].GetLink("ndarray")
 
         # and make it in the response
-        targetndarray = response.CreateObject(ndlink.type)
-        targetba.ndarray = targetndarray
+        #targetndarray = response.CreateObject(ndlink.type)
+        #targetba.ndarray = targetndarray
 
         # a list of matching bounded arrays (@TODO: soon to be the intersection ranges as well)
         bounded_includes_list = []
         totalshape = [x.size for x in request.request_bounds]
+        totalelems = reduce(lambda x,y: x*y, totalshape)
+
+        # fill the entire thing in with Nones so setting slices doesn't kill things
+        #targetndarray.value.extend([-1] * totalelems)
+        targetarray = [None] * totalelems
 
         # iterate bounded arrays in this object
         for ba in obj.bounded_arrays:
@@ -898,6 +904,7 @@ class DataStoreWorkbench(WorkBench):
                 # format: (bounded array, target range of data (multidim), source bounded array range (multidim))
                 bounded_includes_list.append((ba, effective_range, ba_range))
 
+                '''
                 # ok, actually get the ndarray from the DS now!
                 # @TODO: naive, remove this in a bit
                 ndlink = ba.GetLink("ndarray")
@@ -926,6 +933,7 @@ class DataStoreWorkbench(WorkBench):
                     targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
 
                 log.debug("END NAIVE DATA COPY")
+                '''
 
 
         # @TODO: non-naive approach: retrieve and extract slices from each matching array, build data chunk messages,
@@ -933,8 +941,90 @@ class DataStoreWorkbench(WorkBench):
 
         log.debug("Matching Bounded Arrays: %d" % len(bounded_includes_list))
 
+        # get a clear set of the keys we have to get
+        ndarrayset = set([ba[0].GetLink('ndarray').key for ba in bounded_includes_list])
+
+        log.debug("Requesting %d keys from the datastore" % len(ndarrayset))
+
+        # actually get those keys from the datastore, put them in the repo
+        ndblobs = yield self._get_blobs(repo, ndarrayset, lambda x: True)
+        repo.index_hash.update(ndblobs)
+
+        # @TODO: sort these clowns
+
+
+
+        # loop through matching bounded arrays, load ndarray, extract data
+        for batuple in bounded_includes_list:
+            ba, targetranges, srcranges = batuple
+
+            # load ndarray object
+            ndse = repo.index_hash[ba.GetLink('ndarray').key]
+            assert ndse
+            ndobj = repo._load_element(ndse)
+
+            # get slices out of it
+            # get dims of this bounded array
+            ba_shape = [x.size for x in ba.bounds]
+
+            log.debug("BEGIN NAIVE DATA COPY")
+            for targetslice, srcslice in self._get_slices(totalshape, ba_shape, targetranges, srcranges):
+                log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
+
+                #targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+                targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+
+            log.debug("END NAIVE DATA COPY")
+
+        # CREATE RESPONSE CHUNKS OUT OF BIG ORIGINAL RESPONSE MESSAGE
+
+
+        CHUNK_FACTOR = 100
+        totalchunks = int(math.ceil(totalelems / float(CHUNK_FACTOR)))
+
+        log.debug("Chunking %d values into %d messages (factor %d)" % (totalelems, totalchunks, CHUNK_FACTOR))
+
+        for i in xrange(totalchunks):
+
+            # create new message to send
+            chunkmsg = yield self._process.message_client.create_instance(DATA_CHUNK_MESSAGE_TYPE)
+            chunkmsg.seq_number = i+1
+            chunkmsg.seq_max = totalchunks
+
+            curoffset = i * CHUNK_FACTOR
+            slicelen = min(CHUNK_FACTOR, totalchunks - curoffset)
+
+            log.debug("Chunk #%d: offset %d, length %d" % (i, curoffset, slicelen))
+
+            # set info in this chunk
+            chunkmsg.start_index = curoffset
+            chunkmsg.done = (i==totalchunks-1)      # last chunk message?  set the done flag
+
+            # create the ndarray in this chunk
+            #print "losiemp", dir(targetndarray)
+            chunkndarray = chunkmsg.CreateObject(bounded_includes_list[0][0].GetLink('ndarray').type)
+
+            # slice data out of the big object, stick it in this one
+            #chunkndarray.value[0:slicelen] = targetndarray.value[curoffset:curoffset+slicelen]
+            chunkndarray.value[0:slicelen] = targetarray[curoffset:curoffset+slicelen]
+            chunkmsg.ndarray = chunkndarray
+
+            # send this message to the passed in routing key
+            yield self._send_data_chunk(request.data_routing_key, chunkmsg)
+
         self._process.reply_ok(message, response)
         log.info("/op_extract_data")
+
+    @defer.inlineCallbacks
+    def _send_data_chunk(self, data_routing_key, chunkmsg):
+        """
+        Sends a data chunk message (from op_extract_data).  This is split out to facilitate
+        testing via monkeypatching this method.
+        """
+        log.debug("_send_data_chunk to %s" % data_routing_key)
+        print "DEBIG", chunkmsg
+        yield self._process.send(data_routing_key, 'what_operation', chunkmsg)
+
 
     def _double_xrange(self, start1, end1, start2, end2):
         """

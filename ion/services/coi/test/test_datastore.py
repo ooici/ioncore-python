@@ -6,6 +6,7 @@
 @author Matt Rodriguez
 """
 import base64
+from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE
 
 import ion.util.ionlog
@@ -400,6 +401,25 @@ class DataStoreTest(IonTestCase):
         #keylist = ['Ue+mAFyoKxcRjaH9trKNc/ROk/4=', 'Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
         #keylist = ['Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
 
+        @defer.inlineCallbacks
+        def datahandler(data, msg):
+            print "GOT A DATA", data['content'].ndarray.value
+            yield msg.ack()
+
+        consumer_config = { 'exchange' : 'magnet.topic',
+                'exchange_type' : 'topic',
+                'durable': False,
+                'auto_delete': True,
+                'mandatory': True,
+                'immediate': False,
+                'warn_if_exists': False,
+                'routing_key' : 'fake_java_process',      # may be None, if so, no binding is made to the queue (routing_key is incorrectly named in the dict used by Receiver)
+                'queue' : None,              # may be None, if so, the queue is made anonymously (and stored in receiver's consumer.queue attr)
+              }
+
+        datarec = WorkerReceiver('fake_java_process', process=p, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
+        yield datarec.attach()
+
         # this key is from an array in SAMPLE_PROFILE_DATASET
         keylist=['npIXn/VT1fNMIQeMxW4E0f0S+lA=']
 
@@ -409,6 +429,7 @@ class DataStoreTest(IonTestCase):
             print "REQUESTING", key
             import base64
             msg.structure_array_ref = base64.decodestring(key)
+            msg.data_routing_key = 'fake_java_process'
             bounds = msg.request_bounds.add()
             bounds.origin = 1
             bounds.size = 2
@@ -418,6 +439,8 @@ class DataStoreTest(IonTestCase):
             ret = yield dsc.extract_data(msg)
 
             print "GOT A RET: ", str(ret)
+
+        yield datarec.terminate()
 
 
     @defer.inlineCallbacks
