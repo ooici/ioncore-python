@@ -363,7 +363,7 @@ class SchedulerService(ServiceProcess):
             del self._callback_tasks[task_id]
 
         log.debug('Removing task_id %s from store...' % task_id)
-        self.scheduled_events.remove(task_id)
+        yield self.scheduled_events.remove(task_id)
 
         resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
         resp.value = 'OK'
