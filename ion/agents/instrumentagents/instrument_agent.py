@@ -1606,7 +1606,7 @@ class InstrumentAgent(Process):
                 if arg == AgentStatus.CHANNEL_NAMES or arg == 'all':
                     # TODO driver integration.
                     dvr_val = [InstErrorCode.OK,['CHAN_1','CHAN_2','CHAN_3']]
-                    result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                
+                    result[AgentStatus.CHANNEL_NAMES] = (dvr_val[0],dvr_val[1])                
 
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
