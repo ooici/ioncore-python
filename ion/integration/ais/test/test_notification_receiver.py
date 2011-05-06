@@ -147,15 +147,23 @@ class NotificationReceiverTest(IonTestCase):
         # creates the event notification for us and sends it
 
 
+
         yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
                                            dataset_id="dataresrc123",
                                            datasource_id="dataresrc123",
                                            title="TODO",
-                                           url="TODO")
+                                           url="TODO",
+                                           start_datetime_millis = 10000,
+                                           end_datetime_millis = 11000,
+                                           number_of_timesteps = 7
+                                     )
+
+
 
         yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
                                            datasource_id="dataresrc123",
-                                           explanation="explanation")
+                                           error_explanation="explanation")
+        
 
         yield pu.asleep(3.0)
 
