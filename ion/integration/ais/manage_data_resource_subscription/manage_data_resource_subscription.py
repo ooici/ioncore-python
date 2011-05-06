@@ -392,45 +392,6 @@ class ManageDataResourceSubscription(object):
                 log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                 self.userID = self.userRes.ResourceIdentity
 
-                #
-                # START OF TEMPORARY TEMPORARY TEMPORARY!!!
-                #
-                log.info("Creating 2 dispatchers for testing")
-                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
-                log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
-                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
-                self.dispatcherID = self.dispatcherRes.ResourceIdentity
-                log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
-                    
-                try:
-                    #
-                    # Now make an association between the user and this dispatcher
-                    #
-                    association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
-                    if association not in self.userRes.ResourceAssociationsAsSubject:
-                        log.error('Error: subject not in association!')
-                    if association not in self.dispatcherRes.ResourceAssociationsAsObject:
-                        log.error('Error: object not in association')
-                    
-                    #
-                    # Put the association in datastore
-                    #
-                    #self.rc.put_resource_transaction([self.userRes, self.dispatcherRes])
-                    log.debug('Storing association: ' + str(association))
-                    yield self.rc.put_instance(association)
-
-                except AssociationClientError, ex:
-                    errString = 'Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex
-                    log.error(errString)
-                    # build AIS error response
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
-                    Response.error_str = errString
-                    defer.returnValue(Response)
-                #
-                # END OF TEMPORARY TEMPORARY TEMPORARY!!!
-                #
-
                 dispatcherID = yield self.__findDispatcher(self.userRes)
                 if (dispatcherID is None):
                     errString = 'Dispatcher not found for userID' + self.userID
@@ -710,19 +671,6 @@ class ManageDataResourceSubscription(object):
 
         the_resource = yield self.rc.get_associated_resource_subject(association)
         defer.returnValue(the_resource)
-
-
-    @defer.inlineCallbacks
-    def __register_dispatcher(self, name):
-        #rc = yield self.rc
-        rc = self.rc
-        disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
-        disp_res.dispatcher_name = name
-        disp_id = disp_res.ResourceIdentity
-        yield rc.put_instance(disp_res, 'Committing new dispatcher resource for registration')
-        
-        #defer.returnValue(str(disp_res.ResourceIdentity))
-        defer.returnValue(disp_res)
 
 
     @defer.inlineCallbacks
