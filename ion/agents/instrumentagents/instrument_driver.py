@@ -28,9 +28,10 @@ class InstrumentDriver(Process):
         Execute a driver command. Commands may be
         common or specific to the device, with specific commands known through
         knowledge of the device or a previous get_capabilities query.
-        @param content A dict
+        @param content A dict containing channels, command and optional timeout:
             {'channels':[chan_arg,...,chan_arg],
-            'command':[command,arg,...,argN]),}
+            'command':[command,arg,...,argN]),
+            'timeout':timeout}
         @retval A reply message with a dict
             {'success':success,
             'result':{chan_arg:(success,command_specific_values),...,
@@ -41,7 +42,9 @@ class InstrumentDriver(Process):
     def op_get(self, content, headers, msg):
         """
         Get configuration parameters from the device. 
-        @param content A list [(chan_arg,param_arg),...,(chan_arg,param_arg)].
+        @param content A dict containing params and optional timeout: {
+            'params':[(chan_arg,param_arg),...,(chan_arg,param_arg)],
+            'timeout':timeout}
         @retval A reply message with a dict
             {'success':success,'result':{(chan_arg,param_arg):(success,val),...
                 ,(chan_arg,param_arg):(success,val)}}        
@@ -51,8 +54,9 @@ class InstrumentDriver(Process):
     def op_set(self, content, headers, msg):
         """
         Set parameters to the device.
-        @param content A dict {(chan_arg,param_arg):val,...,
-            (chan_arg,param_arg):val}.
+        @param content A dict containing param key-vals dict and optional
+            timeout: {'params':{(chan_arg,param_arg):val,...,
+            (chan_arg,param_arg):val},'timeout':timeout}.
         @retval Reply message with a dict
             {'success':success,'result':
                 {(chan_arg,param_arg):success,...,chan_arg,param_arg):success}}.        
@@ -62,30 +66,43 @@ class InstrumentDriver(Process):
     def op_get_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.
-        @param content A list:[(chan_arg,param_arg,meta_arg),...,
-            (chan_arg,param_arg,meta_arg)] specifying the metadata to retrieve.
+        @param content A dict containing params list and optional timeout:
+            {'params':[(chan_arg,param_arg,meta_arg),...,
+            (chan_arg,param_arg,meta_arg)],
+            'timeout':timeout}.
         @retval Reply message with a dict {'success':success,'result':
                 {(chan_arg,param_arg,meta_arg):(success,val),...,
                 chan_arg,param_arg,meta_arg):(success,val)}}.        
         """
-        
         
 
     def op_get_status(self, content, headers, msg):
         """
         Obtain the status of the device. This includes non-parameter
         and non-lifecycle state of the instrument.
-        @param content A list [(chan_arg,status_arg),...,
-            (chan_arg,status_arg)] specifying the status arguments to query.
+        @param content A dict containing status params and optional timeout:
+            {'params':[(chan_arg,status_arg),...,(chan_arg,status_arg)],
+            'timeout':timeout}.
         @retval A reply message with a dict
             {'success':success,'result':{(chan_arg,status_arg):(success,val),
                 ...,chan_arg,status_arg):(success,val)}}.
          """
 
+    def op_get_capabilities(self, content, headers, msg):
+        """
+        Obtain the capabilities of the device, including available commands,
+            parameters, channels and statuses, both common and device specific.
+        @param content A dict with capabilities params and optional timeout:
+            {'params':[cap_arg,...,cap_arg],'timeout':timeout}.
+        @retval A reply message with a dict
+            {'success':success,'result':{cap_arg:(success,val),
+                ...,cap_arg:(success,val)}}.
+         """
 
     def op_initialize(self, content, headers, msg):
         """
         Restore driver to a default, unconfigured state.
+        @param content A dict with optional timeout {'timeout':timeout}.
         @retval A reply message with a dict {'success':success,'result':None}.
         """
 
@@ -93,8 +110,9 @@ class InstrumentDriver(Process):
     def op_configure(self, content, headers, msg):
         """
         Configure the driver to establish communication with the device.
-        @param content a dict containing required and optional
-            configuration parameters.
+        @param content a dict with configuration parameters and optional
+            timeout: {'params':{'cfg_arg':cfg_val,...,'cfg_arg':cfg_val},
+            'timeout':timeout}.
         @retval A reply message dict {'success':success,'result':content}.
         """
         
@@ -102,6 +120,7 @@ class InstrumentDriver(Process):
     def op_connect(self, content, headers, msg):
         """
         Establish connection to the device.
+        @param content A dict with optional timeout {'timeout':timeout}.
         @retval A dict {'success':success,'result':None} giving the success
             status of the connect operation.
         """
@@ -110,6 +129,7 @@ class InstrumentDriver(Process):
     def op_disconnect(self, content, headers, msg):
         """
         Close connection to the device.
+        @param content A dict with optional timeout {'timeout':timeout}.
         @retval A dict {'success':success,'result':None} giving the success
             status of the disconnect operation.
         """
@@ -117,6 +137,7 @@ class InstrumentDriver(Process):
     def op_get_state(self,content,headers,msg):
         """
         Retrive the current state of the driver.
+        @param content A dict with optional timeout {'timeout':timeout}.
         @retval The current instrument state, from sbe37_state_list
         (see ion.agents.instrumentagents.instrument_agent_constants.
             device_state_list for the common states.)
@@ -145,18 +166,22 @@ class InstrumentDriverClient(ProcessClient):
             chan_arg:(success,command_specific_values)}}. 
         """
 
-        assert(isinstance(channels, (list,tuple))), 'Expected list or tuple channels.'
+        assert(isinstance(channels, (list,tuple))),'Expected list or tuple channels.'
         assert(isinstance(command, (list,tuple))), 'Expected list or tuple command.'
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
-            content_outgoing = {'channels':channels,'command':command,'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('execute',content_outgoing,timeout=rpc_timeout)            
+            content_outgoing = {'channels':channels,
+                                'command':command,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('execute',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
-            content_outgoing = {'channels':channels,'command':command,'timeout':None}
-            (content, headers, message) = yield self.rpc_send('execute',content_outgoing)            
+            content_outgoing = {'channels':channels,
+                                'command':command,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('execute',
+                                content_outgoing)            
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
@@ -180,11 +205,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('get',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('get',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'params':params,'timeout':None}
-            (content, headers, message) = yield self.rpc_send('get',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('get',
+                                content_outgoing)            
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'
         defer.returnValue(content)
@@ -210,13 +237,46 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('set',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('set',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'params':params,'timeout':None}
-            (content, headers, message) = yield self.rpc_send('set',content_outgoing)
+            (content, headers, message) = yield self.rpc_send('set',
+                                content_outgoing)
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def get_metadata(self, params, timeout=None):
+        """
+        Retrieve metadata for the device, its transducers and parameters.
+        @param params A list:[(chan_arg,param_arg,meta_arg),...,
+            (chan_arg,param_arg,meta_arg)] specifying the metadata to retrieve.
+        @param timeout optional timeout to the driver causes the rpc timeout
+            to be set slightly longer.
+        @retval Reply message with a dict {'success':success,'result':
+                {(chan_arg,param_arg,meta_arg):(success,val),...,
+                chan_arg,param_arg,meta_arg):(success,val)}}.        
+        """
+        
+        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 20
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('get_metadata',
+                                content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('get_metadata',
+                                content_outgoing)            
+                
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
@@ -240,17 +300,50 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('get_status',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('get_status',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'params':params,'timeout':None}
-            (content, headers, message) = yield self.rpc_send('get_status',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('get_status',
+                                content_outgoing)            
                 
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
 
 
     @defer.inlineCallbacks
+    def get_capabilities(self, params, timeout=None):
+        """
+        Obtain the capabilities of the device, including available commands,
+            parameters, channels and statuses, both common and device specific.
+        @param content A list [cap_arg,...,cap_arg] specifying the capability
+            arguments to query.
+        @param timeout optional timeout to the driver causes the rpc timeout
+            to be set slightly longer.
+        @retval A reply message with a dict
+            {'success':success,'result':{cap_arg:(success,val),
+                ...,cap_arg:(success,val)}}.
+       """
+        
+        assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 20
+            content_outgoing = {'params':params,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('get_capabilities',
+                                content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'params':params,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('get_capabilities',
+                                content_outgoing)            
+                
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'        
+        defer.returnValue(content)
+        
+        
     def initialize(self, timeout=None):
         """
         Restore driver to a default, unconfigured state.
@@ -264,11 +357,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('initialize',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('initialize',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'timeout':None}
-            (content, headers, message) = yield self.rpc_send('initialize',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('initialize',
+                                content_outgoing)            
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
@@ -290,11 +385,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'params':params,'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('configure',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('configure',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'params':params,'timeout':None}
-            (content, headers, message) = yield self.rpc_send('configure',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('configure',
+                                content_outgoing)            
                 
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
@@ -315,11 +412,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('connect',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('connect',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'timeout':None}
-            (content, headers, message) = yield self.rpc_send('connect',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('connect',
+                                content_outgoing)            
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
@@ -340,11 +439,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('disconnect',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('disconnect',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'timeout':None}
-            (content, headers, message) = yield self.rpc_send('disconnect',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('disconnect',
+                                content_outgoing)            
         
         assert(isinstance(content, dict)), 'Expected a reply content dict.'        
         defer.returnValue(content)
@@ -367,11 +468,13 @@ class InstrumentDriverClient(ProcessClient):
             assert(timeout>0), 'Expected a positive timeout.'
             rpc_timeout = timeout + 20
             content_outgoing = {'timeout':timeout}
-            (content, headers, message) = yield self.rpc_send('get_state',content_outgoing,timeout=rpc_timeout)            
+            (content, headers, message) = yield self.rpc_send('get_state',
+                                content_outgoing,timeout=rpc_timeout)            
             
         else:            
             content_outgoing = {'timeout':None}
-            (content, headers, message) = yield self.rpc_send('get_state',content_outgoing)            
+            (content, headers, message) = yield self.rpc_send('get_state',
+                                content_outgoing)            
                 
         assert(isinstance(content,str)), 'Expected a state string reply.'
         defer.returnValue(content)
