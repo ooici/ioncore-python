@@ -310,7 +310,6 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing user_ooi_ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
         
-
         #
         # Send a request with a temporal bounds covered by data time 
         #
@@ -1269,6 +1268,26 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
                 self.fail('FindDataResourcesByOwner response has no data_resource_id field')
             else:                
                 dsResourceID = data.data_resource_id
+            if not data.IsFieldSet('update_interval_seconds'):
+                self.fail('FindDataResourcesByOwner response has no update_interval_seconds field')
+            else:                
+                log.debug('update_interval_seconds: ' + str(data.update_interval_seconds))
+            if not data.IsFieldSet('ion_title'):
+                self.fail('FindDataResourcesByOwner response has no ion_title field')
+            else:                
+                log.debug('ion_title: ' + str(data.update_interval_seconds))
+            if not data.IsFieldSet('date_registered'):
+                self.fail('FindDataResourcesByOwner response has no date_registered field')
+            else:                
+                log.debug('date_registered: ' + str(data.date_registered))
+            if not data.IsFieldSet('title'):
+                self.fail('FindDataResourcesByOwner response has no title field')
+            else:                
+                log.debug('title: ' + str(data.title))
+            if not data.IsFieldSet('activation_state'):
+                self.fail('FindDataResourcesByOwner response has no activation_state field')
+            else:                
+                log.debug('activation_state: ' + str(data.activation_state))
             i = i + 1                
 
     def __validateDataResourceSummary(self, dataResourceSummaries):
