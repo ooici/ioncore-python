@@ -158,7 +158,7 @@ class ResourceClient(object):
 
 
     @defer.inlineCallbacks
-    def get_instance(self, resource_id):
+    def get_instance(self, resource_id, excluded_types=None):
         """
         @brief Get the latest version of the identified resource from the data store
         @param resource_id can be either a string resource identity or an IDRef
@@ -193,7 +193,7 @@ class ResourceClient(object):
 
             # Pull the repository
         try:
-            result = yield self.workbench.pull(self.datastore_service, reference)
+            result = yield self.workbench.pull(self.datastore_service, reference, excluded_types=excluded_types)
         except workbench.WorkBenchError, ex:
             log.warn(ex)
             raise ResourceClientError(
