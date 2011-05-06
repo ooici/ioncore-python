@@ -10,15 +10,17 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.messaging.message_client import MessageClient
+from ion.core.object import object_utils
+
 from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.util.iontime import IonTime
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
-
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
@@ -26,11 +28,10 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATARESOURCE_SCHEDULE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, \
-                                                                    ResourceInstance
-from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
-                                                                    ResourceInstanceError
+                                                               ResourceInstance, \
+                                                               ResourceClientError, \
+                                                               ResourceInstanceError
 
-from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -327,7 +328,7 @@ class ManageDataResource(object):
             # get user resource so we can associate it later
             user_resource = yield self.rc.get_instance(msg.user_id)
 
-            # create the data source
+            # create the data source from the fields in the input message
             datasrc_resource = yield self._createDataSourceResource(msg)
             my_datasrc_id = datasrc_resource.ResourceIdentity
 
@@ -379,15 +380,6 @@ class ManageDataResource(object):
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
                 dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
 
-
-            #fill in data
-            datasrc_resource.source_type         = msg.source_type
-            datasrc_resource.request_type        = msg.request_type
-            datasrc_resource.ion_title           = msg.ion_title
-            datasrc_resource.ion_description     = msg.ion_description
-            datasrc_resource.ion_institution_id  = msg.ion_institution_id
-
-            #FIXMEEEE more data pls
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
@@ -498,6 +490,7 @@ class ManageDataResource(object):
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
 
+        datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
