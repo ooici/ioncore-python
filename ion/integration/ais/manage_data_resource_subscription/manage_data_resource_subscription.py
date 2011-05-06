@@ -475,7 +475,6 @@ class ManageDataResourceSubscription(object):
             numSubsReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
             log.debug('getSubscriptionList returned: ' + str(numSubsReturned) + ' subscriptions.')
 
-            defer.returnValue(reply)
 
         except ReceivedApplicationError, ex:
             log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to addSubscription(): %s' %ex)
@@ -486,6 +485,11 @@ class ManageDataResourceSubscription(object):
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
+        #
+        # Now iterate through the list, filtering by the bounds
+        #
+
+        defer.returnValue(reply)
 
     @defer.inlineCallbacks
     def __createDispatcherWorkflow(self, createInfo, dispatcherID):
