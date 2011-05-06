@@ -131,7 +131,7 @@ class ManageDataResource(object):
                     sched_task_rsrc.task_id = sched_task.task_id
                     association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                     sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
-                    self.rc.put_instance(sched_task_rsrc)
+                    yield self.rc.put_instance(sched_task_rsrc)
 
 
 
@@ -271,7 +271,6 @@ class ManageDataResource(object):
 
 
 
-
     @defer.inlineCallbacks
     def create(self, msg_wrapped):
         """
@@ -341,7 +340,6 @@ class ManageDataResource(object):
             dataset_resource = yield self.rc.get_instance(my_dataset_id)
             log.info("created data set " + str(dataset_resource))
 
-
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
@@ -381,7 +379,20 @@ class ManageDataResource(object):
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
                 dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
 
+
+            #fill in data
+            datasrc_resource.source_type         = msg.source_type
+            datasrc_resource.request_type        = msg.request_type
+            datasrc_resource.ion_title           = msg.ion_title
+            datasrc_resource.ion_description     = msg.ion_description
+            datasrc_resource.ion_institution_id  = msg.ion_institution_id
+
+            #FIXMEEEE more data pls
+
             yield self.rc.put_resource_transaction(resource_transaction)
+
+
+            #fixme: signal an ingest
 
 
         except ReceivedApplicationError, ex:
