@@ -98,7 +98,7 @@ class DatasetController(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='dataset_controller',
                                              version='0.1.0',
-                                             dependencies=[])
+                                             dependencies=['scheduler'])
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
@@ -118,6 +118,9 @@ class DatasetController(ServiceProcess):
 
         if self.rsa_key:
             rsa_to_dot_ssh(self.rsa_key)
+        log.debug('Creating new message receiver for scheduler')
+
+        log.debug('Scheduling periodic rsync')
             
         log.info('SLC_INIT Dataset Controller')
 
@@ -170,7 +173,7 @@ class DatasetController(ServiceProcess):
         # pfh - create local ncml file as well
         create_ncml(response.key, NCML_PATH)
         # Push to server
-        yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
+        #yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
