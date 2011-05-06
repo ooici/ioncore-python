@@ -63,6 +63,7 @@ topic_res_type_name = 'topic_resource_type'
 dataset_res_type_name = 'dataset_resource_type'
 identity_res_type_name = 'identity_resource_type'
 datasource_res_type_name = 'datasource_resource_type'
+dispatcher_res_type_name = 'dispatcher_resource_type'
 resource_type_type_name = 'resource_type_type'
 default_resource_type_name = 'default_resource_type'
 exchange_space_rtn = 'exchange_space_resource_type'
@@ -77,7 +78,6 @@ dispatcher_res_type_name = 'dispatcher_resource_type'
 dispatcher_workflow_res_type_name = 'dispatcher_workflow_resource_type'
 
 datasource_schedule_rtn = 'dataresource_schedule_type'
-
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
@@ -262,6 +262,7 @@ INSTRUMENT_AGENT_RES_TYPE_ID   = ION_RESOURCE_TYPES[instrument_agent_res_type_na
 DATASET_RESOURCE_TYPE_ID       = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID      = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID    = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
+DISPATCHER_RESOURCE_TYPE_ID    = ION_RESOURCE_TYPES[dispatcher_res_type_name][ID_CFG]
 RESOURCE_TYPE_TYPE_ID          = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
 
 DATARESOURCE_SCHEDULE_TYPE_ID  = ION_RESOURCE_TYPES[datasource_schedule_rtn][ID_CFG]

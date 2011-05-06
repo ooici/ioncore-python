@@ -16,7 +16,8 @@ from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
-                                                                    DATASET_RESOURCE_TYPE_ID
+                                                                    DATASET_RESOURCE_TYPE_ID, \
+                                                                    DISPATCHER_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, \
                                                                     ResourceInstance
@@ -377,14 +378,7 @@ class ManageDataResourceSubscription(object):
                 # There should be a dispatcher associated with this user; find it now.
                 #
 
-                #
-                # TEMPORARY TEMPORARY TEMPORARY!!!
-                #
-                log.info("Creating dispatcher for test")
-                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource')
-                self.dispatcherID = self.dispatcherRes.ResourceIdentity
-                log.info('Created Dispatcher ID: ' + self.dispatcherID)
-                log.info('Getting resource instance')
+                log.info('Getting user resource instance')
                 try:
                     self.userRes = yield self.rc.get_instance(userID)
                 except ResourceClientError:
@@ -395,10 +389,18 @@ class ManageDataResourceSubscription(object):
                     Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
                     Response.error_str = errString
                     defer.returnValue(Response)
-
-                log.info('Got resource instance: ' + self.userRes.ResourceIdentity)
+                log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                 self.userID = self.userRes.ResourceIdentity
-                
+
+                #
+                # START OF TEMPORARY TEMPORARY TEMPORARY!!!
+                #
+                log.info("Creating 2 dispatchers for testing")
+                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+                log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+                self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+                self.dispatcherID = self.dispatcherRes.ResourceIdentity
+                log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
                     
                 try:
                     #
@@ -418,22 +420,20 @@ class ManageDataResourceSubscription(object):
                     yield self.rc.put_instance(association)
 
                 except AssociationClientError, ex:
-                    errString = 'Error creating assocation between userID: ' + userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex
+                    errString = 'Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex
                     log.error(errString)
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                     Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
                     Response.error_str = errString
                     defer.returnValue(Response)
+                #
+                # END OF TEMPORARY TEMPORARY TEMPORARY!!!
+                #
 
-                """
-                #COMMENTING THIS OUT UNTIL I FIND A WAY TO FIND THE ASSOCIATED DISPATCHER
-                #dispatcherID = yield self.__findDispatcher(userID)
                 dispatcherID = yield self.__findDispatcher(self.userRes)
-                #dispatcherID = yield self.__findDispatcherOld(self.userRes)
-
                 if (dispatcherID is None):
-                    errString = 'Dispatcher not found for userID' + userID
+                    errString = 'Dispatcher not found for userID' + self.userID
                     log.error(errString)
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -442,7 +442,6 @@ class ManageDataResourceSubscription(object):
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
-                """                    
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
@@ -458,6 +457,38 @@ class ManageDataResourceSubscription(object):
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
+
+    @defer.inlineCallbacks
+    def __findDispatcher(self, userRes):
+
+        # get the user's associations
+        Associations = yield self.ac.find_associations(subject=userRes)       
+        log.debug('Found ' + str(len(Associations)) + ' associations for user ' + userRes.ResourceIdentity)
+        
+        # get the dispatcher resources out of the Association Service
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = request.pairs.add()
+  
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+        pair.predicate = pref
+  
+        # Set the Object search term
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = DISPATCHER_RESOURCE_TYPE_ID    
+        pair.object = type_ref
+  
+        Dispatchers = yield self.asc.get_subjects(request)     
+        log.debug('Found ' + str(len(Dispatchers.idrefs)) + ' dispatchers.')
+        
+        for Association in Associations:
+            for Dispatcher in Dispatchers.idrefs:
+                log.info('a=%s, d=%s'%(str(Association.ObjectReference.key), str(Dispatcher.key)))
+                if Association.ObjectReference.key == Dispatcher.key:
+                    defer.returnValue(Dispatcher.key)
+        defer.returnValue(None)
+        
 
     @defer.inlineCallbacks
     def find(self, msg):
@@ -679,84 +710,6 @@ class ManageDataResourceSubscription(object):
 
         the_resource = yield self.rc.get_associated_resource_subject(association)
         defer.returnValue(the_resource)
-
-
-    @defer.inlineCallbacks
-    def __findDispatcher(self, userRes):
-
-        #found = yield self.ac.find_associations(subject=userRes, \
-        #                                        predicate_or_predicates=HAS_A_ID)
-        found = yield self.ac.find_associations(subject=userRes)
-        
-        """
-        FIXME
-        This does not work; the assocatiation_exists call below can't find by
-        type!!!
-        """
-
-        log.debug('HAS_A_ID is: ' + HAS_A_ID)
-        log.debug('Found ' + str(len(found)) + ' associations.')
-        association = None
-        for a in found:
-            log.debug('FOUND: ' + str(a))
-            #exists = yield self.ac.association_exists(a.ObjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
-            exists = yield self.ac.association_exists(a.SubjectReference.key, HAS_A_ID, DISPATCHER_RESOURCE_TYPE)
-            if exists:
-                association = a
-
-        if association is None:
-            log.error('No associations found!!!')
-            defer.returnValue(None)
-        else:            
-            the_resource = yield self.rc.get_associated_resource_object(association)
-            defer.returnValue(the_resource)
-
-
-    @defer.inlineCallbacks
-    #def __findDispatcherOld(self, userID):
-    def __findDispatcherOld(self, userRes):
-
-        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
-
-        #
-        # Set up an owned_by_id search term using:
-        # - HAS_A_ID as predicate
-        # - DISPATCHER_RESOURCE_TYPE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = HAS_A_ID
-
-        pair.predicate = pref
-
-        # ..(subject)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        #userRes = yield get_instance(userID)
-        #type_ref.key = userID
-        type_ref.key = userRes
-        
-        pair.subject = type_ref
-
-        log.info('Calling get_objects with userID: ' + userRes.ResourceIdentity)
-
-        try:
-            result = yield self.asc.get_objects(request)
-        
-        except AssociationServiceError:
-            log.error('__findOwner: association error!')
-            defer.returnValue(None)
-
-        if len(result.idrefs) == 0:
-            log.error('Dispatcher not found!')
-            defer.returnValue(None)
-        elif len(result.idrefs) == 1:
-            log.error('FOUND EXACTLY 1!')
-            defer.returnValue(result.idrefs[0].key)
-        else:
-            log.error('More than 1 dispatcher found!')
-            defer.returnValue(None)
 
 
     @defer.inlineCallbacks
