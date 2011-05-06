@@ -116,7 +116,6 @@ class PSAT(IonTestCase):
     def test_complete(self):
         pubkey = self._get_public_key()
         privkey= self._get_rsa_key()
-        # This throws IOError if a fault, which will fail the test
-        pkf, pubkf = rsa_to_dot_ssh(privkey, public_key=pubkey)
 
         yield do_complete_rsync(self.filedir, self.server_url, privkey, pubkey)
+

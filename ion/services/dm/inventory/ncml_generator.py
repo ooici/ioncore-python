@@ -35,6 +35,7 @@ from ion.core import ioninit
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 RSYNC_CMD = CONF['rsync']
+SSH_ADD_CMD = CONF['ssh-add']
 
 class AsyncProcessWithCallbackProto(ProcessProtocol):
     """
@@ -129,6 +130,7 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
         fh = open(pubkey_filename, 'w')
         fh.write(public_key)
         fh.close()
+        
         log.debug('Wrote keys OK')
     except IOError, ioe:
         log.exception('Error writing ssh keys')
@@ -153,10 +155,10 @@ def ssh_add(filename, remove=False):
     else:
         second_arg = ''
 
-    args = ['ssh-add', second_arg, filename]
+    args = [SSH_ADD_CMD, second_arg, filename]
     log.debug('Command is %s' % args)
 
-    reactor.spawnProcess(rpp, 'ssh-add', args, env=environ.data)
+    reactor.spawnProcess(rpp, SSH_ADD_CMD, args, env=environ.data)
     return d
 
 
