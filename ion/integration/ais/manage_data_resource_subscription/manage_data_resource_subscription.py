@@ -446,7 +446,7 @@ class ManageDataResourceSubscription(object):
                 #
                 # Create a dispatcher workflow
                 #
-                yield self._createDispatcherWorkflow(self.userRes)
+                yield self.__createDispatcherWorkflow(self.userRes, dispatcherID)
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
@@ -527,19 +527,20 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
-    def __createDispatcherWorkflow(self, userRes, dispatcherRes):
+    def __createDispatcherWorkflow(self, userRes, dispatcherID):
  
         log.debug('__createDispatcherWorkflow'
                   )
         #dispatcherID = self.dispatcherID
-        dispatcherID = dispatcherRes.ResourceIdentity
+        #dispatcherID = dispatcherRes.ResourceIdentity
+        dispatcherRes = self.rc.get_instance(dispatcherID)
 
         #Create the dispatcher workflow resource
         dwfRes = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, ResourceName = 'DispatcherWorkflow')
         workflowID = dwfRes.ResourceIdentity
-        dwfRes.dataset_id = dataset_resource.key
-        dwfRes.workflow_path = dispatcher_script_path
-        dwfRes.ResourcesLifecycleState = dwr.ACTIVE
+        #dwfRes.dataset_id = dataset_resource.key
+        #dwfRes.workflow_path = dispatcher_script_path
+        #dwfRes.ResourcesLifecycleState = dwr.ACTIVE
         yield self.rc.put_instance(dwfRes)
 
         log.debug('Creating association between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID)        
