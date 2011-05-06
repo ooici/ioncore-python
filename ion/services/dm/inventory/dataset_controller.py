@@ -109,19 +109,18 @@ class DatasetController(ServiceProcess):
         self.asc = AssociationServiceClient(proc=self)
 
         # As per DS, pull config from spawn args first and config file(s) second
-        self.rsa_key = self.spawn_args.get('rsa_key', CONF.getValue('rsa_key', default=None))
+        """
+        self.rsa_key = self.spawn_args.get('rsa_key' , CONF.getValue('rsa_key', default=None))
         self.server_url = self.spawn_args.get('thredds_ncml_url',
                                               CONF.getValue('thredds_ncml_url',
                                               default='thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))
         self.update_interval = self.spawn_args.get('update_interval', CONF.getValue('update_interval', default=5.0))
         log.debug('rsa key: %s Update: %f URL: %s' % (self.rsa_key, self.update_interval, self.server_url))
 
-        if self.rsa_key:
-            rsa_to_dot_ssh(self.rsa_key)
         log.debug('Creating new message receiver for scheduler')
 
         log.debug('Scheduling periodic rsync')
-            
+        """
         log.info('SLC_INIT Dataset Controller')
 
     #noinspection PyUnusedLocal
@@ -172,8 +171,6 @@ class DatasetController(ServiceProcess):
 
         # pfh - create local ncml file as well
         create_ncml(response.key, NCML_PATH)
-        # Push to server
-        #yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
