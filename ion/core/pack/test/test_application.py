@@ -22,7 +22,7 @@ class AppLoaderTest(IonTestCase):
     """
     def test_load_appfile(self):
         # Tests run in <main>/_trial_temp
-        filename = '../res/apps/example.app'
+        filename = 'res/apps/example.app'
         app = AppLoader.load_app_definition(filename)
         log.debug(app)
         self.assertTrue(app)
@@ -33,7 +33,7 @@ class AppLoaderTest(IonTestCase):
     """
     def test_load_resfile(self):
         # Tests run in <main>/_trial_temp
-        filename = '../res/deploy/example.rel'
+        filename = 'res/deploy/example.rel'
         rel = ReleaseLoader.load_rel_definition(filename)
         log.debug(rel)
         self.assertTrue(rel)

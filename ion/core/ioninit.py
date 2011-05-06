@@ -12,6 +12,7 @@ import re
 import os, os.path
 
 from ion.util.context import StackLocal
+from ion.util.path import adjust_dir
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
@@ -30,10 +31,10 @@ del sys
 
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
-logconf = ic.LOGCONF_FILENAME
+logconf = adjust_dir(ic.LOGCONF_FILENAME)
 if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
     # make sure that path exists
-    altpath = os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF)
+    altpath = adjust_dir(os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF))
     if os.path.exists(altpath):
         logconf = altpath
     else:
@@ -81,18 +82,6 @@ def get_config(confname, conf=None):
     if conf == None:
         conf = ion_config
     return Config(conf.getValue(confname)).getObject()
-
-def adjust_dir(filename):
-    """
-    @brief Compensates for different current directories in tests and production
-    """
-    if not filename:
-        return None
-    #if testing:
-    if os.getcwd().endswith("_trial_temp"):
-        return "../" + filename
-    else:
-        return filename
 
 def install_msgpacker():
     from ion.core.messaging.serialization import registry
