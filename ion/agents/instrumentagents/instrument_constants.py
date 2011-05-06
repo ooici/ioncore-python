@@ -426,7 +426,6 @@ class InstErrorCode(BaseEnum):
     DRIVER_DISCONNECT_FAILED = ['ERROR_DRIVER_DISCONNECT_FAILED_FAILED','The agent could not disconnect to the driver.']    
     
     
-    
     @classmethod
     def is_ok(cls,x):
         """

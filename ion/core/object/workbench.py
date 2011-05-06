@@ -70,6 +70,7 @@ BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1
 
 DATA_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=53, version=1)
 DATA_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=54, version=1)
+DATA_CHUNK_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=57, version=1)
 GET_OBJECT_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=55, version=1)
 GET_OBJECT_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=56, version=1)
 

@@ -16,7 +16,10 @@ from ion.core.object import object_utils
 
 from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 from ion.services.dm.ingestion.ingestion import IngestionClient
-from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
+                                                        SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+from ion.services.dm.distribution.events import ScheduleEventPublisher
+
 
 from ion.util.iontime import IonTime
 
@@ -68,6 +71,7 @@ class ManageDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
+        self.pub   = ScheduleEventPublisher(process=ais)
 
 
     @defer.inlineCallbacks
@@ -317,7 +321,7 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
 
-            #FIXME: need to do cfchecker validation before we proceed.  this service doesn't exist yet.
+            #FIXME: need to do cfchecker validation before we proceed. 
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
@@ -383,8 +387,7 @@ class ManageDataResource(object):
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
-
-            #fixme: signal an ingest
+            yield self._createEvent(my_dataset_id, my_datasrc_id)
 
 
         except ReceivedApplicationError, ex:
@@ -415,6 +418,23 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
+
+    @defer.inlineCallbacks
+    def _createEvent(self, dataset_id, datasource_id):
+        """
+        @brief create a single ingest event trigger and send it
+        """
+        log.info("triggering an immediate ingest event")
+        msg = yield self.pub.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                          task_id="manage_data_resource_FAKED_TASK_ID")
+        
+        msg.additional_data.payload = msg.CreateObject(SCHEDULER_PERFORM_INGEST)
+        msg.additional_data.payload.dataset_id     = dataset_id
+        msg.additional_data.payload.datasource_id  = datasource_id
+
+        yield self.pub.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+
+
     @defer.inlineCallbacks
     def _createScheduledEvent(self, interval, start_time, dataset_id, datasource_id):
         """
@@ -429,6 +449,7 @@ class ManageDataResource(object):
         req_msg.payload                = req_msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         req_msg.payload.dataset_id     = dataset_id
         req_msg.payload.datasource_id  = datasource_id
+        req_msg.payload.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
         log.info("sending request to scheduler")
         response = yield self.sc.add_task(req_msg)
@@ -540,7 +561,6 @@ class ManageDataResource(object):
         """
 
         #this seems very un-GPB-ish, to have to check fields...
-        #FIXME: comment out things that aren't actually required
         req_fields = ["user_id",
                       "source_type",
                       "request_type",
@@ -559,7 +579,7 @@ class ManageDataResource(object):
                       ]
 
 
-        #FIXME: what do about these repeated fields?
+        #these repeated fields don't need to be set either
         #repeated string property = 3;
         #repeated string station_id = 4;
 

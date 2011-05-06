@@ -23,6 +23,8 @@ from ion.core.process.process import ProcessFactory
 
 import string
 import smtplib
+import time
+from datetime import datetime
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
@@ -135,7 +137,7 @@ class NotificationAlertService(ServiceProcess):
 
                 BODY = string.join(("You have subscribed to data source %s in OOI CI." % msg.additional_data.datasource_id,
                                         "This is an alert that the data source is currently unavailable.",
-                                        "Explanation: %s" %  msg.additional_data.explanation), "\r\n")
+                                        "Explanation: %s" %  msg.additional_data.error_explanation), "\r\n")
 
                 body = string.join((
 
@@ -180,24 +182,29 @@ class NotificationAlertService(ServiceProcess):
                 yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
                 log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
 
-                log.info('NotificationAlertService.handle_update_event subscription_type %s', rows[key]['subscription_type'])
-                log.info('NotificationAlertService.handle_update_event email_alerts_filter %s', rows[key]['email_alerts_filter'])
-
                 if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
                     and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATES  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
                     # Send the message via our own SMTP server, but don't include the envelope header.
                     # Create the container (outer) email message.
                     log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
+                    format = "%a %b %d %H:%M:%S %Y"
+                    startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
+                    enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
+                    steps =  str(msg.additional_data.number_of_timesteps)
+                    log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
                     FROM = 'OOI@ucsd.edu'
                     TO = tempTbl['user_email']
 
                     SUBJECT = "OOI CI Data Alert"
 
-
                     BODY = string.join(("You have subscribed to data set %s in OOI CI. " % msg.additional_data.datasource_id,
                                     "This is an alert that additional data has been received.",
                                     "Data Source Title: %s" %  msg.additional_data.title,
-                                    "Data Source URL: %s" %  msg.additional_data.url  ), "\r\n")
+                                    "Data Source URL: %s" %  msg.additional_data.url,
+                                    "Start time: %s" % startdt,
+                                    "End time: %s" % enddt,
+                                    "Number of time steps: %s" % steps,
+                                    "To modify or remove this subscription, please access the WebUI. "), "\r\n")
 
                     body = string.join((
 

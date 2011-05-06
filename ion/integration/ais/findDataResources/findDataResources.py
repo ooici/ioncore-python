@@ -44,6 +44,15 @@ DNLD_DIR_PATH = '/dodsC/scanData/'
 DNLD_FILE_TYPE = '.ncml'
 
 class FindDataResources(object):
+
+    #
+    # these are the mappings from resource life cycle states to the view
+    # permission states of a dataset
+    # 
+    REGISTERED = 'Registered'
+    PRIVATE    = 'Private'
+    PUBLIC     = 'Public'
+    UNKOWNN    = 'Unknown'
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
@@ -833,17 +842,18 @@ class FindDataResources(object):
         rspPayload.title = minMetaData['title']
         rspPayload.date_registered = dSource.registration_datetime_millis
         rspPayload.ion_title = dSource.ion_title
-        rspPayload.activation_state = dSource.ResourceLifeCycleState
+        #rspPayload.activation_state = dSource.ResourceLifeCycleState
+        #
+        # Set the activate state based on the resource lcs
+        #
+        if dSource.ResourceLifeCycleState == dSource.NEW:
+            rspPayload.activation_state = self.REGISTERED
+        elif dSource.ResourceLifeCycleState == dSource.ACTIVE:
+            rspPayload.activation_state = self.PRIVATE
+        elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
+            rspPayload.activation_state = self.PUBLIC
+        else:
+            rspPayload.activation_state = self.UNKNOWN
         rspPayload.update_interval_seconds = dSource.update_interval_seconds
         
-        
-        """
-        optional string data_resource_id         = 1; 
-        optional string title                    = 2;
-        optional uint64 date_registered          = 3;
-        optional string ion_title                = 4;
-        optional string activation_state         = 5;
-        optional uint64 update_interval_seconds = 6;
-        """
-
 
