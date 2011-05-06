@@ -206,7 +206,7 @@ class AISManageDataResourceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_updateDataResourceNull(self):
+    def test_updateDataResource_BadInput(self):
         """
         run through the update code but don't specify any ids.
         """
@@ -314,7 +314,7 @@ class AISManageDataResourceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_deleteDataResourceNull(self):
+    def test_deleteDataResource_BadInput(self):
         """
         run through the delete code but don't specify any ids.
         """
@@ -399,16 +399,18 @@ class AISManageDataResourceTest(IonTestCase):
         defer.returnValue(None)
 
 
-
-
     @defer.inlineCallbacks
-    def _createDataResource(self):
-
+    def test_createDataResource_BadInput(self):
         log.info("Trying to call createDataResource with the wrong GPB")
         create_req_msg  = yield self.mc.create_instance(CREATE_DATA_RESOURCE_REQ_TYPE)
         result       = yield self.aisc.createDataResource(create_req_msg)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "createDataResource accepted a GPB that was known to be the wrong type")
+
+
+
+    @defer.inlineCallbacks
+    def _createDataResource(self):
 
         ais_req_msg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         create_req_msg  = ais_req_msg.CreateObject(CREATE_DATA_RESOURCE_REQ_TYPE)
