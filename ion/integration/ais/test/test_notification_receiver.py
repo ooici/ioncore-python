@@ -117,8 +117,8 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
         reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id

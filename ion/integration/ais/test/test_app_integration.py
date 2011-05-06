@@ -1057,6 +1057,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_findDataResourceSubscriptions(self):
+        raise unittest.SkipTest("This SW is not ready for testing.")
         log.debug('Testing findDataResourceSubscriptions.')
 
         # Create a message client
@@ -1157,6 +1158,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
+        raise unittest.SkipTest("This SW is not ready for testing.")
         log.debug('Testing updateDataResourceSubscription.')
 
         # Create a message client and user

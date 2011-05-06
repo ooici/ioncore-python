@@ -27,6 +27,8 @@ from ion.util import procutils as pu
 
 from ion.core.object import object_utils, codec, gpb_wrapper
 
+from ion.util.iontime import IonTime
+
 
 ION_MSG_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
 SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
@@ -568,6 +570,11 @@ def bootstrap_profile_data_source_resource(datasource, *args, **kwargs):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Profile Data Source"
+    datasource.ion_description = "Data Profile"
 
     return True
 
@@ -602,6 +609,11 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
 
     datasource.max_ingest_millis = 10000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Traj Data Source"
+    datasource.ion_description = "Data Traj"
 
     return True
 
@@ -641,6 +653,11 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Station Data Source"
+    datasource.ion_description = "Data Station"
 
     return True
 
@@ -675,6 +692,11 @@ def bootstrap_hycom_data_source(datasource, *args, **kwargs):
     datasource.request_type = datasource.RequestType.FTP
     datasource.base_url = "ftp://ftp7300.nrlssc.navy.mil/pub/smedstad/ROMS/"
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "HyCom Data Source"
+    datasource.ion_description = "Data HyCom"
 
     return True
 
@@ -711,6 +733,11 @@ def bootstrap_ntas1_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "NTAS1 Data Source"
+    datasource.ion_description = "Data NTAS1"
 
     return True
 
@@ -748,6 +775,11 @@ def bootstrap_ntas2_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-2.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "NTAS2 Data Source"
+    datasource.ion_description = "Data NTAS2"
 
     return True
 
@@ -784,6 +816,11 @@ def bootstrap_whots1_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "WHOTS1 Data Source"
+    datasource.ion_description = "Data WHOTS1"
 
     return True
 
@@ -819,6 +856,11 @@ def bootstrap_whots2_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "WHOTS2 Data Source"
+    datasource.ion_description = "Data WHOTS2"
 
     return True
 
@@ -856,6 +898,11 @@ def bootstrap_moanalua_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Moana Loa Data Source"
+    datasource.ion_description = "Data from Moana Loa"
 
     return True
 
@@ -894,6 +941,11 @@ def bootstrap_choptank_river_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Choptank River Data Source"
+    datasource.ion_description = "Data from Choptank River"
 
     return True
 
@@ -932,6 +984,11 @@ def bootstrap_connecticut_river_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Connecticut River Data Source"
+    datasource.ion_description = "Data from Connecticut River"
 
     return True
 
