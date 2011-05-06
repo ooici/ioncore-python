@@ -36,7 +36,7 @@ from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publis
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
-from ion.services.dm.distribution.publisher_subscriber import Publisher
+from ion.services.coi.datastore import DataStoreClient
 from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
 
 
@@ -47,11 +47,27 @@ from ion.core.object import object_utils
 
 CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
+CDM_SINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10009, version=1)
+CDM_UINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10010, version=1)
+CDM_LSINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10011, version=1)
+CDM_LUINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10012, version=1)
+
+CDM_FLOAT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10013, version=1)
+CDM_DOUBLE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10014, version=1)
+
+CDM_STRING_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, version=1)
+CDM_OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
+
+CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+
 SUPPLEMENT_MSG_TYPE           = object_utils.create_type_identifier(object_id=2001, version=1)
 PERFORM_INGEST_MSG_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
 CREATE_DATASET_TOPICS_MSG_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
 INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
 DAQ_COMPLETE_MSG_TYPE = object_utils.create_type_identifier(object_id=2005, version=1)
+
+
+
 
 
 class IngestionError(ApplicationError):
@@ -69,6 +85,10 @@ class IngestionService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='ingestion', version='0.1.0', dependencies=[])
 
     #TypeClassType = gpb_wrapper.get_type_from_obj(type_pb2.ObjectType())
+
+
+    excluded_data_array_types = (CDM_SINT_ARRAY_TYPE, CDM_UINT_ARRAY_TYPE, CDM_LSINT_ARRAY_TYPE, CDM_LUINT_ARRAY_TYPE,
+        CDM_DOUBLE_ARRAY_TYPE, CDM_FLOAT_ARRAY_TYPE, CDM_STRING_ARRAY_TYPE, CDM_OPAQUE_ARRAY_TYPE)
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -152,7 +172,17 @@ class IngestionService(ServiceProcess):
         """
          
         # Get the current state of the dataset:
-        self.dataset = yield self.rc.get_instance(content.dataset_id)
+        self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+
+        ba_links = []
+        for var in self.dataset.root_group.variables:
+
+            var_links = var.content.bounded_arrays.GetLinks()
+            ba_links.extend(var_links)
+
+        self.dataset.Repository.fetch_links(ba_links)
+
+
 
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
@@ -301,9 +331,9 @@ class IngestionService(ServiceProcess):
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
                                      % str(content), content.ResponseCodes.BAD_REQUEST)
-        print '===== Content ==== \n', content
+        #print '===== Content ==== \n', content
 
-        print '===== Dataset ======\n', self.dataset
+        #print '===== Dataset ======\n', self.dataset
 
         if self.dataset is None:
             raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
@@ -314,9 +344,6 @@ class IngestionService(ServiceProcess):
         if content.dataset_id != self.dataset.ResourceIdentity:
             raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
 
-        # Attach the update to each variable!
-        if var_container.ObjectType != SUPPLEMENT_MSG_TYPE:
-            raise IOError('Invalid variable supplement component found in the tar file dataset - "%s"' % filename)
 
         #print 'Tar Content: \n',var_container.PPrint()
 
@@ -336,7 +363,7 @@ class IngestionService(ServiceProcess):
 
 
 
-        print '===== Dataset Updated ======\n',self.dataset
+        #print '===== Dataset Updated ======\n',self.dataset
 
         yield msg.ack()
 
