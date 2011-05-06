@@ -54,7 +54,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # automatically. 
 SKIP_TESTS = [
     'test_execute_instrument',
-    'test_agent_states',
+    'test_state_transitions',
     'dummy'
 ]    
 
@@ -143,7 +143,7 @@ class TestSBE37Agent(IonTestCase):
         if not RUN_TESTS:
             raise unittest.SkipTest("Do not run this test automatically.")
         
-        if 'test_agent_states' in SKIP_TESTS:
+        if 'test_state_transitions' in SKIP_TESTS:
             raise unittest.SkipTest('Skipping during development.')
 
         # Check agent state upon creation. No transaction needed for
