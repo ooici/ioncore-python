@@ -107,19 +107,34 @@ class IngestionTest(IonTestCase):
 
         #print '\n\n\n Got Dataset in Ingest \n\n\n\n'
 
+        # Pick a few variables to 'update'
+        var_list = ['time', 'depth', 'lat', 'lon', 'salinity']
+
+        for var in var_list:
+
+            yield self.create_and_test_variable_chunk(var)
+
+
+    @defer.inlineCallbacks
+    def create_and_test_variable_chunk(self, var_name):
+
+        group = self.ingest.dataset.root_group
+        var = group.FindVariableByName(var_name)
+        starting_bounded_arrays  = var.content.bounded_arrays[:]
+
         supplement_msg = yield self.ingest.mc.create_instance(SUPPLEMENT_MSG_TYPE)
         supplement_msg.dataset_id = SAMPLE_PROFILE_DATASET_ID
-        supplement_msg.variable_name = 'time'
+        supplement_msg.variable_name = var_name
 
         self.create_chunk(supplement_msg)
 
         # Call the op of the ingest process directly
         yield self.ingest.op_recv_chunk(supplement_msg, '', self.fake_msg())
 
+        updated_bounded_arrays = var.content.bounded_arrays[:]
 
-        group = self.ingest.dataset.root_group
-        var = group.FindVariableByName('time')
-
+        # This is all we really need to do - make sure that the bounded array has been added.
+        self.assertEqual(len(updated_bounded_arrays), len(starting_bounded_arrays)+1)
 
 
     def create_chunk(self, supplement_msg):
@@ -127,23 +142,36 @@ class IngestionTest(IonTestCase):
         This method is specialized to create bounded arrays for the Sample profile dataset.
         """
 
-        tsteps = 3
+
 
         supplement_msg.bounded_array = supplement_msg.CreateObject(BOUNDED_ARRAY_TYPE)
         supplement_msg.bounded_array.ndarray = supplement_msg.CreateObject(FLOAT32ARRAY_TYPE)
 
         if supplement_msg.variable_name == 'time':
 
+            tsteps = 3
             tstart = 1280106120
             delt = 3600
             supplement_msg.bounded_array.ndarray.value.extend([tstart + delt*n for n in range(tsteps)])
 
             supplement_msg.bounded_array.bounds.add()
-            supplement_msg.bounded_array.bounds.origin = 0
-            supplement_msg.bounded_array.bounds.size = tsteps
+            supplement_msg.bounded_array.bounds[0].origin = 0
+            supplement_msg.bounded_array.bounds[0].size = tsteps
 
-            
+        elif supplement_msg.variable_name == 'depth':
+            supplement_msg.bounded_array.ndarray.value.extend([0.0, 0.1, 0.2])
+            supplement_msg.bounded_array.bounds.add()
+            supplement_msg.bounded_array.bounds[0].origin = 0
+            supplement_msg.bounded_array.bounds[0].size = 3
 
+        elif supplement_msg.variable_name == 'salinity':
+            supplement_msg.bounded_array.ndarray.value.extend([29.84, 29.76, 29.87, 30.16, 30.55, 30.87])
+            supplement_msg.bounded_array.bounds.add()
+            supplement_msg.bounded_array.bounds[0].origin = 0
+            supplement_msg.bounded_array.bounds[0].size = 2
+            supplement_msg.bounded_array.bounds.add()
+            supplement_msg.bounded_array.bounds[1].origin = 0
+            supplement_msg.bounded_array.bounds[1].size = 3
 
 
 

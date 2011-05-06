@@ -283,9 +283,9 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
                                      % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        print '===== Content ==== \n', content
+        #print '===== Content ==== \n', content
 
-        print '===== Dataset ======\n', self.dataset
+        #print '===== Dataset ======\n', self.dataset
 
         if self.dataset is None:
             raise IngestionError('Calling recv_dataset in an invalid state. No Dataset checked out to ingest.')
@@ -320,7 +320,7 @@ class IngestionService(ServiceProcess):
             else:
                 var.content = resource_instance.CreateObject(array_structure_type)
 
-        print '===== Dataset Updated ======\n',self.dataset.Resource.PPrint()
+        #print '===== Dataset Updated ======\n',self.dataset.Resource.PPrint()
 
         yield msg.ack()
 
