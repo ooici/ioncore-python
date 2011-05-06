@@ -166,15 +166,6 @@ datasource_res_type_name:{ID_CFG:'B8B7BB73-F578-4604-B3B3-088D28F9A7DC',
                                     'meta_description':'protomessage?'}
                         },
 
-dispatcher_res_type_name:{ID_CFG:'E1ED2FAD-6F4C-4C2F-9A0A-A92308A20596',
-                     TYPE_CFG:resource_type_type,
-                     NAME_CFG:dispatcher_res_type_name,
-                     DESCRIPTION_CFG:'A dispather resource cantains the name of a dispatcher',
-                     CONTENT_CFG:{'object_identifier':7002,
-                                  'object_version':1,
-                                  'meta_description':'protomessage?'}
-                     },
-
 queue_rtn : {ID_CFG: 'EEE94F63-CD27-4F7B-9DAA-FD8782B66AE1',
              TYPE_CFG: resource_type_type,
              NAME_CFG:queue_rtn,
