@@ -1367,6 +1367,31 @@ class Repository(ObjectContainer):
         self._object_counter += 1
         return str(self._object_counter)
 
+
+    @defer.inlineCallbacks
+    def fetch_links(self, links):
+
+        if hasattr(self._process, 'fetch_links'):
+            # Get the method from the process if it overrides workbench
+            fetch_links = self._process.fetch_links
+        elif hasattr(self._process, 'workbench'):
+            fetch_links = self._process.workbench.fetch_links
+
+        else:
+            raise RepositoryError('The repository object has no process to send a message with. It can not get the linked objects!')
+
+        #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
+        elements = yield fetch_links(self.upstream, links)
+
+        self.index_hash.update(elements)
+
+        # Load the content by the link!
+        for link in links:
+            self.get_linked_object(link)
+
+
+
+    '''
     @defer.inlineCallbacks
     def get_remote_linked_object(self, link):
             
@@ -1395,10 +1420,9 @@ class Repository(ObjectContainer):
             fetch_links = self._process.workbench.fetch_links
 
         #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
-        elements = yield fetch_links(self.upstream['process'], links)
+        elements = yield fetch_links(self.upstream, links)
 
-        for element in elements:
-            self.index_hash[element.key] = element
+        self.index_hash.update(elements)
 
     @defer.inlineCallbacks
     def load_remote_links(self, items):
@@ -1430,7 +1454,8 @@ class Repository(ObjectContainer):
             res = True
 
         defer.returnValue(res)
-        
+    '''
+    
     def copy_object(self, value, deep_copy=True):
         """
         Copy an object. This method will serialize the current state of the value.
