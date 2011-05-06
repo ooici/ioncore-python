@@ -8,6 +8,7 @@
 
 import os.path
 import weakref
+from ion.util.path import adjust_dir
 
 class Config(object):
     """
@@ -22,7 +23,7 @@ class Config(object):
             by cfgFile will be extracted
         """
         assert cfgFile
-        self.filename = cfgFile
+        self.filename = adjust_dir(cfgFile)
         self.config = None
 
         if config != None:
@@ -31,7 +32,7 @@ class Config(object):
             self.obj = None
         else:
             # Load config from filename
-            filecontent = open(cfgFile,).read()
+            filecontent = open(self.filename,).read()
             self.obj = eval(filecontent)
 
     def __getitem__(self, key):

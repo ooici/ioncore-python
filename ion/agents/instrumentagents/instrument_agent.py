@@ -1446,79 +1446,12 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
 
+
         try:
                     
+            """
             get_errors = False
             result = {}
-
-            """                                    
-            for (param_arg,meta_arg) in params:
-                
-                
-                if param_arg == 'all' and meta_arg == 'all':
-                    for param_key in ci_param_list:
-                        if not result.has_key(param_key):
-                            result[param_key] = {}
-                        if param_key not in ci_param_metadata.keys():
-                            result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
-                            get_errors = True
-                        else:
-                            for meta_key in ci_param_metadata[param_key]:
-                                val = ci_param_metadata[param_key][meta_key]
-                                result[param_key].update({meta_key:(['OK'],val)})
-                                                                
-                
-                elif param_arg == 'all' and meta_arg != 'all':
-                    for param_key in ci_param_list:
-                        if not result.has_key(param_key):
-                            result[param_key] = {}
-                        if param_key not in ci_param_metadata.keys():
-                            result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
-                            get_errors = True
-                        elif meta_arg not in metadata_list:
-                            result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
-                            get_errors = True
-                        else:
-                            try:
-                                val = ci_param_metadata[param_key][meta_arg]
-                            except:
-                                result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
-                                get_errors = True
-                            else:
-                                result[param_key].update({meta_arg:(['OK'],val)})
-                                
-                                            
-                elif param_arg != 'all' and meta_arg == 'all':
-                    if not result.has_key(param_arg):
-                        result[param_arg] = {}
-                    if param_arg not in ci_param_list:
-                        result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
-                        get_errors = True
-                    elif param_arg not in ci_param_metadata.keys():
-                        result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
-                        get_errors = True
-                    else:
-                        for meta_key in ci_param_metadata[param_arg].keys():
-                            val = ci_param_metadata[param_arg][meta_key]
-                            result[param_arg].update({meta_key:(['OK'],val)})
-                    
-                else:
-                    if not result.has_key(param_arg):
-                        result[param_arg] = {}
-                    if param_arg not in ci_param_list:
-                        result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
-                        get_errors = True
-                    elif param_arg not in ci_param_metadata.keys():
-                        result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
-                        get_errors = True
-                    else:
-                        try:
-                            val = ci_param_metadata[param_arg][meta_arg]
-                        except:
-                            result[param_arg].update({meta_arg:(errors['INVALID_METADATA'],None)})    
-                        else:
-                            result[param_arg].update({meta_arg:(['OK'],val)})
-            """
             
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
@@ -1528,6 +1461,10 @@ class InstrumentAgent(Process):
                 
             reply['success'] = success
             reply['result'] = result
+            """
+            
+            # The method is not implemented.
+            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
         
         # Transaction clean up. End implicit or expired transactions.        
         finally:

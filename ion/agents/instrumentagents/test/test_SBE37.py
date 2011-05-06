@@ -60,6 +60,9 @@ SKIP_TESTS = [
     'test_configure',
     'test_connect',
     'test_get_set',
+    'test_get_metadata',
+    'test_get_status',
+    'test_get_capabilities',
     'test_execute',
     'dummy'
 ]
@@ -132,7 +135,6 @@ class TestSBE37(IonTestCase):
         yield self._stop_container()
 
 
-
     @defer.inlineCallbacks
     def test_configure(self):
         """
@@ -160,7 +162,6 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,params)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
-        
     
     @defer.inlineCallbacks
     def test_connect(self):
@@ -470,7 +471,190 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
+
+    @defer.inlineCallbacks
+    def test_get_status(self):
+        """
+        Test driver op_get_status.
+        """
+
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_status' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        params = self.sbe_config
+
+        # We should begin in the unconfigured state.
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(params)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,params)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+
+        # Establish connection to device and verify.
+        try:
+            reply = yield self.driver_client.connect()
+        except:
+            self.fail('Could not connect to the device.')
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+
+        # Test get status. Currently not implemented.
+        params = [('all','all')]
+        reply = yield self.driver_client.get_status(params)
+        success = reply['success']
+        result = reply['result']        
+        self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
+        
+        # Dissolve the connection to the device.
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+
+    @defer.inlineCallbacks
+    def test_get_capabilities(self):
+        """
+        Test driver op_get_capabilities.
+        """
+
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_capabilities' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        params = self.sbe_config
+
+        # We should begin in the unconfigured state.
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(params)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,params)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+
+        # Establish connection to device and verify.
+        try:
+            reply = yield self.driver_client.connect()
+        except:
+            self.fail('Could not connect to the device.')
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+
+        # Test get capabilities. Currently not implemented.
+        params = ['all']
+        reply = yield self.driver_client.get_capabilities(params)
+        success = reply['success']
+        result = reply['result']        
+        self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
+        
+        # Dissolve the connection to the device.
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
     
+    @defer.inlineCallbacks
+    def test_get_metadata(self):
+        """
+        Test driver op_get_metadata.
+        """
+
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_metadata' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        params = self.sbe_config
+
+        # We should begin in the unconfigured state.
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(params)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,params)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+
+        # Establish connection to device and verify.
+        try:
+            reply = yield self.driver_client.connect()
+        except:
+            self.fail('Could not connect to the device.')
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+
+        # Test get metadata. Currently not implemented.
+        params = [('all','all','all')]
+        reply = yield self.driver_client.get_metadata(params)
+        success = reply['success']
+        result = reply['result']        
+        self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
+        
+        # Dissolve the connection to the device.
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+
     @defer.inlineCallbacks
     def test_execute(self):
         """
