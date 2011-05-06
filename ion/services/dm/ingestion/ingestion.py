@@ -36,7 +36,6 @@ from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publis
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
-from net.ooici.play import addressbook_pb2
 from ion.services.dm.distribution.publisher_subscriber import Publisher
 from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
 
@@ -46,13 +45,14 @@ CONF = ioninit.config(__name__)
 
 from ion.core.object import object_utils
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
-PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
-CREATE_DATASET_TOPICS_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
+SUPPLEMENT_MSG_TYPE           = object_utils.create_type_identifier(object_id=2001, version=1)
+PERFORM_INGEST_MSG_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
+CREATE_DATASET_TOPICS_MSG_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
 INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
+DAQ_COMPLETE_MSG_TYPE = object_utils.create_type_identifier(object_id=2005, version=1)
+
 
 class IngestionError(ApplicationError):
     """
@@ -84,13 +84,16 @@ class IngestionService(ServiceProcess):
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
 
+        self.rc = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
 
         self._pscclient = PubSubClient(proc=self)
         self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self)
 
+        self.dataset = None
+
         log.info('IngestionService.__init__()')
-        
+
 
     @defer.inlineCallbacks
     def op_create_dataset_topics(self, content, headers, msg):
@@ -143,13 +146,13 @@ class IngestionService(ServiceProcess):
         return True
 
     @defer.inlineCallbacks
-    def op_ingest(self, content, headers, msg):
+    def _prepare_ingest(self, content):
         """
-        Start the ingestion process by setting up necessary
-        @TODO NO MORE MAGNET.TOPIC
+        Factor out the preparation for ingestion so that we can unit test functionality
         """
-        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
-        log.debug("...Content:\t" + str(content))
+         
+        # Get the current state of the dataset:
+        self.dataset = yield self.rc.get_instance(content.dataset_id)
 
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
@@ -164,6 +167,24 @@ class IngestionService(ServiceProcess):
                                                  binding_key=ingest_data_topic,
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
+
+
+
+    @defer.inlineCallbacks
+    def op_ingest(self, content, headers, msg):
+        """
+        Start the ingestion process by setting up necessary
+        @TODO NO MORE MAGNET.TOPIC
+        """
+        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
+        log.debug("...Content:\t" + str(content))
+
+        if content.MessageType != PERFORM_INGEST_MSG_TYPE:
+            raise IngestionError('Expected message type PerfromIngestRequest, received %s'
+                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        yield self._prepare_ingest(content)
+
 
         def _timeout():
             # trigger execution to continue below with a False result
@@ -203,7 +224,7 @@ class IngestionService(ServiceProcess):
             yield self._notify_ingest(content)
 
             # now reply ok to the original message
-            yield self.reply_ok(msg, content={})
+            yield self.reply_ok(msg)
         else:
             log.debug("Ingest failed, error back to original request")
             raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
@@ -227,17 +248,105 @@ class IngestionService(ServiceProcess):
     def op_recv_dataset(self, content, headers, msg):
         log.info("op_recv_dataset(%s)" % type(content))
         # this is NOT rpc
+
+        if content.MessageType != CDM_DATASET_TYPE:
+            raise IngestionError('Expected message type CDM Dataset Type, received %s'
+                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        print '===== Content ==== \n', content
+
+        print '===== Dataset ======\n', self.dataset
+
+        if self.dataset is None:
+            raise IngestionError('Calling recv_dataset in an invalid state. No Dataset checked out to ingest.')
+
+        if self.dataset.Repository.status is not self.dataset.Repository.UPTODATE:
+            raise IngestionError('Calling recv_dataset in an invalid state. Dataset is already modified.')
+
+        self.dataset.CreateUpdateBranch(content.MessageObject)
+
+        group = self.dataset.root_group
+
+        # Clear any bounded arrays which are empty. Create content field if it is not present
+        for var in group.variables:
+
+            if var.IsFieldSet('content'):
+
+                content = var.content
+
+                if len(content.bounded_arrays) > 0:
+
+                    i =0
+                    while i < len(content.bounded_arrays):
+
+                        ba = content.bounded_arrays[i]
+
+                        if not ba.IsFieldSet('ndarray'):
+                            del content.bounded_arrays[i]
+
+                            continue
+                        else:
+                            i += 1
+            else:
+                var.content = resource_instance.CreateObject(array_structure_type)
+
+        print '===== Dataset Updated ======\n',self.dataset.Resource.PPrint()
+
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_chunk(self, content, headers, msg):
         log.info("op_recv_chunk(%s)" % type(content))
         # this is NOT rpc
+        if content.MessageType != SUPPLEMENT_MSG_TYPE:
+            raise IngestionError('Expected message type SupplementMessageType, received %s'
+                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+        print '===== Content ==== \n', content
+
+        print '===== Dataset ======\n', self.dataset
+
+        if self.dataset is None:
+            raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
+
+        if self.dataset.ResourceLifeCycleState is not self.dataset.UPDATE:
+            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch!')
+
+        if content.dataset_id != self.dataset.ResourceIdentity:
+            raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
+
+        # Attach the update to each variable!
+        if var_container.ObjectType != SUPPLEMENT_MSG_TYPE:
+            raise IOError('Invalid variable supplement component found in the tar file dataset - "%s"' % filename)
+
+        #print 'Tar Content: \n',var_container.PPrint()
+
+        group = self.dataset.root_group
+
+        ba = content.bounded_array
+
+        log.debug('Adding content to variable name: %s' % content.variable_name)
+        try:
+            var = group.FindVariableByName(content.variable_name)
+        except gpb_wrapper.OOIObjectError, oe:
+            log.error(str(oe))
+            raise IOError('Expected variable name %s not found in the dataset' % (content.variable_name))
+
+        ba_link = var.content.bounded_arrays.add()
+        ba_link.SetLink(ba)
+
+
+
+        print '===== Dataset Updated ======\n',self.dataset
+
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
         log.info("op_recv_done(%s)" % type(content))
+        if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
+            raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
+                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+        
         # this is NOT rpc
         yield msg.ack()
 
@@ -266,6 +375,9 @@ class IngestionClient(ServiceClient):
         routing key for intermediate replies (signaling that the ingest is ready), and
         a custom timeout for the ingest service (since it may take much longer than the
         default timeout to complete an ingest)
+        @param msg, GPB 2002/1, a PerformIngestMessage
+        @retval Result is an empty ION Message, reply_ok
+        @GPB{Input,2002,1}
         """
         log.debug('-[]- Entered IngestionClient.perform_ingest()')
         # Ensure a Process instance exists to send messages FROM...
@@ -285,18 +397,25 @@ class IngestionClient(ServiceClient):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('create_dataset_topics', msg)
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
-    def demo(self, ds_ingest_topic):
-        """
-        This is a temporary method used for testing.
-        """
-        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
+    def send_dataset(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_dataset', content=msg)
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
+    @defer.inlineCallbacks
+    def send_chunk(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_chunk', content=msg)
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='demo_done')
+    @defer.inlineCallbacks
+    def send_done(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_done', content=msg)
+
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IngestionService)

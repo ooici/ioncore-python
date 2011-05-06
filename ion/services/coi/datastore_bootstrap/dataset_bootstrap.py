@@ -241,7 +241,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     group.name = 'junk data'
     dataset.root_group = group
     
-    random_initialization = CONF.getValue('Initialize_random_data', False)
+    random_initialization = kwargs.get('random_initialization', CONF.getValue('Initialize_random_data', False))
     log.info("Random initialization of datasets is set to %s" % (random_initialization,))
     # Create all dimension and variable objects
     # Note: CDM variables such as scalars, coordinate variables and data are all represented by
