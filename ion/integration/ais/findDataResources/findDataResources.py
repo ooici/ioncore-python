@@ -339,7 +339,7 @@ class FindDataResources(object):
                     # This was a findDataResourcesByUser request
                     #
                     rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
-                    self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSetResID)
+                    self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSet, dSource)
 
 
                 #self.__printRootAttributes(dSet)
@@ -828,8 +828,22 @@ class FindDataResources(object):
         
         return self.downloadURL
 
-    def __loadRspByOwnerPayload(self, rspPayload, minMetaData, userID, dSetResID):
-        rspPayload.data_resource_id = dSetResID
-
+    def __loadRspByOwnerPayload(self, rspPayload, minMetaData, userID, dSet, dSource):
+        rspPayload.data_resource_id = dSet.ResourceIdentity
+        rspPayload.title = minMetaData['title']
+        rspPayload.date_registered = dSource.registration_datetime_millis
+        rspPayload.ion_title = dSource.ion_title
+        rspPayload.activation_state = dSource.ResourceLifeCycleState
+        rspPayload.update_interval_seconds = dSource.update_interval_seconds
+        
+        
+        """
+        optional string data_resource_id         = 1; 
+        optional string title                    = 2;
+        optional uint64 date_registered          = 3;
+        optional string ion_title                = 4;
+        optional string activation_state         = 5;
+        optional uint64 update_interval_seconds = 6;
+        """
 
 
