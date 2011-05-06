@@ -356,8 +356,8 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete one of the sample data sources
         """
-        #yield self._deleteDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
-        yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
+        yield self._deleteDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        #yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
 
 
 
