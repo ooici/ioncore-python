@@ -8,12 +8,19 @@
 @see http://peak.telecommunity.com/DevCenter/setuptools
 """
 
+from itertools import chain, izip, repeat
+import os
+
 try:
     from setuptools import setup, find_packages
 except ImportError:
     from distutils.core import setup
 
 from ion import __version__ as version
+
+# Workaround a bug in "package_data" that ignores directories. Build flattened list of all files.
+resFiles = [os.path.join(path, file) for path,file in
+            chain(*(izip(repeat(root), files) for root,dirs,files in os.walk('res')))]
 
 setup( name = 'ioncore',
        version = version,
@@ -25,15 +32,14 @@ setup( name = 'ioncore',
        author_email = 'mmeisinger@ucsd.edu',
        keywords = ['ooici','ioncore'],
 
-       packages = find_packages() + ['twisted/plugins'],
+       packages = find_packages() + ['twisted/plugins', 'res'],
        dependency_links = [
            'http://ooici.net/releases'
                           ],
        package_data = {
-           'twisted.plugins' : [
-               'twisted/plugins/cc.py'
-                               ],
-           'ion':['core/messaging/*.xml']
+           'twisted.plugins': ['twisted/plugins/cc.py'],
+           'ion': ['core/messaging/*.xml'],
+           'res': resFiles
                       },
        test_suite = 'ion',
        install_requires = [
