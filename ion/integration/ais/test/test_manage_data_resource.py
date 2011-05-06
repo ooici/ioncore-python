@@ -10,6 +10,7 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import ion.util.procutils as pu
 
 from twisted.internet import defer
 
@@ -19,6 +20,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
 
+
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
@@ -26,50 +28,40 @@ from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 
-# import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
-                                                       AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
-                                                       GET_USER_PROFILE_REQUEST_TYPE, \
-                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
-                                                       FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
-                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
-                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_REQUEST_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_TYPES_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_REQUEST_TYPE, \
-                                                       GET_RESOURCE_RESPONSE_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.core.messaging.message_client import MessageClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 
-# Create CDM Type Objects
-datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
-dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
-group_type = object_utils.create_type_identifier(object_id=10020, version=1)
-dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
-variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
-bounded_array_type = object_utils.create_type_identifier(object_id=10021, version=1)
-array_structure_type = object_utils.create_type_identifier(object_id=10025, version=1)
-
-attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
-stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
-float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
-int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
-
-#
-# ResourceID for testing create download URL response
-#
-TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
+                                                                    TYPE_OF_ID, \
+                                                                    DATASET_RESOURCE_TYPE_ID, \
+                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
+                                                                    DATARESOURCE_SCHEDULE_TYPE_ID
 
 
-class AppIntegrationTest(IonTestCase):
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE, \
+                                                       CREATE_DATA_RESOURCE_REQ_TYPE, \
+                                                       CREATE_DATA_RESOURCE_RSP_TYPE, \
+                                                       UPDATE_DATA_RESOURCE_REQ_TYPE, \
+                                                       UPDATE_DATA_RESOURCE_RSP_TYPE, \
+                                                       DELETE_DATA_RESOURCE_REQ_TYPE, \
+                                                       DELETE_DATA_RESOURCE_RSP_TYPE, \
+                                                       DATA_RESOURCE_SCHEDULED_TASK_TYPE
+
+
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, \
+                                                                    SAMPLE_PROFILE_DATA_SOURCE_ID, \
+                                                                    SAMPLE_STATION_DATA_SOURCE_ID
+
+
+
+from ion.integration.ais.manage_data_resource.manage_data_resource import DEFAULT_MAX_INGEST_MILLIS
+
+
+class AISManageDataResourceTest(IonTestCase):
    
     """
     Testing Application Integration Service.
@@ -154,7 +146,7 @@ class AppIntegrationTest(IonTestCase):
                 'class':'DatasetControllerClient'
             },
             {
-                'name':'scheduler',
+                'name':'scheduler_service_client',
                 'module':'ion.services.dm.scheduler.scheduler_service',
                 'class':'SchedulerServiceClient'
             },
@@ -169,21 +161,10 @@ class AppIntegrationTest(IonTestCase):
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
 
-        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
-        f = None
-        id = None
+        self.rc    = ResourceClient(proc=sup)
+        self.mc    = MessageClient(proc=sup)
+        self.ac    = AssociationClient(proc=sup)
 
-        """        
-        try:
-            f = open('dispatcher.id', 'r')
-            id = f.read().strip()
-            # @todo: ensure this resource exists in the ResourceRepo
-        except IOError:
-             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
-        finally:
-            if f is not None:
-                f.close()
-        """
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -195,6 +176,8 @@ class AppIntegrationTest(IonTestCase):
 
         yield self._shutdown_processes()
         yield self._stop_container()
+        log.info("Successfully tore down test container")
+
 
 
 
@@ -210,9 +193,26 @@ class AppIntegrationTest(IonTestCase):
         #try the delete
         yield self._deleteDataResource(create_resp.data_source_id)
 
+    @defer.inlineCallbacks
+    def test_createUpdateDeleteDataResource(self):
+        raise unittest.SkipTest("Test fails due to a bug in or below scheduler service")
+
+        #run the create
+        log.info("FULL USAGE 1/3: create")
+        create_resp = yield self._createDataResource()
+
+        #run the update 
+        log.info("FULL USAGE 2/3: update")
+        yield self._updateDataResource(create_resp.data_source_id)
+
+        #try the delete
+        log.info("FULL USAGE 3/3: delete")
+        yield self._deleteDataResource(create_resp.data_source_id)
+        log.info("Create/Update/Delete/COMPLETE")
+
 
     @defer.inlineCallbacks
-    def test_updateDataResourceNull(self):
+    def test_updateDataResource_BadInput(self):
         """
         run through the update code but don't specify any ids.
         """
@@ -234,35 +234,51 @@ class AppIntegrationTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_updateDataResource(self):
+    def test_updateDataResourceSample(self):
         """
         try updating one of the preloaded data sources
         """
 
-        log.info("Fetching a sample data resource manually to find out what's in it")
-        initial_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        log.info("Updating a sample data resource")
+        yield self._updateDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
+
+
+    @defer.inlineCallbacks
+    def _updateDataResource(self, data_source_resource_id):
+        log.info("_updateDataResource(%s) " % data_source_resource_id)
+
+        initial_resource = yield self.rc.get_instance(data_source_resource_id)
+        log.info("Fetching the data resource manually to find out what's in it")
 
         #before 
-        b4_max_ingest_millis        = initial_resource.max_ingest_millis
-        b4_update_interval_seconds  = initial_resource.update_interval_seconds
-        b4_ion_institution_id       = initial_resource.ion_institution_id
-        b4_ion_description          = initial_resource.ion_description
-        log.info("Original values are %d, %d, %s, %s" % (b4_max_ingest_millis,
-                                                         b4_update_interval_seconds,
-                                                         b4_ion_institution_id,
-                                                         b4_ion_description))
+        b4_max_ingest_millis            = initial_resource.max_ingest_millis
+        b4_update_interval_seconds      = initial_resource.update_interval_seconds
+        b4_update_start_datetime_millis = initial_resource.update_start_datetime_millis
+        b4_ion_title                    = initial_resource.ion_title
+        #b4_ion_institution_id           = initial_resource.ion_institution_id
+        b4_ion_description              = initial_resource.ion_description
+        log.info("Original values are %d, %d, %d, %s, %s" % (b4_max_ingest_millis,
+                                                             b4_update_interval_seconds,
+                                                             b4_update_start_datetime_millis,
+                                                             #b4_ion_institution_id,
+                                                             b4_ion_title,
+                                                             b4_ion_description))
 
         log.info("Updating the resource based on what we found")
-        fr_max_ingest_millis        = b4_max_ingest_millis + 1
-        fr_update_interval_seconds  = b4_update_interval_seconds + 1
-        fr_ion_institution_id       = b4_ion_institution_id + "_updated"
-        fr_ion_description          = b4_ion_description + "_updated"
+        fr_max_ingest_millis            = b4_max_ingest_millis + 1
+        fr_update_interval_seconds      = b4_update_interval_seconds + 1
+        fr_update_start_datetime_millis = b4_update_start_datetime_millis + 1
+        #fr_ion_institution_id           = b4_ion_institution_id + "_updated"
+        fr_ion_title                    = b4_ion_title + "_updated"
+        fr_ion_description              = b4_ion_description + "_updated"
 
 
-        log.info("new values will be %d, %d, %s, %s" % (fr_max_ingest_millis,
-                                                        fr_update_interval_seconds,
-                                                        fr_ion_institution_id,
-                                                        fr_ion_description))
+        log.info("new values will be %d, %d, %d, %s, %s" % (fr_max_ingest_millis,
+                                                            fr_update_interval_seconds,
+                                                            fr_update_start_datetime_millis,
+                                                            #fr_ion_institution_id,
+                                                            fr_ion_title,
+                                                            fr_ion_description))
 
         log.info("Creating and wrapping update request message")
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -270,11 +286,13 @@ class AppIntegrationTest(IonTestCase):
         ais_req_msg.message_parameters_reference = update_req_msg
 
         #what we want it to be
-        update_req_msg.data_source_resource_id  = SAMPLE_PROFILE_DATA_SOURCE_ID
-        update_req_msg.max_ingest_millis        = fr_max_ingest_millis
-        update_req_msg.update_interval_seconds  = fr_update_interval_seconds
-        update_req_msg.ion_institution_id       = fr_ion_institution_id
-        update_req_msg.ion_description          = fr_ion_description
+        update_req_msg.data_source_resource_id      = SAMPLE_PROFILE_DATA_SOURCE_ID
+        update_req_msg.max_ingest_millis            = fr_max_ingest_millis
+        update_req_msg.update_interval_seconds      = fr_update_interval_seconds
+        update_req_msg.update_start_datetime_millis = fr_update_start_datetime_millis
+        #update_req_msg.ion_institution_id           = fr_ion_institution_id
+        update_req_msg.ion_title                    = fr_ion_title
+        update_req_msg.ion_description              = fr_ion_description
 
         #actual update call
         result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
@@ -292,15 +310,17 @@ class AppIntegrationTest(IonTestCase):
 
         #look up resource to compare with fields from original
         updated_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
-        self.failUnlessEqual(fr_max_ingest_millis        , updated_resource.max_ingest_millis)
-        self.failUnlessEqual(fr_update_interval_seconds  , updated_resource.update_interval_seconds)
-        self.failUnlessEqual(fr_ion_institution_id       , updated_resource.ion_institution_id)
-        self.failUnlessEqual(fr_ion_description          , updated_resource.ion_description)
+        self.failUnlessEqual(fr_max_ingest_millis             , updated_resource.max_ingest_millis)
+        self.failUnlessEqual(fr_update_interval_seconds       , updated_resource.update_interval_seconds)
+        self.failUnlessEqual(fr_update_start_datetime_millis  , updated_resource.update_start_datetime_millis)
+        #self.failUnlessEqual(fr_ion_institution_id            , updated_resource.ion_institution_id)
+        self.failUnlessEqual(fr_ion_title                     , updated_resource.ion_title)
+        self.failUnlessEqual(fr_ion_description               , updated_resource.ion_description)
 
 
 
     @defer.inlineCallbacks
-    def test_deleteDataResourceNull(self):
+    def test_deleteDataResource_BadInput(self):
         """
         run through the delete code but don't specify any ids.
         """
@@ -343,6 +363,7 @@ class AppIntegrationTest(IonTestCase):
         @brief try to delete one of the sample data sources
         """
         yield self._deleteDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        #yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
 
 
 
@@ -384,16 +405,18 @@ class AppIntegrationTest(IonTestCase):
         defer.returnValue(None)
 
 
-
-
     @defer.inlineCallbacks
-    def _createDataResource(self):
-
+    def test_createDataResource_BadInput(self):
         log.info("Trying to call createDataResource with the wrong GPB")
         create_req_msg  = yield self.mc.create_instance(CREATE_DATA_RESOURCE_REQ_TYPE)
         result       = yield self.aisc.createDataResource(create_req_msg)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "createDataResource accepted a GPB that was known to be the wrong type")
+
+
+
+    @defer.inlineCallbacks
+    def _createDataResource(self):
 
         ais_req_msg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         create_req_msg  = ais_req_msg.CreateObject(CREATE_DATA_RESOURCE_REQ_TYPE)
@@ -506,4 +529,5 @@ class AppIntegrationTest(IonTestCase):
 
 
         defer.returnValue(associations)
+
 

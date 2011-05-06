@@ -10,26 +10,31 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.messaging.message_client import MessageClient
+from ion.core.object import object_utils
+
 from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 from ion.services.dm.ingestion.ingestion import IngestionClient
-from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
+                                                        SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+from ion.services.dm.distribution.events import ScheduleEventPublisher
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+
+from ion.util.iontime import IonTime
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
-
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
-                                                                    DATASOURCE_RESOURCE_TYPE_ID
+                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
+                                                                    DATARESOURCE_SCHEDULE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, \
-                                                                    ResourceInstance
-from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
-                                                                    ResourceInstanceError
+                                                               ResourceInstance, \
+                                                               ResourceClientError, \
+                                                               ResourceInstanceError
 
-from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -66,6 +71,7 @@ class ManageDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
+        self.pub   = ScheduleEventPublisher(process=ais)
 
 
     @defer.inlineCallbacks
@@ -102,24 +108,55 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
             datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
+            log.info("These should be equal: %s %s" % (msg.data_source_resource_id, datasrc_resource.ResourceIdentity))
 
-            if msg.IsFieldSet("update_interval_seconds"):
+            if msg.IsFieldSet("update_interval_seconds") and msg.IsFieldSet("update_start_datetime_millis"):
+                yield self._deleteAllScheduledEvents(datasrc_resource)
                 datasrc_resource.update_interval_seconds = msg.update_interval_seconds
-                #FIXME: change scheduling
-                # look up associated scheduler task resource
-                # delete that resource from the scheduler (mark retired too)
-                # get the datasource_id and dataset_id
-                # schedule a new task
+                datasrc_resource.update_start_datetime_millis = msg.update_start_datetime_millis
+                if 0 < msg.update_interval_seconds:
+                    #get the things we need to set up the scheduler message
+                    log.info("Looking up data set resource")
+                    dataset_resource = yield self._getOneAssociationObject(datasrc_resource, 
+                                                                           HAS_A_ID, 
+                                                                           DATASET_RESOURCE_TYPE_ID)
+
+                    #dataset_id = dataset_resource.ResourceIdentity
+                    sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
+                                                                  msg.update_start_datetime_millis,
+                                                                  dataset_resource.ResourceIdentity,
+                                                                  datasrc_resource.ResourceIdentity)
+
+                    log.info("got this from scheduler: " + str(sched_task))
+
+                    log.info("associating scheduler task info with this resource")
+                    sched_task_rsrc = yield self.rc.create_instance(DATA_RESOURCE_SCHEDULED_TASK_TYPE,
+                                                                    ResourceName="ScheduledTask resource")
+
+                    sched_task_rsrc.task_id = sched_task.task_id
+                    association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
+                    sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
+                    yield self.rc.put_instance(sched_task_rsrc)
 
 
-            if msg.IsFieldSet("ion_institution_id"):
-                datasrc_resource.ion_institution_id = msg.ion_institution_id
+
+            if msg.IsFieldSet("ion_title"):
+                datasrc_resource.ion_title = msg.ion_title
 
             if msg.IsFieldSet("ion_description"):
                 datasrc_resource.ion_description = msg.ion_description
 
             if msg.IsFieldSet("max_ingest_millis"):
                 datasrc_resource.max_ingest_millis = msg.max_ingest_millis
+
+            if msg.IsFieldSet("is_public"):
+                if not msg.is_public:
+                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
+                else:
+                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
+
 
             yield self.rc.put_instance(datasrc_resource)
 
@@ -186,12 +223,15 @@ class ManageDataResource(object):
 
                 #FIXME: if user does not own this data set, don't delete it
 
-                #FIXME: stop scheduling
-                #sched_rsrc = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID, 
                 log.info("Getting instance of data source resource")
                 datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
                 log.info("Getting instance of dataset resource from association")
-                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, HAS_A_ID, DATASET_RESOURCE_TYPE_ID)
+                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, 
+                                                                       HAS_A_ID, 
+                                                                       DATASET_RESOURCE_TYPE_ID)
+
+                log.info("Deleting any attached scheduled ingest events")
+                yield self._deleteAllScheduledEvents(datasrc_resource)
 
                 log.info("Setting data source resource lifecycle = retired")
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
@@ -204,7 +244,7 @@ class ManageDataResource(object):
 
 
                 deletions.append(data_source_resource_id)
-    
+
 
             log.info("putting all resource changes in one big transaction, " \
                          + str(len(delete_resources)))
@@ -236,7 +276,6 @@ class ManageDataResource(object):
 
 
 
-
     @defer.inlineCallbacks
     def create(self, msg_wrapped):
         """
@@ -256,7 +295,7 @@ class ManageDataResource(object):
         dataset_resource      = None
         association_resource  = None
 
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client 
+        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
@@ -282,10 +321,10 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
 
-            #FIXME: need to do cfchecker validation before we proceed.  this service doesn't exist yet.
+            #FIXME: need to do cfchecker validation before we proceed. 
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
-            #FIXME: find out what that default should really be.  
+            #FIXME: find out what that default should really be.
             if not msg.IsFieldSet("max_ingest_millis"):
                 msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
 
@@ -293,7 +332,7 @@ class ManageDataResource(object):
             # get user resource so we can associate it later
             user_resource = yield self.rc.get_instance(msg.user_id)
 
-            # create the data source
+            # create the data source from the fields in the input message
             datasrc_resource = yield self._createDataSourceResource(msg)
             my_datasrc_id = datasrc_resource.ResourceIdentity
 
@@ -306,7 +345,6 @@ class ManageDataResource(object):
             dataset_resource = yield self.rc.get_instance(my_dataset_id)
             log.info("created data set " + str(dataset_resource))
 
-
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
@@ -314,32 +352,42 @@ class ManageDataResource(object):
             self.ing.create_dataset_topics(topics_msg)
 
             #make associations
-            #association = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
-            association = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
+            association_u = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
+            association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
             #build transaction
             resource_transaction = [datasrc_resource, dataset_resource]
 
-            if (False):
+            if (msg.IsFieldSet("update_interval_seconds") and \
+                    msg.IsFieldSet("update_start_datetime_millis") and \
+                    msg.update_interval_seconds > 0):
                 # set up the scheduled task
                 sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
-                                                              msg.update_start_datetime_millis, 
-                                                              my_dataset_id, 
+                                                              msg.update_start_datetime_millis,
+                                                              my_dataset_id,
                                                               my_datasrc_id)
                 log.info("got this from scheduler: " + str(sched_task))
 
-                sched_task_rsrc = yield self.rc.create_instance(DATA_RESOURCE_SCHEDULED_TASK_TYPE, 
+                sched_task_rsrc = yield self.rc.create_instance(DATA_RESOURCE_SCHEDULED_TASK_TYPE,
                                                                 ResourceName="ScheduledTask resource")
 
                 sched_task_rsrc.task_id = sched_task.task_id
-                association = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
+                association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
-            #mark lifecycle states
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-            dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
+            #mark lifecycle states, public by default
+            if (msg.IsFieldSet("is_public") and not msg.is_public):
+                datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
+                dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
+            else:
+                datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
+                dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
+
+
             yield self.rc.put_resource_transaction(resource_transaction)
+
+            yield self._createEvent(my_dataset_id, my_datasrc_id)
 
 
         except ReceivedApplicationError, ex:
@@ -366,8 +414,25 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0] = Response.CreateObject(CREATE_DATA_RESOURCE_RSP_TYPE)
         Response.message_parameters_reference[0].data_source_id  = my_datasrc_id
         Response.message_parameters_reference[0].data_set_id     = my_dataset_id
-        Response.message_parameters_reference[0].association_id  = association.AssociationIdentity
+        Response.message_parameters_reference[0].association_id  = association_d.AssociationIdentity
         defer.returnValue(Response)
+
+
+
+    @defer.inlineCallbacks
+    def _createEvent(self, dataset_id, datasource_id):
+        """
+        @brief create a single ingest event trigger and send it
+        """
+        log.info("triggering an immediate ingest event")
+        msg = yield self.pub.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                          task_id="manage_data_resource_FAKED_TASK_ID")
+        
+        msg.additional_data.payload = msg.CreateObject(SCHEDULER_PERFORM_INGEST)
+        msg.additional_data.payload.dataset_id     = dataset_id
+        msg.additional_data.payload.datasource_id  = datasource_id
+
+        yield self.pub.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
 
 
     @defer.inlineCallbacks
@@ -384,6 +449,7 @@ class ManageDataResource(object):
         req_msg.payload                = req_msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         req_msg.payload.dataset_id     = dataset_id
         req_msg.payload.datasource_id  = datasource_id
+        req_msg.payload.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
         log.info("sending request to scheduler")
         response = yield self.sc.add_task(req_msg)
@@ -392,17 +458,27 @@ class ManageDataResource(object):
 
 
     @defer.inlineCallbacks
-    def _deleteScheduledEvent(self, sched_task_rsrc):
+    def _deleteAllScheduledEvents(self, data_source_resource):
         """
-        @brief delete a scheduled event from scheduler and storage
+        @brief delete any scheduled events from scheduler and storage
         """
-        req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
-        req_msg.task_id = sched_task_rsrc.task_id
-        response = yield self.sc.rm_task(req_msg)
-        sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.RETIRED
-        yield self.rc.put_resource(sched_task_rsrc)
 
-        defer.returnValue(None)
+        log.info("Getting instances of scheduled task resources associated with this data source")
+        while True:
+            sched_task_rsrc = yield self._getOneAssociationObject(data_source_resource, 
+                                                                  HAS_A_ID, 
+                                                                  DATARESOURCE_SCHEDULE_TYPE_ID)
+
+            #how we exit
+            if None is sched_task_rsrc: defer.returnValue(None)
+
+            req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
+            req_msg.task_id = sched_task_rsrc.task_id
+            response = yield self.sc.rm_task(req_msg)
+            #fixme: anything to do with this response?  i don't know of anything...
+            sched_task_rsrc.ResourceLifeCycleState = sched_task_rsrc.RETIRED
+            yield self.rc.put_instance(sched_task_rsrc)
+
 
     @defer.inlineCallbacks
     def _createDataSourceResource(self, msg):
@@ -435,6 +511,7 @@ class ManageDataResource(object):
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
 
+        datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
@@ -458,9 +535,14 @@ class ManageDataResource(object):
         association = None
         for a in found:
             mystery_resource = yield self.rc.get_instance(a.ObjectReference.key)
+            mystery_resource_type = mystery_resource.ResourceTypeID.key
+            log.info("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
+            log.info("Want type %s, got type %s" 
+                     % (the_object_type, mystery_resource_type))
             if the_object_type == mystery_resource.ResourceTypeID.key:
-                #FIXME: if not association is None then we have data inconsistency!
-                association = a
+                if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
+                    #FIXME: if not association is None then we have data inconsistency!
+                    association = a
 
         #this is an error case!
         if None is association:
@@ -479,8 +561,7 @@ class ManageDataResource(object):
         """
 
         #this seems very un-GPB-ish, to have to check fields...
-        #FIXME: comment out things that aren't actually required
-        req_fields = ["user_id", 
+        req_fields = ["user_id",
                       "source_type",
                       "request_type",
                       #"request_bounds_north",
@@ -494,10 +575,11 @@ class ManageDataResource(object):
                       "ion_institution_id",
                       #"update_interval_seconds",
                       #"update_start_datetime_millis",
+                      #is_public,
                       ]
-                      
-        
-        #FIXME: what do about these repeated fields?
+
+
+        #these repeated fields don't need to be set either
         #repeated string property = 3;
         #repeated string station_id = 4;
 

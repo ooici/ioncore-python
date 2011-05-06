@@ -34,6 +34,9 @@ message Dataset {
 }
 """
 
+CMD_GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+
+
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 """
 message IDRef {
@@ -132,9 +135,12 @@ class DatasetController(ServiceProcess):
                                                               ResourceName='CDM Dataset Resource',
                                                               ResourceDescription='None')
 
+        resource.root_group = resource.CreateObject(CMD_GROUP_TYPE)
+
+
         # What state should this be in at this point?
         #resource.ResourceLifeCycleState = resource.DEVELOPED
-        #yield self.rc.put_instance(resource)
+        yield self.resource_client.put_instance(resource)
 
         log.info(str(resource))
 
@@ -150,10 +156,10 @@ class DatasetController(ServiceProcess):
         response.MessageResponseCode = response.ResponseCodes.OK
 
         # pfh create ncml file as well
-        create_ncml(response.key, NCML_PATH)
+        #create_ncml(response.key, NCML_PATH)
         # Push to server
         # @bug Returns before rsync completes
-        yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
+        #yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)

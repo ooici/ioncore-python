@@ -20,15 +20,18 @@ from ion.agents.instrumentagents.instrument_connection import InstrumentConnecti
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriverClient
 from ion.agents.instrumentagents.instrument_fsm import InstrumentFSM
-from ion.agents.instrumentagents.instrument_constants import driver_command_list
-from ion.agents.instrumentagents.instrument_constants import driver_state_list
-from ion.agents.instrumentagents.instrument_constants import driver_event_list
-from ion.agents.instrumentagents.instrument_constants import errors
+from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import DriverState
+from ion.agents.instrumentagents.instrument_constants import DriverEvent
+from ion.agents.instrumentagents.instrument_constants import DriverAnnouncement
+from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import BaseEnum
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[1]
+DEBUG_PRINT = (True,False)[0]
 IO_LOG = (True,False)[1]
 IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
 
@@ -44,31 +47,44 @@ SBE37_PROMPT = 'S>'
 SBE37_NEWLINE = '\r\n'
 SBE37_BAD_COMMAND = '?cmd S>'
 
-"""
-Device states. Add SBE37 specific states here.
-"""
-sbe37_state_list = driver_state_list
+# Device states.
+class SBE37State(DriverState):
+    """
+    Add sbe37 specific states here.
+    """
+    pass
 
-"""
-Device events. Add SBE37 specific events here.
-"""
-sbe37_event_list = driver_event_list
+# Device events.
+class SBE37Event(DriverEvent):
+    """
+    Add sbe37 specific events here.
+    """
+    pass
 
-"""
-Device commands. Add SBE37 specific commands here.
-"""
-sbe37_command_list = driver_command_list
+# Device commands.
+class SBE37Command(DriverCommand):
+    """
+    Add sbe37 specific commands here.
+    """
+    pass
 
-"""
-Device channels. A list of driver_channel_list elements specific to this
-instrument.
-"""
-sbe37_channel_list = [
-    'CHAN_INSTRUMENT',
-    'CHAN_TEMPERATURE',
-    'CHAN_PRESSURE',
-    'CHAN_CONDUCTIVITY'
-]
+# Device channels / transducers.
+class SBE37Channel(BaseEnum):
+    """
+    SBE37 channels.
+    """
+    INSTRUMENT = DriverChannel.INSTRUMENT
+    TEMPERATURE = DriverChannel.TEMPERATURE
+    PRESSURE = DriverChannel.PRESSURE
+    CONDUCTIVITY = DriverChannel.CONDUCTIVITY
+
+class SBE37Announcement(DriverAnnouncement):
+    """
+    Add sbe37 specific announcements here.
+    """
+    pass
+
+# Add a parameters enum for sbe37 specific params.
 
 ###############################################################################
 # To do. Use of these constants needs design.
@@ -166,7 +182,7 @@ class DeviceCommandSpecification:
         """
         Fire the command deferred with timeout error.
         """
-        reply = {'success':errors['TIMEOUT'],'result':{}}
+        reply = {'success':InstErrorCode.TIMEOUT,'result':{}}
         if self.deferred != None:
             d,self.deferred = self.deferred, None
             d.callback(reply)
@@ -309,14 +325,14 @@ class SBE37Driver(InstrumentDriver):
         self.parameters = {
             # This needs to be fixed and should be added to status, metadata or
             # somewhere else. Also need a set clock function.
-            #('CHAN_INSTRUMENT','DDMMYY'):{
+            #(SBE37Channel.INSTRUMENT,'DDMMYY'):{
             #    'value': None,
             #    'parser': DeviceIOParser(
             #        r'SBE[\w-]* +V +[\w.]+ + SERIAL +NO. +\d+ +(\d+) +([a-zA-Z]+) +(\d+) +\d+:\d+:\d+',
             #        lambda match: (int(match.group(1)),self.month2int(match.group(1)),int(match.group(3))),
             #        self.date2str_mmddyy)
             #    },
-            #('CHAN_INSTRUMENT','HHMMSS'):{
+            #(SBE37Channel.INSTRUMENT,'HHMMSS'):{
             #    'value': None,
             #    'parser': DeviceIOParser(
             #        r'SBE[\w-]* +V +[\w.]+ + SERIAL +NO. +\d+ +\d+ +[a-zA-Z]+ +\d+ +(\d+):(\d+):(\d+)',
@@ -324,19 +340,19 @@ class SBE37Driver(InstrumentDriver):
             #        self._time_to_string)
             #    },
             # TBD how does this get handled?
-            #('CHAN_INSTRUMENT','BAUD'):{
+            #(SBE37Channel.INSTRUMENT,'BAUD'):{
             #    'value': None,
             #    'parser': None,
             #    'default':'9600'
             #    },
-            ('CHAN_INSTRUMENT','OUTPUTSAL'):{
+            (SBE37Channel.INSTRUMENT,'OUTPUTSAL'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?output salinity with each sample',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            ('CHAN_INSTRUMENT','OUTPUTSV'):{
+            (SBE37Channel.INSTRUMENT,'OUTPUTSV'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?output sound velocity with each sample',
@@ -344,56 +360,56 @@ class SBE37Driver(InstrumentDriver):
                     self._true_false_to_string)
                 },
             # TBD how does this get handled?
-            #('CHAN_INSTRUMENT','FORMAT'):{
+            #(SBE37Channel.INSTRUMENT,'FORMAT'):{
             #    'value': None,
             #    'parser': DeviceIOParser(
             #        r'',
             #        lambda match : 0 ),
             #    'default':1
             #    },
-            ('CHAN_INSTRUMENT','NAVG'):{
+            (SBE37Channel.INSTRUMENT,'NAVG'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'number of samples to average = (\d+)',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                 },
-            ('CHAN_INSTRUMENT','SAMPLENUM'):{
+            (SBE37Channel.INSTRUMENT,'SAMPLENUM'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'samplenumber = (\d+), free = \d+',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                 },
-            ('CHAN_INSTRUMENT','INTERVAL'):{
+            (SBE37Channel.INSTRUMENT,'INTERVAL'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'sample interval = (\d+) seconds',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                  },
-            ('CHAN_INSTRUMENT','STORETIME'):{
+            (SBE37Channel.INSTRUMENT,'STORETIME'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?store time with each sample',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            ('CHAN_INSTRUMENT','TXREALTIME'):{
+            (SBE37Channel.INSTRUMENT,'TXREALTIME'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?transmit real-time data',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            ('CHAN_INSTRUMENT','SYNCMODE'):{
+            (SBE37Channel.INSTRUMENT,'SYNCMODE'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'serial sync mode (enabled|disabled)',
                     lambda match : False if (match.group(1)=='disabled') else True,
                     self._true_false_to_string)
                 },
-            ('CHAN_INSTRUMENT','SYNCWAIT'):{
+            (SBE37Channel.INSTRUMENT,'SYNCWAIT'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'wait time after serial sync sampling = (\d+) seconds',
@@ -401,7 +417,7 @@ class SBE37Driver(InstrumentDriver):
                     self._int_to_string)
                 },
             # Should cal dates be parameters or metadata?
-            ('CHAN_TEMPERATURE','TCALDATE'):{
+            (SBE37Channel.INSTRUMENT,'TCALDATE'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'temperature: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -409,28 +425,28 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            ('CHAN_TEMPERATURE','TA0'):{
+            (SBE37Channel.TEMPERATURE,'TA0'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_TEMPERATURE','TA1'):{
+            (SBE37Channel.TEMPERATURE,'TA1'):{
                 'value': None,
                 'parser': DeviceIOParser(
                    r' +TA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_TEMPERATURE','TA2'):{
+            (SBE37Channel.TEMPERATURE,'TA2'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_TEMPERATURE','TA3'):{
+            (SBE37Channel.TEMPERATURE,'TA3'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA3 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -438,7 +454,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            ('CHAN_CONDUCTIVITY','CCALDATE'):{
+            (SBE37Channel.CONDUCTIVITY,'CCALDATE'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'conductivity: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -446,49 +462,49 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CG'):{
+            (SBE37Channel.CONDUCTIVITY,'CG'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +G = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CH'):{
+            (SBE37Channel.CONDUCTIVITY,'CH'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +H = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CI'):{
+            (SBE37Channel.CONDUCTIVITY,'CI'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +I = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CJ'):{
+            (SBE37Channel.CONDUCTIVITY,'CJ'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +J = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','WBOTC'):{
+            (SBE37Channel.CONDUCTIVITY,'WBOTC'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +WBOTC = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CTCOR'):{
+            (SBE37Channel.CONDUCTIVITY,'CTCOR'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +CTCOR = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_CONDUCTIVITY','CPCOR'):{
+            (SBE37Channel.CONDUCTIVITY,'CPCOR'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +CPCOR = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -496,7 +512,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            ('CHAN_PRESSURE','PCALDATE'):{
+            (SBE37Channel.PRESSURE,'PCALDATE'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'pressure .+ ((\d+)-([a-zA-Z]+)-(\d+))',
@@ -504,70 +520,70 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            ('CHAN_PRESSURE','PA0'):{
+            (SBE37Channel.PRESSURE,'PA0'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PA1'):{
+            (SBE37Channel.PRESSURE,'PA1'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PA2'):{
+            (SBE37Channel.PRESSURE,'PA2'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCA0'):{
+            (SBE37Channel.PRESSURE,'PTCA0'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCA1'):{
+            (SBE37Channel.PRESSURE,'PTCA1'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCA2'):{
+            (SBE37Channel.PRESSURE,'PTCA2'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCB0'):{
+            (SBE37Channel.PRESSURE,'PTCB0'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCB1'):{
+            (SBE37Channel.PRESSURE,'PTCB1'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','PTCB2'):{
+            (SBE37Channel.PRESSURE,'PTCB2'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_PRESSURE','POFFSET'):{
+            (SBE37Channel.PRESSURE,'POFFSET'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +POFFSET = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -575,7 +591,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            ('CHAN_INSTRUMENT','RCALDATE'):{
+            (SBE37Channel.INSTRUMENT,'RCALDATE'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'rtc: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -583,21 +599,21 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            ('CHAN_INSTRUMENT','RTCA0'):{
+            (SBE37Channel.INSTRUMENT,'RTCA0'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_INSTRUMENT','RTCA1'):{
+            (SBE37Channel.INSTRUMENT,'RTCA1'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            ('CHAN_INSTRUMENT','RTCA2'):{
+            (SBE37Channel.INSTRUMENT,'RTCA2'):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -611,22 +627,22 @@ class SBE37Driver(InstrumentDriver):
         Instrument state handlers
         """
         self.state_handlers = {
-            'STATE_UNCONFIGURED':self.state_handler_unconfigured,
-            'STATE_DISCONNECTED':self.state_handler_disconnected,
-            'STATE_CONNECTING':self.state_handler_connecting,
-            'STATE_DISCONNECTING':self.state_handler_disconnecting,
-            'STATE_CONNECTED':self.state_handler_connected,
-            'STATE_ACQUIRE_SAMPLE':self.state_handler_acquire_sample,
-            'STATE_UPDATE_PARAMS':self.state_handler_update_params,
-            'STATE_SET':self.state_handler_set,
-            'STATE_AUTOSAMPLE':self.state_handler_autosample
+            SBE37State.UNCONFIGURED : self.state_handler_unconfigured,
+            SBE37State.DISCONNECTED : self.state_handler_disconnected,
+            SBE37State.CONNECTING : self.state_handler_connecting,
+            SBE37State.DISCONNECTING : self.state_handler_disconnecting,
+            SBE37State.CONNECTED : self.state_handler_connected,
+            SBE37State.ACQUIRE_SAMPLE : self.state_handler_acquire_sample,
+            SBE37State.UPDATE_PARAMS : self.state_handler_update_params,
+            SBE37State.SET : self.state_handler_set,
+            SBE37State.AUTOSAMPLE : self.state_handler_autosample
         }
         
         """
         Instrument state machine.
         """
-        self.fsm = InstrumentFSM(sbe37_state_list,sbe37_event_list,
-                                 self.state_handlers)
+        self.fsm = InstrumentFSM(SBE37State,SBE37Event,self.state_handlers,
+                                 SBE37Event.ENTER,SBE37Event.EXIT)
 
 
     ###########################################################################
@@ -644,33 +660,29 @@ class SBE37Driver(InstrumentDriver):
         STATE_DISCONNECTED if successful.
         EVENT_INITIALIZE: Reset communication parameters to null values.
         """
-        
-        success = True
+
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
-        
-        if event == 'EVENT_ENTER':
-            
+        if event == SBE37Event.ENTER:
             # Announce the state change to agent.                        
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_UNCONFIGURED'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.UNCONFIGURED}
             self.send(self.proc_supid,'driver_event_occurred',content)
-            
             self._initialize()
 
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             pass
         
-        elif event == 'EVENT_INITIALIZE':
+        elif event == SBE37Event.INITIALIZE:
             self._initialize()
             
-        elif event == 'EVENT_CONFIGURE':
+        elif event == SBE37Event.CONFIGURE:
             if self._configure(params):
-                next_state = 'STATE_DISCONNECTED'
+                next_state = SBE37State.DISCONNECTED
         
         else:
-            success = False
-        
+            success = InstErrorCode.INCORRECT_STATE
         return (success,next_state)
         
     
@@ -684,15 +696,15 @@ class SBE37Driver(InstrumentDriver):
         EVENT_CONNECT: Switch to STATE_CONNECTING.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
         
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_DISCONNECTED'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)
             
             # If we enter a disconnect state with the connection complete
@@ -701,20 +713,20 @@ class SBE37Driver(InstrumentDriver):
             # reply to indicate successful disconnect.
             if self._connection_complete_deferred:
                 d,self._connection_complete_deferred = self._connection_complete_deferred,None
-                reply = {'success':['OK'],'result':None}
+                reply = {'success':InstErrorCode.OK,'result':None}
                 d.callback(reply)
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             pass
 
-        elif event == 'EVENT_INITIALIZE':
-            next_state = 'STATE_UNCONFIGURED'         
+        elif event == SBE37Event.INITIALIZE:
+            next_state = SBE37State.UNCONFIGURED         
                     
-        elif event == 'EVENT_CONNECT':
-            next_state = 'STATE_CONNECTING'         
+        elif event == SBE37Event.CONNECT:
+            next_state = SBE37State.CONNECTING         
                     
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
             
         return (success,next_state)
 
@@ -728,32 +740,31 @@ class SBE37Driver(InstrumentDriver):
         EVENT_CONNECTION_COMPLETE: Switch to STATE_UPDATE_PARAMS.
         EVENT_CONNECTION_FAILED: Switch to STATE_DISCONNECTED.
         """
-        
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
         
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_CONNECTING'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.CONNECTING}
             self.send(self.proc_supid,'driver_event_occurred',content)
-            
+
             self.getConnected()
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             pass
                     
-        elif event == 'EVENT_CONNECTION_COMPLETE':
-            next_state = 'STATE_UPDATE_PARAMS'
+        elif event == SBE37Event.CONNECTION_COMPLETE:
+            next_state = SBE37State.UPDATE_PARAMS
                     
-        elif event == 'EVENT_CONNECTION_FAILED':
+        elif event == SBE37Event.CONNECTION_FAILED:
             # Error message to agent here.
-            next_state = 'STATE_DISCONNECTED'
+            next_state = SBE37State.DISCONNECTED
 
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
 
         return (success,next_state)
 
@@ -767,27 +778,27 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DISCONNECT_COMPLETE: Switch to STATE_DISCONNECTED.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
             
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_DISCONNECTED'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
             
             self.getDisconnected()
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             pass
                     
-        elif event == 'EVENT_DISCONNECT_COMPLETE':
-            next_state = 'STATE_DISCONNECTED'
+        elif event == SBE37Event.DISCONNECT_COMPLETE:
+            next_state = SBE37State.DISCONNECTED
 
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
 
         return (success,next_state)
 
@@ -804,15 +815,15 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
 
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_CONNECTED'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.CONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
             
             # If we enter connected with the connection complete deferred
@@ -821,38 +832,38 @@ class SBE37Driver(InstrumentDriver):
             # connection.
             if self._connection_complete_deferred:
                 d,self._connection_complete_deferred = self._connection_complete_deferred,None
-                reply = {'success':['OK'],'result':None}
+                reply = {'success':InstErrorCode.OK,'result':None}
                 d.callback(reply)
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             pass
             
-        elif event == 'EVENT_DISCONNECT':
-            next_state = 'STATE_DISCONNECTING'
+        elif event == SBE37Event.DISCONNECT:
+            next_state = SBE37State.DISCONNECTING
                     
-        elif event == 'EVENT_SET':
-            next_state = 'STATE_SET'
+        elif event == SBE37Event.SET:
+            next_state = SBE37State.SET
             
-        elif event == 'EVENT_ACQUIRE_SAMPLE':
-            next_state = 'STATE_ACQUIRE_SAMPLE'
+        elif event == SBE37Event.ACQUIRE_SAMPLE:
+            next_state = SBE37State.ACQUIRE_SAMPLE
             
-        elif event == 'EVENT_START_AUTOSAMPLE':
-            next_state = 'STATE_AUTOSAMPLE'
+        elif event == SBE37Event.START_AUTOSAMPLE:
+            next_state = SBE37State.AUTOSAMPLE
             
-        elif event == 'EVENT_TEST':
-            next_state = 'STATE_TEST'
+        elif event == SBE37Event.TEST:
+            next_state = SBE37State.TEST
             
-        elif event == 'EVENT_CALIBRATE':
-            next_state = 'STATE_CALIBRATE'
+        elif event == SBE37Event.CALIBRATE:
+            next_state = SBE37State.CALIBRATE
             
-        elif event == 'EVENT_RESET':
-            next_state = 'STATE_RESET'
+        elif event == SBE37Event.RESET:
+            next_state = SBE37State.RESET
             
-        elif event == 'EVENT_DATA_RECEIVED':
+        elif event == SBE37Event.DATA_RECEIVED:
             pass
                 
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
 
         return (success,next_state)
 
@@ -868,15 +879,15 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
 
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
                         
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_ACQUIRE_SAMPLE'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.ACQUIRE_SAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
                         
             # Initialize data buffer and copy device command buffer over
@@ -889,7 +900,7 @@ class SBE37Driver(InstrumentDriver):
             # Start the looping wakeup.
             self._start_wakeup(2.0)
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
 
             # Clear the data buffer.
             self._data_lines = []
@@ -904,12 +915,13 @@ class SBE37Driver(InstrumentDriver):
             else:
                 command_spec.reply['result'] = self._sample_buffer
                 
-            command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
+            command_spec.set_success(InstErrorCode.OK,
+                                     InstErrorCode.ACQUIRE_SAMPLE_ERR)
             command_spec.do_reply()
             self._sample_buffer = []        
                     
                     
-        elif event == 'EVENT_PROMPTED':
+        elif event == SBE37Event.PROMPTED:
                         
                     
             # Cancel looping wakeup if active.
@@ -924,17 +936,17 @@ class SBE37Driver(InstrumentDriver):
             # state.
             except IndexError:
                     
-                next_state = 'STATE_CONNECTED'
+                next_state = SBE37State.CONNECTED
 
             # Write the device command.
             else:
                 
                 self._write_command(cmd+SBE37_NEWLINE)
                                 
-        elif event == 'EVENT_DATA_RECEIVED':
+        elif event == SBE37Event.DATA_RECEIVED:
 
-            #content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-            #           'value':'STATE_UNCONFIGURED'}
+            #content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            #           'value':SBE37State.UNCONFIGURED}
             #self.send(self.proc_supid,'driver_event_occurred',content)
         
 
@@ -947,14 +959,12 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]                
                 self._debug_print('received samples',samples)
-                content = {'type':'DATA_RECEIVED',
-                           'transducer':'CHAN_INSTRUMENT','value':samples}
+                content = {'type':SBE37Announcement.DATA_RECEIVED,
+                           'transducer':SBE37Channel.INSTRUMENT,'value':samples}
                 self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
-            
-            
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
         
         return (success,next_state)
 
@@ -972,15 +982,15 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
 
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
 
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_AUTOSAMPLE'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.AUTOSAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
 
             # Clear the data buffer and copy the device command buffer
@@ -993,15 +1003,14 @@ class SBE37Driver(InstrumentDriver):
             # Start the looping wakeup.
             self._start_wakeup(2.0)
 
-            
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
 
             # Pop the command spec.                
             command_spec = self._driver_command_buffer.pop(0)
 
             # If this is a stop command with getdata arg, populate the reply.
             drv_cmd = command_spec.command
-            if list(drv_cmd) == ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']:
+            if list(drv_cmd) == [SBE37Command.STOP_AUTO_SAMPLING,'GETDATA']:
                 if len(self._sample_buffer)==0:
                     command_spec.errors = True
                 elif len(self._sample_buffer)==1:
@@ -1012,10 +1021,11 @@ class SBE37Driver(InstrumentDriver):
             # Clear the data buffer, set success and fire reply deferred.
             self._data_lines = []
             self._sample_buffer = []
-            command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
+            command_spec.set_success(InstErrorCode.OK,
+                                     InstErrorCode.ACQUIRE_SAMPLE_ERR)
             command_spec.do_reply()
                                     
-        elif event == 'EVENT_PROMPTED':
+        elif event == SBE37Event.PROMPTED:
             
             # Cancel looping wakeup if active.
             self._stop_wakeup()
@@ -1024,7 +1034,7 @@ class SBE37Driver(InstrumentDriver):
             command_spec = self._driver_command_buffer[0]
             drv_cmd = command_spec.command
 
-            if drv_cmd[0] == 'DRIVER_CMD_START_AUTO_SAMPLING':
+            if drv_cmd[0] == SBE37Command.START_AUTO_SAMPLING:
 
                 # Pop the pending autosample device command.
                 try:
@@ -1038,11 +1048,11 @@ class SBE37Driver(InstrumentDriver):
                 else:
                     self._write_command(cmd+SBE37_NEWLINE)
                     self._driver_command_buffer.pop(0)
-                    command_spec.set_success(['OK'],errors['ACQUIRE_SAMPLE_ERR'])
+                    command_spec.set_success(InstErrorCode.OK,
+                                             InstErrorCode.ACQUIRE_SAMPLE_ERR)
                     command_spec.do_reply()
                     
-                                   
-            elif drv_cmd[0] == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
+            elif drv_cmd[0] == SBE37Command.STOP_AUTO_SAMPLING:
 
                 # Pop pending autosample stop device command.
                 try:
@@ -1055,14 +1065,13 @@ class SBE37Driver(InstrumentDriver):
                     if self._line_buffer == '':
                         self._wakeup()
                     else:
-                        next_state = 'STATE_CONNECTED'
+                        next_state = SBE37State.CONNECTED
 
                 # Write the autosample stop device command.                
                 else:
                     self._write_command(cmd+SBE37_NEWLINE)
                     
-                                        
-        elif event == 'EVENT_STOP_AUTOSAMPLE':
+        elif event == SBE37Event.STOP_AUTOSAMPLE:
 
             # Do not clear data buffer, copy over the stop autosample
             # device command buffer.
@@ -1072,8 +1081,7 @@ class SBE37Driver(InstrumentDriver):
             # Start the looping wakeup.
             self._start_wakeup(2.0)
             
-                        
-        elif event == 'EVENT_DATA_RECEIVED':
+        elif event == SBE37Event.DATA_RECEIVED:
             
             # Parse the data buffer for sample output. Publish these as
             # appropriate, and package them in the reply if the option
@@ -1084,13 +1092,13 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]
                 self._debug_print('received samples',samples)
-                content = {'type':'DATA_RECEIVED',
-                           'transducer':'CHAN_INSTRUMENT','value':samples}
+                content = {'type':SBE37Announcement.DATA_RECEIVED,
+                           'transducer':SBE37Channel.INSTRUMENT,'value':samples}
                 self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
         else:
             
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
         
         return (success,next_state)           
 
@@ -1106,15 +1114,16 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
 
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_UPDATE_PARAMS'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.UPDATE_PARAMS}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
               
             # Clear data buffer and populate device command buffer directly.
@@ -1123,9 +1132,8 @@ class SBE37Driver(InstrumentDriver):
            
             # Start looping wakeup.
             self._start_wakeup(2.0)
-
             
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             
             # Clear data buffer.
             self._data_lines = []
@@ -1150,12 +1158,12 @@ class SBE37Driver(InstrumentDriver):
             # Announce the config change to agent. This assumes
             # that param updates occur one-to-one with config changes.
             paramdict = self.get_parameters()
-            content = {'type':'CONFIG_CHANGE','transducer':'CHAN_INSTRUMENT',
+            content = {'type':SBE37Announcement.CONFIG_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':paramdict}
             self.send(self.proc_supid,'driver_event_occurred',content)                                                
-                                
                     
-        elif event == 'EVENT_PROMPTED':
+        elif event == SBE37Event.PROMPTED:
             
             # Cancel the looping wakeup if active.
             self._stop_wakeup()
@@ -1176,20 +1184,20 @@ class SBE37Driver(InstrumentDriver):
                 except IndexError:
                     
                     self._read_param_values(self._data_lines)
-                    next_state = 'STATE_CONNECTED'
+                    next_state = SBE37State.CONNECTED
     
                 # Write command to device.
                 else:
                     self._write_command(cmd+SBE37_NEWLINE)
                 
-
-        elif event == 'EVENT_DATA_RECEIVED':
+        elif event == SBE37Event.DATA_RECEIVED:
             pass
                 
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
 
         return (success,next_state)
+
 
     def state_handler_set(self,event,params):
         """
@@ -1203,15 +1211,16 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        success = True
+        success = InstErrorCode.OK
         next_state = None
         self._debug_print(event)
 
-        if event == 'EVENT_ENTER':
+        if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':'STATE_CHANGE','transducer':'CHAN_INSTRUMENT',
-                       'value':'STATE_SET'}
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.SET}
             self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
             # Clear the data buffer and copy the device command buffer over
@@ -1223,13 +1232,12 @@ class SBE37Driver(InstrumentDriver):
             # Start the looping wakeup.
             self._start_wakeup(2.0)
 
-            
-        elif event == 'EVENT_EXIT':
+        elif event == SBE37Event.EXIT:
             
             # Clear the data buffer.
             self._data_lines = []
                     
-        elif event == 'EVENT_PROMPTED':
+        elif event == SBE37Event.PROMPTED:
             
             #print 'line buf: '+self._line_buffer+'xx'
             # Cancel the looping wakeup if active.
@@ -1238,12 +1246,11 @@ class SBE37Driver(InstrumentDriver):
             # Validate previous response.
             command_spec = self._driver_command_buffer[0]
             if self._line_buffer == SBE37_PROMPT:
-                prev_result = ['OK']
+                prev_result = InstErrorCode.OK
             else:
-                prev_result = errors['BAD_DRIVER_COMMAND']
+                prev_result = InstErrorCode.BAD_DRIVER_COMMAND
             command_spec.set_previous_result(prev_result)
             
-
             # Pop the pending device set command.
             try:
                 
@@ -1253,8 +1260,9 @@ class SBE37Driver(InstrumentDriver):
             # state.
             except IndexError:
                 
-                command_spec.set_success(['OK'],errors['SET_DEVICE_ERR'])
-                next_state = 'STATE_UPDATE_PARAMS'
+                command_spec.set_success(InstErrorCode.OK,
+                                         InstErrorCode.SET_DEVICE_ERR)
+                next_state = SBE37State.UPDATE_PARAMS
 
             # Write the device set command.                
             else:
@@ -1263,11 +1271,11 @@ class SBE37Driver(InstrumentDriver):
                 #print 'writing command '+set_cmd
                 self._write_command(set_cmd+SBE37_NEWLINE)
 
-        elif event == 'EVENT_DATA_RECEIVED':
+        elif event == SBE37Event.DATA_RECEIVED:
             pass                
                         
         else:
-            success = False
+            success = InstErrorCode.INCORRECT_STATE
             
         return (success,next_state)
 
@@ -1285,7 +1293,7 @@ class SBE37Driver(InstrumentDriver):
         yield
         
         # Set initial state.
-        self.fsm.start('STATE_UNCONFIGURED')
+        self.fsm.start(SBE37State.UNCONFIGURED)
                 
 
     @defer.inlineCallbacks
@@ -1313,11 +1321,12 @@ class SBE37Driver(InstrumentDriver):
         self._instrument_connection = yield cc.connectTCP(self._ipaddr,
                                                           int(self._ipport))        
         
+        
         if self._instrument_connection:
             self._instrument_connection.transport.setTcpNoDelay(1)
-            self.fsm.on_event('EVENT_CONNECTION_COMPLETE')
+            self.fsm.on_event(SBE37Event.CONNECTION_COMPLETE)
         else:
-            self.fsm.on_event('EVENT_CONNECTION_FAILED')
+            self.fsm.on_event(SBE37Event.CONNECTION_FAILED)
 
 
     def gotConnected(self, instrument):
@@ -1341,7 +1350,7 @@ class SBE37Driver(InstrumentDriver):
         """
 
         self._instrument_connection = None
-        self.fsm.on_event('EVENT_DISCONNECT_COMPLETE')
+        self.fsm.on_event(SBE37Event.DISCONNECT_COMPLETE)
 
 
     def gotData(self, dataFrag):
@@ -1388,19 +1397,19 @@ class SBE37Driver(InstrumentDriver):
         
         # If new complete lines are detected, send an EVENT_DATA_RECEIVED.
         if new_lines:
-            self.fsm.on_event('EVENT_DATA_RECEIVED')
+            self.fsm.on_event(SBE37Event.DATA_RECEIVED)
         
         # If a normal or bad command prompt is detected, send an
         # EVENT_PROMPTED
         if (self._line_buffer == SBE37_PROMPT or
             self._line_buffer == SBE37_BAD_COMMAND):
-            self.fsm.on_event('EVENT_PROMPTED')
+            self.fsm.on_event(SBE37Event.PROMPTED)
             
         # If a stop autosample type prompt is detected, send an
         # EVENT_PROMPTED.
         elif (self._line_buffer == '' and
               (len(self._data_lines)>0 and self._data_lines[-1] == SBE37_PROMPT)):
-            self.fsm.on_event('EVENT_PROMPTED')
+            self.fsm.on_event(SBE37Event.PROMPTED)
 
 
     ###########################################################################
@@ -1433,11 +1442,11 @@ class SBE37Driver(InstrumentDriver):
 
         # Fail if required parameters absent.
         if not command:
-            reply['success'] = errors['REQUIRED_PARAMETER']
+            reply['success'] = InstErrorCode.REQUIRED_PARAMETER
             yield self.reply_ok(msg,reply)
             return
         if not channels:
-            reply['success'] = errors['REQUIRED_PARAMETER']
+            reply['success'] = InstErrorCode.REQUIRED_PARAMETER
             yield self.reply_ok(msg,reply)
             return
 
@@ -1451,30 +1460,30 @@ class SBE37Driver(InstrumentDriver):
             pass
         
         # Fail if command or channels not valid for sbe37.
-        if command[0] not in sbe37_command_list:
-            reply['success'] = errors['UNKNOWN_COMMAND']
+        if not SBE37Command.has(command[0]):
+            reply['success'] = InstErrorCode.UNKNOWN_COMMAND
             yield self.reply_ok(msg,reply)
             return
         
         for chan in channels:
-            if chan not in sbe37_channel_list:
-                reply['success'] = errors['UNKNOWN_CHANNEL']
+            if not SBE37Channel.has(chan):
+                reply['success'] = InstErrorCode.UNKNOWN_CHANNEL
                 yield self.reply_ok(msg,reply)
                 return
 
         drv_cmd = command[0]
         
         # Process acquire sample command.
-        if drv_cmd == 'DRIVER_CMD_ACQUIRE_SAMPLE':
+        if drv_cmd == SBE37Command.ACQUIRE_SAMPLE:
 
             # Create command spec and set event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_ACQUIRE_SAMPLE'
+            event = SBE37Event.ACQUIRE_SAMPLE
             
             # The acquire command only applies to the instrument as a whole.
             # Fail if the channel is not set properly.
-            if len(channels)>1 or channels[0] != 'CHAN_INSTRUMENT':
-                reply['success'] = errors['INVALID_CHANNEL']
+            if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1487,7 +1496,7 @@ class SBE37Driver(InstrumentDriver):
             # for sbe37. If so append it to device command buffer.
             elif len(command)==2:                
                 if command[1] not in sbe37_cmd_acquire_sample_args:
-                    reply['success'] = errors['INVALID_COMMAND']
+                    reply['success'] = InstErrorCode.INVALID_COMMAND
                     yield self.reply_ok(msg,reply)
                     return
                 else:
@@ -1495,25 +1504,24 @@ class SBE37Driver(InstrumentDriver):
             
             # If the command has a length greater than 2, fail.      
             else:
-                reply['success'] = errors['INVALID_COMMAND']
+                reply['success'] = InstErrorCode.INVALID_COMMAND
                 yield self.reply_ok(msg,reply)
                 return
 
             # Set up the reply deferred and fire the command event.  
             reply = yield self._process_command(command_spec,event,timeout)
 
-
         # Process start autosampling command.
-        elif drv_cmd == 'DRIVER_CMD_START_AUTO_SAMPLING':
+        elif drv_cmd == SBE37Command.START_AUTO_SAMPLING:
 
             # Create command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_START_AUTOSAMPLE'
+            event = SBE37Event.START_AUTOSAMPLE
 
             # The acquire command only applies to the instrument as a whole.
             # Fail if channel not set properly.
-            if len(channels)>1 or channels[0] != 'CHAN_INSTRUMENT':
-                reply['success'] = errors['INVALID_CHANNEL']
+            if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1523,30 +1531,29 @@ class SBE37Driver(InstrumentDriver):
             # Set up the reply deferred and fire the command event.  
             reply = yield self._process_command(command_spec,event,timeout)
 
-
         # Process stop autosampling command.
-        elif drv_cmd == 'DRIVER_CMD_STOP_AUTO_SAMPLING':
+        elif drv_cmd == SBE37Command.STOP_AUTO_SAMPLING:
             
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_STOP_AUTOSAMPLE'
+            event = SBE37Event.STOP_AUTOSAMPLE
 
             # The acquire command only applies to the instrument as a whole.
             # Fail if channel not set properly.
-            if len(channels)>1 or channels[0] != 'CHAN_INSTRUMENT':
-                reply['success'] = errors['INVALID_CHANNEL']
+            if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
                 yield self.reply_ok(msg,reply)
                 return
             
             # The command has one optional argument,
             # that retrieves the autosampled data in the stop reply.
             if len(command)>2:
-                reply['success'] = errors['INVALID_COMMAND']
+                reply['success'] = InstErrorCode.INVALID_COMMAND
                 yield self.reply_ok(msg,reply)
                 return
 
             if len(command)==2 and command[1]!='GETDATA':
-                reply['success'] = errors['INVALID_COMMAND']
+                reply['success'] = InstErrorCode.INVALID_COMMAND
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1556,47 +1563,46 @@ class SBE37Driver(InstrumentDriver):
             # Set up the reply deferred and fire the command event.  
             reply = yield self._process_command(command_spec,event,timeout)
 
-
         # Process test command.
-        elif drv_cmd == 'DRIVER_CMD_TEST':
+        elif drv_cmd == SBE37Command.TEST:
             
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_RESET'
+            event = SBE37Event.TEST  
             
             # Return not implemented reply.
-            reply['success'] = errors['NOT_IMPLEMENTED']
+            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
-        elif drv_cmd == 'DRIVER_CMD_CALIBRATE':
+        elif drv_cmd == SBE37Command.CALIBRATE:
             
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_RESET'
+            event = SBE37Event.CALIBRATE
             
             # Return not implemented reply.
-            reply['success'] = errors['NOT_IMPLEMENTED']
+            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
-        elif drv_cmd == 'DRIVER_CMD_RESET':
+        elif drv_cmd == SBE37Command.RESET:
                        
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
-            event = 'EVENT_RESET'
+            event = SBE37Event.RESET
 
             # Return not implemented reply.
-            reply['success'] = errors['NOT_IMPLEMENTED']
+            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
-        elif drv_cmd == 'DRIVER_CMD_TEST_ERRORS':
+        elif drv_cmd == SBE37Command.TEST_ERRORS:
                        
             # Create a command spec and set the event to fire.
             command_spec = DeviceCommandSpecification(command)
             
-            reply = {'success':['OK'],'result':{}}
+            #reply = {'success':InstErrorCode.OK,'result':{}}
             
             # This raises an internal server error on the client side with
             # the reply contained in the exception content.
@@ -1612,11 +1618,10 @@ class SBE37Driver(InstrumentDriver):
             #yield self.reply_err(msg,defer.TimeoutError())
             #return
 
-
         else:
             
             # The command is properly handled in the above clause.
-            reply['success'] = errors['INVALID_COMMAND']
+            reply['success'] = InstErrorCode.INVALID_COMMAND
             yield self.reply_ok(msg,reply)
             return
         
@@ -1679,30 +1684,43 @@ class SBE37Driver(InstrumentDriver):
             pass
         
         # Create the command spec and set the event to fire.
-        command_spec = DeviceCommandSpecification(['DRIVER_CMD_SET'])        
-        event = 'EVENT_SET'
+        command_spec = DeviceCommandSpecification([SBE37Command.SET])        
+        event = SBE37Event.SET
         
         # Populate the device command buffer with the equivalent
         # sbe37 set commands.
         device_command_buffer = []
+        sample_num_command = None
         for (chan,param) in params.keys():
             val = params[(chan,param)]
             if self.parameters.get((chan,param),None):
                 str_val = self.parameters[(chan,param)]['parser'].tostring(val)
                 if str_val:
-                    device_command_buffer.append(((chan,param),val,
-                        param+'='+str_val))
+                    if (chan,param) == (SBE37Channel.INSTRUMENT,'SAMPLENUM'):
+                        sample_num_command = ((SBE37Channel.INSTRUMENT,
+                                              'SAMPLENUM'),val,param+'='+str_val)
+                    else:
+                        device_command_buffer.append(((chan,param),val,
+                            param+'='+str_val))
                 else:
                     # Parser error creating value string.
                     pass
             else:
-                command_spec.reply['result'][(chan,param)] = errors['INVALID_PARAMETER']
+                command_spec.reply['result'][(chan,param)] = \
+                    InstErrorCode.INVALID_PARAMETER
                 command_spec.errors = True
+
+        # Move set sample number, if it exists to the end as other commands
+        # can reset this to zero.
+        if sample_num_command != None:
+            device_command_buffer.append(sample_num_command)
 
         # If no valid commands, reply error.
         if len(device_command_buffer)==0:
             reply = command_spec.reply
-            reply['success'] = errors['SET_DEVICE_ERR']
+            reply['success'] = InstErrorCode.SET_DEVICE_ERR
+            yield self.reply_ok(msg,reply)
+            return
             
         # Otherwise, set device command buffer and process command.
         else:
@@ -1735,9 +1753,8 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
         
-        
         # The method is not implemented.
-        reply = {'success':errors['NOT_IMPLEMENTED'],'result':None}
+        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
         yield self.reply_ok(msg, reply)
 
 
@@ -1764,9 +1781,8 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
 
-        
         # The method is not implemented.
-        reply = {'success':errors['NOT_IMPLEMENTED'],'result':None}
+        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
         yield self.reply_ok(msg, reply)
 
 
@@ -1786,14 +1802,15 @@ class SBE37Driver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success':None,'result':None}         
-        success = self.fsm.on_event('EVENT_INITIALIZE')
+        success = self.fsm.on_event(SBE37Event.INITIALIZE)
         
         # Set success and send reply. Unsuccessful initialize means the
         # event is not handled in the current state.
         if not success:
-            reply['success'] = errors['INCORRECT_STATE']
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+
         else:
-            reply['success'] = ['OK']
+            reply['success'] = InstErrorCode.OK
  
         yield self.reply_ok(msg, reply)
 
@@ -1817,22 +1834,21 @@ class SBE37Driver(InstrumentDriver):
             assert(isinstance(timeout,int)), 'Expected integer timeout'
             assert(timeout>0), 'Expected positive timeout'
             pass
-        
+
         # Set up the reply message and validate the configuration parameters.
         # Reply with the error message if the parameters not valid.
         reply = {'success':None,'result':params}
         reply['success'] = self._validate_configuration(params)
-        if reply['success'][0] != 'OK':
+
+        if InstErrorCode.is_error(reply['success']):
             yield self.reply_ok(msg,reply)
             return
         
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if the event is not handled in the current
         # state.
-        success = self.fsm.on_event('EVENT_CONFIGURE',params)
-        if not success:
-            reply['success'] = errors['INCORRECT_STATE']
-            
+        reply['success'] = self.fsm.on_event(SBE37Event.CONFIGURE,params)
+
         yield self.reply_ok(msg, reply)
 
 
@@ -1898,7 +1914,6 @@ class SBE37Driver(InstrumentDriver):
         yield self.reply_ok(msg, cur_state)
 
 
-
     ###########################################################################
     # Nonpublic methods.
     ###########################################################################        
@@ -1915,7 +1930,7 @@ class SBE37Driver(InstrumentDriver):
         
         # Validate configuration.
         success = self._validate_configuration(params)
-        if success[0] != 'OK':
+        if InstErrorCode.is_error(success):
             return False
 
         # Set configuration parameters.
@@ -1939,18 +1954,18 @@ class SBE37Driver(InstrumentDriver):
 
         # fail if missing a required parameter.
         if not _ipport or not _ipaddr:
-            return errors['REQUIRED_PARAMETER']
+            return InstErrorCode.REQUIRED_PARAMETER
 
         # Validate port number.
         if not isinstance(_ipport,int) or _ipport <0 or _ipport > 65535:
-            return errors['INVALID_PARAM_VALUE']
+            return InstErrorCode.INVALID_PARAM_VALUE
         
         # Validate ip address.
         # TODO: Add logic to veirfy string format.
         if not isinstance(_ipaddr,str): 
-            return errors['INVALID_PARAM_VALUE']
+            return InstErrorCode.INVALID_PARAM_VALUE
 
-        return ['OK']        
+        return InstErrorCode.OK
 
         
     def _initialize(self):
@@ -1976,9 +1991,9 @@ class SBE37Driver(InstrumentDriver):
         self._connection_complete_deferred = d
         
         # Fire EVENT_CONNECT. If the event fails the state is wrong.
-        success = self.fsm.on_event('EVENT_CONNECT')
-        if not success:
-            reply = {'success':errors['INCORRECT_STATE'],'result':None}
+        success = self.fsm.on_event(SBE37Event.CONNECT)
+        if InstErrorCode.is_error(success):
+            reply = {'success':success,'result':None}
             d,self._connection_complete_deferred = self._connection_complete_deferred,None
             d.callback(reply)            
 
@@ -1999,9 +2014,10 @@ class SBE37Driver(InstrumentDriver):
         self._connection_complete_deferred = d
         
         # Fire EVENT_DISCONNECT. If the event fails the state is wrong.
-        success = self.fsm.on_event('EVENT_DISCONNECT')
-        if not success:
-            reply = {'success':errors['INCORRECT_STATE'],'result':None}
+        success = self.fsm.on_event(SBE37Event.DISCONNECT)
+        #if not success:
+        if InstErrorCode.is_error(success):
+            reply = {'success':success,'result':None}
             d,self._connection_complete_deferred = self._connection_complete_deferred,None
             d.callback(reply)            
 
@@ -2060,7 +2076,7 @@ class SBE37Driver(InstrumentDriver):
         if self.fsm.on_event(event):
             return d
         else:
-            reply = {'success':errors['INCORRECT_STATE'],'result':None}
+            reply = {'success':InstErrorCode.INCORRECT_STATE,'result':None}
             del self._driver_command_buffer[-1]
             return reply            
         
@@ -2071,15 +2087,19 @@ class SBE37Driver(InstrumentDriver):
         """
         yield
 
+
     ###########################################################################
     # Other.
     ###########################################################################
 
+
     def get_parameters(self):
         """
+        Return a dict with all driver paramters.
         """
         paramdict = dict(map(lambda x: (x[0],x[1]['value']),self.parameters.items()))
         return paramdict
+
 
     def _wakeup(self,wakeup_string=SBE37_NEWLINE,reps=1):
         """
@@ -2101,7 +2121,6 @@ class SBE37Driver(InstrumentDriver):
         self._wakeup_scheduler = task.LoopingCall(self._wakeup)
         self._wakeup_scheduler.start(period)
 
-            
         
     def _stop_wakeup(self):
         """
@@ -2123,6 +2142,7 @@ class SBE37Driver(InstrumentDriver):
         if self._instrument_connection:
             self._instrument_connection.transport.write(cmd)
             self._instrument_connection.transport.doWrite()                
+
         
     def _parse_sample_output(self):
         """
@@ -2191,31 +2211,33 @@ class SBE37Driver(InstrumentDriver):
             # Retrieve all parameters.
             if chan == 'all' and param == 'all':
                 for (key,val) in self.parameters.iteritems():
-                    result[key] = (['OK'],val['value'])
+                    result[key] = (InstErrorCode.OK,val['value'])
 
             elif chan == 'all':
 
                 # Invalid parameter name.
                 if param not in params_list:
-                    result[(chan,param)] = (errors['INVALID_PARAMETER'],None)
-
+                    result[(chan,param)] = (InstErrorCode.INVALID_PARAMETER,None)
+                    get_errors = True
+                    
                 # Retrieve a valid named parameter for all channels.
                 else:
                     for (key,val) in self.parameters.iteritems():
                         if key[1] == param:
-                            result[key] = (['OK'],val['value'])
+                            result[key] = (InstErrorCode.OK,val['value'])
 
             elif param == 'all':
 
                 # Invalid channel name.
                 if chan not in channels_list:
-                    result[(chan,param)] = (errors['INVALID_PARAMETER'],None)
+                    result[(chan,param)] = (InstErrorCode.INVALID_PARAMETER,None)
+                    get_errors = True
                     
                 # Retrieve all parameters for a valid named channel.
                 else:
                     for (key,val) in self.parameters.iteritems():
                         if key[0] == chan:
-                            result[key] = (['OK'],val['value'])
+                            result[key] = (InstErrorCode.OK,val['value'])
                             
             # Retrieve named channel-parameters
             else:
@@ -2224,21 +2246,21 @@ class SBE37Driver(InstrumentDriver):
 
                 # Invalid channel or parameter name.
                 if val == None:
-                    result[(chan,param)] = (errors['INVALID_PARAMETER'],None)
+                    result[(chan,param)] = (InstErrorCode.INVALID_PARAMETER,None)
                     get_errors = True
 
                 # Valid channel parameter names.
                 else:
-                    result[(chan,param)] = (['OK'],val['value'])
+                    result[(chan,param)] = (InstErrorCode.OK,val['value'])
         
         # Set up reply success and return.
         if get_errors:
-            reply['success'] = errors['GET_DEVICE_ERR']
+            reply['success'] = InstErrorCode.GET_DEVICE_ERR
+
         else:
-            reply['success'] = ['OK']
+            reply['success'] = InstErrorCode.OK
 
         reply['result'] = result
-        
         return reply
 
     

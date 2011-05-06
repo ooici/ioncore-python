@@ -17,7 +17,10 @@ from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.SBE37_driver import SBE37DriverClient
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.SBE37_driver import DriverException
-
+from ion.agents.instrumentagents.SBE37_driver import SBE37State
+from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
+from ion.agents.instrumentagents.SBE37_driver import SBE37Command
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -145,7 +148,7 @@ class TestSBE37(IonTestCase):
 
         # We should begin in the unconfigured state.
         current_state = yield self.driver_client.get_state()
-        self.assertEqual(current_state,'STATE_UNCONFIGURED')
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(params)        
@@ -153,11 +156,11 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
                 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,params)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
-
+        
     
     @defer.inlineCallbacks
     def test_connect(self):
@@ -175,7 +178,7 @@ class TestSBE37(IonTestCase):
 
         # We should begin in the unconfigured state.
         current_state = yield self.driver_client.get_state()
-        self.assertEqual(current_state,'STATE_UNCONFIGURED')
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(params)        
@@ -183,9 +186,9 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,params)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
 
         # Establish connection to device and verify.
@@ -198,9 +201,9 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
 
         
         # Dissolve the connection to the device.
@@ -209,10 +212,9 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
-
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
         
         
     @defer.inlineCallbacks
@@ -232,19 +234,17 @@ class TestSBE37(IonTestCase):
 
         # We should begin in the unconfigured state.
         current_state = yield self.driver_client.get_state()
-        self.assertEqual(current_state,'STATE_UNCONFIGURED')
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(params)        
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,params)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
-
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
         # Establish connection to device. This starts a loop of
         # wakeups to the device handled when the prompt returns.
@@ -252,16 +252,14 @@ class TestSBE37(IonTestCase):
             reply = yield self.driver_client.connect()
         except:
             self.fail('Could not connect to the device.')
-        
-        
+                
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_CONNECTED')
-
+        self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Get all parameters and verify. Store the current config for later.
         params = [('all','all')]
@@ -272,49 +270,44 @@ class TestSBE37(IonTestCase):
         result = reply['result']
         config = result
         config = dict(map(lambda x: (x[0],x[1][1]),config.items()))
-      
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(all(map(lambda x: x[1] != None,result.values())),True)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
 
-        
         # Get all pressure parameters and verify.        
-        params = [('CHAN_PRESSURE','all')]
-
+        params = [(SBE37Channel.PRESSURE,'all')]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
                 
         pressure_params = [
-            ('CHAN_PRESSURE','PCALDATE'),
-            ('CHAN_PRESSURE','PA0'),
-            ('CHAN_PRESSURE','PA1'),
-            ('CHAN_PRESSURE','PA2'),
-            ('CHAN_PRESSURE','PTCA0'),
-            ('CHAN_PRESSURE','PTCA1'),
-            ('CHAN_PRESSURE','PTCA2'),
-            ('CHAN_PRESSURE','PTCB0'),
-            ('CHAN_PRESSURE','PTCB1'),
-            ('CHAN_PRESSURE','PTCB2'),
-            ('CHAN_PRESSURE','POFFSET')            
+            (SBE37Channel.PRESSURE,'PCALDATE'),
+            (SBE37Channel.PRESSURE,'PA0'),
+            (SBE37Channel.PRESSURE,'PA1'),
+            (SBE37Channel.PRESSURE,'PA2'),
+            (SBE37Channel.PRESSURE,'PTCA0'),
+            (SBE37Channel.PRESSURE,'PTCA1'),
+            (SBE37Channel.PRESSURE,'PTCA2'),
+            (SBE37Channel.PRESSURE,'PTCB0'),
+            (SBE37Channel.PRESSURE,'PTCB1'),
+            (SBE37Channel.PRESSURE,'PTCB2'),
+            (SBE37Channel.PRESSURE,'POFFSET')            
             ]
                 
-                
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(pressure_params.sort(),result.keys().sort())
         self.assertEqual(all(map(lambda x: x[1] != None ,result.values())),True)
-        self.assertEqual(current_state,'STATE_CONNECTED')
-        
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Get a few parameters by name and verify.
         params = [
-            ('CHAN_INSTRUMENT','NAVG'),
-            ('CHAN_INSTRUMENT','INTERVAL'),
-            ('CHAN_INSTRUMENT','OUTPUTSV'),
-            ('CHAN_TEMPERATURE','TA0'),
-            ('CHAN_CONDUCTIVITY','WBOTC')
+            (SBE37Channel.INSTRUMENT,'NAVG'),
+            (SBE37Channel.INSTRUMENT,'INTERVAL'),
+            (SBE37Channel.INSTRUMENT,'OUTPUTSV'),
+            (SBE37Channel.TEMPERATURE,'TA0'),
+            (SBE37Channel.CONDUCTIVITY,'WBOTC')
             ]
 
         reply = yield self.driver_client.get(params)
@@ -322,52 +315,49 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(params.sort(),result.keys().sort())
         self.assertEqual(all(map(lambda x: x[1] != None ,result.values())),True)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
                         
-                
         # Set a few parameters and verify.
         orig_params = {
-            ('CHAN_INSTRUMENT','NAVG'):config[('CHAN_INSTRUMENT','NAVG')],
-            ('CHAN_INSTRUMENT','INTERVAL'):config[('CHAN_INSTRUMENT','INTERVAL')],
-            ('CHAN_INSTRUMENT','OUTPUTSV'):config[('CHAN_INSTRUMENT','OUTPUTSV')],
-            ('CHAN_TEMPERATURE','TA0'):config[('CHAN_TEMPERATURE','TA0')],
-            ('CHAN_CONDUCTIVITY','WBOTC'):config[('CHAN_CONDUCTIVITY','WBOTC')]            
+            (SBE37Channel.INSTRUMENT,'NAVG'):config[(SBE37Channel.INSTRUMENT,'NAVG')],
+            (SBE37Channel.INSTRUMENT,'INTERVAL'):config[(SBE37Channel.INSTRUMENT,'INTERVAL')],
+            (SBE37Channel.INSTRUMENT,'OUTPUTSV'):config[(SBE37Channel.INSTRUMENT,'OUTPUTSV')],
+            (SBE37Channel.TEMPERATURE,'TA0'):config[(SBE37Channel.TEMPERATURE,'TA0')],
+            (SBE37Channel.CONDUCTIVITY,'WBOTC'):config[(SBE37Channel.CONDUCTIVITY,'WBOTC')]            
         }
         new_params = {}
-        new_params[('CHAN_INSTRUMENT','NAVG')] = orig_params[('CHAN_INSTRUMENT','NAVG')] + 1
-        new_params[('CHAN_INSTRUMENT','INTERVAL')] = orig_params[('CHAN_INSTRUMENT','INTERVAL')] + 1
-        new_params[('CHAN_INSTRUMENT','OUTPUTSV')] = not orig_params[('CHAN_INSTRUMENT','OUTPUTSV')]
-        new_params[('CHAN_TEMPERATURE','TA0')] = 2*float(orig_params[('CHAN_TEMPERATURE','TA0')])
-        new_params[('CHAN_CONDUCTIVITY','WBOTC')] = 2*float(orig_params[('CHAN_CONDUCTIVITY','WBOTC')])
-        
-        
+        new_params[(SBE37Channel.INSTRUMENT,'NAVG')] = orig_params[(SBE37Channel.INSTRUMENT,'NAVG')] + 1
+        new_params[(SBE37Channel.INSTRUMENT,'INTERVAL')] = orig_params[(SBE37Channel.INSTRUMENT,'INTERVAL')] + 1
+        new_params[(SBE37Channel.INSTRUMENT,'OUTPUTSV')] = not orig_params[(SBE37Channel.INSTRUMENT,'OUTPUTSV')]
+        new_params[(SBE37Channel.TEMPERATURE,'TA0')] = 2*float(orig_params[(SBE37Channel.TEMPERATURE,'TA0')])
+        new_params[(SBE37Channel.CONDUCTIVITY,'WBOTC')] = 2*float(orig_params[(SBE37Channel.CONDUCTIVITY,'WBOTC')])
+                
         reply = yield self.driver_client.set(new_params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(new_params.keys().sort(),result.keys().sort())
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Get all parameters, verify the changes were made.        
         params = [('all','all')]
-
         reply = yield self.driver_client.get(params)
         get_current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
-        self.assertAlmostEqual(result[('CHAN_CONDUCTIVITY','WBOTC')][1],new_params[('CHAN_CONDUCTIVITY','WBOTC')],4)
-        self.assertAlmostEqual(result[('CHAN_TEMPERATURE','TA0')][1],new_params[('CHAN_TEMPERATURE','TA0')],4)
-        self.assertEqual(result[('CHAN_INSTRUMENT','NAVG')][1],new_params[('CHAN_INSTRUMENT','NAVG')])
-        self.assertEqual(result[('CHAN_INSTRUMENT','INTERVAL')][1],new_params[('CHAN_INSTRUMENT','INTERVAL')])
-        self.assertEqual(result[('CHAN_INSTRUMENT','OUTPUTSV')][1],new_params[('CHAN_INSTRUMENT','OUTPUTSV')])
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertAlmostEqual(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')][1],new_params[(SBE37Channel.CONDUCTIVITY,'WBOTC')],4)
+        self.assertAlmostEqual(result[(SBE37Channel.TEMPERATURE,'TA0')][1],new_params[(SBE37Channel.TEMPERATURE,'TA0')],4)
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'NAVG')][1],new_params[(SBE37Channel.INSTRUMENT,'NAVG')])
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'INTERVAL')][1],new_params[(SBE37Channel.INSTRUMENT,'INTERVAL')])
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'OUTPUTSV')][1],new_params[(SBE37Channel.INSTRUMENT,'OUTPUTSV')])
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Restore original state.         
         reply = yield self.driver_client.set(orig_params)
@@ -375,74 +365,71 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(orig_params.keys().sort(),result.keys().sort())
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Get parameters and make sure they match the original config.
         params = [('all','all')]
-
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
-        self.assertAlmostEqual(result[('CHAN_CONDUCTIVITY','WBOTC')][1],config[('CHAN_CONDUCTIVITY','WBOTC')],4)
-        self.assertAlmostEqual(result[('CHAN_TEMPERATURE','TA0')][1],config[('CHAN_TEMPERATURE','TA0')],4)
-        self.assertEqual(result[('CHAN_INSTRUMENT','NAVG')][1],config[('CHAN_INSTRUMENT','NAVG')])
-        self.assertEqual(result[('CHAN_INSTRUMENT','INTERVAL')][1],config[('CHAN_INSTRUMENT','INTERVAL')])
-        self.assertEqual(result[('CHAN_INSTRUMENT','OUTPUTSV')][1],config[('CHAN_INSTRUMENT','OUTPUTSV')])
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertAlmostEqual(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')][1],config[(SBE37Channel.CONDUCTIVITY,'WBOTC')],4)
+        self.assertAlmostEqual(result[(SBE37Channel.TEMPERATURE,'TA0')][1],config[(SBE37Channel.TEMPERATURE,'TA0')],4)
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'NAVG')][1],config[(SBE37Channel.INSTRUMENT,'NAVG')])
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'INTERVAL')][1],config[(SBE37Channel.INSTRUMENT,'INTERVAL')])
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'OUTPUTSV')][1],config[(SBE37Channel.INSTRUMENT,'OUTPUTSV')])
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
-                
         # Try getting bad parameters.This should fail for bad parameters but
         # succeed for the good ones.
         params = [
             ('I am a bad channel name','NAVG'),
-            ('CHAN_INSTRUMENT','INTERVAL'),
-            ('CHAN_INSTRUMENT','I am a bad parameter name'),
-            ('CHAN_TEMPERATURE','TA0'),
-            ('CHAN_CONDUCTIVITY','WBOTC')
+            (SBE37Channel.INSTRUMENT,'INTERVAL'),
+            (SBE37Channel.INSTRUMENT,'I am a bad parameter name'),
+            (SBE37Channel.TEMPERATURE,'TA0'),
+            (SBE37Channel.CONDUCTIVITY,'WBOTC')
             ]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'ERROR')
-        self.assertEqual(result[('I am a bad channel name','NAVG')][0][0],'ERROR')
+        self.assert_(InstErrorCode.is_error(success))
+        self.assert_(InstErrorCode.is_error(result[('I am a bad channel name','NAVG')][0]))
         self.assertEqual(result[('I am a bad channel name','NAVG')][1],None)
-        self.assertEqual(result[('CHAN_INSTRUMENT','INTERVAL')][0][0],'OK')
-        self.assertIsInstance(result[('CHAN_INSTRUMENT','INTERVAL')][1],int)
-        self.assertEqual(result[('CHAN_INSTRUMENT','I am a bad parameter name')][0][0],'ERROR')
-        self.assertEqual(result[('CHAN_INSTRUMENT','I am a bad parameter name')][1],None)
-        self.assertEqual(result[('CHAN_TEMPERATURE','TA0')][0][0],'OK')
-        self.assertIsInstance(result[('CHAN_TEMPERATURE','TA0')][1],float)
-        self.assertEqual(result[('CHAN_CONDUCTIVITY','WBOTC')][0][0],'OK')
-        self.assertIsInstance(result[('CHAN_CONDUCTIVITY','WBOTC')][1],float)
-        self.assertEqual(current_state,'STATE_CONNECTED')
-        
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.INSTRUMENT,'INTERVAL')][0]))
+        self.assertIsInstance(result[(SBE37Channel.INSTRUMENT,'INTERVAL')][1],int)
+        self.assert_(InstErrorCode.is_error(result[(SBE37Channel.INSTRUMENT,'I am a bad parameter name')][0]))
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'I am a bad parameter name')][1],None)
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.TEMPERATURE,'TA0')][0]))
+        self.assertIsInstance(result[(SBE37Channel.TEMPERATURE,'TA0')][1],float)
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')][0]))
+        self.assertIsInstance(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')][1],float)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Try setting bad parameters. This should fail for bad parameters but succeed for
         # valid ones.
         bad_params = new_params
-        bad_params[('I am a bad channel','NAVG')] = bad_params[('CHAN_INSTRUMENT','NAVG')]
-        del bad_params[('CHAN_INSTRUMENT','NAVG')]
-        bad_params[('CHAN_TEMPERATURE','I am a bad parameter')] = bad_params[('CHAN_TEMPERATURE','TA0')]
-        del bad_params[('CHAN_TEMPERATURE','TA0')]
+        bad_params[('I am a bad channel','NAVG')] = bad_params[(SBE37Channel.INSTRUMENT,'NAVG')]
+        del bad_params[(SBE37Channel.INSTRUMENT,'NAVG')]
+        bad_params[(SBE37Channel.TEMPERATURE,'I am a bad parameter')] = bad_params[(SBE37Channel.TEMPERATURE,'TA0')]
+        del bad_params[(SBE37Channel.TEMPERATURE,'TA0')]
         
         reply = yield self.driver_client.set(bad_params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'ERROR')
-        self.assertEqual(result[('I am a bad channel','NAVG')][0],'ERROR')
-        self.assertEqual(result[('CHAN_INSTRUMENT','INTERVAL')][0],'OK')
-        self.assertEqual(result[('CHAN_INSTRUMENT','OUTPUTSV')][0],'OK')
-        self.assertEqual(result[('CHAN_TEMPERATURE','I am a bad parameter')][0],'ERROR')
-        self.assertEqual(result[('CHAN_CONDUCTIVITY','WBOTC')][0],'OK')
+        self.assert_(InstErrorCode.is_error(success))
+        self.assert_(InstErrorCode.is_error(result[('I am a bad channel','NAVG')]))
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.INSTRUMENT,'INTERVAL')]))
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.INSTRUMENT,'OUTPUTSV')]))
+        self.assert_(InstErrorCode.is_error(result[(SBE37Channel.TEMPERATURE,'I am a bad parameter')]))
+        self.assert_(InstErrorCode.is_ok(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')]))
 
         # Get all parameters, verify the valid ones were set, and the invalid ones kept the
         # old values.
@@ -452,28 +439,26 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
-        self.assertEqual(result[('CHAN_INSTRUMENT','INTERVAL')][1],new_params[('CHAN_INSTRUMENT','INTERVAL')])
-        self.assertEqual(result[('CHAN_INSTRUMENT','OUTPUTSV')][1],new_params[('CHAN_INSTRUMENT','OUTPUTSV')])
-        self.assertAlmostEqual(result[('CHAN_CONDUCTIVITY','WBOTC')][1],new_params[('CHAN_CONDUCTIVITY','WBOTC')],4)
-        self.assertEqual(result[('CHAN_INSTRUMENT','NAVG')][1],orig_params[('CHAN_INSTRUMENT','NAVG')])
-        self.assertAlmostEqual(result[('CHAN_TEMPERATURE','TA0')][1],orig_params[('CHAN_TEMPERATURE','TA0')],4)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'INTERVAL')][1],new_params[(SBE37Channel.INSTRUMENT,'INTERVAL')])
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'OUTPUTSV')][1],new_params[(SBE37Channel.INSTRUMENT,'OUTPUTSV')])
+        self.assertAlmostEqual(result[(SBE37Channel.CONDUCTIVITY,'WBOTC')][1],new_params[(SBE37Channel.CONDUCTIVITY,'WBOTC')],4)
+        self.assertEqual(result[(SBE37Channel.INSTRUMENT,'NAVG')][1],orig_params[(SBE37Channel.INSTRUMENT,'NAVG')])
+        self.assertAlmostEqual(result[(SBE37Channel.TEMPERATURE,'TA0')][1],orig_params[(SBE37Channel.TEMPERATURE,'TA0')],4)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Restore the original configuration and verify.
         # This should set all the parameters in the driver.
         # In addition to restoring original, it tests that each parameter can be set.
-        
         
         reply = yield self.driver_client.set(config) 
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(config.keys().sort(),result.keys().sort())
-        self.assertEqual(current_state,'STATE_CONNECTED')
-        
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
@@ -481,11 +466,10 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
-    
     
     @defer.inlineCallbacks
     def test_execute(self):
@@ -503,18 +487,17 @@ class TestSBE37(IonTestCase):
 
         # We should begin in the unconfigured state.
         current_state = yield self.driver_client.get_state()
-        self.assertEqual(current_state,'STATE_UNCONFIGURED')
-
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+        
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(params)        
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,params)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
-
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
         # Establish connection to device and verify.
         try:
@@ -526,27 +509,27 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_CONNECTED')
-
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+        
         # Make sure the parameters are in a reasonable state for sampling.
         # Set a few parameters and verify.
         params = {}
-        params[('CHAN_INSTRUMENT','NAVG')] = 1
-        params[('CHAN_INSTRUMENT','INTERVAL')] = 5
-        params[('CHAN_INSTRUMENT','OUTPUTSV')] = True
-        params[('CHAN_INSTRUMENT','OUTPUTSAL')] = True
-        params[('CHAN_INSTRUMENT','TXREALTIME')] = True
-        params[('CHAN_INSTRUMENT','STORETIME')] = True
+        params[(SBE37Channel.INSTRUMENT,'NAVG')] = 1
+        params[(SBE37Channel.INSTRUMENT,'INTERVAL')] = 5
+        params[(SBE37Channel.INSTRUMENT,'OUTPUTSV')] = True
+        params[(SBE37Channel.INSTRUMENT,'OUTPUTSAL')] = True
+        params[(SBE37Channel.INSTRUMENT,'TXREALTIME')] = True
+        params[(SBE37Channel.INSTRUMENT,'STORETIME')] = True
         
         reply = yield self.driver_client.set(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
-        self.assertEqual(current_state,'STATE_CONNECTED')        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(current_state,SBE37State.CONNECTED)        
 
         # Get all the parameters and dump them to the screen if desired.
         params = [('all','all')]
@@ -554,18 +537,17 @@ class TestSBE37(IonTestCase):
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-
-        self.assertEqual(success[0],'OK')
-        self.assertEqual(current_state,'STATE_CONNECTED')        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(current_state,SBE37State.CONNECTED)        
 
         # Comment this out for automated testing.
         # It is useful to examine the instrument parameters during
         # interactive testing.
-        dump_dict(result)
-
+        # dump_dict(result)
+        
         # Acquire a polled sample and verify result.
-        channels = ['CHAN_INSTRUMENT']
-        command = ['DRIVER_CMD_ACQUIRE_SAMPLE']
+        channels = [SBE37Channel.INSTRUMENT]
+        command = [SBE37Command.ACQUIRE_SAMPLE]
         timeout = 10
         reply = yield self.driver_client.execute(channels,command,timeout)
             
@@ -573,8 +555,7 @@ class TestSBE37(IonTestCase):
         success = reply['success']
         result = reply['result']
         
-        
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
         self.assertIsInstance(result.get('pressure',None),float)
@@ -582,27 +563,26 @@ class TestSBE37(IonTestCase):
         self.assertIsInstance(result.get('conductivity',None),float)
         self.assertIsInstance(result.get('time',None),tuple)
         self.assertIsInstance(result.get('date',None),tuple)
-        self.assertEqual(current_state,'STATE_CONNECTED')
-        
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Test and verify autosample mode.
-        channels = ['CHAN_INSTRUMENT']
-        command = ['DRIVER_CMD_START_AUTO_SAMPLING']
+        channels = [SBE37Channel.INSTRUMENT]
+        command = [SBE37Command.START_AUTO_SAMPLING]
         timeout = 10
         reply = yield self.driver_client.execute(channels,command,timeout)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
 
         # Wait for a few samples to arrive.
         yield pu.asleep(30)
 
         # Test and verify autosample exit and check sample data.
-        channels = ['CHAN_INSTRUMENT']
-        command = ['DRIVER_CMD_STOP_AUTO_SAMPLING','GETDATA']
-        timeout = 10
+        channels = [SBE37Channel.INSTRUMENT]
+        command = [SBE37Command.STOP_AUTO_SAMPLING,'GETDATA']
+        timeout = 20
         
         # If a timeout occurs in stop, reattempt until the test times out.
         # Note: if this times out the instrument will be stuck in autosample
@@ -613,21 +593,21 @@ class TestSBE37(IonTestCase):
             current_state = yield self.driver_client.get_state()
             success = reply['success']
             result = reply['result']
-            
-            if success[0] == 'OK':
+
+            if InstErrorCode.is_ok(success):
                 # The command succeeded.
                 break
                             
-            elif success[1] == 'TIMEOUT':
+            elif success == InstErrorCode.TIMEOUT:
                 # The driver command timed out, try again.
                 pass
             
             else:
                 # Some other error occurred.
-                self.fail('DRIVER_CMD_STOP_AUTO_SAMPLING failed with error:'+str(success))
+                self.fail('SBE37Command.STOP_AUTO_SAMPLING failed with error:'+str(success))
 
         # We succeeded in completing the stop. Verify the samples recovered.
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         for sample in result:
             self.assertIsInstance(sample.get('temperature'),float)
             self.assertIsInstance(sample.get('salinity'),float)
@@ -636,19 +616,18 @@ class TestSBE37(IonTestCase):
             self.assertIsInstance(sample.get('conductivity',None),float)
             self.assertIsInstance(sample.get('time',None),tuple)
             self.assertIsInstance(sample.get('date',None),tuple)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
         
-
+        
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
-        self.assertEqual(success[0],'OK')
+        self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
-        
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
         
         
     """
@@ -666,7 +645,7 @@ class TestSBE37(IonTestCase):
 
         # We should begin in the unconfigured state.
         current_state = yield self.driver_client.get_state()
-        self.assertEqual(current_state,'STATE_UNCONFIGURED')
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(params)        
@@ -676,7 +655,7 @@ class TestSBE37(IonTestCase):
         
         self.assertEqual(success[0],'OK')
         self.assertEqual(result,params)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
 
         # Establish connection to device and verify.
@@ -691,12 +670,12 @@ class TestSBE37(IonTestCase):
 
         self.assertEqual(success[0],'OK')
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_CONNECTED')
+        self.assertEqual(current_state,SBE37State.CONNECTED)
 
 
         params = {
             'command':['DRIVER_CMD_TEST_ERRORS'],
-            'channels':['CHAN_INSTRUMENT']
+            'channels':[SBE37Channel.INSTRUMENT]
                 }
         
         try:
@@ -724,7 +703,7 @@ class TestSBE37(IonTestCase):
 
         self.assertEqual(success[0],'OK')
         self.assertEqual(result,None)
-        self.assertEqual(current_state,'STATE_DISCONNECTED')
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
     """
 
 

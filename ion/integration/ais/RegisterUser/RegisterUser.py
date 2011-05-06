@@ -139,8 +139,14 @@ class RegisterUser(object):
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getUser response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_USER_PROFILE_RESPONSE_TYPE)
+      if user_info.resource_reference.IsFieldSet('name'):
+         Response.message_parameters_reference[0].name = user_info.resource_reference.name
+      if user_info.resource_reference.IsFieldSet('institution'):
+         Response.message_parameters_reference[0].institution = user_info.resource_reference.institution
       if user_info.resource_reference.IsFieldSet('email'):
          Response.message_parameters_reference[0].email_address = user_info.resource_reference.email
+      if user_info.resource_reference.IsFieldSet('authenticating_organization'):
+         Response.message_parameters_reference[0].authenticating_organization = user_info.resource_reference.authenticating_organization
       if user_info.resource_reference.IsFieldSet('profile'):
          i = 0
          for item in user_info.resource_reference.profile:
@@ -189,6 +195,14 @@ class RegisterUser(object):
       Request.configuration = Request.CreateObject(IDENTITY_TYPE)
       Request.configuration.subject = user_info.resource_reference.subject
       
+      # check to see if name is present in GPB
+      if msg.message_parameters_reference.IsFieldSet('name'):
+         Request.configuration.name = msg.message_parameters_reference.name
+      
+      # check to see if institution is present in GPB
+      if msg.message_parameters_reference.IsFieldSet('institution'):
+         Request.configuration.institution = msg.message_parameters_reference.institution
+      
       # check to see if email address is present in GPB
       if msg.message_parameters_reference.IsFieldSet('email_address'):
          Request.configuration.email = msg.message_parameters_reference.email_address
@@ -208,13 +222,13 @@ class RegisterUser(object):
          result = yield self.irc.update_user_profile(Request)
       except ReceivedApplicationError, ex:
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserProfile error response')
          Response.error_num = ex.msg_content.MessageResponseCode
          Response.error_str = 'Error calling update_user_profile (AIS): '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
       # build AIS response
-      Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS updateUserEmail response')
+      Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS updateUserProfile response')
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
  

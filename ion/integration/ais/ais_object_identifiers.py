@@ -121,6 +121,19 @@ message FindDataResourcesRspMsg {
 }
 """
 
+FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9038, version=1)
+"""
+message FindDataResourcesByOwnerRspMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9038;
+       _VERSION = 1;	
+   }
+
+   repeated net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasetByOwnerMetadataType datasetByOwnerMetadata = 1;
+
+}
+"""
+
 # GetDataResourceDetail GPBs from ion-object-definitions/net/ooici/integration/ais/getDataResourceDetail/get_data_resource_detail.proto
 GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9033, version=1)
 """
@@ -213,8 +226,10 @@ message UpdateUserProfileRequest {
    }
    // objects in a protofile are called messages
    optional string user_ooi_id=1;
-   optional string email_address=2;
-   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=3;
+   optional string name=2;
+   optional string institution=3;
+   optional string email_address=4;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=5;
 }
 """
 

@@ -195,6 +195,17 @@ class AssociationInstance(object):
         self._add_association()
 
 
+    def __str__(self):
+        output = '============== Association ==============\n'
+        output += str(self.AssociationIdentity) + '\n'
+        output += '========================================\n'
+        output += 'Subject: ' + str(self.SubjectReference) + '\n'
+        output += 'Predicate: ' + str(self.PredicateReference) + '\n'
+        output += 'Object: ' + str(self.ObjectReference) + '\n'
+        output += '============ End Association ===========\n'
+        return output
+
+
     def _add_association(self):
         """
         Add this association to any objects that the local process has for book keeping.

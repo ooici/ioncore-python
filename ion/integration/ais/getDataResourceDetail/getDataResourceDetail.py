@@ -10,7 +10,9 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.core.object import object_utils
 from ion.core.exception import ReceivedApplicationError
+from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 #from ion.integration.ais.getDataResourceDetail.cfdata import cfData
@@ -25,13 +27,17 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 from ion.integration.ais.ais_object_identifiers import GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import DATASOURCE_RESOURCE_TYPE_ID
 
+USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
+RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+
 class GetDataResourceDetail(object):
     
     def __init__(self, ais):
         log.info('GetDataResourceDetail.__init__()')
         self.ais = ais
-        self.rc = ResourceClient()
+        self.rc = ResourceClient(proc=ais)
         self.mc = ais.mc
+        self.irc = IdentityRegistryClient(proc=ais)
 
         
     @defer.inlineCallbacks
@@ -73,7 +79,8 @@ class GetDataResourceDetail(object):
             defer.returnValue(RspMsg)
 
         #
-        # Find the datasource associated with this dataset; for now, instantiate
+        # Find the datasource associated with this dataset, and then find the
+        # owner associated with the dataset; for now, instantiate
         # a FindDataResources worker object. The getAssociatedSource should be
         # moved into a common worker class; it's currently in the FindDataResources
         # class, which doesn't use it.
@@ -82,6 +89,10 @@ class GetDataResourceDetail(object):
         worker = FindDataResources(self.ais)
         dSourceResID = None
         dSourceResID = yield worker.getAssociatedSource(resID)
+        ownerID = yield worker.getAssociatedOwner(resID)
+        
+        log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + resID)
+        userProfile = yield self.__getUserProfile(ownerID)
 
         if not (dSourceResID is None):
             log.debug('Associated datasourceID: ' + dSourceResID)
@@ -96,7 +107,6 @@ class GetDataResourceDetail(object):
 
         self.__printSourceMetadata(dSource)
         
-        
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE)
@@ -104,7 +114,7 @@ class GetDataResourceDetail(object):
         rspMsg.message_parameters_reference[0].data_resource_id = resID
 
         self.__loadGPBMinMetaData(rspMsg.message_parameters_reference[0].dataResourceSummary, ds)
-        self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource)
+        self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource, userProfile)
         
         i = 0
         for var in ds.root_group.variables:
@@ -135,7 +145,7 @@ class GetDataResourceDetail(object):
                 i = i + 1
 
 
-    def __loadGPBSourceMetaData(self, GPBSource, dSource):
+    def __loadGPBSourceMetaData(self, GPBSource, dSource, userProfile):
         log.debug("__loadGPSSourceMetaData()")
     
         #for attrib in var.attributes:
@@ -149,26 +159,13 @@ class GetDataResourceDetail(object):
         GPBSource.base_url = dSource.base_url
         GPBSource.max_ingest_millis = dSource.max_ingest_millis
 
-        """
-        This is the actual GPB
-        optional net.ooici.services.sa.SourceType source_type = 1;
-        repeated string property   = 2;
-        repeated string station_id = 3;
-    
-        optional net.ooici.services.sa.RequestType request_type = 4;
-        optional double top    = 5;
-        optional double bottom = 6;
-        optional double left   = 7;
-        optional double right  = 8;
-        optional string base_url    = 9;
-        optional string dataset_url = 10;
-        optional string ncml_mask   = 11;
-        optional uint64 max_ingest_millis = 12;
-    
-        optional string start_time = 13;
-        optional string end_time   = 14;
-        optional string institution_id = 15;
-        """
+        GPBSource.ion_title = dSource.ion_title
+        GPBSource.ion_description = dSource.ion_description
+
+        GPBSource.ion_name = userProfile.resource_reference.name
+        GPBSource.ion_email = userProfile.resource_reference.email
+        GPBSource.ion_institution = userProfile.resource_reference.institution
+        
         
     def __printSourceMetadata(self, dSource):
         log.debug('source_type: ' + str(dSource.source_type))
@@ -215,6 +212,19 @@ class GetDataResourceDetail(object):
                 rootAttributes.ion_geospatial_vertical_max = float(attrib.GetValue())
             elif attrib.name == 'ion_geospatial_vertical_positive':                
                 rootAttributes.ion_geospatial_vertical_positive = attrib.GetValue()
+
+    @defer.inlineCallbacks
+    def __getUserProfile(self, userID):
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        OoiIdRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
+        OoiIdRequest.configuration = IdentityRequest.CreateObject(USER_OOIID_TYPE)
+        OoiIdRequest.configuration.ooi_id = userID
+        try:
+            result = yield self.irc.get_user(OoiIdRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("get_user failed to find a registered user")
+            
+        defer.returnValue(result)            
 
 
 

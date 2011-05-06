@@ -23,6 +23,8 @@ from ion.core.process.process import ProcessFactory
 
 import string
 import smtplib
+import time
+from datetime import datetime
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
@@ -85,7 +87,7 @@ class NotificationAlertService(ServiceProcess):
 
         #initialize index store for subscription information
         SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path', \
-                                        'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
+                                        'date_registered', 'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
                                         'ion_time_coverage_start', 'ion_time_coverage_end', 'ion_geospatial_lat_min', 'ion_geospatial_lat_max', \
                                         'ion_geospatial_lon_min', 'ion_geospatial_lon_max', \
                                         'ion_geospatial_vertical_min', 'ion_geospatial_vertical_max', 'ion_geospatial_vertical_positive', 'download_url']
@@ -135,7 +137,7 @@ class NotificationAlertService(ServiceProcess):
 
                 BODY = string.join(("You have subscribed to data source %s in OOI CI." % msg.additional_data.datasource_id,
                                         "This is an alert that the data source is currently unavailable.",
-                                        "Explanation: %s" %  msg.additional_data.explanation), "\r\n")
+                                        "Explanation: %s" %  msg.additional_data.error_explanation), "\r\n")
 
                 body = string.join((
 
@@ -180,24 +182,29 @@ class NotificationAlertService(ServiceProcess):
                 yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
                 log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
 
-                log.info('NotificationAlertService.handle_update_event subscription_type %s', rows[key]['subscription_type'])
-                log.info('NotificationAlertService.handle_update_event email_alerts_filter %s', rows[key]['email_alerts_filter'])
-
                 if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
                     and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATES  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
                     # Send the message via our own SMTP server, but don't include the envelope header.
                     # Create the container (outer) email message.
                     log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
+                    format = "%a %b %d %H:%M:%S %Y"
+                    startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
+                    enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
+                    steps =  str(msg.additional_data.number_of_timesteps)
+                    log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
                     FROM = 'OOI@ucsd.edu'
                     TO = tempTbl['user_email']
 
                     SUBJECT = "OOI CI Data Alert"
 
-
                     BODY = string.join(("You have subscribed to data set %s in OOI CI. " % msg.additional_data.datasource_id,
                                     "This is an alert that additional data has been received.",
                                     "Data Source Title: %s" %  msg.additional_data.title,
-                                    "Data Source URL: %s" %  msg.additional_data.url  ), "\r\n")
+                                    "Data Source URL: %s" %  msg.additional_data.url,
+                                    "Start time: %s" % startdt,
+                                    "End time: %s" % enddt,
+                                    "Number of time steps: %s" % steps,
+                                    "To modify or remove this subscription, please access the WebUI. "), "\r\n")
 
                     body = string.join((
 
@@ -256,27 +263,53 @@ class NotificationAlertService(ServiceProcess):
             raise NotificationAlertException('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
-        #Check that user ids in both GPBs match
-        if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
-            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('date_registered'):
+            raise NotificationAlertException('date_registered (provided by AIS) missing, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
+
+        #Check that user ids in both GPBs match - decided not to do this check as one id is for the user requesting the subscription and the other is for the user who owns the data source
+        #if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
+        #   raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
+        log.info('NotificationAlertService.handle_update_event subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
+        log.info('NotificationAlertService.handle_update_event datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
             raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
-        # get the data resource metadata information
-        #yield self.GetDatasetInformation(content.message_parameters_reference.data_src_id, attributes)
+
+        #Check that the item is in the store
+        updateSubscriptionExists = 0
+        offlineSubscriptionExists = 0
+
+        #Check if subscribers have already been created for these events on this data source
+        query = Query()
+        query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
+        rows = yield self.index_store.query(query)
+        #log.info("NotificationAlertService.FOOBAR  Rows returned from query %s " % (rows,))
+        #add each result row into the response message
+        i = 0
+        for key, row in rows.iteritems ( ) :
+            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES :
+                updateSubscriptionExists = 1
+            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE :
+                offlineSubscriptionExists = 1
+            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE :
+                updateSubscriptionExists = 1
+                offlineSubscriptionExists = 1
 
 
+        log.info("NotificationAlertService.FOOBAR subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
         #add the subscription to the index store
-        log.info('NotificationAlertService.op_addSubscription() add attributes\n ')
+        log.info('NotificationAlertService.op_addSubscription add attributes\n ')
         self.attributes = {'user_ooi_id':content.message_parameters_reference.subscriptionInfo.user_ooi_id,
                    'data_src_id': content.message_parameters_reference.subscriptionInfo.data_src_id,
                    'subscription_type':content.message_parameters_reference.subscriptionInfo.subscription_type,
                    'email_alerts_filter': content.message_parameters_reference.subscriptionInfo.email_alerts_filter,
                    'dispatcher_alerts_filter':content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter,
                    'dispatcher_script_path': content.message_parameters_reference.subscriptionInfo.dispatcher_script_path,
+                   'date_registered': content.message_parameters_reference.subscriptionInfo.date_registered,
 
                    'title' : content.message_parameters_reference.datasetMetadata.title,
                    'institution' : content.message_parameters_reference.datasetMetadata.institution,
@@ -306,38 +339,40 @@ class NotificationAlertService(ServiceProcess):
         # Create the correct listener for this data source
 
         #First, check if updates should be subscribed to for this data source
-        foo = content.message_parameters_reference.subscriptionInfo.subscription_type
-        log.info('NotificationAlertService.op_addSubscription create DatasetSupplementAddedEventSubscriber  foo: %s', foo)
-        if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
-              and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-            or \
-            ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
-              and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-            ):
-            self.sub = DatasetSupplementAddedEventSubscriber(process=self, origin="magnet_topic")
-            log.info('NotificationAlertService.op_addSubscription set handler for DatasetSupplementAddedEventSubscriber')
-            self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
-            yield self.sub.register()
-            yield self.sub.initialize()
-            yield self.sub.activate()
-            log.info('NotificationAlertService.op_addSubscription DatasetSupplementAddedEvent activation complete')
+        if not updateSubscriptionExists :
+            if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
+                  and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
+                or \
+                ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
+                  and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
+                ):
+                self.sub = DatasetSupplementAddedEventSubscriber(process=self, origin="magnet_topic")
+                log.info('NotificationAlertService.op_addSubscription set handler for DatasetSupplementAddedEventSubscriber')
+                self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
+                yield self.sub.register()
+                yield self.sub.initialize()
+                yield self.sub.activate()
+                log.info('NotificationAlertService.op_addSubscription DatasetSupplementAddedEvent activation complete')
 
 
         #Second, check if data source unavailable events should be subscribed to for this data source
-        if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
-              and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-            or \
-            ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
-              and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter) \
-            ):
-            log.info('NotificationAlertService.op_addSubscription create DatasourceUnavailableEventSubscriber')
-            self.sub = DatasourceUnavailableEventSubscriber(process=self, origin="magnet_topic")
-            log.info('NotificationAlertService.op_addSubscription set handler for DatasourceUnavailableEventSubscriber')
-            self.sub.ondata = self.handle_offline_event    # need to do something with the data when it is received
-            yield self.sub.register()
-            yield self.sub.initialize()
-            yield self.sub.activate()
-            log.info('NotificationAlertService.op_addSubscription DatasourceUnavailableEventSubscriber activation complete')
+        if not offlineSubscriptionExists :
+            if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
+                  and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
+                or \
+                ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
+                  and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter) \
+                ):
+                log.info('NotificationAlertService.op_addSubscription create DatasourceUnavailableEventSubscriber')
+                self.sub = DatasourceUnavailableEventSubscriber(process=self, origin="magnet_topic")
+                log.info('NotificationAlertService.op_addSubscription set handler for DatasourceUnavailableEventSubscriber')
+                self.sub.ondata = self.handle_offline_event    # need to do something with the data when it is received
+                yield self.sub.register()
+                yield self.sub.initialize()
+                yield self.sub.activate()
+                log.info('NotificationAlertService.op_addSubscription DatasourceUnavailableEventSubscriber activation complete')
+
+
         
 
         # create the AIS response GPBs
@@ -433,6 +468,7 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.email_alerts_filter = rows[key]['email_alerts_filter']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered = rows[key]['date_registered']
 
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.data_resource_id = rows[key]['data_src_id']

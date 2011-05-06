@@ -17,8 +17,14 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
+                                                                    HAS_A_ID, \
+                                                                    ROOT_USER_ID, \
+                                                                    ANONYMOUS_USER_ID, \
+                                                                    DISPATCHER_RESOURCE_TYPE_ID
 
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
@@ -67,6 +73,7 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 # ResourceID for testing create download URL response
 #
 TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
+DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 
 
 class AppIntegrationTest(IonTestCase):
@@ -163,6 +170,8 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
+        self.rc = ResourceClient(proc=sup)
+        self.ac  = AssociationClient(proc=sup)
 
         # Step 1: Get this dispatcher's ID from the local dispatcher.id file
         f = None
@@ -206,22 +215,11 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.minLatitude  = 30
-        #reqMsg.message_parameters_reference.maxLatitude  = 45
-        #reqMsg.message_parameters_reference.minLongitude = -75
-        #reqMsg.message_parameters_reference.maxLongitude = -70
-        #reqMsg.message_parameters_reference.minVertical  = 20
-        #reqMsg.message_parameters_reference.maxVertical  = 30
-        #reqMsg.message_parameters_reference.posVertical  = 'down'
-        #reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
-        #reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
-
         
         log.debug('Calling findDataResources to get list of resources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
-
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
         log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
@@ -321,7 +319,6 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing user_ooi_ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
         
-
         #
         # Send a request with a temporal bounds covered by data time 
         #
@@ -344,11 +341,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with temporal bounds that covers data time
@@ -373,11 +370,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds minTime covered by data time, but
@@ -401,11 +398,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
         
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
         #
         # Send a request with a temporal bounds maxTime covered by data time, but
@@ -429,11 +426,11 @@ class AppIntegrationTest(IonTestCase):
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        numResReturned = len(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
         if numResReturned == 0:
             self.fail('findDataResourcesByUser returned zero resources.')
-
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        
+        self.__validateDatasetByOwnerMetadata(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata)
 
 
     @defer.inlineCallbacks
@@ -478,7 +475,7 @@ class AppIntegrationTest(IonTestCase):
 
         if len(rspMsg.message_parameters_reference) > 0:
             if len(rspMsg.message_parameters_reference[0].dataResourceSummary) > 0:
-                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
+                dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
         
                 #
                 # Now create a request message to get the metadata details about the
@@ -506,6 +503,11 @@ class AppIntegrationTest(IonTestCase):
                 log.debug('  RequestType: ' + str(dSource.request_type))
                 log.debug('  Base URL: ' + dSource.base_url)
                 log.debug('  Max Ingest Millis: ' + str(dSource.max_ingest_millis))
+                log.debug('  ion_title: ' + dSource.ion_title)
+                log.debug('  ion_description: ' + dSource.ion_description)
+                log.debug('  ion_name: ' + dSource.ion_name)
+                log.debug('  ion_email: ' + dSource.ion_email)
+                log.debug('  ion_institution: ' + dSource.ion_institution)
 
                 if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('title'):
                     #self.fail('response to findDataResources has no title field')
@@ -717,6 +719,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -799,6 +803,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserProfile request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
+        msg.message_parameters_reference.name = "some_person"
+        msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
@@ -838,7 +844,10 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('getUser returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
+        self.assertEqual(reply.message_parameters_reference[0].name, "some_person")
+        self.assertEqual(reply.message_parameters_reference[0].institution, "some_place")
         self.assertEqual(reply.message_parameters_reference[0].email_address, "some_person@some_place.some_domain")
+        self.assertEqual(reply.message_parameters_reference[0].authenticating_organization, "ProtectNetwork")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].name, "ProfileItem_1_Name")
         self.assertEqual(reply.message_parameters_reference[0].profile[0].value, "ProfileItem_1_Value")
         self.assertEqual(reply.message_parameters_reference[0].profile[1].name, "ProfileItem_2_Name")
@@ -1015,6 +1024,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
+
+    @defer.inlineCallbacks
+    def __register_dispatcher(self, name):
+        dispatcher_res = yield self.rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
+        dispatcher_res.dispatcher_name = name
+        dispatcher_id = dispatcher_res.ResourceIdentity
+        yield self.rc.put_instance(dispatcher_res, 'Committing new dispatcher resource for registration')
+        defer.returnValue(dispatcher_res)
+
+
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
         log.debug('Testing createDataResourcesSubscription.')
@@ -1027,6 +1046,41 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # is returned.
         #
         yield self.createUser()
+
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
        # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1054,6 +1108,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 
+
     @defer.inlineCallbacks
     def test_findDataResourceSubscriptions(self):
         log.debug('Testing findDataResourceSubscriptions.')
@@ -1062,6 +1117,41 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         mc = MessageClient(proc=self.test_sup)
 
         yield self.createUser()
+
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
         #
         # Add a couple of subscriptions to find later...
@@ -1141,11 +1231,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
         numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
 
-        log.debug('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
+        log.info('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
         if numSubsReturned != 2:
             errString = 'findDataResourcesByUser returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 2'
             #self.fail('findDataResourcesByUser returned " + numResReturned + " subscriptions.  Should have been 2')
             self.fail(errString)
+        else:
+            i = 0
+            while i < numSubsReturned:
+                log.info('Date of subscription registration: ' + str(rspMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered))
+                i = i + 1
+
 
             
     @defer.inlineCallbacks
@@ -1156,7 +1252,42 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
         
-        # first create a subscription to be updated
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
+
+       # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1184,7 +1315,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1211,6 +1342,41 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
         
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
+
         # create a subscription to be deleted
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -1250,53 +1416,94 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
 
 
-    def __validateDataResourceSummary(self, dataResourceSummary):
+    def __validateDatasetByOwnerMetadata(self, metadata):
         log.debug('__validateDataResourceSummary()')
         
         i = 0
-        while i < len(dataResourceSummary):
-            dsResourceID = dataResourceSummary[i].data_resource_id
-            if not dataResourceSummary[i].IsFieldSet('user_ooi_id'):
-                self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
-            if not dataResourceSummary[i].IsFieldSet('data_resource_id'):
+        while i < len(metadata):
+            data = metadata[i]
+            if not data.IsFieldSet('data_resource_id'):
+                self.fail('FindDataResourcesByOwner response has no data_resource_id field')
+            else:                
+                dsResourceID = data.data_resource_id
+            if not data.IsFieldSet('update_interval_seconds'):
+                self.fail('FindDataResourcesByOwner response has no update_interval_seconds field')
+            else:                
+                log.debug('update_interval_seconds: ' + str(data.update_interval_seconds))
+            if not data.IsFieldSet('ion_title'):
+                self.fail('FindDataResourcesByOwner response has no ion_title field')
+            else:                
+                log.debug('ion_title: ' + str(data.update_interval_seconds))
+            if not data.IsFieldSet('date_registered'):
+                self.fail('FindDataResourcesByOwner response has no date_registered field')
+            else:                
+                log.debug('date_registered: ' + str(data.date_registered))
+            if not data.IsFieldSet('title'):
+                self.fail('FindDataResourcesByOwner response has no title field')
+            else:                
+                log.debug('title: ' + str(data.title))
+            if not data.IsFieldSet('activation_state'):
+                self.fail('FindDataResourcesByOwner response has no activation_state field')
+            else:                
+                log.debug('activation_state: ' + str(data.activation_state))
+            i = i + 1                
+
+    def __validateDataResourceSummary(self, dataResourceSummaries):
+        log.debug('__validateDataResourceSummary()')
+        
+        i = 0
+        while i < len(dataResourceSummaries):
+            datasetMetadata = dataResourceSummaries[i].datasetMetadata
+            dsResourceID = datasetMetadata.data_resource_id
+
+            if not dataResourceSummaries[i].IsFieldSet('notificationSet'):
+                self.fail('dataset: ' +  dsResourceID + ' has no notificationSet field')
+            log.info('notificationSet: ' + str(dataResourceSummaries[i].notificationSet))
+            if not dataResourceSummaries[i].IsFieldSet('date_registered'):
+                self.fail('dataset: ' +  dsResourceID + ' has no date_registered field')
+            log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
+
+            #if not datasetMetadata.IsFieldSet('user_ooi_id'):
+            #    self.fail('dataset: ' +  dsResourceID + ' has no user_ooi_id field')
+            if not datasetMetadata.IsFieldSet('data_resource_id'):
                 self.fail('dataset: ' +  dsResourceID + ' has no resource_id field')
-            if not dataResourceSummary[i].IsFieldSet('title'):
+            if not datasetMetadata.IsFieldSet('title'):
                 #self.fail('response to findDataResources has no title field')
                 log.error('dataset: ' +  dsResourceID + ' has no title field')
-            if not dataResourceSummary[i].IsFieldSet('institution'):
+            if not datasetMetadata.IsFieldSet('institution'):
                 #self.fail('response to findDataResources has no institution field')
                 log.error('dataset: ' +  dsResourceID + ' has no institution field')
-            if not dataResourceSummary[i].IsFieldSet('source'):
+            if not datasetMetadata.IsFieldSet('source'):
                 #self.fail('response to findDataResources has no source field')
                 log.error('dataset: ' +  dsResourceID + ' has no source field')
-            if not dataResourceSummary[i].IsFieldSet('references'):
+            if not datasetMetadata.IsFieldSet('references'):
                 #self.fail('response to findDataResources has no references field')
                 log.error('dataset: ' +  dsResourceID + ' has no references field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_start'):
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_start'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_start field')
-            if not dataResourceSummary[i].IsFieldSet('ion_time_coverage_end'):
+            if not datasetMetadata.IsFieldSet('ion_time_coverage_end'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_time_coverage_end field')
-            if not dataResourceSummary[i].IsFieldSet('summary'):
+            if not datasetMetadata.IsFieldSet('summary'):
                 #self.fail('response to findDataResources has no summary field')
                 log.error('dataset: ' +  dsResourceID + ' has no summary field')
-            if not dataResourceSummary[i].IsFieldSet('comment'):
+            if not datasetMetadata.IsFieldSet('comment'):
                 #self.fail('response to findDataResources has no comment field')
                 log.error('dataset: ' +  dsResourceID + ' has no comment field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lat_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lat_max'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lat_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_lon_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_lon_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_lon_max'):
                 self.fail('dataset: ' +  dsResourceID + ' no ion_geospatial_lon_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_min'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_min'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_min field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_max'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_max'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_max field')
-            if not dataResourceSummary[i].IsFieldSet('ion_geospatial_vertical_positive'):
+            if not datasetMetadata.IsFieldSet('ion_geospatial_vertical_positive'):
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
-            if not dataResourceSummary[i].IsFieldSet('download_url'):
+            if not datasetMetadata.IsFieldSet('download_url'):
                 self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
             i = i + 1                
 
@@ -1368,7 +1575,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         self.user_id = reply.message_parameters_reference[0].ooi_id
-        log.info("NotificationAlertTest:createUser id = "+str(self.user_id))
+        log.info("AppIntegrationTest:createUser id = "+str(self.user_id))
 
 
         # Give our test user an email address
