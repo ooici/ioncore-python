@@ -407,7 +407,7 @@ class ManageDataResourceSubscription(object):
                 #
                 # Create a dispatcher workflow
                 #
-                yield self.__createDispatcherWorkflow(self.userRes, dispatcherID)
+                yield self.__createDispatcherWorkflow(msg.message_parameters_reference, dispatcherID)
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
@@ -488,35 +488,30 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
-    def __createDispatcherWorkflow(self, userRes, dispatcherID):
+    def __createDispatcherWorkflow(self, createInfo, dispatcherID):
  
-        log.debug('__createDispatcherWorkflow'
-                  )
-        #dispatcherID = self.dispatcherID
-        #dispatcherID = dispatcherRes.ResourceIdentity
-        dispatcherRes = self.rc.get_instance(dispatcherID)
+        log.debug('__createDispatcherWorkflow')
 
-        #Create the dispatcher workflow resource
+        dispatcherRes = yield self.rc.get_instance(dispatcherID)
+        subscriptionInfo = createInfo.subscriptionInfo
+        datasetInfo = createInfo.datasetMetadata
+
+        #
+        # Create the dispatcher workflow resource
+        #
         dwfRes = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, ResourceName = 'DispatcherWorkflow')
         workflowID = dwfRes.ResourceIdentity
-        #dwfRes.dataset_id = dataset_resource.key
-        #dwfRes.workflow_path = dispatcher_script_path
-        #dwfRes.ResourcesLifecycleState = dwr.ACTIVE
+        dwfRes.dataset_id = datasetInfo.data_resource_id
+        dwfRes.user_ooi_id = subscriptionInfo.user_ooi_id
+        dwfRes.workflow_path = subscriptionInfo.dispatcher_script_path
         yield self.rc.put_instance(dwfRes)
 
         log.debug('Creating association between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID)        
-        """
+
         #
         # Create an association between the workflow and the dispatcher
         #
-        #  BILL: I just started working on this and got pulled off...I'm
-        # checking it in so we don't have a merge issue.  I'll get back to
-        # it ASAP
-        #
         try:
-            #
-            # Now make an association between the dispatcher and the workflow
-            #
             association = yield self.ac.create_association(dispatcherRes, HAS_A_ID, dwfRes)
             if association not in self.userRes.ResourceAssociationsAsSubject:
                 log.error('Error: subject not in association!')
@@ -530,7 +525,7 @@ class ManageDataResourceSubscription(object):
             yield self.rc.put_instance(association)
 
         except AssociationClientError, ex:
-            errString = 'Error creating assocation between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID + '. ex: ' + ex
+            errString = 'Error creating assocation between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID + '. ex: ' + str(ex)
             log.error(errString)
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -538,10 +533,10 @@ class ManageDataResourceSubscription(object):
             Response.error_str = errString
             defer.returnValue(Response)
 
-        
+                
         # Publish the new subscription notification
-        yield publisher.create_and_publish_event(dispatcher_workflow=dwr.ResourceObject)
-        """
+        publisher = yield self.pfn.build(origin = dispatcherID)
+        yield publisher.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject)
 
         defer.returnValue(None)
 
