@@ -598,15 +598,13 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(result_1.keys().sort(),AgentStatus.list().sort())
 
         self.assertEqual(AgentState.has(result_1[AgentStatus.AGENT_STATE][1]),True)
-        self.assertEqual(isinstance(result_1[AgentStatus.CHANNEL_NAMES][1],(list,tuple)),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,str),result_1[AgentStatus.CHANNEL_NAMES][1])),True)
         self.assertEqual(type(result_1[AgentStatus.CONNECTION_STATE][1]),str)
         self.assertEqual(isinstance(result_1[AgentStatus.ALARMS][1],(list,tuple)),True)
         self.assertEqual(all(map(lambda x: (x in instrument_agent.status_alarms) or (x==None),result_1[AgentStatus.ALARMS][1])),True)
-        self.assertEqual(type(result_1[AgentStatus.TIME_STATUS][1]),dict)
-        self.assertEqual(type(result_1[AgentStatus.BUFFER_SIZE][1]),int)
-        self.assertEqual(type(result_1[AgentStatus.AGENT_VERSION][1]),str)
-        self.assertEqual(type(result_1[AgentStatus.DRIVER_VERSION][1]),str)
+        self.assertIsInstance(result_1[AgentStatus.TIME_STATUS][1],dict)
+        self.assertIsInstance(result_1[AgentStatus.BUFFER_SIZE][1],int)
+        self.assertIsInstance(result_1[AgentStatus.AGENT_VERSION][1],str)
+        self.assertIsInstance(result_1[AgentStatus.PENDING_TRANSACTIONS][1],(list,tuple))
 
 
         # Get all observatory vals using explicit list.
@@ -624,7 +622,6 @@ class TestInstrumentAgent(IonTestCase):
         # Attempt to get some values, including bad ones.
         params_3 = [
             AgentStatus.AGENT_STATE,
-            AgentStatus.CHANNEL_NAMES,
             AgentStatus.CONNECTION_STATE,
             'BAD_STATUS_KEY_1',
             'BAD_STATUS_KEY_2'            
@@ -634,28 +631,18 @@ class TestInstrumentAgent(IonTestCase):
         result_3 = reply_3['result']
         transaction_id_3 = reply_3['transaction_id']
 
-        #self.assertEqual(success_3[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_3))
         self.assertEqual(transaction_id_3,None)
         self.assertEqual(type(result_3),dict)
         self.assertEqual(result_3.keys().sort(),params_3.sort())
-        #self.assertEqual(result_3[AgentStatus.AGENT_STATE][0][0],'OK')        
-        #self.assertEqual(result_3[AgentStatus.CHANNEL_NAMES][0][0],'OK')        
-        #self.assertEqual(result_3[AgentStatus.CONNECTION_STATE][0][0],'OK')
         self.assert_(InstErrorCode.is_ok(result_3[AgentStatus.AGENT_STATE][0]))
-        self.assert_(InstErrorCode.is_ok(result_3[AgentStatus.CHANNEL_NAMES][0]))
         self.assert_(InstErrorCode.is_ok(result_3[AgentStatus.CONNECTION_STATE][0]))
-        #self.assertEqual(result_3['BAD_STATUS_KEY_1'][0][0],'ERROR')        
         self.assert_(InstErrorCode.is_error(result_3['BAD_STATUS_KEY_1'][0]))
         self.assertEqual(result_3['BAD_STATUS_KEY_1'][1],None)        
-        #self.assertEqual(result_3['BAD_STATUS_KEY_2'][0][0],'ERROR')        
         self.assert_(InstErrorCode.is_error(result_3['BAD_STATUS_KEY_2'][0]))
         self.assertEqual(result_3['BAD_STATUS_KEY_2'][1],None)        
         self.assertEqual(AgentState.has(result_1[AgentStatus.AGENT_STATE][1]),True)
-        self.assertEqual(isinstance(result_1[AgentStatus.CHANNEL_NAMES][1],(list,tuple)),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,str),result_1[AgentStatus.CHANNEL_NAMES][1])),True)
         self.assertEqual(type(result_1[AgentStatus.CONNECTION_STATE][1]),str)
-
 
         # Start a transaction.
         reply_4 = yield self.ia_client.start_transaction(0)
@@ -672,7 +659,6 @@ class TestInstrumentAgent(IonTestCase):
         result_5 = reply_5['result']
         transaction_id_5 = reply_5['transaction_id']
     
-        #self.assertEqual(success_5[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_5))
         self.assertEqual(result_5,None)
         self.assertEqual(transaction_id_5,None)
@@ -684,7 +670,6 @@ class TestInstrumentAgent(IonTestCase):
         result_6 = reply_6['result']
         transaction_id_6 = reply_6['transaction_id']
     
-        #self.assertEqual(success_6[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_6))
         self.assertEqual(result_6,None)
         self.assertEqual(transaction_id_6,None)
@@ -697,7 +682,6 @@ class TestInstrumentAgent(IonTestCase):
         result_7 = reply_7['result']
         transaction_id_7 = reply_7['transaction_id']
     
-        #self.assertEqual(success_7[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_7))
         self.assertEqual(result_7,None)
         self.assertEqual(transaction_id_7,None)
@@ -725,7 +709,6 @@ class TestInstrumentAgent(IonTestCase):
         result_10 = reply_10['result']
         transaction_id_10 = reply_10['transaction_id']
 
-        #self.assertEqual(success_10[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_10))
         self.assertEqual(result_10,None)
         self.assertEqual(transaction_id_10,None)
