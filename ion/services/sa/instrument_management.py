@@ -13,20 +13,20 @@ from twisted.internet import defer
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.process.process import ProcessFactory, ProcessDesc
-#from ion.data.dataobject import DataObject, ResourceReference, LCStates
-#from ion.resources.dm_resource_descriptions import PubSubTopicResource
-#from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
-#from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
+
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.resource_registry.association_client import AssociationClientError
-#from ion.services.sa.instrument_registry import InstrumentRegistryClient
-#from ion.services.sa.data_product_registry import DataProductRegistryClient
-#from ion.services.coi.agent_registry import AgentRegistryClient
 import ion.util.procutils as pu
-from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
-from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient, ResourceRegistryError
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+
+import ion.agents.instrumentagents.instrument_agent as instrument_agent
+
+from ion.core.process.process import Process
+from ion.core.process.process import ProcessDesc
+from ion.core import bootstrap
+
 
 from ion.core.object import object_utils
 
@@ -36,6 +36,20 @@ INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
+
+        # Setup a subscriber to an event topic
+class SBE37EventSubscriber(InfoLoggingEventSubscriber):
+    def __init__(self, *args, **kwargs):
+        self.msgs = []
+        InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+
+    def ondata(self, data):
+        log.info("IMSSRVC !!!!!!! TestEventSubscriber received a message with name: %s",
+                data['content'].name)
+        self.msgs.append(data)
+
+
+        
 class InstrumentManagementService(ServiceProcess):
     """
     Instrument management service interface.
@@ -90,7 +104,7 @@ class InstrumentManagementService(ServiceProcess):
         if 'fw_version' in userInput:
             resource.fw_version = str(userInput['fw_version'])
 
-        yield self.rc.put_instance(resource, 'Testing write...')
+        yield self.rc.put_instance(resource, 'Save instrument resource')
         res_id = resource.ResourceIdentity
         log.info("IMSSRVC op_create_new_instrument stored resource. identity: %s ", res_id)
 
@@ -225,6 +239,7 @@ class InstrumentManagementService(ServiceProcess):
 
         yield self.reply_ok(msg, resvalues)
 
+
     @defer.inlineCallbacks
     def op_start_instrument_agent(self, content, headers, msg):
         """
@@ -248,51 +263,95 @@ class InstrumentManagementService(ServiceProcess):
         else:
             raise ValueError("Input for model not present")
 
-        if model != 'SBE49':
-            raise ValueError("Only SBE49 supported!")
+        if model != 'SBE37':
+            raise ValueError("Only SBE37 supported!")
         log.info("IMSSRVC op_start_instrument_agent good input")
 
-        #agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
-        #if agent_pid:
-        #    raise StandardError("Agent already started for instrument "+str(inst_id))
 
-        simulator = Simulator(inst_id)
-        #simulator.start()
 
-        #topicname = "Inst/RAW/"+inst_id
-        #topic = PubSubTopicResource.create(topicname,"")
+        #yield self._start_container()
 
-        # Use the service to create a queue and register the topic
-        #topic = yield self.dpsc.define_topic(topic)
+        # Driver and agent configuration. Configuration data will ultimatly be
+        # accessed via some persistance mechanism: platform filesystem
+        # or a device registry. For now, we pass all configuration data
+        # that would be read this way as process arguments.
+        sbe_host = '137.110.112.119'
+        sbe_port = 4001
+        driver_config = {
+            'ipport':sbe_port,
+            'ipaddr':sbe_host
+        }
+        agent_config = {}
+
+        # Process description for the SBE37 driver.
+        driver_desc = {
+            'name':'SBE37_driver',
+            'module':'ion.agents.instrumentagents.SBE37_driver',
+            'class':'SBE37Driver',
+            'spawnargs':{'config':driver_config}
+        }
+
+        # Process description for the SBE37 driver client.
+        driver_client_desc = {
+            'name':'SBE37_client',
+            'module':'ion.agents.instrumentagents.SBE37_driver',
+            'class':'SBE37DriverClient',
+            'spawnargs':{}
+        }
+
+        # Spawnargs for the instrument agent.
+        spawnargs = {
+            'driver-desc':driver_desc,
+            'client-desc':driver_client_desc,
+            'driver-config':driver_config,
+            'agent-config':agent_config
+        }
+
+        # Process description for the instrument agent.
+        agent_desc = {
+            'name':'instrument_agent',
+            'module':'ion.agents.instrumentagents.instrument_agent',
+            'class':'InstrumentAgent',
+            'spawnargs':spawnargs
+        }
+
+        # Processes for the tests.
+        processes = [
+            agent_desc
+        ]
+
+        # Spawn agent and driver, create agent client.
+        log.info("IMSSRVC op_start_instrument_agent spawn")
+        #self.sup1 = yield bootstrap.create_supervisor()
+        proc1 = ProcessDesc(**agent_desc)
+        self.svc_id = yield self.spawn_child(proc1)
+        log.info("IMSSRVC op_start_instrument_agent spawned process id: %s", self.svc_id)
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=self.svc_id)
+        log.info("IMSSRVC op_start_instrument_agent get ia_client")
+
+        #self.ia_client.register_resource(content['instrumentResourceID'])
 
         """
-        iagent_args = {}
-        iagent_args['instrument-id'] = inst_id
-        driver_args = {}
-        driver_args['port'] = simulator.port
-        driver_args['publish-to'] = topic.RegistryIdentity
-        iagent_args['driver-args'] = driver_args
-
-        iapd = ProcessDesc(**{'name':'SBE49IA',
-                  'module':'ion.agents.instrumentagents.SBE49_IA',
-                  'class':'SBE49InstrumentAgent',
-                  'spawnargs':iagent_args})
-
-        iagent_id = yield self.spawn_child(iapd)
+        reply_1 = yield self.ia_client.start_transaction(0)
+        log.info("IMSSRVC op_start_instrument_agent start trans %s", reply_1)
+        transaction_id_1 = reply_1['transaction_id']
+        reply_3 = yield self.ia_client.end_transaction(transaction_id_1)
+        log.info("IMSSRVC op_start_instrument_agent end trans %s", reply_3)
         """
 
+        log.info("IMSSRVC op_start_instrument_agent register resource")
         #store the new instrument agent in the resource registry
         instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Test Instrument Agent Resource', ResourceDescription='A test instrument resource')
 
         # Set the attributes
-        instrumentAgentResource.name = 'SBE49IA'
-        instrumentAgentResource.description = 'Seabird Sensor'
-        #instrumentAgentResource.version = str(userInput['manufacturer'])
-        instrumentAgentResource.class_name = 'SBE49InstrumentAgent'
-        instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE49_IA'
+        instrumentAgentResource.name = content['model']
+        instrumentAgentResource.description = content['model']
+        instrumentAgentResource.class_name = 'SBE37InstrumentAgent'
+        instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE37_IA'
+        instrumentAgentResource.process_id = str(self.svc_id)
 
         #Store the resource in the registry
-        yield self.rc.put_instance(instrumentAgentResource, 'Testing write...')
+        yield self.rc.put_instance(instrumentAgentResource, 'Save agent resource')
         inst_agnt_id = instrumentAgentResource.ResourceIdentity
         log.info("IMSSRVC op_start_instrument_agent stored agent resource. identity: %s ", inst_agnt_id)
 
@@ -300,12 +359,29 @@ class InstrumentManagementService(ServiceProcess):
         instrument_resource = yield self.rc.get_instance(inst_resource_id)
         association = yield self.ac.create_association(instrument_resource, HAS_A_ID, instrumentAgentResource)
         # Put the association and the resources in the datastore
-        self.rc.put_resource_transaction([instrument_resource, instrumentAgentResource])
+        yield self.rc.put_resource_transaction([instrument_resource, instrumentAgentResource])
         log.info("IMSSRVC op_start_instrument_agent created association %s", association)
 
-        #iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
-        #yield iaclient.register_resource(inst_id)
 
+        #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/presentation/web_viz_consumer.py
+        #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/distribution/consumers/timeseries_consumer.py
+
+
+        log.info("IMSSRVC op_start_instrument_agent spawn listerner")
+        subproc = Process()
+        yield subproc.spawn()
+        testsub = SBE37EventSubscriber(origin=str(self.svc_id), process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+
+        log.info("IMSSRVC op_start_instrument_agent cause event")
+        # Twiddle the IA
+        result = yield self.ia_client.start_transaction(5)
+        tid = result['transaction_id']
+        yield self.ia_client.end_transaction(tid)
+
+        # check the event
+        yield pu.asleep(3.0)  
 
         #yield self.reply_ok(msg, "OK")
         res_value = {'instrument_agent_id':inst_agnt_id }

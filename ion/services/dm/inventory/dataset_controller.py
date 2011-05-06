@@ -34,6 +34,9 @@ message Dataset {
 }
 """
 
+CMD_GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+
+
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 """
 message IDRef {
@@ -144,9 +147,12 @@ class DatasetController(ServiceProcess):
                                                               ResourceName='CDM Dataset Resource',
                                                               ResourceDescription='None')
 
+        resource.root_group = resource.CreateObject(CMD_GROUP_TYPE)
+
+
         # What state should this be in at this point?
         #resource.ResourceLifeCycleState = resource.DEVELOPED
-        #yield self.rc.put_instance(resource)
+        yield self.resource_client.put_instance(resource)
 
         log.info(str(resource))
 
