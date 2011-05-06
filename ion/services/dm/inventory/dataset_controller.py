@@ -10,7 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml
+from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, rsa_to_dot_ssh
 from ion.core import ioninit
 
 from ion.core.process.process import ProcessFactory
@@ -20,7 +20,7 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, \
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
     HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
@@ -105,8 +105,20 @@ class DatasetController(ServiceProcess):
 
         self.asc = AssociationServiceClient(proc=self)
 
+        # As per DS, pull config from spawn args first and config file(s) second
+        self.rsa_key = self.spawn_args.get('rsa_key', CONF.getValue('rsa_key', default=None))
+        self.server_url = self.spawn_args.get('thredds_ncml_url',
+                                              CONF.getValue('thredds_ncml_url',
+                                              default='thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))
+        self.update_interval = self.spawn_args.get('update_interval', CONF.getValue('update_interval', default=5.0))
+        log.debug('rsa key: %s Update: %f URL: %s' % (self.rsa_key, self.update_interval, self.server_url))
+
+        if self.rsa_key:
+            rsa_to_dot_ssh(self.rsa_key)
+            
         log.info('SLC_INIT Dataset Controller')
 
+    #noinspection PyUnusedLocal
     @defer.inlineCallbacks
     def op_create_dataset_resource(self, request, headers, msg):
         """

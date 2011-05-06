@@ -17,7 +17,6 @@ from ion.core import ioninit
 import ion.util.ionlog
 from ion.util.itv_decorator import itv
 from ion.test.iontest import IonTestCase
-from ion.util.procutils import asleep
 
 from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml
 from ion.services.dm.inventory import ncml_generator
@@ -56,8 +55,9 @@ class PSAT(IonTestCase):
         create_ncml(str(uuid4()), filedir)
         create_ncml(str(uuid4()), filedir)
 
-        yield rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')
+        yield rsync_ncml(filedir, 'thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data')
 
+    #noinspection PyUnreachableCode
     @itv(CONF)
     @defer.inlineCallbacks
     def test_with_rsync(self):
@@ -71,4 +71,4 @@ class PSAT(IonTestCase):
         create_ncml(str(uuid4()), filedir)
         create_ncml(str(uuid4()), filedir)
 
-        yield rsync_ncml(filedir, 'amoeba.ucsd.edu:/tmp/pfh')
+        yield rsync_ncml(filedir, 'thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data')
