@@ -17,8 +17,14 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
+                                                                    HAS_A_ID, \
+                                                                    ROOT_USER_ID, \
+                                                                    ANONYMOUS_USER_ID, \
+                                                                    DISPATCHER_RESOURCE_TYPE_ID
 
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
@@ -67,6 +73,7 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 # ResourceID for testing create download URL response
 #
 TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
+DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 
 
 class AppIntegrationTest(IonTestCase):
@@ -163,6 +170,8 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
+        self.rc = ResourceClient(proc=sup)
+        self.ac  = AssociationClient(proc=sup)
 
         # Step 1: Get this dispatcher's ID from the local dispatcher.id file
         f = None
@@ -1015,6 +1024,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
+
+    @defer.inlineCallbacks
+    def __register_dispatcher(self, name):
+        dispatcher_res = yield self.rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
+        dispatcher_res.dispatcher_name = name
+        dispatcher_id = dispatcher_res.ResourceIdentity
+        yield self.rc.put_instance(dispatcher_res, 'Committing new dispatcher resource for registration')
+        defer.returnValue(dispatcher_res)
+
+
     @defer.inlineCallbacks
     def test_createDataResourceSubscription(self):
         log.debug('Testing createDataResourcesSubscription.')
@@ -1027,6 +1046,41 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # is returned.
         #
         yield self.createUser()
+
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
        # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1054,15 +1108,50 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 
+
     @defer.inlineCallbacks
     def test_findDataResourceSubscriptions(self):
-        raise unittest.SkipTest("This SW is not ready for testing.")
         log.debug('Testing findDataResourceSubscriptions.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
         yield self.createUser()
+
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
         #
         # Add a couple of subscriptions to find later...
@@ -1157,14 +1246,48 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
-        raise unittest.SkipTest("This SW is not ready for testing.")
         log.debug('Testing updateDataResourceSubscription.')
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
         
-        # first create a subscription to be updated
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
+
+       # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1192,7 +1315,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1219,6 +1342,41 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
         
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
+
         # create a subscription to be deleted
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -1417,7 +1575,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         self.user_id = reply.message_parameters_reference[0].ooi_id
-        log.info("NotificationAlertTest:createUser id = "+str(self.user_id))
+        log.info("AppIntegrationTest:createUser id = "+str(self.user_id))
 
 
         # Give our test user an email address
