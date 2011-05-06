@@ -125,6 +125,17 @@ class DriverEvent(BaseEnum):
     ENTER = 'DRIVER_EVENT_ENTER'
     EXIT = 'DRIVER_EVENT_EXIT'
     
+
+"""
+Common driver statuses.
+"""
+class DriverStatus(BaseEnum):
+    """
+    Common driver status enum.
+    """
+    DRIVER_VERSION = 'DRIVER_STATUS_DRIVER_VERSION'
+    DRIVER_STATE = 'DRIVER_STATUS_DRIVER_STATE'
+    OBSERVATORY_STATE = 'DRIVER_STATUS_OBSERVATORY_STATE'
     
 
 ###############################################################################
@@ -137,7 +148,8 @@ Observatory state names.
 
 class AgentState(BaseEnum):
     """
-    Common agent state enum.
+    Common agent state enum. Includes aggregate states of the agent state
+    machine.
     """
     UNKNOWN = 'AGENT_STATE_UNKNOWN'
     POWERED_DOWN = 'AGENT_STATE_POWERED_DOWN'
@@ -209,6 +221,7 @@ class AgentParameter(BaseEnum):
     DRIVER_CLIENT_DESC = 'AGENT_PARAM_DRIVER_CLIENT_DESC'
     DRIVER_CONFIG = 'AGENT_PARAM_DRIVER_CONFIG'
 
+
 """
 List of observatory status names.
 """
@@ -217,15 +230,31 @@ class AgentStatus(BaseEnum):
     """
     Common agent status enum.
     """
-    AGENT_STATE = 'AGENT_STATUS_STATE'
-    CHANNEL_NAMES = 'AGENT_STATUS_CHANNEL_NAMES'
-    CONNECTION_STATE = 'AGENT_STATUS_INSTRUMENT_CONNECTION_STATE'
+    AGENT_STATE = 'AGENT_STATUS_AGENT_STATE'
+    CONNECTION_STATE = 'AGENT_STATUS_CONNECTION_STATE'
     ALARMS = 'AGENT_STATUS_ALARMS'
     TIME_STATUS = 'AGENT_STATUS_TIME_STATUS'
     BUFFER_SIZE = 'AGENT_STATUS_BUFFER_SIZE'
     AGENT_VERSION = 'AGENT_STATUS_AGENT_VERSION'
-    DRIVER_VERSION = 'AGENT_STATUS_DRIVER_VERSION'
+    PENDING_TRANSACTIONS = 'AGENT_STATUS_PENDING_TRANSACTIONS'
 
+
+"""
+Agent connection state.
+"""
+
+class AgentConnectionState(BaseEnum):
+    """
+    Common agent connection state enum. Possible states
+    of connection/disconnection an agent may be in, among the shore and
+    wet side agent, the driver and the hardware iteself.
+    """
+    REMOTE_DISCONNECTED = 'AGENT_CONNECTION_STATE_REMOTE_DISCONNECTED'
+    POWERED_DOWN = 'AGENT_CONNECTION_STATE_POWERED_DOWN'
+    NO_DRIVER = 'AGENT_CONNECTION_STATE_NO_DRIVER'
+    DISCONNECTED = 'AGENT_CONNECTION_STATE_DISCONNECTED'
+    CONNECTED = 'AGENT_CONNECTION_STATE_CONNECTED'
+    UNKOWN = 'AGENT_CONNECTION_STATE_UNKNOWN'
 
 """
 Agent parameter and metadata types.

@@ -210,29 +210,29 @@ class InstrumentAgent(Process):
         An integer in seconds for how long to wait to acquire a new
         transaction if a value is not explicitly given.
         """
-        self.default_acq_timeout = 20   
+        #self._default_acq_timeout = 20   
         
         """
         An integer in seconds for the maximum allowable timeout to wait for
         a new transaction.
         """
-        self.max_acq_timeout = 60
+        self._max_acq_timeout = 60
     
         """
         An integer in seconds for the minimum time a transaction must be open.
         """
-        self.min_exp_timeout = 1
+        self._min_exp_timeout = 1
         
         """
         An integer in seconds for the default time a transaction may be open.
         """
-        self.default_exp_timeout = 300
+        self._default_exp_timeout = 300
         
         """
         An integer in seconds giving the maximum allowable time a transaction
         may be open.
         """
-        self.max_exp_timeout = 600
+        self._max_exp_timeout = 600
         
         """
         Upon transaction expire timeout, this flag indicates if the transaction
@@ -245,29 +245,29 @@ class InstrumentAgent(Process):
         String indicating the source of time being used for the instrument.
         See time_sources list for available values.
         """
-        self.time_source = TimeSource.NOT_SPECIFIED
+        self._time_source = TimeSource.NOT_SPECIFIED
     
         """
         String describing how the device is connected to the observatory.
         See connection_methods list for available values.
         """
-        self.connection_method = ConnectionMethod.NOT_SPECIFIED
+        self._connection_method = ConnectionMethod.NOT_SPECIFIED
         
         """
         Buffer to hold instrument data for periodic transmission.
         """
         #TODO driver integration. I think this is a list of strings.
-        self.data_buffer = []
+        self._data_buffer = []
     
         """
         List of current alarm conditions. Tuple of (ID,description).
         """
-        self.alarms = []
+        self._alarms = []
         
         """
         Dictionary of time status values.
         """
-        self.time_status = {
+        self._time_status = {
             'Uncertainty': None,
             'Peers' : None
         }
@@ -340,6 +340,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
+            
             pass
         
         elif event == AgentEvent.EXIT:
@@ -745,11 +746,11 @@ class InstrumentAgent(Process):
         
         # Ensure the expiration timeout is in the valid range.
         if exp_timeout == None:
-            exp_timeout = self.default_exp_timeout        
-        elif exp_timeout > self.max_exp_timeout: 
-            exp_timeout = self.max_exp_timeout
-        elif exp_timeout < self.min_exp_timeout:
-            exp_timeout = self.min_exp_timeout
+            exp_timeout = self._default_exp_timeout        
+        elif exp_timeout > self._max_exp_timeout: 
+            exp_timeout = self._max_exp_timeout
+        elif exp_timeout < self._min_exp_timeout:
+            exp_timeout = self._min_exp_timeout
             
         # If the resource is free, issue a new transaction immediately.
         if self.transaction_id == None:
@@ -804,17 +805,17 @@ class InstrumentAgent(Process):
         
         # Ensure the expiration timeout is in the valid range.
         if exp_timeout == None:
-            exp_timeout = self.default_exp_timeout        
-        elif exp_timeout > self.max_exp_timeout: 
-            exp_timeout = self.max_exp_timeout
-        elif exp_timeout < self.min_exp_timeout:
-            exp_timeout = self.min_exp_timeout
+            exp_timeout = self._default_exp_timeout        
+        elif exp_timeout > self._max_exp_timeout: 
+            exp_timeout = self._max_exp_timeout
+        elif exp_timeout < self._min_exp_timeout:
+            exp_timeout = self._min_exp_timeout
             
         # Ensure the acquisition timeout is in the valid range.
         if acq_timeout == None:
             acq_timeout = 0
-        elif acq_timeout > self.max_acq_timeout:
-            acq_timeout = self.max_acq_timeout
+        elif acq_timeout > self._max_acq_timeout:
+            acq_timeout = self._max_acq_timeout
 
         d = defer.Deferred()
 
@@ -935,7 +936,7 @@ class InstrumentAgent(Process):
 
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
-            (success,tid) = self._start_transaction(self.default_exp_timeout)
+            (success,tid) = self._start_transaction(self._default_exp_timeout)
 
             if InstErrorCode.is_ok(success):
                 return True
@@ -1147,27 +1148,23 @@ class InstrumentAgent(Process):
                 
                 if arg == AgentParameter.TIME_SOURCE or arg=='all':
                     result[AgentParameter.TIME_SOURCE] = \
-                        (InstErrorCode.OK,self.time_source)
+                        (InstErrorCode.OK,self._time_source)
                     
                 if arg == AgentParameter.CONNECTION_METHOD or arg=='all':
                     result[AgentParameter.CONNECTION_METHOD] = \
-                        (InstErrorCode.OK,self.connection_method)
-                    
-                if arg == AgentParameter.DEFAULT_ACQ_TIMEOUT or arg=='all':
-                     result[AgentParameter.DEFAULT_ACQ_TIMEOUT] = \
-                        (InstErrorCode.OK,self.default_acq_timeout)
+                        (InstErrorCode.OK,self._connection_method)
                     
                 if arg == AgentParameter.MAX_ACQ_TIMEOUT or arg=='all':
                     result[AgentParameter.MAX_ACQ_TIMEOUT] = \
-                        (InstErrorCode.OK,self.max_acq_timeout)
+                        (InstErrorCode.OK,self._max_acq_timeout)
                     
                 if arg == AgentParameter.DEFAULT_EXP_TIMEOUT or arg=='all':
                     result[AgentParameter.DEFAULT_EXP_TIMEOUT] = \
-                        (InstErrorCode.OK,self.default_exp_timeout)
+                        (InstErrorCode.OK,self._default_exp_timeout)
 
                 if arg == AgentParameter.MAX_EXP_TIMEOUT or arg=='all':
                     result[AgentParameter.MAX_EXP_TIMEOUT] = \
-                        (InstErrorCode.OK,self.max_exp_timeout)
+                        (InstErrorCode.OK,self._max_exp_timeout)
                     
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
@@ -1292,8 +1289,8 @@ class InstrumentAgent(Process):
                 
                 elif arg == AgentParameter.TIME_SOURCE :
                     if TimeSource.has(val):
-                        if val != self.time_source:
-                            self.time_source = val
+                        if val != self._time_source:
+                            self._time_source = val
                             # Logic here when new time source set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
@@ -1309,8 +1306,8 @@ class InstrumentAgent(Process):
                     
                 elif arg == AgentParameter.CONNECTION_METHOD :
                     if ConnectionMethod.has(val):
-                        if val != self.connection_method:
-                            self.connection_method = val
+                        if val != self._connection_method:
+                            self._connection_method = val
                             # Logic here when new connection method set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
@@ -1324,31 +1321,10 @@ class InstrumentAgent(Process):
 
                     result[arg] = success
                     
-                elif arg == AgentParameter.DEFAULT_ACQ_TIMEOUT :
-                    if isinstance(val,int) and val >= 0:
-                        self.default_acq_timeout = val
-                        success = InstErrorCode.OK
-                        
-                        if self.max_acq_timeout < val:
-                            self.max_acq_timeout = val
-                            result[AgentParameter.MAX_ACQ_TIMEOUT] = \
-                                InstErrorCode.OK
-                            
-                    else:
-                        set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
-                        
-                    result[arg] = success
-                    
                 elif arg == AgentParameter.MAX_ACQ_TIMEOUT :
                     if isinstance(val,int) and val >= 0:
-                        self.max_acq_timeout = val
+                        self._max_acq_timeout = val
                         success = InstErrorCode.OK
-
-                        if self.default_acq_timeout > val:
-                            self.default_acq_timeout = val
-                            result[AgentParameter.DEFAULT_ACQ_TIMEOUT] = \
-                                InstErrorCode.OK
 
                     else:
                         set_errors = True
@@ -1357,9 +1333,9 @@ class InstrumentAgent(Process):
                     result[arg] = success
     
                 elif arg == AgentParameter.DEFAULT_EXP_TIMEOUT :
-                    if isinstance(val,int) and val >= self.min_exp_timeout \
-                        and val <= self.max_exp_timeout:
-                        self.default_exp_timeout = val
+                    if isinstance(val,int) and val >= self._min_exp_timeout \
+                        and val <= self._max_exp_timeout:
+                        self._default_exp_timeout = val
                         success = InstErrorCode.OK
                         
                     else:
@@ -1369,8 +1345,8 @@ class InstrumentAgent(Process):
                     result[arg] = success
 
                 elif arg == AgentParameter.MAX_EXP_TIMEOUT :
-                    if isinstance(val,int) and val > self.min_exp_timeout:
-                        self.max_exp_timeout = val
+                    if isinstance(val,int) and val > self._min_exp_timeout:
+                        self._max_exp_timeout = val
                         success = InstErrorCode.OK
 
                     else:
@@ -1528,55 +1504,60 @@ class InstrumentAgent(Process):
             get_errors = False
             result = {}
             
-            # Do the work here.
+            """
+            AGENT_STATE = 'AGENT_STATUS_AGENT_STATE' # Basic agent state.
+            CONNECTION_STATE = 'AGENT_STATUS_CONNECTION_STATE'
+            OBSERVATORY_STATE = 'AGENT_STATUS_OBSERVATORY_STATE'
+            ALARMS = 'AGENT_STATUS_ALARMS'
+            TIME_STATUS = 'AGENT_STATUS_TIME_STATUS'
+            BUFFER_SIZE = 'AGENT_STATUS_BUFFER_SIZE'
+            AGENT_VERSION = 'AGENT_STATUS_AGENT_VERSION'
+            """
+            
             # Set up the result message.
             for arg in params:
+
+                # If status key not recognized, report error.
                 if not AgentStatus.has(arg) and arg != 'all':
                     result[arg] = (InstErrorCode.INVALID_STATUS,None)
                     get_errors = True
                     continue
                 
+                # Agent state.
                 if arg == AgentStatus.AGENT_STATE or arg == 'all':
                     result[AgentStatus.AGENT_STATE] = \
                         (InstErrorCode.OK,self.fsm.get_current_state())
 
-                if arg == AgentStatus.CHANNEL_NAMES or arg == 'all':
-                    # TODO driver integration.
-                    dvr_val = [InstErrorCode.OK,['CHAN_1','CHAN_2','CHAN_3']]
-                    result[AgentStatus.CHANNEL_NAMES] = (dvr_val[0],dvr_val[1])                
-
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
-                        
+                # Connection state.                        
                 if arg == AgentStatus.CONNECTION_STATE or arg == 'all':
-                    #TODO driver integration.
-                    dvr_val=[InstErrorCode.OK,'DRIVER_CONNECTION_STATE']
-                    result[AgentStatus.CONNECTION_STATE] = (dvr_val[0],dvr_val[1])                    
-
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
-                        
+                    result[AgentStatus.CONNECTION_STATE] = \
+                        (InstErrorCode.OK,self._get_connection_state())
+                
+                # Alarm conditions.
                 if arg == AgentStatus.ALARMS or arg == 'all':
-                    result[AgentStatus.ALARMS] = (InstErrorCode.OK,self.alarms)
+                    result[AgentStatus.ALARMS] = \
+                        (InstErrorCode.OK,self._alarms)
 
+                # Time status.
                 if arg == AgentStatus.TIME_STATUS or arg == 'all':
                     result[AgentStatus.TIME_STATUS] = \
-                        (InstErrorCode.OK,self.time_status)
+                        (InstErrorCode.OK,self._time_status)
 
+                # Data buffer size.
                 if arg == AgentStatus.BUFFER_SIZE or arg == 'all':
                     result[AgentStatus.BUFFER_SIZE] = \
                         (InstErrorCode.OK,self._get_buffer_size())
 
+                # Agent software version.
                 if arg == AgentStatus.AGENT_VERSION or arg == 'all':
                     result[AgentStatus.AGENT_VERSION] = \
-                        (InstErrorCode.OK,self.get_version())
-
-                if arg == AgentStatus.DRIVER_VERSION or arg == 'all':
-                    #TODO driver integration.
-                    version = '0.1'
-                    result[AgentStatus.DRIVER_VERSION] = (InstErrorCode.OK,version)
-                
+                        (InstErrorCode.OK,self.get_version())                
                     
+                # Agent software version.
+                if arg == AgentStatus.PENDING_TRANSACTIONS or arg == 'all':
+                    result[AgentStatus.PENDING_TRANSACTIONS] = \
+                        (InstErrorCode.OK,self._pending_transactions)                
+
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
 
@@ -2364,6 +2345,40 @@ class InstrumentAgent(Process):
     ############################################################################
 
         
+    def _get_connection_state(self):
+        """
+        @retval The current connection state of the agent, including
+            connection to a remote-side agent, existence of a driver,
+            and connection to instrument hardware. Should be extended to
+            handle cases where there is a persistent shoreside and
+            intermittant wetside agent component.
+        """
+            
+        if ((self._driver_pid != None) and (self._driver_client != None)):
+            curstate = self.fsm.get_current_state()
+            
+            if curstate == AgentState.POWERED_DOWN:
+                return AgentConnectionState.POWERED_DOWN
+            elif curstate == AgentState.UNINITIALIZED:
+                return AgentConnectionState.NO_DRIVER
+            elif curstate == AgentState.INACTIVE:
+                return AgentConnectionState.DISCONNECTED
+            elif curstate == AgentState.IDLE:
+                return AgentConnectionState.CONNECTED
+            elif curstate == AgentState.STOPPED:
+                return AgentConnectionState.CONNECTED
+            elif curstate == AgentState.OBSERVATORY_MODE:
+                return AgentConnectionState.CONNECTED
+            elif curstate == AgentState.DIRECT_ACCESS_MODE:
+                return AgentConnectionState.CONNECTED
+            elif curstate == AgentState.UNKNOWN:
+                return AgentConnectionState.UNKOWN
+            else:
+                return AgentConnectionState.UNKOWN
+        else:
+            return AgentConnectionState.NO_DRIVER
+        
+        
     def _is_child_process(self, name):
         """
         Determine if a process with the given name is a child process
@@ -2385,7 +2400,7 @@ class InstrumentAgent(Process):
         Return the total size in characters of the data buffer.
         Assumes the buffer is a list of string data lines.
         """
-        return sum(map(lambda x: len(x),self.data_buffer))
+        return sum(map(lambda x: len(x),self._data_buffer))
         
         
     def _debug_print_driver_event(self,type,transducer,value):
