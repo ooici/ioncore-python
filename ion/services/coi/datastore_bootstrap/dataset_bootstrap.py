@@ -34,18 +34,18 @@ ION_MSG_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
 SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
 
 # Create CDM Type Objects
-datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
-dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
-group_type = object_utils.create_type_identifier(object_id=10020, version=1)
-dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
-variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
-bounded_array_type = object_utils.create_type_identifier(object_id=10021, version=1)
-array_structure_type = object_utils.create_type_identifier(object_id=10025, version=1)
+DATASOURCE_TYPE = object_utils.create_type_identifier(object_id=4502, version=1)
+DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
+GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+DIMENSION_TYPE = object_utils.create_type_identifier(object_id=10018, version=1)
+VARIABLE_TYPE = object_utils.create_type_identifier(object_id=10024, version=1)
+BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
-attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
-stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
-float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
-int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
+ATTRIBUTE_TYPE = object_utils.create_type_identifier(object_id=10017, version=1)
+STRINGARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, version=1)
+FLOAT32ARRAY_TYPE = object_utils.create_type_identifier(object_id=10013, version=1)
+INT32ARRAY_TYPE = object_utils.create_type_identifier(object_id=10009, version=1)
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -163,7 +163,7 @@ def read_ooicdm_tar_file(resource_instance, filename):
         if head_obj.ObjectType == ION_MSG_TYPE:
             head_obj = head_obj.message_object
 
-        if head_obj.ObjectType == dataset_type:
+        if head_obj.ObjectType == DATASET_TYPE:
             root_obj = head_obj
         else:
             vars.append(head_obj)
@@ -197,7 +197,7 @@ def read_ooicdm_tar_file(resource_instance, filename):
                         i += 1
 
         else:
-            var.content = resource_instance.CreateObject(array_structure_type)
+            var.content = resource_instance.CreateObject(ARRAY_STRUCTURE_TYPE)
 
     # Now add any bounded arrays that we need....
     for var_container in vars:
@@ -237,7 +237,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     This method constructs a dataset manually!
     """
     # Attach the root group
-    group = dataset.CreateObject(group_type)
+    group = dataset.CreateObject(GROUP_TYPE)
     group.name = 'junk data'
     dataset.root_group = group
     
@@ -271,14 +271,14 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     #       Data Variables:
     #       Data variables are the most straight-forward types to implement.  The following example
     #       should explain all that is needed to use these types.
-    dimension_t = dataset.CreateObject(dimension_type)       # dimension object for time
-    dimension_z = dataset.CreateObject(dimension_type)       # dimension object for depth
-    variable_t = dataset.CreateObject(variable_type)         # coordinate variable for time
-    variable_z = dataset.CreateObject(variable_type)         # coordinate variable for depth
-    scalar_lat = dataset.CreateObject(variable_type)         # scalar variable for latitude
-    scalar_lon = dataset.CreateObject(variable_type)         # scalar variable for longitude
-    scalar_sid = dataset.CreateObject(variable_type)         # scalar variable for station ID
-    variable_salinity = dataset.CreateObject(variable_type)  # Data variable for salinity
+    dimension_t = dataset.CreateObject(DIMENSION_TYPE)       # dimension object for time
+    dimension_z = dataset.CreateObject(DIMENSION_TYPE)       # dimension object for depth
+    variable_t = dataset.CreateObject(VARIABLE_TYPE)         # coordinate variable for time
+    variable_z = dataset.CreateObject(VARIABLE_TYPE)         # coordinate variable for depth
+    scalar_lat = dataset.CreateObject(VARIABLE_TYPE)         # scalar variable for latitude
+    scalar_lon = dataset.CreateObject(VARIABLE_TYPE)         # scalar variable for longitude
+    scalar_sid = dataset.CreateObject(VARIABLE_TYPE)         # scalar variable for station ID
+    variable_salinity = dataset.CreateObject(VARIABLE_TYPE)  # Data variable for salinity
 
 
     # Assign required field values (name, length, datatype, etc)
@@ -322,14 +322,14 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
     _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
     # Add data values
-    variable_t.content = dataset.CreateObject(array_structure_type)
+    variable_t.content = dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     variable_t.content.bounded_arrays.add()
-    variable_t.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    variable_t.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     variable_t.content.bounded_arrays[0].bounds.add()
     variable_t.content.bounded_arrays[0].bounds[0].origin = 0
     variable_t.content.bounded_arrays[0].bounds[0].size = 2
-    variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(INT32ARRAY_TYPE)
     
     if random_initialization:
         start_time = 1280102000 + int(round(random.random()* 360000))
@@ -339,14 +339,14 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     else:
         variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
 
-    variable_z.content = dataset.CreateObject(array_structure_type)
+    variable_z.content = dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     variable_z.content.bounded_arrays.add()
-    variable_z.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    variable_z.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     variable_z.content.bounded_arrays[0].bounds.add()
     variable_z.content.bounded_arrays[0].bounds[0].origin = 0
     variable_z.content.bounded_arrays[0].bounds[0].size = 3
-    variable_z.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_z.content.bounded_arrays[0].ndarray = dataset.CreateObject(FLOAT32ARRAY_TYPE)
     variable_z.content.bounded_arrays[0].ndarray.value.extend([0.0, 0.1, 0.2])
 
 
@@ -364,9 +364,9 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
     _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
     # Add data values
-    scalar_lat.content= dataset.CreateObject(array_structure_type)
+    scalar_lat.content= dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     scalar_lat.content.bounded_arrays.add()
-    scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     if random_initialization:
         sign = 1
@@ -382,29 +382,29 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     scalar_lat.content.bounded_arrays[0].bounds.add()
     scalar_lat.content.bounded_arrays[0].bounds[0].origin = 0
     scalar_lat.content.bounded_arrays[0].bounds[0].size = 1
-    scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(FLOAT32ARRAY_TYPE)
     scalar_lat.content.bounded_arrays[0].ndarray.value.extend([lat])
 
 
-    scalar_lon.content= dataset.CreateObject(array_structure_type)
+    scalar_lon.content= dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     scalar_lon.content.bounded_arrays.add()
-    scalar_lon.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    scalar_lon.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     scalar_lon.content.bounded_arrays[0].bounds.add()
     scalar_lon.content.bounded_arrays[0].bounds[0].origin = 0
     scalar_lon.content.bounded_arrays[0].bounds[0].size = 1
-    scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(FLOAT32ARRAY_TYPE)
     scalar_lon.content.bounded_arrays[0].ndarray.value.extend([long])
 
 
-    scalar_sid.content= dataset.CreateObject(array_structure_type)
+    scalar_sid.content= dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     scalar_sid.content.bounded_arrays.add()
-    scalar_sid.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    scalar_sid.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     scalar_sid.content.bounded_arrays[0].bounds.add()
     scalar_sid.content.bounded_arrays[0].bounds[0].origin = 0
     scalar_sid.content.bounded_arrays[0].bounds[0].size = 1
-    scalar_sid.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    scalar_sid.content.bounded_arrays[0].ndarray = dataset.CreateObject(INT32ARRAY_TYPE)
     scalar_sid.content.bounded_arrays[0].ndarray.value.extend([10059])
 
 
@@ -421,9 +421,9 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
     _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
     # Add data values
-    variable_salinity.content= dataset.CreateObject(array_structure_type)
+    variable_salinity.content= dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     variable_salinity.content.bounded_arrays.add()
-    variable_salinity.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    variable_salinity.content.bounded_arrays[0] = dataset.CreateObject(BOUNDED_ARRAY_TYPE)
 
     variable_salinity.content.bounded_arrays[0].bounds.add()
     variable_salinity.content.bounded_arrays[0].bounds[0].origin = 0
@@ -431,7 +431,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     variable_salinity.content.bounded_arrays[0].bounds.add()
     variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
     variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
-    variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(FLOAT32ARRAY_TYPE)
     
     if random_initialization:
         l = [round(random.random()*2 +29,2) for i in range(6)]
@@ -522,10 +522,10 @@ def _create_string_attribute(dataset, name, values):
     '''
     Helper method to create string attributes for variables and dataset groups
     '''
-    atrib = dataset.CreateObject(attribute_type)
+    atrib = dataset.CreateObject(ATTRIBUTE_TYPE)
     atrib.name = name
     atrib.data_type = atrib.DataType.STRING
-    atrib.array = dataset.CreateObject(stringArray_type)
+    atrib.array = dataset.CreateObject(STRINGARRAY_TYPE)
     atrib.array.value.extend(values)
     return atrib
 
