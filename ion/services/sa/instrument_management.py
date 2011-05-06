@@ -20,6 +20,7 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 import ion.util.procutils as pu
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+from ion.services.dm.distribution.events import DataEventSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 
@@ -36,16 +37,30 @@ INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
+INSTRUMENTDATA_EVENT_ID = 5001
 
-        # Setup a subscriber to an event topic
-class SBE37EventSubscriber(InfoLoggingEventSubscriber):
+
+class InstrumentDataEventSubscriber(DataEventSubscriber):
+    """
+    Event Notification Subscriber for Instrument Data.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_id = INSTRUMENTDATA_EVENT_ID
+
+ # Setup a subscriber to an event topic
+class SBE37DataEventSubscriber(InstrumentDataEventSubscriber):
     def __init__(self, *args, **kwargs):
         self.msgs = []
-        InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+        DataEventSubscriber.__init__(self, *args, **kwargs)
 
     def ondata(self, data):
-        log.info("IMSSRVC !!!!!!! TestEventSubscriber received a message with name: %s",
-                data['content'].name)
+        log.info("IMSSRVC !!!!!!! SBE37DataEventSubscriber received a message with content: %s",
+                data['content'])
+
+        msg = data['content'];
+        log.info("IMSSRVC !!!!!!! SBE37DataEventSubscriber additional info: %s", msg.additional_data.data_block)
+
         self.msgs.append(data)
 
 
@@ -362,28 +377,19 @@ class InstrumentManagementService(ServiceProcess):
         yield self.rc.put_resource_transaction([instrument_resource, instrumentAgentResource])
         log.info("IMSSRVC op_start_instrument_agent created association %s", association)
 
-
         #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/presentation/web_viz_consumer.py
         #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/distribution/consumers/timeseries_consumer.py
-
 
         log.info("IMSSRVC op_start_instrument_agent spawn listerner")
         subproc = Process()
         yield subproc.spawn()
-        testsub = SBE37EventSubscriber(origin=str(self.svc_id), process=subproc)
-        yield testsub.initialize()
-        yield testsub.activate()
 
-        log.info("IMSSRVC op_start_instrument_agent cause event")
-        # Twiddle the IA
-        result = yield self.ia_client.start_transaction(5)
-        tid = result['transaction_id']
-        yield self.ia_client.end_transaction(tid)
+        dataEventSubscrbr = SBE37DataEventSubscriber(origin=inst_agnt_id, process=subproc)
+        log.info('IMSSRVC op_start_instrument_agent set handler for DataEventSubscriber')
+        yield dataEventSubscrbr.initialize()
+        yield dataEventSubscrbr.activate()
+        log.info('IMSSRVC op_start_instrument_agent DataEvent activation complete')
 
-        # check the event
-        yield pu.asleep(3.0)  
-
-        #yield self.reply_ok(msg, "OK")
         res_value = {'instrument_agent_id':inst_agnt_id }
         yield self.reply_ok(msg, res_value)
 

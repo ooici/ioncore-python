@@ -223,7 +223,7 @@ class ObjectContainer(object):
         The upstream source of this repository.
         """
 
-        self.excluded_types = self.DefaultExcludedTypes[:]
+        self.excluded_types = set(self.DefaultExcludedTypes[:])
         """
         The list of currently excluded object types
         """
@@ -367,7 +367,7 @@ class ObjectContainer(object):
 
         return obj
 
-    def load_links(self, obj, excluded_types=None, recursed=False):
+    def load_links(self, obj, excluded_types=None):
         """
         Load the child objects into the work space recursively
         """
@@ -375,14 +375,7 @@ class ObjectContainer(object):
         for link in obj.ChildLinks:
             if not link.type.GPBMessage in excluded_types:
                 child = self.get_linked_object(link)
-                self.load_links(child, excluded_types, True)
-
-        # load excluded_types, but only on the main call.
-        # this is meh, we could improve by making self.excluded_types a set...
-        if not recursed:
-            for extype in excluded_types:
-                if extype not in self.excluded_types:
-                    self.excluded_types.append(extype)
+                self.load_links(child, excluded_types)
 
     def _checkout_local_commit(self, commit, excluded_types):
 
@@ -454,7 +447,7 @@ class ObjectContainer(object):
         """
 
         # Set the excluded types used in checking out this repository
-        self.excluded_types = excluded_types
+        self.excluded_types.update(set(excluded_types))
 
         if not hasattr(excluded_types, '__contains__' ):
             raise RepositoryError('Invalid argument excluded_types in checkout_commit: must be a list of object types')
