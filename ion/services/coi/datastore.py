@@ -832,7 +832,9 @@ class DataStoreWorkbench(WorkBench):
         repo.load_links(obj, filterlist)
 
         # update repository's excluded_types
-        repo.excluded_types.update(set(filterlist))
+        for extype in filterlist:
+            if extype not in repo.excluded_types:
+                repo.excluded_types.append(extype)
 
         # now onto the fun.  let's traverse all the bounded arrays we find!
 
@@ -1123,7 +1125,9 @@ class DataStoreWorkbench(WorkBench):
         response.Repository.load_links(root_obj, excluded_types)
 
         # update repository's excluded_types
-        response.Repository.excluded_types.update(set(excluded_types))
+        for extype in excluded_types:
+            if extype not in response.Repository.excluded_types:
+                response.Repository.excluded_types.append(extype)
 
         # fill in response, respond
         response.retrieved_object = root_obj
