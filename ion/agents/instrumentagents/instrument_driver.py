@@ -344,6 +344,7 @@ class InstrumentDriverClient(ProcessClient):
         defer.returnValue(content)
         
         
+    @defer.inlineCallbacks
     def initialize(self, timeout=None):
         """
         Restore driver to a default, unconfigured state.
