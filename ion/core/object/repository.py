@@ -883,7 +883,7 @@ class Repository(ObjectContainer):
         """
 
         if excluded_types is None:
-            excluded_types = self.excluded_types or self.DefaultExcludedTypes
+            excluded_types = self.excluded_types or set(self.DefaultExcludedTypes[:])
         elif not hasattr(excluded_types, '__iter__'):
             raise RepositoryError('Invalid excluded_types argument passed to checkout')
 
