@@ -223,7 +223,7 @@ class ObjectContainer(object):
         The upstream source of this repository.
         """
 
-        self.excluded_types = set(self.DefaultExcludedTypes[:])
+        self.excluded_types = self.DefaultExcludedTypes[:]
         """
         The list of currently excluded object types
         """
@@ -447,7 +447,7 @@ class ObjectContainer(object):
         """
 
         # Set the excluded types used in checking out this repository
-        self.excluded_types.update(set(excluded_types))
+        self.excluded_types = excluded_types    # @TODO: update instead of replace?
 
         if not hasattr(excluded_types, '__contains__' ):
             raise RepositoryError('Invalid argument excluded_types in checkout_commit: must be a list of object types')
@@ -883,7 +883,7 @@ class Repository(ObjectContainer):
         """
 
         if excluded_types is None:
-            excluded_types = self.excluded_types or set(self.DefaultExcludedTypes[:])
+            excluded_types = self.excluded_types or self.DefaultExcludedTypes[:]
         elif not hasattr(excluded_types, '__iter__'):
             raise RepositoryError('Invalid excluded_types argument passed to checkout')
 
