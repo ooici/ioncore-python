@@ -1221,6 +1221,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.dataBounds.minLatitude  = -50
+        reqMsg.message_parameters_reference.dataBounds.maxLatitude  = -40
+        reqMsg.message_parameters_reference.dataBounds.minLongitude = 20
+        reqMsg.message_parameters_reference.dataBounds.maxLongitude = 30
+        reqMsg.message_parameters_reference.dataBounds.minVertical  = 20
+        reqMsg.message_parameters_reference.dataBounds.maxVertical  = 30
+        reqMsg.message_parameters_reference.dataBounds.posVertical  = 'down'
+        reqMsg.message_parameters_reference.dataBounds.minTime      = '2007-01-1T10:00:00Z'
+        reqMsg.message_parameters_reference.dataBounds.maxTime      = '2008-08-1T11:00:00Z'
+        
+        
         
         log.debug('Calling findDataResourceSubscriptions.')
         rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
