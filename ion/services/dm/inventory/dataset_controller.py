@@ -132,7 +132,7 @@ class DatasetController(ServiceProcess):
         log.info('SLC_INIT Dataset Controller')
 
     @defer.inlineCallbacks
-    def _create_scheduled_event(self, interval):
+    def _create_scheduled_event(self):
         log.debug('creating scheduled event')
 
         msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
@@ -140,9 +140,10 @@ class DatasetController(ServiceProcess):
         msg.payload = msg.CreateObject(RSYNC_TYPE)
 
         log.debug('Sending request to scheduler')
-        response = yield self.ssc.add_task(msg)
+        yield self.ssc.add_task(msg)
         log.debug('got response')
 
+    #noinspection PyUnusedLocal
     @defer.inlineCallbacks
     def do_ncml_sync(self, request, headers, msg):
         """
@@ -206,7 +207,7 @@ class DatasetController(ServiceProcess):
 
         # pfh - create local ncml file as well. These accumulate and are
         # harvested by the scheduled rsync
-        create_ncml(response.key, NCML_PATH)
+        create_ncml(response.key, self.ncml_path)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)

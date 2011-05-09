@@ -1125,10 +1125,6 @@ class InstrumentAgent(Process):
                     if self._driver_client:
                         result[AgentParameter.DRIVER_ADDRESS] = \
                             (InstErrorCode.OK,str(self._driver_client.target))
-                    else:
-                        get_errors = True
-                        result[AgentParameter.DRIVER_ADDRESS] = \
-                            (InstErrorCode.INVALID_DRIVER,None)
                 
                 if arg == AgentParameter.DRIVER_DESC or arg == 'all':
                     result[AgentParameter.DRIVER_DESC] = \
