@@ -1736,6 +1736,34 @@ class SBE37Driver(InstrumentDriver):
 
 
     @defer.inlineCallbacks
+    def op_execute_direct(self, content, headers, msg):
+        """
+        Execute untraslated commands on the device.
+        @param content A dict with a bytestring containing the raw device
+            commands and optional timeout: {'bytes':bytes,'timeout':timeout}
+        @retval Reply message with a dict containing success value and
+            raw bytes result.
+            {'success':success,'result':result}.        
+        """
+        print 'in exe direct'
+        print content
+        assert(isinstance(content,dict)), 'Expected dict content.'
+        params = content.get('bytes',None)
+        assert(isinstance(params,str)), 'Expected bytes string.'
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+        
+        # The method is not implemented.
+        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
     def op_get_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.

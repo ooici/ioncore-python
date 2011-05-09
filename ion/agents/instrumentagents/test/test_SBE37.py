@@ -64,6 +64,7 @@ SKIP_TESTS = [
     'test_get_status',
     'test_get_capabilities',
     'test_execute',
+    'test_execute_direct'
     'dummy'
 ]
 
@@ -812,6 +813,69 @@ class TestSBE37(IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
+        
+        
+    @defer.inlineCallbacks
+    def test_execute_direct(self):
+        """
+        Test direct executes function.
+        """
+
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_execute_direct' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        params = self.sbe_config
+
+        # We should begin in the unconfigured state.
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+        
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(params)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,params)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+        # Establish connection to device and verify.
+        try:
+            reply = yield self.driver_client.connect()
+        except:
+            self.fail('Could not connect to the device.')
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+        
+        # Send raw bytes commands to the device.
+        bytes = 'to_be_done'
+        timeout = 10
+        reply = yield self.driver_client.execute_direct(bytes,timeout)
+            
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
+
+        # Dissolve the connection to the device.
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
         
         
     """

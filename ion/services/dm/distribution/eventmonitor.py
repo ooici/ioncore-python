@@ -46,6 +46,8 @@ class EventMonitorService(ServiceProcess):
         log.debug("message for you sir %s %s %s" % (session_id, subid, str(msg['content'].datetime)))
         assert self._subs.has_key(session_id) and self._subs[session_id]['subscribers'].has_key(subid)
 
+        msg['content'].Repository.persistent = True
+        
         self._subs[session_id]['subscribers'][subid]['msgs'].append(msg)
 
     def _bump_timestamp(self, session_id):
