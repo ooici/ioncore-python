@@ -20,7 +20,9 @@ from ion.agents.instrumentagents.SBE37_driver import DriverException
 from ion.agents.instrumentagents.SBE37_driver import SBE37State
 from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
+from ion.agents.instrumentagents.SBE37_driver import SBE37Status
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
+from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -61,10 +63,10 @@ SKIP_TESTS = [
     'test_connect',
     'test_get_set',
     'test_get_metadata',
-    'test_get_status',
+    #'test_get_status',
     'test_get_capabilities',
     'test_execute',
-    'test_execute_direct'
+    'test_execute_direct',
     'dummy'
 ]
 
@@ -521,7 +523,59 @@ class TestSBE37(IonTestCase):
         reply = yield self.driver_client.get_status(params)
         success = reply['success']
         result = reply['result']        
-        self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
+        self.assert_(InstErrorCode.is_ok(success))
+        
+        dvr_state = result[(SBE37Channel.INSTRUMENT,
+                            SBE37Status.DRIVER_STATE)][1]
+        dvr_version = result[(SBE37Channel.INSTRUMENT,
+                              SBE37Status.DRIVER_VERSION)][1]
+        obs_state = result[(SBE37Channel.INSTRUMENT,
+                            SBE37Status.OBSERVATORY_STATE)][1]
+        dvr_alarms = result[(SBE37Channel.INSTRUMENT,
+                             SBE37Status.DRIVER_ALARMS)][1]
+        
+        self.assert_(SBE37State.has(dvr_state))
+        self.assertIsInstance(dvr_version,str)
+        self.assert_(ObservatoryState.has(obs_state))
+        self.assertIsInstance(dvr_alarms,(list,tuple))
+        
+        # Try to get some bad status vals. This should fail for those that
+        # are bad and work for the good ones.
+        params = [
+            (SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_STATE),
+            (SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_VERSION),
+            (SBE37Channel.INSTRUMENT,'Bad status name'),
+            ('Bad channel name',SBE37Status.DRIVER_ALARMS),
+            (SBE37Channel.CONDUCTIVITY,SBE37Status.OBSERVATORY_STATE),
+        ]
+        reply = yield self.driver_client.get_status(params)
+        success = reply['success']
+        result = reply['result']        
+        self.assert_(InstErrorCode.is_error(success))
+
+
+                
+        dvr_state = result[(SBE37Channel.INSTRUMENT,
+                            SBE37Status.DRIVER_STATE)]
+        dvr_version = result[(SBE37Channel.INSTRUMENT,
+                              SBE37Status.DRIVER_VERSION)]
+        bad_status = result[(SBE37Channel.INSTRUMENT,
+                            'Bad status name')]
+        bad_chan = result[('Bad channel name',
+                             SBE37Status.DRIVER_ALARMS)]
+        mixed_up = result[(SBE37Channel.CONDUCTIVITY,
+                           SBE37Status.OBSERVATORY_STATE)]
+        self.assert_(InstErrorCode.is_ok(dvr_state[0]))
+        self.assert_(SBE37State.has(dvr_state[1]))
+        self.assert_(InstErrorCode.is_ok(dvr_version[0]))
+        self.assertIsInstance(dvr_version[1],str)
+        self.assert_(InstErrorCode.is_error(bad_status[0]))
+        self.assertEqual(bad_status[1],None)
+        self.assert_(InstErrorCode.is_error(bad_chan[0]))
+        self.assertEqual(bad_chan[1],None)
+        self.assert_(InstErrorCode.is_error(mixed_up[0]))
+        self.assertEqual(mixed_up[1],None)
+        
         
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
