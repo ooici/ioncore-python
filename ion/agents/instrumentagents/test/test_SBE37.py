@@ -63,7 +63,7 @@ SKIP_TESTS = [
     'test_connect',
     'test_get_set',
     'test_get_metadata',
-    #'test_get_status',
+    'test_get_status',
     'test_get_capabilities',
     'test_execute',
     'test_execute_direct',
