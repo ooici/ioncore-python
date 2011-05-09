@@ -210,6 +210,15 @@ class IngestionTest(IonTestCase):
         yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
 
+        complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
+
+        complete_msg.status = complete_msg.StatusCode.OK
+        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+
+
+
+
+
         # Now send a done message and watch the magic happen...
 
 

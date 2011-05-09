@@ -251,9 +251,6 @@ class IngestionService(ServiceProcess):
             # we succeeded, cancel the timeout
             timeoutcb.cancel()
 
-            # send notification we performed an ingest
-            yield self._notify_ingest(content)
-
             # now reply ok to the original message
             yield self.reply_ok(msg)
         else:
@@ -385,6 +382,25 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
+
+        self.dataset.Repository.commit('Ingest received complete notification.')
+
+        merge_branch = self.dataset.Repository.current_branch_key()
+
+
+        yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
+
+        #Remove the head for the update!
+        self.dataset.Repository.remove_branch(merge_branch)
+
+        print self.dataset.Repository
+
+
+
+        # send notification we performed an ingest
+        #yield self._notify_ingest(content)
+
+
         # this is NOT rpc
         yield msg.ack()
 
@@ -429,7 +445,7 @@ class IngestionClient(ServiceClient):
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
-        (content, headers, msg) = yield self.rpc_send('perform_ingest', msg, timeout=ingest_service_timeout + 30)
+        (content, headers, msg) = yield self.rpc_send('ingest', msg, timeout=ingest_service_timeout + 30)
 
         defer.returnValue(content)
 

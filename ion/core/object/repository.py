@@ -614,6 +614,13 @@ class Repository(ObjectContainer):
         output += 'Number of current workspace objects: %d \n' % len(self._workspace)
         output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
         output += 'Current context identifier for repository: %s \n' % self.convid_context
+
+        if self.merge is not None:
+            output += 'Repository is currently merging %d state(s)! \n' % len(self.merge)
+
+        else:
+            output += 'Not currently merging state in this repository. \n'
+
         output += 'Excluded types:\n'
         try:
             for type in self.excluded_types:
@@ -625,7 +632,17 @@ class Repository(ObjectContainer):
         output += str(self._dotgit) + '\n'
         output += '============== Root Object ==============\n'
         output += str(self._workspace_root) + '\n'
-        output += '============ End Resource ============\n'
+
+        if self.merge is not None:
+            for root in self.merge:
+
+                output += '============== Merge Root Object ==============\n'
+                output += str(root) + '\n'
+
+
+        output += '============ End Repository! ============\n'
+
+
         return output
 
     @property
