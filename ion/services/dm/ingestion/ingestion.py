@@ -382,6 +382,10 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
+        if len(self.dataset.Repository.branches) != 2:
+
+            raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
+
 
         self.dataset.Repository.commit('Ingest received complete notification.')
 
@@ -394,6 +398,14 @@ class IngestionService(ServiceProcess):
         self.dataset.Repository.remove_branch(merge_branch)
 
         print self.dataset.Repository
+
+
+        merge_root = self.dataset.Merge[0].root_group
+
+        for var in merge_root.variables:
+
+            print var
+
 
 
 
