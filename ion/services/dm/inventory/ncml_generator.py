@@ -4,11 +4,13 @@
 @file ion/services/dm/inventory/ncml_generator.py
 @author Paul Hubbard
 @date 4/29/11
-@brief For each dataset in the inventory, create a corresponding NcML file and sync with remove server. Some
-tricky code for running a process and noting its exit with a deferred.
+@brief For each dataset in the inventory, create a corresponding NcML file and
+sync with remove server. Some tricky code for running a process and noting its
+exit with a deferred.
 """
 
-# File template. The filename and 'location' are just the GUID. Note the %s for string substitution.
+# File template. The filename and 'location' are just the GUID.
+# Note the %s for string substitution.
 file_template = """
 <?xml version="1.0" encoding="UTF-8"?>
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
@@ -74,8 +76,9 @@ def create_ncml(id_ref, filepath=""):
 
 def rsync_ncml(local_filepath, server_url):
     """
-    @brief Method to perform a bidirectional sync with a remote server, probably via rsync, unison
-    or similar. Should be called after generating all local ncml files.
+    @brief Method to perform a bidirectional sync with a remote server,
+    probably via rsync, unison or similar. Should be called after generating all
+    local ncml files.
     @param local_filepath Local directory for writing ncml file(s)
     @param server_url rsync URL of the server
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
@@ -94,8 +97,8 @@ def rsync_ncml(local_filepath, server_url):
 
 def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
     """
-    @brief Another hack. Take an RSA key, save it as an ssh-formatted file into the .ssh
-        directory for use by rsync.
+    @brief Another hack. Take an RSA key, save it as an ssh-formatted file into
+    the .ssh directory for use by rsync.
     @param rsa_key RSA private key, as returned from 'ssh-keygen -t rsa'
     @retval Tuple of filenames - private and public key
     @note Raises IOError if necessary
@@ -133,12 +136,15 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
 
 def ssh_add(filename, remove=False):
     """
-    Reuse async protocol class to run ssh-add as a subprocess. Adds or removes a key by filename.
-    Returns a deferred that fires when the ssh-add completes.
+    Reuse async protocol class to run ssh-add as a subprocess.
+    Adds or removes a key by filename.
 
-    @bug Deleting the key fails - see https://bugs.launchpad.net/ubuntu/+source/openssh/+bug/58162
+    @retval Returns a deferred that fires when the ssh-add completes.
 
-    You need to have the public key present in the ssh directory for delete to work.
+    @bug Deleting the key fails -
+    @see https://bugs.launchpad.net/ubuntu/+source/openssh/+bug/58162
+    @note You need to have the public key present in the ssh directory for
+    delete to work.
     """
     d = defer.Deferred()
     rpp = AsyncProcessWithCallbackProto(d)
@@ -158,7 +164,8 @@ def ssh_add(filename, remove=False):
 @defer.inlineCallbacks
 def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     """
-    Orchestration routine to tie it all together plus cleanup at the end. 
+    Orchestration routine to tie it all together plus cleanup at the end.
+    Needs the inlineCallbacks to serialise.
     """
 
     # Generate a private key, add to ssh agent

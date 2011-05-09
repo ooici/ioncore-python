@@ -18,7 +18,8 @@ import ion.util.ionlog
 from ion.util.itv_decorator import itv
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, rsa_to_dot_ssh, ssh_add, do_complete_rsync
+from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, \
+    rsa_to_dot_ssh, ssh_add, do_complete_rsync
 from ion.services.dm.inventory import ncml_generator
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -124,8 +125,9 @@ class PSAT(IonTestCase):
 
         rsa_key_fn = os.path.join(os.path.dirname(__file__), 'data', 'datactlr.rsa')
 
+        # Only run this test iff you have the required keyfile locally.
         if not os.path.exists(rsa_key_fn):
-            raise unittest.SkipTest('Missing RSA key')
+            raise unittest.SkipTest('Missing RSA key %s' % rsa_key_fn)
         
         privkey = open(rsa_key_fn, 'r').read()
         rsa_key_fn = os.path.join(os.path.dirname(__file__), 'data', 'datactlr.pub')
