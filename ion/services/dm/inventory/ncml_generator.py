@@ -4,20 +4,11 @@
 @file ion/services/dm/inventory/ncml_generator.py
 @author Paul Hubbard
 @date 4/29/11
-@brief For each dataset in the inventory, create a corresponding NcML file and sync with remove server.
-
-Example file:
-
-Contents:
-<?xml version="1.0" encoding="UTF-8"?>
-<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
-location="ooici:17957467-0650-49c6-b7f5-5321a1cf018e"/>
-
-Filename: 17957467-0650-49c6-b7f5-5321a1cf018e.ncml
-
-So the filename and 'location' are just the GUID. Seems doable.
+@brief For each dataset in the inventory, create a corresponding NcML file and sync with remove server. Some
+tricky code for running a process and noting its exit with a deferred.
 """
 
+# File template. The filename and 'location' are just the GUID. Note the %s for string substitution.
 file_template = """
 <?xml version="1.0" encoding="UTF-8"?>
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
@@ -107,6 +98,7 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
         directory for use by rsync.
     @param rsa_key RSA private key, as returned from 'ssh-keygen -t rsa'
     @retval Tuple of filenames - private and public key
+    @note Raises IOError if necessary
     """
     ssh_dir = path.join(path.expanduser('~'), '.ssh')
     rsa_filename = path.join(ssh_dir, 'rsync_ncml.rsa')
@@ -122,6 +114,7 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
             return None
 
     try:
+        # Write out public and private keys
         fh = open(rsa_filename, 'w')
         fh.write(private_key)
         fh.close()
@@ -165,7 +158,7 @@ def ssh_add(filename, remove=False):
 @defer.inlineCallbacks
 def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     """
-    Orchestration routine to tie it all together plus cleanup at the end.
+    Orchestration routine to tie it all together plus cleanup at the end. 
     """
 
     # Generate a private key, add to ssh agent
