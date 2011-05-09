@@ -63,6 +63,16 @@ class InstrumentDriver(Process):
         """
 
 
+    def op_execute_direct(self, content, headers, msg):
+        """
+        Execute untraslated commands on the device.
+        @param content A bytestring containing the raw device commands and
+            optional timeout: {'bytes':bytes,'timeout':timeout}
+        @retval Reply message with a dict containing success value and
+            raw bytes result.
+            {'success':success,'result':result}.        
+        """
+
     def op_get_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.
@@ -250,6 +260,35 @@ class InstrumentDriverClient(ProcessClient):
 
 
     @defer.inlineCallbacks
+    def execute_direct(self, bytes, timeout=None):
+        """
+        Execute untraslated commands on the device.
+        @param bytes A bytestring containing the raw device commands.
+        @param timeout optional timeout to the driver causes the rpc timeout
+            to be set slightly longer.
+        @retval Reply message with a dict containing success value and
+            raw bytes result: {'success':success,'result':result}.        
+        """
+
+        assert(isinstance(bytes, str)), 'Expected a bytes string.'                
+        if timeout != None:
+            assert(isinstance(timeout, int)), 'Expected a timeout int.'
+            assert(timeout>0), 'Expected a positive timeout.'
+            rpc_timeout = timeout + 20
+            content_outgoing = {'bytes':bytes,'timeout':timeout}
+            (content, headers, message) = yield self.rpc_send('execute_direct',
+                                content_outgoing,timeout=rpc_timeout)            
+            
+        else:            
+            content_outgoing = {'bytes':bytes,'timeout':None}
+            (content, headers, message) = yield self.rpc_send('execute_direct',
+                                content_outgoing)
+        
+        assert(isinstance(content, dict)), 'Expected a reply content dict.'
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
     def get_metadata(self, params, timeout=None):
         """
         Retrieve metadata for the device, its transducers and parameters.
@@ -344,6 +383,7 @@ class InstrumentDriverClient(ProcessClient):
         defer.returnValue(content)
         
         
+    @defer.inlineCallbacks
     def initialize(self, timeout=None):
         """
         Restore driver to a default, unconfigured state.

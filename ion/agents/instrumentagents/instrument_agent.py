@@ -1143,7 +1143,6 @@ class InstrumentAgent(Process):
                         (InstErrorCode.OK,self._driver_config)                
 
                 if arg == AgentParameter.RESOURCE_ID or arg=='all':
-                    # TODO: how do we access this?
                     result[AgentParameter.RESOURCE_ID] = (InstErrorCode.OK,None)
                 
                 if arg == AgentParameter.TIME_SOURCE or arg=='all':
@@ -1922,6 +1921,75 @@ class InstrumentAgent(Process):
 
 
     @defer.inlineCallbacks
+    def op_execute_device_direct(self,content,headers,msg):
+        """
+        Execute untranslated byte data commands on the device.
+        Must be in direct access mode.
+        @param content A dict {'bytes':bytes}
+        @retval A dict {'success':success,'result':result}.
+        """
+        
+        self._in_protected_function = True
+        
+        assert(isinstance(content,dict)), 'Expected a dict content.'
+        assert(content.has_key('bytes')), 'Expected bytes.'
+        assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
+        
+        bytes = content['bytes']
+        tid = content['transaction_id']
+        
+        assert(isinstance(bytes,str)), 'Expected a bytes string.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        reply = {'success':None,'result':None,'transaction_id':None}
+
+        if tid != 'create' and tid != 'none' and len(tid) != 36:
+            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+            yield self.reply_ok(msg,reply)
+            return
+
+        # Set up the transaction
+        result = yield self._verify_transaction(tid,'get')
+        if not result:
+            if tid == 'none':
+                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
+
+            elif tid=='create':
+                reply['success'] = InstErrorCode.LOCKED_RESOURCE
+
+            else:
+                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
+
+            yield self.reply_ok(msg,reply)
+            return
+
+        reply['transaction_id'] = self.transaction_id
+         
+        agent_state = self.fsm.get_current_state()
+        if agent_state != AgentState.DIRECT_ACCESS_MODE:
+            reply['success'] = InstErrorCode.INCORRECT_STATE
+            yield self.reply_ok(msg,reply)
+            return
+
+        timeout = 20
+                    
+        try:                    
+                    
+            dvr_result = yield self._driver_client.execute_direct(bytes,timeout)
+        
+            reply['success'] = dvr_result['success']
+            reply['result'] = dvr_result['result']
+        
+        # Transaction clean up. End implicit or expired transactions.        
+        finally:
+            if (tid == 'create') or (self._transaction_timed_out == True):
+                self._end_transaction(self.transaction_id)
+            self._in_protected_function = False
+                    
+        yield self.reply_ok(msg,reply)
+        
+        
+    @defer.inlineCallbacks
     def op_get_device_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.
@@ -2054,78 +2122,6 @@ class InstrumentAgent(Process):
         try:
             
             dvr_content = {'params':params}
-            dvr_result = yield self._driver_client.get_status(dvr_content)
-        
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
-        
-        # Transaction clean up. End implicit or expired transactions.        
-        finally:
-            if (tid == 'create') or (self._transaction_timed_out == True):
-                self._end_transaction(self.transaction_id)
-            self._in_protected_function = False
-                    
-        yield self.reply_ok(msg,reply)
-
-
-    # TODO: decide how this is used with direct access mode. Should
-    # transactions be enabled here, e.g. only one user in direct access mode,
-    # et cetera.
-    @defer.inlineCallbacks
-    def op_execute_device_direct(self,content,headers,msg):
-        """
-        Execute untranslated byte data commands on the device.
-        Must be in direct access mode and possess the correct transaction_id key
-        for the direct access session.
-        @param content A dict {'bytes':block_of_data,'transaction_id':transaction_id}
-        @retval A dict {'success':success,'result':block_of_data}.
-        """
-        
-        self._in_protected_function = True
-        
-        assert(isinstance(content,dict)), 'Expected a dict content.'
-        assert(content.has_key('bytes')), 'Expected bytes.'
-        assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
-        
-        bytes = content['bytes']
-        tid = content['transaction_id']
-
-        # expect a byte string?
-        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
-
-        reply = {'success':None,'result':None,'transaction_id':None}
-
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
-        # Set up the transaction
-        result = yield self._verify_transaction(tid,'execute')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
-            yield self.reply_ok(msg,reply)
-            return
-
-        reply['transaction_id'] = self.transaction_id
-
-        agent_state = self.fsm.get_current_state()
-        if agent_state != AgentState.DIRECT_ACCESS_MODE:
-            reply['success'] = InstErrorCode.INCORRECT_STATE
-            yield self.reply_ok(msg,reply)
-            return
-                    
-        try:                    
-                    
-            dvr_content = {'bytes':bytes}
             dvr_result = yield self._driver_client.get_status(dvr_content)
         
             reply['success'] = dvr_result['success']

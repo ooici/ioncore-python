@@ -30,6 +30,7 @@ from ion.core import bootstrap
 
 
 from ion.core.object import object_utils
+import gviz_api
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
@@ -38,6 +39,102 @@ INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, vers
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 INSTRUMENTDATA_EVENT_ID = 5001
+
+
+line_template = '''
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>
+      OOICI Message Count Consumer Visualization
+    </title>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load('visualization', '1', {packages: ['corechart']});
+    </script>
+    <script type="text/javascript">
+      function drawVisualization() {
+        // Create and populate the data table.
+        var data = new google.visualization.DataTable(%(json)s);
+
+        // Create and draw the visualization.
+        new google.visualization.LineChart(document.getElementById('visualization')).
+            draw(data, {curveType: "function",
+                        width: 800, height: 600,
+                        vAxis: {maxValue: 10}}
+                );
+      }
+
+
+      google.setOnLoadCallback(drawVisualization);
+    </script>
+    <script language="JavaScript">
+    <!--
+
+    var sURL = unescape(window.location.pathname);
+
+    function doLoad()
+    {
+        // the timeout value should be the same as in the "refresh" meta-tag
+        setTimeout( "refresh()", 2*1000 );
+    }
+
+    function refresh()
+    {
+        //  This version of the refresh function will cause a new
+        //  entry in the visitor's history.  It is provided for
+        //  those browsers that only support JavaScript 1.0.
+        //
+        window.location.href = sURL;
+    }
+    //-->
+    </script>
+
+    <script language="JavaScript1.1">
+    <!--
+    function refresh()
+    {
+        //  This version does NOT cause an entry in the browser's
+        //  page view history.  Most browsers will always retrieve
+        //  the document from the web-server whether it is already
+        //  in the browsers page-cache or not.
+        //
+        window.location.replace( sURL );
+    }
+    //-->
+    </script>
+
+    <script language="JavaScript1.2">
+    <!--
+    function refresh()
+    {
+        //  This version of the refresh function will be invoked
+        //  for browsers that support JavaScript version 1.2
+        //
+
+        //  The argument to the location.reload function determines
+        //  if the browser should retrieve the document from the
+        //  web-server.  In our example all we need to do is cause
+        //  the JavaScript block in the document body to be
+        //  re-evaluated.  If we needed to pull the document from
+        //  the web-server again (such as where the document contents
+        //  change dynamically) we would pass the argument as 'true'.
+        //
+        window.location.reload( false );
+    }
+    //-->
+</script>
+
+
+  </head>
+  <body onload="doLoad()" style="font-family: Arial;border: 0 none;">
+    <div id="visualization" style="width: 800px; height: 600px;"></div>
+    %(msg)s
+  </body>
+</html>
+'''
+
 
 
 class InstrumentDataEventSubscriber(DataEventSubscriber):
@@ -52,18 +149,44 @@ class InstrumentDataEventSubscriber(DataEventSubscriber):
 class SBE37DataEventSubscriber(InstrumentDataEventSubscriber):
     def __init__(self, *args, **kwargs):
         self.msgs = []
+        self.pdata=[]
         DataEventSubscriber.__init__(self, *args, **kwargs)
+        self.max_points=50
 
     def ondata(self, data):
-        log.info("IMSSRVC !!!!!!! SBE37DataEventSubscriber received a message with content: %s",
-                data['content'])
-
         msg = data['content'];
-        log.info("IMSSRVC !!!!!!! SBE37DataEventSubscriber additional info: %s", msg.additional_data.data_block)
+        log.info("IMSSRVC SBE37DataEventSubscriber additional info: %s", msg.additional_data.data_block)
 
         self.msgs.append(data)
+        #convert the incoming string into a dict
+        list = msg.additional_data.data_block.split(';')
+        dataDict = {}
+        for entry in list:
+            key, val = entry.split(':')
+            dataDict[key] = val
 
+        log.info("IMSSRVC SBE37DataEventSubscriber new dict: %s", dataDict )
 
+        description = [('time','string', 'time (Seconds)'), ('temperature','number', 'temperature')]
+        self.pdata.append([str(dataDict['time' ]), float(dataDict['temperature']) ] )
+
+        dlen = len(self.pdata)
+        if  dlen > self.max_points:
+            self.pdata = self.pdata[dlen-self.max_points : ]
+
+        data_table = gviz_api.DataTable(description)
+        data_table.LoadData(self.pdata)
+        #json = data_table.ToJSon(columns_order=("name", "salary"),order_by="salary")
+        json = data_table.ToJSon()
+
+        # Make message for the screen below
+        hdr = '<p>Timestamp: %s </p>\n' % pu.currenttime()
+
+        page = line_template % {'msg':hdr,'json':json}
+        
+        #log.info("IMSSRVC SBE37DataEventSubscriber page: %s", page)
+
+        #self.queue_result(queue,page,'Google Viz of message counts')
         
 class InstrumentManagementService(ServiceProcess):
     """

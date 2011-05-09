@@ -203,7 +203,7 @@ class TestInstMgmtRT(IonTestCase):
         result = yield self.imc.start_instrument_agent("SeaBird Electronics", result['instrument_id'], "SBE37")
         log.info("IMSSRVC test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] )
 
-        dataDict = "'conductivity':0.3444;'pressure':0.3732;'temperature':28.0;'sound velocity':3838.3;'salinity':0.993;'time':'(15,33,30)';'date':'(2011,5,5)'"
+        dataDict = "conductivity:0.3444;pressure:0.3732;temperature:28.0;sound velocity:3838.3;salinity:0.993;time:(15,33,30);date:(2011,5,5)"
 
         pubDataEvent = InstrumentDataEventPublisher(process=self.sup, origin="magnet_topic") # all publishers/subscribers need a process associated
         yield pubDataEvent.initialize()

@@ -448,7 +448,7 @@ class WorkBench(object):
 
         # set excluded types on this repository
         if excluded_types is not None:
-            repo.excluded_types = excluded_types
+            repo.excluded_types = excluded_types        # @TODO: update instead of replace?
 
         # Create pull message
         pullmsg = yield self._process.message_client.create_instance(PULL_MESSAGE_TYPE)

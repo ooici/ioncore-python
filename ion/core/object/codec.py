@@ -106,6 +106,7 @@ def pack_structure(content):
     # extract the excluded_object_types list if we have one!
     excluded_object_types = []
     if hasattr(content, 'excluded_object_types') and len(content.excluded_object_types) > 0:
+        log.debug("Codec pack_structure has %d excluded_object_types" % len(content.excluded_object_types))
         excluded_object_types = [x.GPBMessage for x in content.excluded_object_types]
 
     # Recurse through the DAG and add the keys to a set - obj_set.
@@ -198,12 +199,18 @@ def unpack_structure(serialized_container):
     repo.branch(nickname='master')
 
     # attempt to extract a list of excluded objects, if the message contains the field 'excluded_object_types'
-    excluded_objects = None
+    excluded_types = []
     if hasattr(root_obj, 'message_object') and hasattr(root_obj.message_object, 'excluded_object_types'):
-        excluded_objects = [x.GPBMessage for x in root_obj.message_object.excluded_object_types]
+        log.debug("Codec unpack_structure has %d excluded_object_types set in field" % len(root_obj.message_object.excluded_object_types))
+        excluded_types = [x.GPBMessage for x in root_obj.message_object.excluded_object_types]
 
     # Now load the rest of the linked objects - down to the leaf nodes.
-    repo.load_links(root_obj, excluded_objects)
+    repo.load_links(root_obj, excluded_types)
+
+    # append the excluded object types in the repo (load links no longer does this)
+    for extype in excluded_types:
+        if extype not in repo.excluded_types:
+            repo.excluded_types.append(extype)
 
     # Create a commit to record the state when the message arrived
     cref = repo.commit(comment='Message for you Sir!')
