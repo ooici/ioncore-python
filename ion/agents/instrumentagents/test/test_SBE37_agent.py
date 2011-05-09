@@ -61,9 +61,8 @@ SKIP_TESTS = [
 class TestSBE37Agent(IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 180    
+    timeout = 180
     
-
 
     @defer.inlineCallbacks
     def setUp(self):

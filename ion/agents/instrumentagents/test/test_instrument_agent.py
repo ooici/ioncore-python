@@ -239,14 +239,12 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_error(success))
 
            
-
     @defer.inlineCallbacks
     def test_transaction_acquire_timeouts(self):
         """
         Test lifetime of an asynchronous transaction request.
         """
         raise unittest.SkipTest("Long running test.")
-        
         
         
         # Start a transaction.        
@@ -321,7 +319,6 @@ class TestInstrumentAgent(IonTestCase):
         result_1 = reply_1['result']
         transaction_id_1 = reply_1['transaction_id']
         # It may not be possible to retirieve all parameters during development.
-        #self.assert_(InstErrorCode.is_ok(success_1))
         self.assertEqual(result_1.keys().sort(),params_1.sort())
         self.assertEqual(transaction_id_1,None)
     
@@ -333,7 +330,6 @@ class TestInstrumentAgent(IonTestCase):
         result_2 = reply_2['result']
         transaction_id_2 = reply_2['transaction_id']
         # It may not be possible to retrieve all parameters during development. So do not assert success.
-        #self.assert_(InstErrorCode.is_ok(success_2))
         self.assertEqual(result_2.keys().sort(),params_1.sort())
         self.assertEqual(result_1,result_2)
         self.assertEqual(transaction_id_2,None)
@@ -346,7 +342,6 @@ class TestInstrumentAgent(IonTestCase):
         result_3 = reply_3['result']
         transaction_id_3 = reply_3['transaction_id']
         # It may not be possible to retrieve all parameters during development. So do not assert success.
-        #self.assert_(InstErrorCode.is_ok(success_3))
         self.assertEqual(result_3.keys().sort(),params_1.sort())
         self.assertEqual(result_1,result_3)
         self.assertEqual(type(transaction_id_3),str)
@@ -359,7 +354,6 @@ class TestInstrumentAgent(IonTestCase):
         success_4 = reply_4['success']
         result_4 = reply_4['result']
         transaction_id_4 = reply_4['transaction_id']
-        #self.assertEqual(success_4[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_4))
         self.assertEqual(result_4,None)
         self.assertEqual(transaction_id_4,None)
@@ -376,7 +370,6 @@ class TestInstrumentAgent(IonTestCase):
         success_5 = reply_5['success']
         result_5 = reply_5['result']
         transaction_id_5 = reply_5['transaction_id']
-        #self.assertEqual(success_5[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_5))
         self.assertEqual(result_5,None)
         self.assertEqual(transaction_id_5,None)
@@ -400,7 +393,6 @@ class TestInstrumentAgent(IonTestCase):
         success_7 = reply_7['success']
         result_7 = reply_7['result']
         transaction_id_7 = reply_7['transaction_id']
-        #self.assertEqual(success_7[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_7))        
         self.assertEqual(result_7,None)
         self.assertEqual(transaction_id_7,None)
@@ -436,7 +428,6 @@ class TestInstrumentAgent(IonTestCase):
         success_10 = reply_10['success']
         result_10 = reply_10['result']
         transaction_id_10 = reply_10['transaction_id']
-        #self.assertEqual(success_10[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_10))        
         self.assertEqual(result_10,None)
         self.assertEqual(transaction_id_10,None)
@@ -466,7 +457,6 @@ class TestInstrumentAgent(IonTestCase):
         result_12 = reply_12['result']
         transaction_id_12 = reply_12['transaction_id']
         # Not all parameters can be retreived during development. So don't assert success.
-        #self.assert_(InstErrorCode.is_ok(success_12))
         self.assertEqual(result_12,result_1)
         self.assertEqual(type(transaction_id_12),str)
         self.assertEqual(len(transaction_id_12),36)
@@ -476,7 +466,6 @@ class TestInstrumentAgent(IonTestCase):
         reply_13 = yield self.ia_client.start_transaction(0)
         success_13 = reply_13['success']
         transaction_id_13 = reply_13['transaction_id']
-        #self.assertEqual(success_13[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_13))        
         self.assertEqual(transaction_id_13,None)
         self.assertEqual(transaction_id_13,None)
@@ -489,12 +478,7 @@ class TestInstrumentAgent(IonTestCase):
         success_14 = reply_14['success']
         result_14 = reply_14['result']
         transaction_id_14 = reply_14['transaction_id']
-        #self.assertEqual(success_14[0],'ERROR')
         self.assert_(InstErrorCode.is_error(success_14))        
-        #self.assertEqual(result_14[AgentParameter.TIME_SOURCE][0],'OK')
-        #self.assertEqual(result_14[AgentParameter.MAX_EXP_TIMEOUT][0],'OK')
-        #self.assertEqual(result_14[AgentParameter.CONNECTION_METHOD][0],'ERROR')
-        #self.assertEqual(result_14[AgentParameter.DEFAULT_EXP_TIMEOUT][0],'ERROR')
         self.assert_(InstErrorCode.is_ok(result_14[AgentParameter.TIME_SOURCE]))
         self.assert_(InstErrorCode.is_ok(result_14[AgentParameter.MAX_EXP_TIMEOUT]))
         self.assert_(InstErrorCode.is_error(result_14[AgentParameter.CONNECTION_METHOD]))
@@ -511,9 +495,6 @@ class TestInstrumentAgent(IonTestCase):
         success_15 = reply_15['success']
         result_15 = reply_15['result']
         transaction_id_15 = reply_15['transaction_id']
-        #self.assertEqual(success_15[0],'ERROR')
-        #self.assertEqual(result_15['I_AM_AN_UNKNOWN_PARAMETER'][0],'ERROR')
-        #self.assertEqual(result_15[AgentParameter.DEFAULT_EXP_TIMEOUT][0],'OK')
         self.assert_(InstErrorCode.is_error(success_15))
         self.assert_(InstErrorCode.is_error(result_15['I_AM_AN_UNKNOWN_PARAMETER']))
         self.assert_(InstErrorCode.is_ok(result_15[AgentParameter.DEFAULT_EXP_TIMEOUT]))
@@ -534,25 +515,19 @@ class TestInstrumentAgent(IonTestCase):
         result_17 = reply_17['result']
         transaction_id_17 = reply_17['transaction_id']
         # Not all parameters can be retreived during development. So don't assert success.
-        #self.assert_(InstErrorCode.is_ok(success_17))
         for (key,val) in result_17.iteritems():
             if key == AgentParameter.TIME_SOURCE:
-                #self.assertEqual(val[0][0],'OK')
                 self.assert_(InstErrorCode.is_ok(val[0]))
                 self.assertEqual(val[1],params_14[AgentParameter.TIME_SOURCE])
             elif key == AgentParameter.MAX_EXP_TIMEOUT:
-                #self.assertEqual(val[0][0],'OK')
                 self.assert_(InstErrorCode.is_ok(val[0]))
                 self.assertEqual(val[1],params_14[AgentParameter.MAX_EXP_TIMEOUT])
             elif key == AgentParameter.DEFAULT_EXP_TIMEOUT:
-                #self.assertEqual(val[0][0],'OK')
                 self.assert_(InstErrorCode.is_ok(val[0]))
                 self.assertEqual(val[1],params_15[AgentParameter.DEFAULT_EXP_TIMEOUT])
             else:
                 self.assertEqual(val,result_1[key])
-        #self.assertEqual(result_15['I_AM_AN_UNKNOWN_PARAMETER'][0],'ERROR')
         self.assert_(InstErrorCode.is_error(result_15['I_AM_AN_UNKNOWN_PARAMETER']))
-        #self.assertEqual(result_15[AgentParameter.DEFAULT_EXP_TIMEOUT][0],'OK')
         self.assert_(InstErrorCode.is_ok(result_15[AgentParameter.DEFAULT_EXP_TIMEOUT]))
         self.assertEqual(type(transaction_id_15),str)
         self.assertEqual(len(transaction_id_15),36)
@@ -784,19 +759,14 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(type(result),dict)
         self.assertEqual(transaction_id,None)
-        #self.assertEqual(result[AgentCapability.OBSERVATORY_STATUSES][0][0],'OK')
-        #self.assertEqual(result[AgentCapability.METADATA][0][0],'OK')
-        #self.assertEqual(result[AgentCapability.DEVICE_COMMANDS][0][0],'OK')
         self.assert_(InstErrorCode.is_ok(result[AgentCapability.OBSERVATORY_STATUSES][0]))
         self.assert_(InstErrorCode.is_ok(result[AgentCapability.METADATA][0]))
         self.assert_(InstErrorCode.is_ok(result[AgentCapability.DEVICE_COMMANDS][0]))
         self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[AgentCapability.OBSERVATORY_STATUSES][1])),True)
         self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[AgentCapability.METADATA][1])),True)
         self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_COMMANDS][1])),True)        
-        #self.assertEqual(result['CAP_BAD_CAPABILITY_1'][0][0],'ERROR')
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_1'][0]))
         self.assertEqual(result['CAP_BAD_CAPABILITY_1'][1],None)
-        #self.assertEqual(result['CAP_BAD_CAPABILITY_2'][0][0],'ERROR')
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_2'][0]))
         self.assertEqual(result['CAP_BAD_CAPABILITY_2'][1],None)
                 
@@ -867,38 +837,9 @@ class TestInstrumentAgent(IonTestCase):
         
         self.assert_(InstErrorCode.is_ok(success))
         
-        
-                
-    """                
-    @defer.inlineCallbacks
-    def test_execute_device(self):
-        raise unittest.SkipTest("To be done.")
-    
-
-    @defer.inlineCallbacks
-    def test_get_device(self):
-        raise unittest.SkipTest("To be done.")
 
 
-    @defer.inlineCallbacks
-    def test_set_device(self):
-        raise unittest.SkipTest("To be done.")
-            
-            
-    @defer.inlineCallbacks
-    def test_get_device_metadata(self):
-        raise unittest.SkipTest("To be done.")
 
-
-    @defer.inlineCallbacks
-    def test_get_device_status(self):
-        raise unittest.SkipTest("To be done.")
-
-
-    @defer.inlineCallbacks
-    def test_execute_device_direct(self):
-        raise unittest.SkipTest("To be done.")        
-    """    
  
     @defer.inlineCallbacks
     def test_publish(self):
