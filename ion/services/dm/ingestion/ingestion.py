@@ -15,32 +15,29 @@ To test this with the Java CC!
 import time
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
 import ion.util.ionlog
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.python import reflect
-
-
-
-from net.ooici.services.coi import resource_framework_pb2
-from net.ooici.core.type import type_pb2
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry.resource_client import \
-    ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
-from ion.services.coi.datastore import DataStoreClient
 from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
+from ion.services.coi import datastore
 
+from ion.core.exception import ReceivedApplicationError, ReceivedError, ReceivedContainerError
 
 from ion.core import ioninit
+
 CONF = ioninit.config(__name__)
 
 from ion.core.object import object_utils
@@ -60,14 +57,13 @@ CDM_OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, ver
 
 CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
 
-SUPPLEMENT_MSG_TYPE           = object_utils.create_type_identifier(object_id=2001, version=1)
-PERFORM_INGEST_MSG_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
-CREATE_DATASET_TOPICS_MSG_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
-INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
+SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
+PERFORM_INGEST_MSG_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
+CREATE_DATASET_TOPICS_MSG_TYPE = object_utils.create_type_identifier(object_id=2003, version=1)
+INGESTION_READY_TYPE = object_utils.create_type_identifier(object_id=2004, version=1)
 DAQ_COMPLETE_MSG_TYPE = object_utils.create_type_identifier(object_id=2005, version=1)
 
-
-
+BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
 
 
 class IngestionError(ApplicationError):
@@ -75,6 +71,7 @@ class IngestionError(ApplicationError):
     An error occured during the begin_ingest op of IngestionService.
     """
     pass
+
 
 class IngestionService(ServiceProcess):
     """
@@ -88,11 +85,12 @@ class IngestionService(ServiceProcess):
 
 
     excluded_data_array_types = (CDM_SINT_ARRAY_TYPE, CDM_UINT_ARRAY_TYPE, CDM_LSINT_ARRAY_TYPE, CDM_LUINT_ARRAY_TYPE,
-        CDM_DOUBLE_ARRAY_TYPE, CDM_FLOAT_ARRAY_TYPE, CDM_STRING_ARRAY_TYPE, CDM_OPAQUE_ARRAY_TYPE)
+                                 CDM_DOUBLE_ARRAY_TYPE, CDM_FLOAT_ARRAY_TYPE, CDM_STRING_ARRAY_TYPE,
+                                 CDM_OPAQUE_ARRAY_TYPE)
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        
+
         #assert isinstance(backend, store.IStore)
         #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
@@ -108,7 +106,10 @@ class IngestionService(ServiceProcess):
         self.mc = MessageClient(proc=self)
 
         self._pscclient = PubSubClient(proc=self)
-        self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self)
+        self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher,
+                                                       process=self)
+
+        self.dsc = datastore.DataStoreClient(proc=self)
 
         self.dataset = None
 
@@ -151,6 +152,7 @@ class IngestionService(ServiceProcess):
         Specially derived Subscriber that routes received messages into the ingest service's
         standard receive method, as if it is one of the process receivers.
         """
+
         @defer.inlineCallbacks
         def _receive_handler(self, content, msg):
             yield self._process.receive(content, msg)
@@ -170,13 +172,12 @@ class IngestionService(ServiceProcess):
         """
         Factor out the preparation for ingestion so that we can unit test functionality
         """
-         
+
         # Get the current state of the dataset:
         self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
 
         ba_links = []
         for var in self.dataset.root_group.variables:
-
             var_links = var.content.bounded_arrays.GetLinks()
             ba_links.extend(var_links)
 
@@ -199,7 +200,6 @@ class IngestionService(ServiceProcess):
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
 
-
     @defer.inlineCallbacks
     def op_ingest(self, content, headers, msg):
         """
@@ -211,7 +211,7 @@ class IngestionService(ServiceProcess):
 
         if content.MessageType != PERFORM_INGEST_MSG_TYPE:
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
-                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
 
         yield self._prepare_ingest(content)
 
@@ -224,7 +224,8 @@ class IngestionService(ServiceProcess):
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
-        log.info('Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
+        log.info(
+            'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
         irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
         irmsg.xp_name = "magnet.topic"
         irmsg.publish_topic = ingest_data_topic
@@ -281,7 +282,7 @@ class IngestionService(ServiceProcess):
 
         if content.MessageType != CDM_DATASET_TYPE:
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
-                                     % str(content), content.ResponseCodes.BAD_REQUEST)
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
 
         #print '===== Content ==== \n', content
 
@@ -299,16 +300,12 @@ class IngestionService(ServiceProcess):
 
         # Clear any bounded arrays which are empty. Create content field if it is not present
         for var in group.variables:
-
             if var.IsFieldSet('content'):
-
                 content = var.content
 
                 if len(content.bounded_arrays) > 0:
-
-                    i =0
+                    i = 0
                     while i < len(content.bounded_arrays):
-
                         ba = content.bounded_arrays[i]
 
                         if not ba.IsFieldSet('ndarray'):
@@ -330,8 +327,8 @@ class IngestionService(ServiceProcess):
         # this is NOT rpc
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
-                                     % str(content), content.ResponseCodes.BAD_REQUEST)
-        #print '===== Content ==== \n', content
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+            #print '===== Content ==== \n', content
 
         #print '===== Dataset ======\n', self.dataset
 
@@ -345,25 +342,39 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
 
 
-        #print 'Tar Content: \n',var_container.PPrint()
-
+        # Get the group out of the datset
         group = self.dataset.root_group
 
+        # get the bounded array out of the message
         ba = content.bounded_array
 
+
+        # Create a blobs message to send to the datastore with the ndarray
+        blobs_msg = yield self.mc.create_instance(BLOBS_MESSAGE_TYPE)
+        ndarray_element = content.Repository.index_hash.get(ba.ndarray.MyId)
+        obj = content.Repository._wrap_message_object(ndarray_element._element)
+
+        link = blobs_msg.blob_elements.add()
+        link.SetLink(obj)
+
+        # Put it to the datastore
+        try:
+            yield self.dsc.put_blobs(blobs_msg)
+        except ReceivedError, re:
+            log.error(re)
+            raise IngestionError('Could not put blob in received chunk to the datastore.')
+
+        # Now add the bounded array, but not the ndarray to the dataset in the ingestion service
         log.debug('Adding content to variable name: %s' % content.variable_name)
         try:
             var = group.FindVariableByName(content.variable_name)
         except gpb_wrapper.OOIObjectError, oe:
             log.error(str(oe))
-            raise IOError('Expected variable name %s not found in the dataset' % (content.variable_name))
+            raise IngestionError('Expected variable name %s not found in the dataset' % (content.variable_name))
 
         ba_link = var.content.bounded_arrays.add()
-        ba_link.SetLink(ba)
-
-
-
-        #print '===== Dataset Updated ======\n',self.dataset
+        my_ba = ba_link.Repository.copy_object(ba, deep_copy=False)
+        ba_link.SetLink(my_ba)
 
         yield msg.ack()
 
@@ -372,29 +383,32 @@ class IngestionService(ServiceProcess):
         log.info("op_recv_done(%s)" % type(content))
         if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
-                                     % str(content), content.ResponseCodes.BAD_REQUEST)
-        
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+
         # this is NOT rpc
         yield msg.ack()
 
         # trigger the op_perform_ingest to complete!
         self._defer_ingest.callback(True)
 
+
 class IngestionClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
     """
+
     def __init__(self, proc=None, **kwargs):
         # Step 1: Delegate initialization to parent "ServiceClient"
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "ingestion"
         ServiceClient.__init__(self, proc, **kwargs)
-        
+
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self.proc)
-#        self.rc = ResourceClient(proc=self.proc)
-        
-        
+
+    #        self.rc = ResourceClient(proc=self.proc)
+
+
     @defer.inlineCallbacks
     def ingest(self, msg):
         """
@@ -415,7 +429,7 @@ class IngestionClient(ServiceClient):
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
-        (content, headers, msg) = yield self.rpc_send('perform_ingest', msg, timeout=ingest_service_timeout+30)
+        (content, headers, msg) = yield self.rpc_send('perform_ingest', msg, timeout=ingest_service_timeout + 30)
 
         defer.returnValue(content)
 
@@ -446,8 +460,6 @@ class IngestionClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IngestionService)
-
-
 
 '''
 

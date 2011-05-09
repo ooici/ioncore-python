@@ -44,6 +44,11 @@ class IngestionTest(IonTestCase):
         log.debug('Process ID:' + str(ingestion1))
         self.ingest= self._get_procinstance(ingestion1)
 
+        ds1 = yield self.sup.get_child_id('ds1')
+        log.debug('Process ID:' + str(ds1))
+        self.datastore= self._get_procinstance(ds1)
+
+
     class fake_msg(object):
 
         def ack(self):
@@ -72,7 +77,7 @@ class IngestionTest(IonTestCase):
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
-        yield bootstrap_profile_dataset(cdm_dset_msg, random_initialization=True)
+        yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
 
         #print '\n\n\n Filled out message with a dataset \n\n\n\n'
 
@@ -80,7 +85,7 @@ class IngestionTest(IonTestCase):
         yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
         # ==========
-        # Can't use messaging and client because the send returns before the op is complete.
+        # Can't use messaging and client because the send returns before the op is complete so the result is untestable.
         #yield self._ic.send_dataset(SAMPLE_PROFILE_DATASET_ID,cdm_dset_msg)
         #yield pu.asleep(1)
         # ==========
@@ -136,6 +141,13 @@ class IngestionTest(IonTestCase):
         # This is all we really need to do - make sure that the bounded array has been added.
         self.assertEqual(len(updated_bounded_arrays), len(starting_bounded_arrays)+1)
 
+        # The bounded array but not the ndarray should be in the ingestion service dataset
+        self.assertIn(supplement_msg.bounded_array.MyId, self.ingest.dataset.Repository.index_hash)
+        self.assertNotIn(supplement_msg.bounded_array.ndarray.MyId, self.ingest.dataset.Repository.index_hash)
+
+        # The datastore should now have this ndarray
+        self.failUnless(self.datastore.b_store.has_key(supplement_msg.bounded_array.ndarray.MyId))
+
 
     def create_chunk(self, supplement_msg):
         """
@@ -172,6 +184,34 @@ class IngestionTest(IonTestCase):
             supplement_msg.bounded_array.bounds.add()
             supplement_msg.bounded_array.bounds[1].origin = 0
             supplement_msg.bounded_array.bounds[1].size = 3
+
+
+        supplement_msg.Repository.commit('Commit before fake send...')
+
+
+    @defer.inlineCallbacks
+    def test_recv_done(self):
+        """
+        This is a test method for the recv dataset operation of the ingestion service
+        """
+
+        # Receive a dataset to get setup...
+        content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id = SAMPLE_PROFILE_DATASET_ID
+
+        yield self.ingest._prepare_ingest(content)
+
+
+        # Now fake the receipt of the dataset message
+        cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
+        yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
+
+        # Call the op of the ingest process directly
+        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+
+
+        # Now send a done message and watch the magic happen...
+
 
 
 

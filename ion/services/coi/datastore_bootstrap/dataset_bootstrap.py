@@ -50,11 +50,13 @@ INT32ARRAY_TYPE = object_utils.create_type_identifier(object_id=10009, version=1
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+
 def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     """
     Example file: ion/services/coi/SOS_Test.arr
     This method loads data from byte array files on disk - structure container GPB's or tgz of the same...
     """
+
     ds_svc = args[0]
     filename = kwargs['filename']
     log.debug('Bootstraping dataset from local byte array: "%s"' % filename)
@@ -230,7 +232,6 @@ def read_ooicdm_tar_file(resource_instance, filename):
     return result
 
 
-    
 def bootstrap_profile_dataset(dataset, *args, **kwargs):
     """
     Pass in a link from the resource object which is created in the initialization of the datastore
@@ -240,8 +241,10 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     group = dataset.CreateObject(GROUP_TYPE)
     group.name = 'junk data'
     dataset.root_group = group
-    
+
+    supplement_number = kwargs.get('supplement_number', CONF.getValue('supplement_number', False))
     random_initialization = kwargs.get('random_initialization', CONF.getValue('Initialize_random_data', False))
+
     log.info("Random initialization of datasets is set to %s" % (random_initialization,))
     # Create all dimension and variable objects
     # Note: CDM variables such as scalars, coordinate variables and data are all represented by
@@ -330,14 +333,25 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     variable_t.content.bounded_arrays[0].bounds[0].origin = 0
     variable_t.content.bounded_arrays[0].bounds[0].size = 2
     variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(INT32ARRAY_TYPE)
-    
-    if random_initialization:
+
+
+    if supplement_number is not False:
+
+        start_time = 1280102520 + 3600 * supplement_number
+        supplement_number += 1
+        end_time = 1280102520 + 3600 * supplement_number
+
+    elif random_initialization:
         start_time = 1280102000 + int(round(random.random()* 360000))
         end_time = start_time + 3600
-        variable_t.content.bounded_arrays[0].ndarray.value.extend([start_time, end_time])
-        log.info("start_time %s end_time %s " % (start_time, end_time))
+
     else:
-        variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
+        start_time = 1280102520
+        end_time = 1280106120
+
+    log.info("start_time %s end_time %s " % (start_time, end_time))
+
+    variable_t.content.bounded_arrays[0].ndarray.value.extend([start_time, end_time])
 
     variable_z.content = dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     variable_z.content.bounded_arrays.add()
@@ -471,8 +485,12 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     attrib_history = _create_string_attribute(dataset, 'history', ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
     attrib_references = _create_string_attribute(dataset, 'references', ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
     attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
-    attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', ['2008-08-01T00:50:00Z'])
-    attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', ['2008-08-01T23:50:00Z'])
+
+    stime = IonTime(start_time * 1000)
+    etime = IonTime(end_time * 1000)
+    attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime.time_str,])
+    attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime.time_str,])
+
     attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', [str(lat)])
     attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', [str(lat)])
     attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', [str(long)])
