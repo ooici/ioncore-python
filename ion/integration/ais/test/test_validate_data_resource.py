@@ -49,6 +49,11 @@ class AISValidateDataResourceTest(IonTestCase):
                 'module':'ion.integration.ais.app_integration_service',
                 'class':'AppIntegrationService'
             },
+#            {
+#                'name':'cdm_validation',
+#                'module': 'on.integration.eoi.validation.cdm_validation_service',
+#                'class': 'CdmValidationClient'
+#            },
             ]
 
         log.debug('AppIntegrationTest.setUp(): spawning processes')
@@ -116,6 +121,27 @@ class AISValidateDataResourceTest(IonTestCase):
         self.failUnlessEqual(res.ion_geospatial_lat_max, 89.956055)
         self.failUnlessEqual(res.ion_geospatial_lon_min, -179.95605)
         self.failUnlessEqual(res.ion_geospatial_lon_max, 179.95605)
+
+
+    @defer.inlineCallbacks
+    def test_validateDataResourceNegative(self):
+        raise unittest.SkipTest("All I need is a data source URL that's known to be non-NetCDF compliant")
+
+        log.info("Creating and wrapping validation request")
+        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        validate_req_msg  = ais_req_msg.CreateObject(VALIDATE_DATASOURCE_REQ)
+        ais_req_msg.message_parameters_reference = validate_req_msg
+
+
+        validate_req_msg.data_resource_url = 'http://tashtego.marine.rutgers.edu:8080/thredds/dodsC/cool/avhrr/bigbight'
+
+        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
+
+        self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
+                             "validateDataResource passed a known-bad URL")
+
+
+
 
     @defer.inlineCallbacks
     def _validateDataResource(self, data_source_url):
