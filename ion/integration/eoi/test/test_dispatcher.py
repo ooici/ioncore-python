@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from shutil import copy
 import ion.util.procutils as pu
+import os
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
@@ -189,7 +190,10 @@ class DispatcherTest(IonTestCase):
 
         yield self.createUser()
 
-        copy ("/Users/Bill/WorkSpace/ioncore-python/ion/integration/eoi/dispatcher/dispatcher_users.id", "dispatcher_users.id")
+        try:
+           copy ("../ion/integration/eoi/dispatcher/dispatcher_users.id", "dispatcher_users.id")
+        except:
+           log.warn('could not copy dispatcher_users.id file to temp directory')
         #
         # start dispatcher
         #
