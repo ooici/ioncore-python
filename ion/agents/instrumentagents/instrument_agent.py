@@ -181,6 +181,12 @@ class InstrumentAgent(Process):
                                     origin=self.event_publisher_origin)
     
         """
+        The transducer of the last data received event. Used to publish
+        left over buffer contents on end of a streaming session.
+        """
+        self._prev_data_transducer = None
+    
+        """
         A UUID specifying the current transaction. None
         indicates no current transaction.
         """
@@ -313,8 +319,9 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state=AgentState.POWERED_DOWN)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.POWERED_DOWN)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -340,8 +347,9 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state="test")
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.UNINITIALIZED)
             pass
         
         elif event == AgentEvent.EXIT:
@@ -386,8 +394,9 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
-            #yield self._state_publisher.create_and_publish_event(\
-            #   state=AgentState.INACTIVE)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.INACTIVE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -445,8 +454,9 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state=AgentState.STOPPED)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.STOPPED)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -516,8 +526,9 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state=AgentState.IDLE)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.IDLE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -582,8 +593,9 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state=AgentState.OBSERVATORY_MODE)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.OBSERVATORY_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -654,8 +666,9 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            #yield self._state_publisher.create_and_publish_event(\
-            #    state=AgentState.DIRECT_ACCESS_MODE)
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.DIRECT_ACCESS_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -1170,6 +1183,10 @@ class InstrumentAgent(Process):
                     result[AgentParameter.MAX_EXP_TIMEOUT] = \
                         (InstErrorCode.OK,self._max_exp_timeout)
                     
+                if arg == AgentParameter.BUFFER_SIZE or arg=='all':
+                    result[AgentParameter.BUFFER_SIZE] = \
+                        (InstErrorCode.OK,self._data_buffer_limit)
+
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
                 
@@ -1358,6 +1375,19 @@ class InstrumentAgent(Process):
                         success = InstErrorCode.INVALID_PARAM_VALUE
 
                     result[arg] = success
+
+                elif arg == AgentParameter.BUFFER_SIZE :
+                    if isinstance(val,int) and val >= 0:
+                        self._data_buffer_limit = val
+                        success = InstErrorCode.OK
+
+                    else:
+                        set_errors = True
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+
+                    result[arg] = success
+
+
     
             if set_errors:
                 success = InstErrorCode.SET_OBSERVATORY_ERR
@@ -2166,17 +2196,36 @@ class InstrumentAgent(Process):
                         'driver event occured evoked from a non-child process')
             return
         
+        # If data received, coordinate buffering and publishing.
         if type == DriverAnnouncement.DATA_RECEIVED:
-            if len(value) > 0:
-                strval = "{"
-                for (key,val) in value.iteritems():
-                    strval += "'"+key+"':"+str(val)+","
-                strval = strval[:-1]
-                strval += "}"
-            origin = "%s.%s" % (transducer,self.event_publisher_origin)
-            yield self._data_publisher.create_and_publish_event(origin=origin,
-                                                            description=strval)
             
+            # Get the driver observatory state.
+            key = (DriverChannel.INSTRUMENT,DriverStatus.OBSERVATORY_STATE)
+            reply = self._driver_client.get_status([key])
+            success = reply['success']
+            result = reply['result']
+            obs_status = result.get(key,None)
+            strval = ''
+            
+            # If in streaming mode, buffer data and publish at intervals.
+            if InstErrorCode.is_ok(success) and obs_status != None:
+                if obs_status[1] == ObservatoryState.STREAMING:
+                    self._data_buffer.appen(value)
+                    if len(self._data_buffer) > self._data_buffer_limit:
+                        strval = self._get_data_string(self._data_buffer)
+                        self._data_buffer = []
+            
+            # If not in streaming mode, always publish data upon receipt.   
+            else:
+                strval = self._get_data_string(value)
+
+            if len(strval)>0:
+                self._prev_data_transducer = transducer
+                origin = "%s.%s" % (transducer,self.event_publisher_origin)
+                yield self._data_publisher.create_and_publish_event(\
+                    origin=origin,description=strval)
+                
+        # If the driver state changed, publish any buffered data remaining.
         elif type == DriverAnnouncement.CONFIG_CHANGE:
             pass
         
@@ -2184,35 +2233,19 @@ class InstrumentAgent(Process):
             pass
         
         elif type == DriverAnnouncement.STATE_CHANGE:
-            pass
+
+            strval = self._get_data_string(self._data_buffer)
+            if len(strval) > 0:    
+                origin = "%s.%s" % (self._prev_data_transducer,
+                                    self.event_publisher_origin)
+                yield self._data_publisher.create_and_publish_event(\
+                    origin=origin,description=strval)
         
         elif type == DriverAnnouncement.EVENT_OCCURRED:
             pass
             
         else:
             pass
-
-
-        """
-        content = {'type':DriverAnnouncement.DATA_RECEIVED,
-            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
-        self.send(self.proc_supid,'driver_event_occurred',content)                                                
-
-        
-        if (content["Type"] == publish_msg_type["Data"]):
-            yield self._data_publisher.create_and_publish_event( \
-                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
-                description=content["Value"])
-        elif ((content["Type"] == publish_msg_type["Error"])
-            or (content["Value"] == "ConfigChange")):
-            yield self._log_publisher.create_and_publish_event( \
-            origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
-            description=content["Value"])
-        elif (content["Type"] == publish_msg_type["StateChange"]):
-            yield self._state_publisher.create_and_publish_event( \
-                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
-                description=content["Value"])
-        """
         
         self._debug_print_driver_event(type,transducer,value)
         
@@ -2447,6 +2480,29 @@ class InstrumentAgent(Process):
         return sum(map(lambda x: len(x),self._data_buffer))
         
         
+    def _get_data_string(self,data):
+        """
+        Convert a sample dictionary or list of sample dictionaries into a
+        publishable string value.
+        @param data A dictionary containing an instrument data sample in
+            key-value pairs or a list of such dictionaries representing a
+            buffered set of samples.
+        @retval A string representation of the data to be published.
+        """
+        
+        assert(isinstance(data,(list,tuple,dict))), 'Expected a data dict, \
+            or a list or tuple of data dicts'
+        
+        if isinstance(data,dict):
+            return str(data)
+        else:
+            for item in data:
+                strval += str(item) + ','
+                
+            strval = strval[:-1]
+            return strval
+        
+                
     def _debug_print_driver_event(self,type,transducer,value):
         """
         Print debug driver events to stdio.
