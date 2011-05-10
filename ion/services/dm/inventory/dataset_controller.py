@@ -98,8 +98,7 @@ class RscncHandler(ScheduleEventSubscriber):
     This class provides the messaging hooks to invoke rsync on receipt
     of scheduler messages.
     """
-    def __init__(self, queue_name, hook_fn, *args, **kwargs):
-        self.queue_name = queue_name
+    def __init__(self, hook_fn, *args, **kwargs):
         self.hook_fn = hook_fn
         ScheduleEventSubscriber.__init__(self, *args, **kwargs)
 
@@ -158,7 +157,8 @@ class DatasetController(ServiceProcess):
             yield self._create_scheduled_event()
 
         log.debug('Creating new message receiver for scheduler')
-        self.sesc = RscncHandler(self.queue_name, self.do_ncml_sync,
+        self.sesc = RscncHandler(self.do_ncml_sync,
+                                queue_name=self.queue_name,
                                 origin=str(self.svc_name),
                                 process=self)
 
