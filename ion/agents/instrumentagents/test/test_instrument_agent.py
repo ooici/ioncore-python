@@ -845,8 +845,6 @@ class TestInstrumentAgent(IonTestCase):
             def ondata(self, data):
                 log.debug("TestEventSubscriber received a message with name: %s",
                           data['content'].name)
-                print 'TestEventSubscriber received a message with name %s' % \
-                    data['content'].name
                 self.msgs.append(data)
                 
         subproc = Process()
