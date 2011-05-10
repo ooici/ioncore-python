@@ -8,8 +8,6 @@
 
 
 import os,datetime
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 try:
     from pysnmp.entity.rfc3413.oneliner import cmdgen
@@ -299,7 +297,6 @@ class SnmpReader:
         self.timeout = timeout
         self.retries = 3
         self._supportsSNMP = True
-        log.debug('Supports Pysnmp - ' + str(PysnmpImported))
         if not PysnmpImported:
             self._supportsPysnmp = False
             self._supportsRfc2790 = False

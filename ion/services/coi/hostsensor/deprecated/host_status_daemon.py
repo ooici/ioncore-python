@@ -29,7 +29,7 @@ class HostStatusDaemon(Daemon):
                  snmpHost          = 'localhost',
                  snmpPort          = 161,
                  snmpAgentName     = 'ooici',
-                 snmpCommunityName = 'ooicinet',
+                 snmpCommunityName = 'public',
                  rpcHost           = 'localhost',
                  rpcPort           = 9010  ):
         """
@@ -44,7 +44,7 @@ class HostStatusDaemon(Daemon):
                                  )
         self.rpcPort = rpcPort
         self.rpcHost = rpcHost
-        log.debug('host_status_daemon intialized')
+        # log.debug('host_status_daemon intialized')
 
 
     def run(self):
