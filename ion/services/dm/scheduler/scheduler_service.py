@@ -38,6 +38,7 @@ CONF = ioninit.config(__name__)
 # constants from https://confluence.oceanobservatories.org/display/syseng/Scheduler+Events
 # import these and use them to schedule your events, they should be in the "desired origin" field
 SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE="1001"
+SCHEDULE_TYPE_DSC_RSYNC = '1002'
 
 ADDTASK_REQ_TYPE  = object_utils.create_type_identifier(object_id=2601, version=1)
 """

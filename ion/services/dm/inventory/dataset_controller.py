@@ -21,7 +21,7 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, SCHEDULE_TYPE_DSC_RSYNC
 from ion.services.dm.distribution.events import ScheduleEventSubscriber
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
@@ -93,7 +93,7 @@ class DatasetControllerError(ApplicationError):
     """
 
 
-class RscncHandler(ScheduleEventSubscriber):
+class RsyncHandler(ScheduleEventSubscriber):
     """
     This class provides the messaging hooks to invoke rsync on receipt
     of scheduler messages.
@@ -129,8 +129,6 @@ class DatasetController(ServiceProcess):
         self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
 
-        self.task_id = str(uuid.uuid4())
-
         # As per DS, pull config from spawn args first and config file(s) second
         self.private_key = self.spawn_args.get('private_key' ,
                                                CONF.getValue('private_key'))
@@ -147,20 +145,24 @@ class DatasetController(ServiceProcess):
         self.queue_name = self.spawn_args.get('queue_name',
                                             CONF.getValue('queue_name', default='data_controller_scheduler'))
 
+        self.task_id = self.spawn_args.get('task_id',
+                                            CONF.getValue('task_id',
+                                                          default=str(uuid.uuid4())))
+
         log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
-        log.debug('Scheduler queue name: %s' % self.queue_name)
+        log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
+
+        log.debug('Creating new message receiver for scheduler')
+        self.sesc = RsyncHandler(self.do_ncml_sync,
+                                queue_name=self.queue_name,
+                                origin=SCHEDULE_TYPE_DSC_RSYNC,
+                                process=self)
 
         # Check for singleton
         if self.spawn_args.get('do-init', False):
             log.debug('I am the walrus.')
             yield self._create_scheduled_event()
-
-        log.debug('Creating new message receiver for scheduler')
-        self.sesc = RscncHandler(self.do_ncml_sync,
-                                queue_name=self.queue_name,
-                                origin=str(self.svc_name),
-                                process=self)
 
         log.info('SLC_INIT Dataset Controller')
 
