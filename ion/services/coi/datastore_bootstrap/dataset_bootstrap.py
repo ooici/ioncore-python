@@ -492,10 +492,10 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     #etime = IonTime(end_time * 1000)
 
     gmtuple = time.gmtime(start_time)
-    stime = time.strftime("%Y-%m-%dT%H:%M:%S", gmtuple)
+    stime = time.strftime("%Y-%m-%dT%H:%M:%SZ", gmtuple)
 
     gmtuple = time.gmtime(end_time)
-    etime = time.strftime("%Y-%m-%dT%H:%M:%S", gmtuple)
+    etime = time.strftime("%Y-%m-%dT%H:%M:%SZ", gmtuple)
 
     attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime,])
     attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime,])
