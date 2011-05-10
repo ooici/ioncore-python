@@ -41,14 +41,6 @@ ci_param_metadata = {
         {MetadataParameter.DATATYPE : Datatype.PUBSUB_ORIGIN,
          MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
          MetadataParameter.FRIENDLY_NAME : 'Event Publisher Origin'},
-    AgentParameter.DRIVER_ADDRESS :
-        {MetadataParameter.DATATYPE : Datatype.ADDRESS,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.FRIENDLY_NAME : 'Driver Address'},
-    AgentParameter.RESOURCE_ID :
-        {MetadataParameter.DATATYPE : Datatype.RESOURCE_ID,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.FRIENDLY_NAME : 'Resource ID'},
     AgentParameter.TIME_SOURCE :
         {MetadataParameter.DATATYPE : Datatype.ENUM,
          MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
@@ -77,12 +69,6 @@ ci_param_metadata = {
          MetadataParameter.MINIMUM_VALUE : 0,
          MetadataParameter.UNITS : 'Seconds',
          MetadataParameter.FRIENDLY_NAME : 'Max Transaction Acquire Timeout'},
-    AgentParameter.DEFAULT_ACQ_TIMEOUT :
-        {MetadataParameter.DATATYPE : Datatype.INT,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.MINIMUM_VALUE : 0,
-         MetadataParameter.UNITS : 'Seconds',
-         MetadataParameter.FRIENDLY_NAME : 'Default Transaction Acquire Timeout'}    
 }
 
         
@@ -1142,12 +1128,7 @@ class InstrumentAgent(Process):
                     else:
                         result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
                             (InstErrorCode.OK,self.event_publisher_origin)
-                
-                if arg == AgentParameter.DRIVER_ADDRESS or arg=='all':
-                    if self._driver_client:
-                        result[AgentParameter.DRIVER_ADDRESS] = \
-                            (InstErrorCode.OK,str(self._driver_client.target))
-                
+                                
                 if arg == AgentParameter.DRIVER_DESC or arg == 'all':
                     result[AgentParameter.DRIVER_DESC] = \
                         (InstErrorCode.OK,self._driver_desc)
@@ -1160,9 +1141,6 @@ class InstrumentAgent(Process):
                     result[AgentParameter.DRIVER_CONFIG] = \
                         (InstErrorCode.OK,self._driver_config)                
 
-                if arg == AgentParameter.RESOURCE_ID or arg=='all':
-                    result[AgentParameter.RESOURCE_ID] = (InstErrorCode.OK,None)
-                
                 if arg == AgentParameter.TIME_SOURCE or arg=='all':
                     result[AgentParameter.TIME_SOURCE] = \
                         (InstErrorCode.OK,self._time_source)
@@ -1258,6 +1236,7 @@ class InstrumentAgent(Process):
             
             result = {}
             set_errors = False
+            set_successes = False
             
             # Add each observatory parameter given in params list.
             # Note: it seems like all the current params should be read only by
@@ -1270,9 +1249,6 @@ class InstrumentAgent(Process):
                 
                 val = params[arg]
                 
-                if arg == AgentParameter.DRIVER_ADDRESS :
-                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
-                    set_errors = True
                     
                 if arg == AgentParameter.DRIVER_DESC:
                     if not isinstance(val,dict):
@@ -1283,8 +1259,9 @@ class InstrumentAgent(Process):
                     else:
                         self._driver_desc = val
                         result[arg] = InstErrorCode.OK
-
-                if arg == AgentParameter.DRIVER_CLIENT_DESC:
+                        set_successes = True
+                        
+                elif arg == AgentParameter.DRIVER_CLIENT_DESC:
                     if not isinstance(val,dict):
                         # Better checking here.
                         result[arg] = InstErrorCode.INVALID_PARAM_VALUE
@@ -1293,8 +1270,9 @@ class InstrumentAgent(Process):
                     else:
                         self._client_desc = val
                         result[arg] = InstErrorCode.OK
+                        set_successes = True
 
-                if arg == AgentParameter.DRIVER_CONFIG:
+                elif arg == AgentParameter.DRIVER_CONFIG:
                     if not isinstance(val,dict):
                         # Better checking here.
                         result[arg] = InstErrorCode.INVALID_PARAM_VALUE
@@ -1303,11 +1281,8 @@ class InstrumentAgent(Process):
                     else:
                         self._driver_config = val
                         result[arg] = InstErrorCode.OK
-                
-                elif arg == AgentParameter.RESOURCE_ID :
-                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
-                    set_errors = True
-                
+                        set_successes = True
+                                
                 elif arg == AgentParameter.TIME_SOURCE :
                     if TimeSource.has(val):
                         if val != self._time_source:
@@ -1315,6 +1290,7 @@ class InstrumentAgent(Process):
                             # Logic here when new time source set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
+                            set_successes = True
                             
                         else:
                             success = InstErrorCode.OK
@@ -1332,6 +1308,7 @@ class InstrumentAgent(Process):
                             # Logic here when new connection method set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
+                            set_successes = True
 
                         else:
                             success = InstErrorCode.OK
@@ -1346,6 +1323,7 @@ class InstrumentAgent(Process):
                     if isinstance(val,int) and val >= 0:
                         self._max_acq_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
 
                     else:
                         set_errors = True
@@ -1358,6 +1336,7 @@ class InstrumentAgent(Process):
                         and val <= self._max_exp_timeout:
                         self._default_exp_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
                         
                     else:
                         set_errors = True
@@ -1369,6 +1348,7 @@ class InstrumentAgent(Process):
                     if isinstance(val,int) and val > self._min_exp_timeout:
                         self._max_exp_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
 
                     else:
                         set_errors = True
@@ -1380,6 +1360,7 @@ class InstrumentAgent(Process):
                     if isinstance(val,int) and val >= 0:
                         self._data_buffer_limit = val
                         success = InstErrorCode.OK
+                        set_successes = True
 
                     else:
                         set_errors = True
@@ -1387,7 +1368,14 @@ class InstrumentAgent(Process):
 
                     result[arg] = success
 
-
+            # Publish the new agent configuration.
+            if set_successes:
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                config = self._get_parameters()
+                strval = self._get_data_string(config)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                        description=strval)
+ 
     
             if set_errors:
                 success = InstErrorCode.SET_OBSERVATORY_ERR
@@ -1397,7 +1385,7 @@ class InstrumentAgent(Process):
                 
             reply['success'] = success
             reply['result'] = result
-            
+        
         # Transaction clean up. End implicit or expired transactions.        
         finally:
             if (tid == 'create') or (self._transaction_timed_out == True):
@@ -2201,7 +2189,7 @@ class InstrumentAgent(Process):
             
             # Get the driver observatory state.
             key = (DriverChannel.INSTRUMENT,DriverStatus.OBSERVATORY_STATE)
-            reply = self._driver_client.get_status([key])
+            reply = yield self._driver_client.get_status([key])
             success = reply['success']
             result = reply['result']
             obs_status = result.get(key,None)
@@ -2210,7 +2198,7 @@ class InstrumentAgent(Process):
             # If in streaming mode, buffer data and publish at intervals.
             if InstErrorCode.is_ok(success) and obs_status != None:
                 if obs_status[1] == ObservatoryState.STREAMING:
-                    self._data_buffer.appen(value)
+                    self._data_buffer.append(value)
                     if len(self._data_buffer) > self._data_buffer_limit:
                         strval = self._get_data_string(self._data_buffer)
                         self._data_buffer = []
@@ -2224,14 +2212,24 @@ class InstrumentAgent(Process):
                 origin = "%s.%s" % (transducer,self.event_publisher_origin)
                 yield self._data_publisher.create_and_publish_event(\
                     origin=origin,description=strval)
-                
-        # If the driver state changed, publish any buffered data remaining.
+
+        # Driver configuration changed, publish config.                
         elif type == DriverAnnouncement.CONFIG_CHANGE:
-            pass
+            
+            #
+            reply = yield self._driver_client.get([('all','all')])
+            success = reply['success']
+            result = reply['result']
+            if InstErrorCode.is_ok(success) and len(result)>0:
+                strval = self._get_data_string(result)
+                origin="%s.%s" % (transducer, self.event_publisher_origin)            
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=strval)
         
         elif type == DriverAnnouncement.ERROR:
             pass
         
+        # If the driver state changed, publish any buffered data remaining.
         elif type == DriverAnnouncement.STATE_CHANGE:
 
             strval = self._get_data_string(self._data_buffer)
@@ -2496,12 +2494,32 @@ class InstrumentAgent(Process):
         if isinstance(data,dict):
             return str(data)
         else:
+            strval = ''
             for item in data:
                 strval += str(item) + ','
                 
             strval = strval[:-1]
             return strval
         
+    def _get_parameters(self):
+        """
+        Get a dictionary of agent parameter values.
+        @retval A dict containing the agent parameters as key-value pairs.
+        """
+
+        params = {}
+        params[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
+            self.event_publisher_origin
+        params[AgentParameter.TIME_SOURCE] = self._time_source
+        params[AgentParameter.CONNECTION_METHOD] = self._connection_method
+        params[AgentParameter.MAX_ACQ_TIMEOUT] = self._max_acq_timeout
+        params[AgentParameter.DEFAULT_EXP_TIMEOUT] = self._default_exp_timeout
+        params[AgentParameter.MAX_EXP_TIMEOUT] = self._max_exp_timeout
+        params[AgentParameter.DRIVER_DESC] = self._driver_desc
+        params[AgentParameter.DRIVER_CLIENT_DESC] = self._client_desc
+        params[AgentParameter.DRIVER_CONFIG] = self._driver_config
+        params[AgentParameter.BUFFER_SIZE] = self._data_buffer_limit
+        return params
                 
     def _debug_print_driver_event(self,type,transducer,value):
         """
