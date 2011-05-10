@@ -101,6 +101,7 @@ class ResourceRegistryService(ServiceProcess):
     def _register_resource_instance(self, resource_description, headers):
 
 
+        # only pull it once - predicates should not change!
         if self.owned_by is None:
             yield self.pull_owned_by()
 
@@ -122,9 +123,6 @@ class ResourceRegistryService(ServiceProcess):
         user.checkout('master')
 
 
-        # Create the response object...
-        response = yield self.message_client.create_instance(MessageContentTypeID=None)
-
         # Create a new repository to hold this resource
         resource_repository = self.workbench.create_repository(RESOURCE_TYPE)
         resource = resource_repository.root_object
@@ -136,7 +134,7 @@ class ResourceRegistryService(ServiceProcess):
         try:
             res_obj = resource_repository.create_object(resource_description.object_type)
         except object_utils.ObjectUtilException, ex:
-            raise ResourceRegistryError(ex, response.ResponseCodes.NOT_FOUND)
+            raise ResourceRegistryError(ex, resource_description.ResponseCodes.NOT_FOUND)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
 
@@ -164,6 +162,9 @@ class ResourceRegistryService(ServiceProcess):
         # push the new resource to the data store
         yield self.push(self.datastore_service, resource_repository)
         # If the push fails hand back the workbench error
+
+        # Create the response object...
+        response = yield self.message_client.create_instance(MessageContentTypeID=None)
 
         response.MessageResponseCode = response.ResponseCodes.OK
         response.MessageResponseBody = resource.identity

@@ -8,12 +8,19 @@
 @see http://peak.telecommunity.com/DevCenter/setuptools
 """
 
+from itertools import chain, izip, repeat
+import os
+
 try:
     from setuptools import setup, find_packages
 except ImportError:
     from distutils.core import setup
 
 from ion import __version__ as version
+
+# Workaround a bug in "package_data" that ignores directories. Build flattened list of all files.
+resFiles = [os.path.join(path, file) for path,file in
+            chain(*(izip(repeat(root), files) for root,dirs,files in os.walk('res')))]
 
 setup( name = 'ioncore',
        version = version,
@@ -25,15 +32,14 @@ setup( name = 'ioncore',
        author_email = 'mmeisinger@ucsd.edu',
        keywords = ['ooici','ioncore'],
 
-       packages = find_packages() + ['twisted/plugins'],
+       packages = find_packages() + ['twisted/plugins', 'res'],
        dependency_links = [
            'http://ooici.net/releases'
                           ],
        package_data = {
-           'twisted.plugins' : [
-               'twisted/plugins/cc.py'
-                               ],
-           'ion':['core/messaging/*.xml']
+           'twisted.plugins': ['twisted/plugins/cc.py'],
+           'ion': ['core/messaging/*.xml'],
+           'res': resFiles
                       },
        test_suite = 'ion',
        install_requires = [
@@ -45,12 +51,13 @@ setup( name = 'ioncore',
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
-           'ionproto>=0.3.17',
-           'pysnmp>=4.1',
+           'ionproto>=0.3.18',
+           'ply==3.4',
                           ],
        entry_points = {
                         'console_scripts': [
                             'ion-admin=ion.core.env.ion_admin:main',
+                            'cassandra-cfg=ion.core.data.cassandra_schema_script:main',
                             ],
                         },
        include_package_data = True,

@@ -15,6 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import bootstrap
 from ion.core import ioninit
+from ion.core.ioninit import request
 from ion.core.cc import service
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
@@ -59,12 +60,13 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
+        mopt['broker_credfile'] = CONF.getValue('broker_credfile', None)
         mopt['no_shell'] = True
         # This is where dependent apps can be included
         if start_apps and type(start_apps) in (tuple, list):
             apps = []
             for app in start_apps:
-                apps.append("../res/apps/%s.app" % app)
+                apps.append("res/apps/%s.app" % app)
             mopt['scripts'] = apps
         elif CONF['start_app']:
             mopt['scripts'] = [CONF['start_app']]
@@ -215,6 +217,7 @@ class IonTestCase(unittest.TestCase):
         # as well as force certain policy enforcement failures, etc.
         #request.user_id = 'MYUSERID'
         #request.expiry = '999999999'
+        request.workbench_context = 'Test runner context!'
         unittest.TestCase.run(self, result)
 
 

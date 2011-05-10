@@ -11,6 +11,8 @@ import logging.config
 import re
 import os, os.path
 
+from ion.util.context import StackLocal
+from ion.util.path import adjust_dir
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
@@ -29,10 +31,10 @@ del sys
 
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
-logconf = ic.LOGCONF_FILENAME
+logconf = adjust_dir(ic.LOGCONF_FILENAME)
 if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
     # make sure that path exists
-    altpath = os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF)
+    altpath = adjust_dir(os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF))
     if os.path.exists(altpath):
         logconf = altpath
     else:
@@ -58,6 +60,12 @@ sys_name = None
 # Global flag determining whether currently running unit test
 testing = True
 
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+request = StackLocal()
+
+
+
 def config(name):
     """
     Get a subtree of the global configuration, typically for a module
@@ -74,18 +82,6 @@ def get_config(confname, conf=None):
     if conf == None:
         conf = ion_config
     return Config(conf.getValue(confname)).getObject()
-
-def adjust_dir(filename):
-    """
-    @brief Compensates for different current directories in tests and production
-    """
-    if not filename:
-        return None
-    #if testing:
-    if os.getcwd().endswith("_trial_temp"):
-        return "../" + filename
-    else:
-        return filename
 
 def install_msgpacker():
     from ion.core.messaging.serialization import registry
@@ -166,3 +162,23 @@ def clean_twisted_logging():
     log.removeObserver = remove_nop
 
 clean_twisted_logging()
+
+
+# SIGQUIT stack trace based on:
+# http://stackoverflow.com/questions/132058/getting-stack-trace-from-a-running-python-application/133384#133384
+import code, traceback, signal
+def debug(sig, frame):
+    d = {'_frame':frame}
+    d.update(frame.f_globals)
+    d.update(frame.f_locals)
+
+    i = code.InteractiveConsole(d)
+    message  = "Signal recieved : entering python shell.\nTraceback:\n"
+    message += ''.join(traceback.format_stack(frame))
+    i.interact(message)
+
+try:
+    signal.signal(signal.SIGQUIT, debug)  # Register handler
+except ValueError, ex:
+    # You're on Windows, no fancy debugging for you!!
+    pass

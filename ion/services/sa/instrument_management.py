@@ -5,24 +5,90 @@
 @author Michael Meisinger
 @brief service for data acquisition
 """
-'''
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.core.process.process import ProcessFactory, ProcessDesc
-from ion.data.dataobject import DataObject, ResourceReference, LCStates
-from ion.resources.dm_resource_descriptions import PubSubTopicResource
-from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
-from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.sa.instrument_registry import InstrumentRegistryClient
-from ion.services.sa.data_product_registry import DataProductRegistryClient
-from ion.services.coi.agent_registry import AgentRegistryClient
-import ion.util.procutils as pu
 
+from ion.core.process.process import ProcessFactory, ProcessDesc
+
+from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.association_client import AssociationClientError
+import ion.util.procutils as pu
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.dm.distribution.events import DataEventSubscriber, InstrumentSampleDataEventSubscriber
+
+import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.agents.instrumentagents.instrument_constants import AgentCommand
+from ion.agents.instrumentagents.instrument_constants import AgentEvent
+from ion.agents.instrumentagents.instrument_constants import AgentStatus
+from ion.agents.instrumentagents.instrument_constants import AgentState
+from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
+
+from ion.core.process.process import Process
+from ion.core.process.process import ProcessDesc
+from ion.core import bootstrap
+
+
+from ion.core.object import object_utils
+import gviz_api
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
+
+INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
+INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
+
+
+ # Setup a subscriber to an event topic
+class SBE37DataEventSubscriber(InstrumentSampleDataEventSubscriber):
+    def __init__(self, *args, **kwargs):
+        #self.msgs = []
+        #self.pdata=[]
+        #self.max_points=50
+        InstrumentSampleDataEventSubscriber.__init__(self, *args, **kwargs)
+
+    def ondata(self, data):
+        msg = data['content'];
+        log.info("IMSSRVC SBE37DataEventSubscriber additional info: %s", msg.additional_data.date)
+
+        """
+        self.msgs.append(data)
+        #convert the incoming string into a dict
+        list = msg.additional_data.data_block.split(';')
+        dataDict = {}
+        for entry in list:
+            key, val = entry.split(':')
+            dataDict[key] = val
+
+        log.info("IMSSRVC SBE37DataEventSubscriber new dict: %s", dataDict )
+
+        description = [('time','string', 'time (Seconds)'), ('temperature','number', 'temperature')]
+        self.pdata.append([str(dataDict['time' ]), float(dataDict['temperature']) ] )
+
+        dlen = len(self.pdata)
+        if  dlen > self.max_points:
+            self.pdata = self.pdata[dlen-self.max_points : ]
+
+        data_table = gviz_api.DataTable(description)
+        data_table.LoadData(self.pdata)
+        #json = data_table.ToJSon(columns_order=("name", "salary"),order_by="salary")
+        json = data_table.ToJSon()
+
+        # Make message for the screen below
+        hdr = '<p>Timestamp: %s </p>\n' % pu.currenttime()
+
+        page = line_template % {'msg':hdr,'json':json}
+        
+        #log.info("IMSSRVC SBE37DataEventSubscriber page: %s", page)
+
+        #self.queue_result(queue,page,'Google Viz of message counts')
+        """
+        
 class InstrumentManagementService(ServiceProcess):
     """
     Instrument management service interface.
@@ -38,10 +104,13 @@ class InstrumentManagementService(ServiceProcess):
                                           dependencies=[])
 
     def slc_init(self):
-        self.irc = InstrumentRegistryClient(proc=self)
-        self.dprc = DataProductRegistryClient(proc=self)
-        self.arc = AgentRegistryClient(proc=self)
+        #self.irc = InstrumentRegistryClient(proc=self)
+        #self.dprc = DataProductRegistryClient(proc=self)
+        #self.arc = AgentRegistryClient(proc=self)
         #self.dpsc = DataPubsubClient(proc=self)
+        self.rc = ResourceClient(proc=self)
+        self.ac    = AssociationClient(proc=self)
+
 
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):
@@ -51,29 +120,36 @@ class InstrumentManagementService(ServiceProcess):
         """
         userInput = content['userInput']
 
-        newinstrument = InstrumentResource.create_new_resource()
+        resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Test Instrument Resource', ResourceDescription='A test instrument resource')
 
+        log.info("IMSSRVC op_create_new_instrument created resource")
+
+        # Set the attributes
         if 'name' in userInput:
-            newinstrument.name = str(userInput['name'])
+            resource.name = str(userInput['name'])
 
         if 'description' in userInput:
-            newinstrument.description = str(userInput['description'])
+            resource.description = str(userInput['description'])
 
         if 'manufacturer' in userInput:
-            newinstrument.manufacturer = str(userInput['manufacturer'])
+            resource.manufacturer = str(userInput['manufacturer'])
 
         if 'model' in userInput:
-            newinstrument.model = str(userInput['model'])
+            resource.model = str(userInput['model'])
 
         if 'serial_num' in userInput:
-            newinstrument.serial_num = str(userInput['serial_num'])
+            resource.serial_num = str(userInput['serial_num'])
 
         if 'fw_version' in userInput:
-            newinstrument.fw_version = str(userInput['fw_version'])
+            resource.fw_version = str(userInput['fw_version'])
 
-        instrument_res = yield self.irc.register_instrument_instance(newinstrument)
+        yield self.rc.put_instance(resource, 'Save instrument resource')
+        res_id = resource.ResourceIdentity
+        log.info("IMSSRVC op_create_new_instrument stored resource. identity: %s ", res_id)
 
-        yield self.reply_ok(msg, instrument_res.encode())
+        res_value = {'instrument_id':res_id }
+
+        yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_create_new_data_product(self, content, headers, msg):
@@ -84,6 +160,7 @@ class InstrumentManagementService(ServiceProcess):
         """
         dataProductInput = content['dataProductInput']
 
+        """
         newdp = DataProductResource.create_new_resource()
         if 'instrumentID' in dataProductInput:
             inst_id = str(dataProductInput['instrumentID'])
@@ -116,6 +193,7 @@ class InstrumentManagementService(ServiceProcess):
         ref = res.reference(head=True)
 
         yield self.reply_ok(msg, res.encode())
+        """
 
     @defer.inlineCallbacks
     def op_execute_command(self, content, headers, msg):
@@ -123,78 +201,85 @@ class InstrumentManagementService(ServiceProcess):
         Service operation: Execute a command on an instrument.
         """
 
-        # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
-
-        if 'instrumentID' in commandInput:
-            inst_id = str(commandInput['instrumentID'])
+        log.info("IMSSRVC op_execute_command start")
+        if 'instrument_agent_id' in content:
+            instrument_agent_id = str(content['instrument_agent_id'])
         else:
-            raise ValueError("Input for instrumentID not present")
+            raise ValueError("Input for instrument agent resource ID not present")
 
-        command = []
-        if 'command' in commandInput:
-            command_op = str(commandInput['command'])
+        if 'command' in content:
+            command = str(content['command'])
         else:
             raise ValueError("Input for command not present")
 
-        command.append(command_op)
+        # Step 1: Extract the arguments from the UI generated message content
+        #commandInput = content['commandInput']
 
-        arg_idx = 0
-        while True:
-            argname = 'cmdArg'+str(arg_idx)
-            arg_idx += 1
-            if argname in commandInput:
-                command.append(str(commandInput[argname]))
-            else:
-                break
+        log.info("IMSSRVC op_execute_command instAgent_resrc__id: %s", instrument_agent_id)
 
-        # Step 2: Find the agent id for the given instrument id
-        agent_pid  = yield self.get_agent_pid_for_instrument(inst_id)
-        if not agent_pid:
-            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
-            defer.returnValue(None)
+        #Retreieve the instrument agent resource from the RR
+        instAgent_resrc = yield self.rc.get_instance(instrument_agent_id)
 
-        # Step 3: Interact with the agent to execute the command
-        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        commandlist = [command,]
-        log.info("Sending command to IA: "+str(commandlist))
-        cmd_result = yield iaclient.execute_instrument(commandlist)
+        log.info("IMSSRVC op_execute_command instAgent_resource: %s", instAgent_resrc)
 
-        yield self.reply_ok(msg, cmd_result)
+        #create the client for this instrumnet agent
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=instAgent_resrc.process_id )
+
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction(0)
+        tid = reply['transaction_id']
+        log.info("IMSSRVC op_execute_command start_transaction id: %s", tid)
+
+        #Execute the command
+        log.info("IMSSRVC op_execute_command command list: %s", content['command'])
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [content['command']]
+        execReply = yield self.ia_client.execute_device(chans,cmd,tid)
+        log.info("IMSSRVC op_execute_command execute_device: %s", execReply)
+
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
+        log.info("IMSSRVC op_execute_command end_transaction: %s", reply)
+
+        yield self.reply_ok(msg, execReply)
 
     @defer.inlineCallbacks
     def op_get_instrument_state(self, content, headers, msg):
         """
         Service operation: .
         """
-        # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
-
-        if 'instrumentID' in commandInput:
-            inst_id = str(commandInput['instrumentID'])
+        log.info("IMSSRVC op_get_instrument_state start")
+        if 'instrument_agent_id' in content:
+            instrument_agent_id = str(content['instrument_agent_id'])
         else:
-            raise ValueError("Input for instrumentID not present")
+            raise ValueError("Input for instrument agent resource ID not present")
 
-        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
-        if not agent_pid:
-            raise StandardError("No agent found for instrument "+str(inst_id))
+        # Step 1: Extract the arguments from the UI generated message content
+        #commandInput = content['commandInput']
 
-        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        inst_cap = yield iaclient.get_capabilities()
-        if not inst_cap:
-            raise StandardError("No capabilities available for instrument "+str(inst_id))
+        log.info("IMSSRVC op_get_instrument_state instAgent_resrc__id: %s", instrument_agent_id)
 
-        ci_commands = inst_cap['ci_commands']
-        instrument_commands = inst_cap['instrument_commands']
-        instrument_parameters = inst_cap['instrument_parameters']
-        ci_parameters = inst_cap['ci_parameters']
+        #Retreieve the instrument agent resource from the RR
+        instAgent_resrc = yield self.rc.get_instance(instrument_agent_id)
 
-        values = yield iaclient.get_from_instrument(instrument_parameters)
-        resvalues = {}
-        if values:
-            resvalues = values
+        log.info("IMSSRVC op_get_instrument_state instAgent_resource: %s", instAgent_resrc)
 
-        yield self.reply_ok(msg, resvalues)
+        #create the client for this instrumnet agent
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=instAgent_resrc.process_id )
+
+        log.info("IMSSRVC op_get_instrument_state ia_client created")
+
+        # Check agent state upon creation. No transaction needed for
+        # get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params)
+        result = reply['result']
+        log.info("IMSSRVC op_get_instrument_state get_observatory_status result %s", result)
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+
+        yield self.reply_ok(msg, result)
+
 
     @defer.inlineCallbacks
     def op_start_instrument_agent(self, content, headers, msg):
@@ -202,49 +287,129 @@ class InstrumentManagementService(ServiceProcess):
         Service operation: Starts an instrument agent for a type of
         instrument.
         """
+
+        log.info("IMSSRVC op_start_instrument_agent start")
         if 'instrumentID' in content:
             inst_id = str(content['instrumentID'])
         else:
             raise ValueError("Input for instrumentID not present")
+
+        if 'instrumentResourceID' in content:
+            inst_resource_id = str(content['instrumentResourceID'])
+        else:
+            raise ValueError("Input for instrumentResourceID not present")
 
         if 'model' in content:
             model = str(content['model'])
         else:
             raise ValueError("Input for model not present")
 
-        if model != 'SBE49':
-            raise ValueError("Only SBE49 supported!")
+        if model != 'SBE37':
+            raise ValueError("Only SBE37 supported!")
+        log.info("IMSSRVC op_start_instrument_agent good input")
 
-        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
-        if agent_pid:
-            raise StandardError("Agent already started for instrument "+str(inst_id))
 
-        simulator = Simulator(inst_id)
-        simulator.start()
 
-        topicname = "Inst/RAW/"+inst_id
-        topic = PubSubTopicResource.create(topicname,"")
+        #yield self._start_container()
 
-        # Use the service to create a queue and register the topic
-        topic = yield self.dpsc.define_topic(topic)
+        # Driver and agent configuration. Configuration data will ultimatly be
+        # accessed via some persistance mechanism: platform filesystem
+        # or a device registry. For now, we pass all configuration data
+        # that would be read this way as process arguments.
+        sbe_host = '137.110.112.119'
+        sbe_port = 4001
+        driver_config = {
+            'ipport':sbe_port,
+            'ipaddr':sbe_host
+        }
+        agent_config = {}
 
-        iagent_args = {}
-        iagent_args['instrument-id'] = inst_id
-        driver_args = {}
-        driver_args['port'] = simulator.port
-        driver_args['publish-to'] = topic.RegistryIdentity
-        iagent_args['driver-args'] = driver_args
+        # Process description for the SBE37 driver.
+        driver_desc = {
+            'name':'SBE37_driver',
+            'module':'ion.agents.instrumentagents.SBE37_driver',
+            'class':'SBE37Driver',
+            'spawnargs':{'config':driver_config}
+        }
 
-        iapd = ProcessDesc(**{'name':'SBE49IA',
-                  'module':'ion.agents.instrumentagents.SBE49_IA',
-                  'class':'SBE49InstrumentAgent',
-                  'spawnargs':iagent_args})
+        # Process description for the SBE37 driver client.
+        driver_client_desc = {
+            'name':'SBE37_client',
+            'module':'ion.agents.instrumentagents.SBE37_driver',
+            'class':'SBE37DriverClient',
+            'spawnargs':{}
+        }
 
-        iagent_id = yield self.spawn_child(iapd)
-        iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
-        yield iaclient.register_resource(inst_id)
+        # Spawnargs for the instrument agent.
+        spawnargs = {
+            'driver-desc':driver_desc,
+            'client-desc':driver_client_desc,
+            'driver-config':driver_config,
+            'agent-config':agent_config
+        }
 
-        yield self.reply_ok(msg, "OK")
+        # Process description for the instrument agent.
+        agent_desc = {
+            'name':'instrument_agent',
+            'module':'ion.agents.instrumentagents.instrument_agent',
+            'class':'InstrumentAgent',
+            'spawnargs':spawnargs
+        }
+
+        # Processes for the tests.
+        processes = [
+            agent_desc
+        ]
+
+        # Spawn agent and driver, create agent client.
+        log.info("IMSSRVC op_start_instrument_agent spawn")
+        #self.sup1 = yield bootstrap.create_supervisor()
+        proc1 = ProcessDesc(**agent_desc)
+        self.svc_id = yield self.spawn_child(proc1)
+        log.info("IMSSRVC op_start_instrument_agent spawned process id: %s", self.svc_id)
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=self.svc_id)
+        log.info("IMSSRVC op_start_instrument_agent get ia_client")
+
+        #self.ia_client.register_resource(content['instrumentResourceID'])
+
+        log.info("IMSSRVC op_start_instrument_agent register resource")
+        #store the new instrument agent in the resource registry
+        instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Test Instrument Agent Resource', ResourceDescription='A test instrument resource')
+
+        # Set the attributes
+        instrumentAgentResource.name = content['model']
+        instrumentAgentResource.description = content['model']
+        instrumentAgentResource.class_name = 'SBE37InstrumentAgent'
+        instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE37_IA'
+        instrumentAgentResource.process_id = str(self.svc_id)
+
+        #Store the resource in the registry
+        yield self.rc.put_instance(instrumentAgentResource, 'Save agent resource')
+        inst_agnt_id = instrumentAgentResource.ResourceIdentity
+        log.info("IMSSRVC op_start_instrument_agent stored agent resource. identity: %s ", inst_agnt_id)
+
+        #Associate this agent to the instrument
+        instrument_resource = yield self.rc.get_instance(inst_resource_id)
+        association = yield self.ac.create_association(instrument_resource, HAS_A_ID, instrumentAgentResource)
+        # Put the association and the resources in the datastore
+        yield self.rc.put_resource_transaction([instrument_resource, instrumentAgentResource])
+        log.info("IMSSRVC op_start_instrument_agent created association %s", association)
+
+        #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/presentation/web_viz_consumer.py
+        #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/distribution/consumers/timeseries_consumer.py
+
+        log.info("IMSSRVC op_start_instrument_agent spawn listerner")
+        subproc = Process()
+        yield subproc.spawn()
+
+        dataEventSubscrbr = SBE37DataEventSubscriber(origin=inst_agnt_id, process=subproc)
+        log.info('IMSSRVC op_start_instrument_agent set handler for DataEventSubscriber')
+        yield dataEventSubscrbr.initialize()
+        yield dataEventSubscrbr.activate()
+        log.info('IMSSRVC op_start_instrument_agent DataEvent activation complete')
+
+        res_value = {'instrument_agent_id':inst_agnt_id }
+        yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_stop_instrument_agent(self, content, headers, msg):
@@ -271,6 +436,7 @@ class InstrumentManagementService(ServiceProcess):
     @defer.inlineCallbacks
     def get_agent_desc_for_instrument(self, instrument_id):
         log.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
+        """
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
@@ -281,9 +447,29 @@ class InstrumentManagementService(ServiceProcess):
         agent_pid = agent_res.proc_id
         log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
+        """
 
     @defer.inlineCallbacks
-    def get_agent_for_instrument(self, instrument_id):
+    def get_agent_for_instrument(self, inst_resource_id):
+
+        result = None
+        instrument_resource = yield self.rc.get_instance(inst_resource_id)
+        try:
+            results = yield self.ac.find_associations(subject=instrument_resource, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('AssociationError')
+            defer.returnValue(result)
+
+        for association in results:
+            log.info('Associated Source for Instrument: ' + \
+                      association.ObjectReference.key + \
+                      ' is: ' + association.SubjectReference.key)
+
+        instrument_agent_resource = yield self.rc.get_instance(association.ObjectReference.key)
+
+
+        """
         log.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
@@ -296,15 +482,18 @@ class InstrumentManagementService(ServiceProcess):
         if len(agents) > 0:
             agent_res = agents[0]
         defer.returnValue(agent_res)
+        """
 
     @defer.inlineCallbacks
     def get_agent_pid_for_instrument(self, instrument_id):
+        """
         agent_res = yield self.get_agent_for_instrument(instrument_id)
         if not agent_res:
             defer.returnValue(None)
         agent_pid = agent_res.proc_id
         log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
+        """
 
 class InstrumentManagementClient(ServiceClient):
     """
@@ -321,23 +510,25 @@ class InstrumentManagementClient(ServiceClient):
         reqcont['userInput'] = userInput
 
         (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
-        defer.returnValue(DataObject.decode(cont['value']))
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def create_new_data_product(self, dataProductInput):
         reqcont = {}
         reqcont['dataProductInput'] = dataProductInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('create_new_data_product', reqcont)
-        defer.returnValue(DataObject.decode(cont['value']))
+        result = yield self.rpc_send('create_new_data_product', reqcont)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def start_instrument_agent(self, instrumentID, model):
+    def start_instrument_agent(self, instrumentID, instrumentResourceID, model):
         reqcont = {}
         reqcont['instrumentID'] = instrumentID
+        reqcont['instrumentResourceID'] = instrumentResourceID
         reqcont['model'] = model
-        result = yield self._base_command('start_instrument_agent', reqcont)
-        defer.returnValue(result)
+        #result = yield self._base_command('start_instrument_agent', reqcont)
+        (cont, hdrs, msg)  = yield self.rpc_send('start_instrument_agent', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def stop_instrument_agent(self, instrumentID):
@@ -348,30 +539,32 @@ class InstrumentManagementClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-    def get_instrument_state(self, instrumentID):
+    def get_instrument_state(self, instrument_agent_id):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        reqcont['commandInput'] = commandInput
+        #commandInput = {}
+        reqcont['instrument_agent_id'] = instrument_agent_id
+        #reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('get_instrument_state', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('get_instrument_state', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def execute_command(self, instrumentID, command, arglist):
+    def execute_command(self, instrument_agent_id, cmd):
         reqcont = {}
         commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        commandInput['command'] = command
-        if arglist:
-            argnum = 0
-            for arg in arglist:
-                commandInput['cmdArg'+str(argnum)] = arg
-                argnum += 1
-        reqcont['commandInput'] = commandInput
+        reqcont['instrument_agent_id'] = instrument_agent_id
+        reqcont['command'] = cmd
+        #commandInput['instrumentID'] = instrumentID
+        #commandInput['command'] = command
+        #if arglist:
+        #    argnum = 0
+        #    for arg in arglist:
+        #        commandInput['cmdArg'+str(argnum)] = arg
+        #        argnum += 1
+        #reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('execute_command', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('execute_command', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def _base_command(self, op, content):
@@ -380,4 +573,3 @@ class InstrumentManagementClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentManagementService)
-'''

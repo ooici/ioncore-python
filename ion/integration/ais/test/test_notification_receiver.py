@@ -16,6 +16,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.test.iontest import IonTestCase
 from ion.core.exception import ReceivedApplicationError
 from ion.core.process.process import Process
+from ion.util.iontime import IonTime
 
 import ion.util.procutils as pu
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
@@ -116,9 +117,12 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataresrc123'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
@@ -143,15 +147,23 @@ class NotificationReceiverTest(IonTestCase):
         # creates the event notification for us and sends it
 
 
+
         yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
                                            dataset_id="dataresrc123",
                                            datasource_id="dataresrc123",
                                            title="TODO",
-                                           url="TODO")
+                                           url="TODO",
+                                           start_datetime_millis = 10000,
+                                           end_datetime_millis = 11000,
+                                           number_of_timesteps = 7
+                                     )
+
+
 
         yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
                                            datasource_id="dataresrc123",
-                                           explanation="explanation")
+                                           error_explanation="explanation")
+        
 
         yield pu.asleep(3.0)
 

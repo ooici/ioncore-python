@@ -4,9 +4,13 @@
 @file ion/services/coi/datastore.py
 @author David Stuebe
 @author Matt Rodriguez
+@author Dave Foster <dfoster@asascience.com>
 @TODO
 
 """
+import math
+from ion.core.object.gpb_wrapper import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE
+from ion.core.object.repository import ARRAY_STRUCTURE_TYPE
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -23,7 +27,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -62,6 +66,9 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
+CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+
+
 class DataStoreWorkBenchError(WorkBenchError):
     """
     An Exception class for errors in the data store workbench
@@ -70,9 +77,9 @@ class DataStoreWorkBenchError(WorkBenchError):
 class DataStoreWorkbench(WorkBench):
 
 
-    def __init__(self, process, blob_store, commit_store):
+    def __init__(self, process, blob_store, commit_store, cache_size=10**8):
 
-        WorkBench.__init__(self, process)
+        WorkBench.__init__(self, process, cache_size)
 
         self._blob_store = blob_store
         self._commit_store = commit_store
@@ -307,7 +314,7 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
                 #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key)
+                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
                 self.put_repository(repo)
                 repo_keys=set()
             else:
@@ -758,7 +765,7 @@ class DataStoreWorkbench(WorkBench):
         log.info("Number of commits: %s " % sum(num_commit_keys))
 
         # Now clear the in memory workbench
-        self.clear_non_persistent()
+        self.clear()
 
 
     @defer.inlineCallbacks
@@ -774,12 +781,366 @@ class DataStoreWorkbench(WorkBench):
 
         defer.returnValue(len(rows)>0)
 
+    @defer.inlineCallbacks
+    def op_extract_data(self, request, headers, message):
+        """
+        @TODO daf: this is the naive approach, with one big response message. Next up: chunking and responding.
+        DataRequestMessage / DataReplyMessage
+        """
+        log.info("op_extract_data")
 
-    #@defer.inlineCallbacks
+        if not hasattr(request, 'MessageType') or request.MessageType != DATA_REQUEST_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid extract_data request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(DATA_REPLY_MESSAGE_TYPE)
+
+        # begin to build the response BA
+        targetba = response.CreateObject(CDM_BOUNDED_ARRAY_TYPE)
+        response.bounded_arrays = targetba
+        for bounds in request.request_bounds:
+            newbounds = targetba.bounds.add()
+            newbounds.origin = bounds.origin
+            newbounds.size = bounds.size
+
+        # create an anonymous repo to load things into
+        repo = self.create_repository(root_type=ARRAY_STRUCTURE_TYPE)
+
+        filterlist = [CDM_ARRAY_INT32_TYPE,
+                      CDM_ARRAY_UINT32_TYPE,
+                      CDM_ARRAY_INT64_TYPE,
+                      CDM_ARRAY_UINT64_TYPE,
+                      CDM_ARRAY_FLOAT32_TYPE,
+                      CDM_ARRAY_FLOAT64_TYPE,
+                      CDM_ARRAY_STRING_TYPE,
+                      CDM_ARRAY_OPAQUE_TYPE]
+
+        def filtermethod(x):
+            """
+            Filter out any ndarray content types.
+            """
+            return x.type not in filterlist
+
+        # get some blobs into the repo
+        blobs = yield self._get_blobs(repo, [request.structure_array_ref], filtermethod)
+        repo.index_hash.update(blobs)
+
+        # get element pointed to by key
+        se = repo.index_hash[request.structure_array_ref]
+        assert se
+        obj = repo._load_element(se)
+
+        repo.load_links(obj, filterlist)
+
+        # update repository's excluded_types
+        for extype in filterlist:
+            if extype not in repo.excluded_types:
+                repo.excluded_types.append(extype)
+
+        # now onto the fun.  let's traverse all the bounded arrays we find!
+
+        log.debug("op_extract_data: obj has %d bounded arrays" % len(obj.bounded_arrays))
+
+        # get the type of bounded array we have here
+        assert len(obj.bounded_arrays) > 0
+        ndlink = obj.bounded_arrays[0].GetLink("ndarray")
+
+        # and make it in the response
+        #targetndarray = response.CreateObject(ndlink.type)
+        #targetba.ndarray = targetndarray
+
+        # a list of matching bounded arrays (@TODO: soon to be the intersection ranges as well)
+        bounded_includes_list = []
+        totalshape = [x.size for x in request.request_bounds]
+        totalelems = reduce(lambda x,y: x*y, totalshape)
+
+        # fill the entire thing in with Nones so setting slices doesn't kill things
+        #targetndarray.value.extend([-1] * totalelems)
+        targetarray = [None] * totalelems
+
+        # iterate bounded arrays in this object
+        for ba in obj.bounded_arrays:
+
+            # need to be the same rank
+            if not len(ba.bounds) == len(request.request_bounds):
+                raise DataStoreWorkBenchError("Bounds dimensionality mismatch: this ba has %d dims, our request has %d" % (len(ba.bounds), len(request.request_bounds)))
+
+            effective_range = []
+            ba_range = []
+
+            # this for loop is doing a few things:
+            # - checking to see if the ranges intersect for each dimension.  If one does not intersect, the whole array
+            #   is rejected.
+            # - computing the intersection slices for each of those dimensions if they do intersect.
+            # - if we make it through the for without a rejection on a dimension, the else: clause is run, which marks
+            #   an array as being a required to copy array along with the ranges in both target and source.
+            for reqbounds, babounds in zip(request.request_bounds, ba.bounds):
+
+                log.debug("Cur bounds: %d+%d, Req bounds: %d+%d" % (babounds.origin, babounds.size, reqbounds.origin, reqbounds.size))
+
+                # this bounds is below our target range
+                # requested end is lower than this bounds start (exclusive)
+                if reqbounds.origin + reqbounds.size <= babounds.origin:
+                    break
+
+                # this bounds is above our target range
+                # requested start is higher than this bounds end (exclusive)
+                if reqbounds.origin >= babounds.origin + babounds.size:
+                    break
+
+                # compute intersections and offsets into request and src bounded arrays
+                isec_start = max(babounds.origin, reqbounds.origin)
+                isec_end = min(babounds.origin + babounds.size, reqbounds.origin + reqbounds.size)
+
+                effective_start = isec_start - reqbounds.origin
+                effective_end = isec_end - reqbounds.origin
+
+                ba_start = isec_start - babounds.origin
+                ba_end = isec_end - babounds.origin
+
+                # append those intersections - each entry represents a range into a dimension
+                effective_range.append((effective_start, effective_end))
+                ba_range.append((ba_start, ba_end))
+
+            else:
+                # all bounds are included, this bounded array is good to go
+                # format: (bounded array, target range of data (multidim), source bounded array range (multidim))
+                bounded_includes_list.append((ba, effective_range, ba_range))
+
+                '''
+                # ok, actually get the ndarray from the DS now!
+                # @TODO: naive, remove this in a bit
+                ndlink = ba.GetLink("ndarray")
+
+                # get actual data blobs into the repo
+                def nofilter(x):
+                    return True
+
+                ndblobs = yield self._get_blobs(repo, [ndlink.key], nofilter)
+                repo.index_hash.update(ndblobs)
+
+                # get element pointed to by key
+                ndse = repo.index_hash[ndlink.key]
+                assert ndse
+                ndobj = repo._load_element(ndse)
+
+                # calc all slices we must copy
+
+                # get dims of this bounded array
+                ba_shape = [x.size for x in ba.bounds]
+
+                log.debug("BEGIN NAIVE DATA COPY")
+                for targetslice, srcslice in self._get_slices(totalshape, ba_shape, effective_range, ba_range):
+                    log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
+
+                    targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+
+                log.debug("END NAIVE DATA COPY")
+                '''
+
+
+        # @TODO: non-naive approach: retrieve and extract slices from each matching array, build data chunk messages,
+        # send them to requester before sending response to this rpc method
+
+        log.debug("Matching Bounded Arrays: %d" % len(bounded_includes_list))
+
+        # get a clear set of the keys we have to get
+        ndarrayset = set([ba[0].GetLink('ndarray').key for ba in bounded_includes_list])
+
+        log.debug("Requesting %d keys from the datastore" % len(ndarrayset))
+
+        # actually get those keys from the datastore, put them in the repo
+        ndblobs = yield self._get_blobs(repo, ndarrayset, lambda x: True)
+        repo.index_hash.update(ndblobs)
+
+        # @TODO: sort these clowns
+
+
+
+        # loop through matching bounded arrays, load ndarray, extract data
+        for batuple in bounded_includes_list:
+            ba, targetranges, srcranges = batuple
+
+            # load ndarray object
+            ndse = repo.index_hash[ba.GetLink('ndarray').key]
+            assert ndse
+            ndobj = repo._load_element(ndse)
+
+            # get slices out of it
+            # get dims of this bounded array
+            ba_shape = [x.size for x in ba.bounds]
+
+            log.debug("BEGIN NAIVE DATA COPY")
+            for targetslice, srcslice in self._get_slices(totalshape, ba_shape, targetranges, srcranges):
+                log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
+
+                #targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+                targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+
+            log.debug("END NAIVE DATA COPY")
+
+        # CREATE RESPONSE CHUNKS OUT OF BIG ORIGINAL RESPONSE MESSAGE
+
+
+        CHUNK_FACTOR = 100
+        totalchunks = int(math.ceil(totalelems / float(CHUNK_FACTOR)))
+
+        log.debug("Chunking %d values into %d messages (factor %d)" % (totalelems, totalchunks, CHUNK_FACTOR))
+
+        for i in xrange(totalchunks):
+
+            # create new message to send
+            chunkmsg = yield self._process.message_client.create_instance(DATA_CHUNK_MESSAGE_TYPE)
+            chunkmsg.seq_number = i+1
+            chunkmsg.seq_max = totalchunks
+
+            curoffset = i * CHUNK_FACTOR
+            slicelen = min(CHUNK_FACTOR, totalchunks - curoffset)
+
+            log.debug("Chunk #%d: offset %d, length %d" % (i, curoffset, slicelen))
+
+            # set info in this chunk
+            chunkmsg.start_index = curoffset
+            chunkmsg.done = (i==totalchunks-1)      # last chunk message?  set the done flag
+
+            # create the ndarray in this chunk
+            #print "losiemp", dir(targetndarray)
+            chunkndarray = chunkmsg.CreateObject(bounded_includes_list[0][0].GetLink('ndarray').type)
+
+            # slice data out of the big object, stick it in this one
+            #chunkndarray.value[0:slicelen] = targetndarray.value[curoffset:curoffset+slicelen]
+            chunkndarray.value[0:slicelen] = targetarray[curoffset:curoffset+slicelen]
+            chunkmsg.ndarray = chunkndarray
+
+            # send this message to the passed in routing key
+            yield self._send_data_chunk(request.data_routing_key, chunkmsg)
+
+        self._process.reply_ok(message, response)
+        log.info("/op_extract_data")
+
+    @defer.inlineCallbacks
+    def _send_data_chunk(self, data_routing_key, chunkmsg):
+        """
+        Sends a data chunk message (from op_extract_data).  This is split out to facilitate
+        testing via monkeypatching this method.
+        """
+        log.debug("_send_data_chunk to %s" % data_routing_key)
+        print "DEBIG", chunkmsg
+        yield self._process.send(data_routing_key, 'what_operation', chunkmsg)
+
+
+    def _double_xrange(self, start1, end1, start2, end2):
+        """
+        This is a method just like xrange, but it operates on two diff ranges at once.
+        Used by extract_data when mapping slice ranges for data extraction.
+        """
+        counter1 = start1
+        counter2 = start2
+        while counter1 < end1 and counter2 < end2:
+            yield (counter1, counter2)
+
+            counter1 += 1
+            counter2 += 1
+
+    def _get_slices(self, targetdimextents, srcdimextents, targetranges, srcranges, targetidx=0, srcidx=0):
+        """
+        Returns a tuple of slice ranges (as tuples) that you can use to extract data from slices
+        inside an ndarray. This is used by extract_data.
+
+        @param  targetdimextents    The dimensional extents of the target bounded array.
+        @param  srcdimextents       The dimensional extents of the source bounded array.
+        @param  targetranges        A list of tuples (one tuple per dimension), specifying a range in each
+                                    dimension that we are storing into.
+        @param  srcranges           A list of tuples (one tuple per dimension), specifying a range in each
+                                    dimension that we are pulling data out of.
+        @param  targetidx           An accumulated index value into the target bounded array which gives the
+                                    current index calculated on each recursive call.
+        @param  srcidx              An accumulated index value into the source bounded array which gives the
+                                    current index calculated on each recursive call.
+
+        @returns                    On each yield, a tuple containing two tuples: a range to the target,
+                                    and a range to copy from the source.
+        """
+        curtargetrange=targetranges[0]
+        cursrcrange=srcranges[0]
+
+        if len(targetranges) == 1:
+            # add current targetranges to indices
+            finaltarget = (curtargetrange[0] + targetidx, curtargetrange[1] + targetidx)
+            finalsrc = (cursrcrange[0] + srcidx, cursrcrange[1] + srcidx)
+            yield (finaltarget, finalsrc)
+        else:
+
+            lefttargetranges=targetranges[1:]
+            leftsrcranges=srcranges[1:]
+
+            for i, j in self._double_xrange(curtargetrange[0], curtargetrange[1], cursrcrange[0], cursrcrange[1]):
+
+                # calc current indexes
+
+                # number of items in this dimension
+                totaltargetitems=reduce(lambda x,y: x*y, targetdimextents[len(targetdimextents)-len(targetranges):])
+                totalsrcitems=reduce(lambda x,y: x*y, srcdimextents[len(srcdimextents)-len(srcranges):])
+
+                newtargetidx = i * totaltargetitems + targetidx
+                newsrcidx = j * totalsrcitems + srcidx
+
+                for xx in self._get_slices(targetdimextents, srcdimextents, lefttargetranges, leftsrcranges, newtargetidx, newsrcidx):
+                    yield xx
+
+
+    @defer.inlineCallbacks
     def op_get_object(self, request, headers, message):
-        pass
+        log.info('op_get_object')
 
+        if not hasattr(request, 'MessageType') or request.MessageType != GET_OBJECT_REQUEST_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid get_object request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        response = yield self._process.message_client.create_instance(GET_OBJECT_REPLY_MESSAGE_TYPE)
+
+        key = request.object_id.key
+        repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
+        assert repo
+
+        # @TODO: use first head for now
+        comms = repo.current_heads()
+        commit = repo.current_heads()[0]
+
+        link = commit.GetLink('objectroot')
+
+        def filtermethod(x):
+            """
+            Returns true if the passed in link's type is not in the excluded_object_types list of the passed in message.
+            """
+            return x.type not in request.excluded_object_types
+
+        # get blobs, update into response repository so we don't have to copy
+        blobs = yield self._get_blobs(response.Repository, [link.key], filtermethod)
+        response.Repository.index_hash.update(blobs)
+
+        # load root object + links
+        element = response.Repository.index_hash[link.key]
+        root_obj = response.Repository._load_element(element)
+
+        excluded_types = [x.GPBMessage for x in request.excluded_object_types]
+        response.Repository.load_links(root_obj, excluded_types)
+
+        # update repository's excluded_types
+        for extype in excluded_types:
+            if extype not in response.Repository.excluded_types:
+                response.Repository.excluded_types.append(extype)
+
+        # fill in response, respond
+        response.retrieved_object = root_obj
+        for ex_type in request.excluded_object_types:
+            link = response.excluded_object_types.add()
+            newex = response.CreateObject(GPBTYPE_TYPE)
+            newex.object_id = ex_type.object_id
+            newex.version = ex_type.version
+            link.SetLink(newex)
+
+        yield self._process.reply_ok(message, response)
+
+        log.debug("/op_get_object")
 
 class DataStoreError(ApplicationError):
     """
@@ -813,7 +1174,9 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         self._backend_cls_names[COMMIT_CACHE] = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
-        
+
+        self._cache_size = self.spawn_args.get('cache_size', CONF.getValue('cache_size', default=10**8))
+
         self._backend_classes={}
 
         self._username = self.spawn_args.get("username", CONF.getValue("username", None))
@@ -903,7 +1266,7 @@ class DataStoreService(ServiceProcess):
 
         
         log.info("Created stores")
-        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
         yield self.initialize_datastore()
 
@@ -916,6 +1279,8 @@ class DataStoreService(ServiceProcess):
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
         self.op_put_blobs = self.workbench.op_put_blobs
+        self.op_get_object = self.workbench.op_get_object
+        self.op_extract_data = self.workbench.op_extract_data
 
 
     @defer.inlineCallbacks
@@ -1132,13 +1497,17 @@ class DataStoreService(ServiceProcess):
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs.update(description[CONTENT_ARGS_CFG])
 
-            load_result = content(resource_instance, self, **kwargs)
+            set_content_ok = content(resource_instance, self, **kwargs)
 
-            if not load_result:
-                set_content_ok = False
 
         if set_content_ok:
             resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+            ### EXTREMELY VERBOSE LOGGING!
+            #log.warn(description)
+            #log.warn(resource_instance)
+            #log.warn(resource_instance.ResourceObject.PPrint())
+            
             return resource_instance
 
         else:
@@ -1229,6 +1598,14 @@ class DataStoreClient(ServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_object', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def extract_data(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('extract_data', content)
+        defer.returnValue(content)
 
 #    @defer.inlineCallbacks
 #    def get_preloaded_datasets_dict(self):
@@ -1251,5 +1628,3 @@ class DataStoreClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)
-
-

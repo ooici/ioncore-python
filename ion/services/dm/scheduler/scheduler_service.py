@@ -27,6 +27,8 @@ from ion.core.object import object_utils
 from ion.services.dm.distribution.events import TriggerEventPublisher, ScheduleEventPublisher
 from ion.core.data.storage_configuration_utility import get_cassandra_configuration, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
 
+from ion.util.iontime import IonTime
+
 import ion.util.procutils as pu
 
 # get configuration
@@ -244,12 +246,13 @@ class SchedulerService(ServiceProcess):
                             first callback. If None is specified, will use now. Note: the first callback to
                             occur will not happen immediatly, it will be after the first interval has elapsed,
                             whether starttime is specified or not. This parameter should be specified in UNIX
-                            epoch format, in ms. You will have to conver the output from time.time() in Python.
+                            epoch format, in ms. You will have to convert the output from time.time() in Python, or
+                            use the IonTime utility class.
         @param  interval    The interval to trigger scheduler events, in seconds.
         @param  task_id     The task_id to trigger.
         """
         assert interval and task_id and interval > 0
-        curtime = int(round(time.time() * 1000))
+        curtime = IonTime().time_ms
         starttime = starttime or curtime
 
         # determine first callback time
@@ -360,7 +363,7 @@ class SchedulerService(ServiceProcess):
             del self._callback_tasks[task_id]
 
         log.debug('Removing task_id %s from store...' % task_id)
-        self.scheduled_events.remove(task_id)
+        yield self.scheduled_events.remove(task_id)
 
         resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
         resp.value = 'OK'

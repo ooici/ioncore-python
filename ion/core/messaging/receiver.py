@@ -23,6 +23,11 @@ from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
 from ion.core.object.codec import ION_R1_GPB
 
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+from ion.core.ioninit import request
+
+
 class IReceiver(Interface):
     """
     Interface for a receiver on an Exchange name.
@@ -237,7 +242,32 @@ class Receiver(BasicLifecycleObject):
                 finally:
                     del self.rec_messages[id(msg)]
             else:
-                if 'encoding' in data and data['encoding'] == ION_R1_GPB:
+
+                convid = data.get('conv-id', None)
+                protocol = data.get('protocol', None)
+                performative = data.get('performative', None)
+
+                request.convid = convid
+                request.protocol = protocol
+                request.performative = performative
+
+                """
+                print 'BEFORE YIELD'
+                print 'CONVID "%s"' %  convid
+                print 'PERFORMATIVE "%s"' % performative
+                print 'PROTOCOL "%s"' % protocol
+                """
+
+                if protocol != 'rpc':
+                    # if it is not an rpc conversation - set the context
+                    request.workbench_context = convid
+
+                elif performative is 'request':
+                    # if it is an rpc request - set the context
+                    request.workbench_context = convid
+
+                encoding = data.get('encoding', None)
+                if hasattr(self.process, 'workbench') and encoding == ION_R1_GPB:
                     # The Codec does not attach the repository to the process. That is done here.
                     content = data.get('content')
                     self.process.workbench.put_repository(content.Repository)
@@ -247,6 +277,8 @@ class Receiver(BasicLifecycleObject):
                     for handler in self.handlers:
                         yield defer.maybeDeferred(handler, data, msg)
                 finally:
+
+
                     if msg._state == "RECEIVED":
                         log.error("Message has not been ACK'ed at the end of processing")
                     del self.rec_messages[id(msg)]
@@ -255,6 +287,34 @@ class Receiver(BasicLifecycleObject):
                     if self.completion_deferred and len(self.processing_messages) == 0:
                         self.completion_deferred.callback(None)
                         self.completion_deferred = None
+
+                    # Cleanup the workbench after an op...
+
+                    if hasattr(self.process, 'workbench'):
+
+                        workbench_context = request.get('workbench_context', None)
+                        convid = request.get('convid', None)
+                        #performative = request.get('performative', None)
+                        #protocol = request.get('protocol', None)
+
+                        """
+                        print 'AFTER YIELD'
+                        print 'CONVID', convid
+                        print 'PERFORMATIVE',performative
+                        print 'WORKBENCH CONTXT',workbench_context
+                        print 'PROTOCOL "%s"' % protocol
+                        """
+
+                        if convid == workbench_context:
+
+                            log.info('Receiver Process: Calling workbench clear:')
+                            self.process.workbench.manage_workbench_cache(workbench_context)
+
+                            nrepos = len(self.process.workbench._repos)
+                            if  nrepos > 0:
+                                # Print a warning if someone else is using the persistence tricks...
+                                log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
+
 
     @defer.inlineCallbacks
     def send(self, **kwargs):

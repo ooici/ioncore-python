@@ -15,6 +15,7 @@ from twisted.internet import defer
 
 from ion.core import bootstrap
 from ion.core import ioninit
+from ion.core.ioninit import request
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -41,3 +42,9 @@ class BootstrapTest2(IonTestCase):
 
     def test_1(self):
         pass
+
+    @defer.inlineCallbacks
+    def test_1(self):
+
+        yield pu.asleep(1)
+        self.assertEqual(request.workbench_context, 'Test runner context!')

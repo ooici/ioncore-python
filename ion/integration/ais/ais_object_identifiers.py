@@ -5,46 +5,12 @@ from ion.core.object import object_utils
 
 # AIS GPBs from ion-object-definitions/net/ooici/integration/ais/ais_request_response.proto
 AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
-"""
-message ApplicationIntegrationServiceRequestMsg{
-    enum _MessageTypeIdentifier {
-      _ID = 9001;
-      _VERSION = 1;
-    }
-
-    // The message parameters object
-    optional net.ooici.core.link.CASRef message_parameters_reference = 1;
-}
-"""
-
 AIS_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9002, version=1)
-"""
-message ApplicationIntegrationServiceResponseMsg{
-    enum _MessageTypeIdentifier {
-      _ID = 9002;
-      _VERSION = 1;
-    }
-
-    // The message parameters object
-    repeated net.ooici.core.link.CASRef message_parameters_reference = 1;
-
-    optional int32 result = 2;
-}
-"""
-
 AIS_RESPONSE_ERROR_TYPE = object_utils.create_type_identifier(object_id=9003, version=1)
-"""
-message ApplicationIntegrationServiceError{
-    enum _MessageTypeIdentifier {
-      _ID = 9003;
-      _VERSION = 1;
-    }
 
-    optional int32 error_num = 1;
 
-    optional string error_str = 2;
-}
-"""
+VALIDATE_DATASOURCE_REQ = object_utils.create_type_identifier(object_id=9010, version=1)
+VALIDATE_DATASOURCE_RSP = object_utils.create_type_identifier(object_id=9011, version=1)
 
 # AisDataResourceMetadata GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_resource_metadata.proto
 AIS_DATASET_METADATA_TYPE = object_utils.create_type_identifier(object_id=9021, version=1)
@@ -159,6 +125,19 @@ message FindDataResourcesRspMsg {
 }
 """
 
+FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9038, version=1)
+"""
+message FindDataResourcesByOwnerRspMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9038;
+       _VERSION = 1;	
+   }
+
+   repeated net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasetByOwnerMetadataType datasetByOwnerMetadata = 1;
+
+}
+"""
+
 # GetDataResourceDetail GPBs from ion-object-definitions/net/ooici/integration/ais/getDataResourceDetail/get_data_resource_detail.proto
 GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9033, version=1)
 """
@@ -251,8 +230,10 @@ message UpdateUserProfileRequest {
    }
    // objects in a protofile are called messages
    optional string user_ooi_id=1;
-   optional string email_address=2;
-   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=3;
+   optional string name=2;
+   optional string institution=3;
+   optional string email_address=4;
+   repeated net.ooici.integration.ais.common.aisNameValuePairType.NameValuePairType profile=5;
 }
 """
 
@@ -401,103 +382,16 @@ message SubscriptionInfoType {
 }
 """
 
+# ion-object-definitions/net/ooici/integration/ais/manageDataResource/manage_data_resource.proto
+# look there for the definitions
 CREATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
-"""
-message DataResourceCreateRequest {
-    enum _MessageTypeIdentifier {
-        _ID = 9211;
-        _VERSION = 1;
-    }
-
-    optional SourceType source_type       = 1;
-
-    // ISO8601 Date Format (yyyy-MM-dd'T'HH:mm:ss'Z'
-    optional string start_time            = 2;
-    optional string end_time              = 3;
-    optional uint64 update_interval_msec  = 4;
-    repeated string property              = 5;
-    repeated string station_id            = 6;
-
-    optional RequestType request_type     = 7;
-    optional double top                   = 8;
-    optional double bottom                = 9;
-    optional double left                  = 10;
-    optional double right                 = 11;
-    optional string base_url              = 12;
-    optional string dataset_url           = 13;
-    optional string ncml_mask             = 14;
-    optional string institution_id        = 15;
-
-}
-"""
-
 CREATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9212, version=1)
-"""
-message DataResourceCreateResponse {
-    enum _MessageTypeIdentifier {
-        _ID = 9212;
-        _VERSION = 1;
-    }
-
-    optional string data_source_id  = 1;
-    optional string data_set_id     = 2;
-    optional string association_id  = 3;
-}
-"""
-
-
 DELETE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9213, version=1)
-"""
-message DataResourceDeleteRequest {
-    enum _MessageTypeIdentifier {
-        _ID = 9213;
-        _VERSION = 1;
-    }
-
-    repeated string data_resource_id  = 1;
-}
-"""
-
 DELETE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9214, version=1)
-"""
-message DataResourceDeleteResponse {
-    enum _MessageTypeIdentifier {
-        _ID = 9214;
-        _VERSION = 1;
-    }
-
-    repeated string successfully_deleted_id  = 1;
-}
-"""
-
-
-
 UPDATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9215, version=1)
-"""
-message DataResourceUpdateRequest {
-    enum _MessageTypeIdentifier {
-        _ID = 9215;
-        _VERSION = 1;
-    }
-
-    optional string user_id               = 1;
-    optional uint64 update_interval_msec  = 2;
-    optional string institution_id        = 3;
-}
-"""
-
-
 UPDATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9216, version=1)
-"""
-message DataResourceCreateUpdateResponse {
-    enum _MessageTypeIdentifier {
-        _ID = 9216;
-        _VERSION = 1;
-    }
+DATA_RESOURCE_SCHEDULED_TASK_TYPE = object_utils.create_type_identifier(object_id=9217, version=1)
 
-    optional bool success = 1;
-}
-"""
 
 
 SUBSCRIBE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9203, version=1)
@@ -574,6 +468,30 @@ message SubscriptionInfoListRspMsg {
 }
 """
 
+UPDATE_SUBSCRIPTION_REQ_TYPE  = object_utils.create_type_identifier(object_id=9209, version=1)
+"""
+message SubscriptionUpdateReqMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9209;
+      _VERSION = 1;
+    }
+
+    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+}
+"""
+
+UPDATE_SUBSCRIPTION_RSP_TYPE  = object_utils.create_type_identifier(object_id=9210, version=1)
+"""
+message SubscriptionUpdateRspMsg {
+    enum _MessageTypeIdentifier {
+      _ID = 9210;
+      _VERSION = 1;
+    }
+
+    optional bool success = 1;
+}
+"""
+
 FIND_DATA_SUBSCRIPTIONS_REQ_TYPE = object_utils.create_type_identifier(object_id=9218, version=1)
 """
 message SubscriptionFindReqMsg {
@@ -599,3 +517,4 @@ message SubscriptionFindRspMsg {
     //repeated net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
 }
 """
+

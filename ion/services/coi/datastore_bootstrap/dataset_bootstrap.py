@@ -25,8 +25,13 @@ from twisted.internet import defer
 
 from ion.util import procutils as pu
 
-from ion.core.object import object_utils, codec
+from ion.core.object import object_utils, codec, gpb_wrapper
 
+from ion.util.iontime import IonTime
+
+
+ION_MSG_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
+SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -60,43 +65,15 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     if not filename or filename == 'None':
         log.info('Could not bootstrap dataset with using datastore service "%s" and filename "%s"' % (str(ds_svc), str(filename)))
         return False
-    
-    result = False
-    f = None
-    tar = None
-    try:
 
-        # Get an absolute path to the file
-        filename = pu.get_ion_path(filename)
+    if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
 
-        if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
-            log.debug('Untaring file...')
-            tar = tarfile.open(filename, 'r')
-            f = tar.extractfile(tar.next())
+        result = read_ooicdm_tar_file(resource_instance, filename)
 
-        else:
-            f = open(filename, 'r')
-        result = True
-    except IOError, e:
-        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
+    else:
+        result = read_ooicdm_file(resource_instance, filename)
 
-    except ExtractError, e:
-        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
 
-    if f is not None:
-        head_elm, obj_dict = codec._unpack_container(f.read())
-        resource_instance.Repository.index_hash.update(obj_dict)
-
-        root_obj = resource_instance.Repository._load_element(head_elm)
-        resource_instance.ResourceObject = root_obj
-    
-        resource_instance.Repository.load_links(root_obj)
-
-        f.close()
-
-    if tar is not None:
-
-        tar.close()
 
 
     log.debug('Bootstraping dataset from local byte array complete: "%s"' % filename)
@@ -104,6 +81,154 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
 
 
     return result
+
+def read_ooicdm_file(resource_instance, filename):
+    f = None
+    try:
+
+        # Get an absolute path to the file
+        filename = pu.get_ion_path(filename)
+
+        f = open(filename, 'r')
+        result = True
+
+    except IOError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
+
+    if f is not None:
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
+
+        root_obj = resource_instance.Repository._load_element(head_elm)
+
+        resource_instance.Repository.load_links(root_obj)
+
+
+        if root_obj.ObjectType == ION_MSG_TYPE:
+            dataset = root_obj.message_object
+        else:
+            dataset = root_obj
+            
+        resource_instance.ResourceObject = root_obj
+
+
+
+        f.close()
+
+    return result
+
+def read_ooicdm_tar_file(resource_instance, filename):
+    f = None
+    tar = None
+    result = False
+    try:
+
+        # Get an absolute path to the file
+        filename = pu.get_ion_path(filename)
+
+
+        log.debug('Untaring file...')
+        tar = tarfile.open(filename, 'r')
+
+        #f = tar.extractfile(tar.next())
+
+    except IOError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
+
+    except ExtractError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not read from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
+
+    if tar is None:
+        return False
+
+
+    vars=[]
+    root_obj = None
+    for name in tar.getnames():
+
+        try:
+            f = tar.extractfile(tar.getmember(name))
+        except ExtractError, e:
+            log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not extract from zipped tar filepath "%s", Extract error: %s' % (filename, str(e)))
+            return False
+
+        head_elm, obj_dict = codec._unpack_container(f.read())
+        resource_instance.Repository.index_hash.update(obj_dict)
+
+        f.close()
+
+        head_obj = resource_instance.Repository._load_element(head_elm)
+
+        # Get rid of the ION Message object if present...
+        if head_obj.ObjectType == ION_MSG_TYPE:
+            head_obj = head_obj.message_object
+
+        if head_obj.ObjectType == dataset_type:
+            root_obj = head_obj
+        else:
+            vars.append(head_obj)
+
+    resource_instance.ResourceObject = root_obj
+
+    resource_instance.Repository.load_links(root_obj)
+
+
+    group = root_obj.root_group
+
+    # Clear any bounded arrays which are empty. Create content field if it is not present
+    for var in group.variables:
+
+        if var.IsFieldSet('content'):
+
+            content = var.content
+
+            if len(content.bounded_arrays) > 0:
+
+                i =0
+                while i < len(content.bounded_arrays):
+
+                    ba = content.bounded_arrays[i]
+
+                    if not ba.IsFieldSet('ndarray'):
+                        del content.bounded_arrays[i]
+
+                        continue
+                    else:
+                        i += 1
+
+        else:
+            var.content = resource_instance.CreateObject(array_structure_type)
+
+    # Now add any bounded arrays that we need....
+    for var_container in vars:
+
+
+        if var_container.ObjectType != SUPPLEMENT_MSG_TYPE:
+            raise IOError('Invalid variable supplement component found in the tar file dataset - "%s"' % filename)
+
+        #print 'Tar Content: \n',var_container.PPrint()
+
+        ba = var_container.bounded_array
+
+        log.debug('Adding content to variable name: %s' % var_container.variable_name)
+        try:
+            var = group.FindVariableByName(var_container.variable_name)
+        except gpb_wrapper.OOIObjectError, oe:
+            log.error(str(oe))
+            raise IOError('Expected variable name %s not found in tar file dataset - "%s"' % (var_container.variable_name, filename))
+
+        ba_link = var.content.bounded_arrays.add()
+        ba_link.SetLink(ba)
+
+    result = True
+
+    tar.close()
+
+    #print 'Complete Group:',group.PPrint()
+
+
+    return result
+
 
     
 def bootstrap_profile_dataset(dataset, *args, **kwargs):
@@ -445,6 +570,11 @@ def bootstrap_profile_data_source_resource(datasource, *args, **kwargs):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Profile Data Source"
+    datasource.ion_description = "Data Profile"
 
     return True
 
@@ -479,6 +609,11 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
 
     datasource.max_ingest_millis = 10000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Traj Data Source"
+    datasource.ion_description = "Data Traj"
 
     return True
 
@@ -518,6 +653,11 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Station Data Source"
+    datasource.ion_description = "Data Station"
 
     return True
 
@@ -552,6 +692,11 @@ def bootstrap_hycom_data_source(datasource, *args, **kwargs):
     datasource.request_type = datasource.RequestType.FTP
     datasource.base_url = "ftp://ftp7300.nrlssc.navy.mil/pub/smedstad/ROMS/"
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "HyCom Data Source"
+    datasource.ion_description = "Data HyCom"
 
     return True
 
@@ -588,6 +733,11 @@ def bootstrap_ntas1_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "NTAS1 Data Source"
+    datasource.ion_description = "Data NTAS1"
 
     return True
 
@@ -625,6 +775,11 @@ def bootstrap_ntas2_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-2.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "NTAS2 Data Source"
+    datasource.ion_description = "Data NTAS2"
 
     return True
 
@@ -661,6 +816,11 @@ def bootstrap_whots1_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "WHOTS1 Data Source"
+    datasource.ion_description = "Data WHOTS1"
 
     return True
 
@@ -696,6 +856,11 @@ def bootstrap_whots2_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_WHOTS_2010_R_M-1.nc"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "WHOTS2 Data Source"
+    datasource.ion_description = "Data WHOTS2"
 
     return True
 
@@ -733,6 +898,11 @@ def bootstrap_moanalua_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Moana Loa Data Source"
+    datasource.ion_description = "Data from Moana Loa"
 
     return True
 
@@ -771,6 +941,11 @@ def bootstrap_choptank_river_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Choptank River Data Source"
+    datasource.ion_description = "Data from Choptank River"
 
     return True
 
@@ -809,6 +984,11 @@ def bootstrap_connecticut_river_data_source(datasource, *args, **kwargs):
     datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
 
     datasource.max_ingest_millis = 6000
+    
+    datasource.registration_datetime_millis = IonTime().time_ms
+    
+    datasource.ion_title = "Connecticut River Data Source"
+    datasource.ion_description = "Data from Connecticut River"
 
     return True
 

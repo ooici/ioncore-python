@@ -27,6 +27,7 @@ from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownlo
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 from ion.integration.ais.ManageResources.ManageResources import ManageResources
 from ion.integration.ais.manage_data_resource.manage_data_resource import ManageDataResource
+from ion.integration.ais.validate_data_resource.validate_data_resource import ValidateDataResource
 from ion.integration.ais.manage_data_resource_subscription.manage_data_resource_subscription import ManageDataResourceSubscription
 
 
@@ -198,6 +199,17 @@ class AppIntegrationService(ServiceProcess):
         response = yield worker.delete(content);
         yield self.reply_ok(msg, response)
 
+    @defer.inlineCallbacks
+    def op_validateDataResource(self, content, headers, msg):
+        """
+        @brief validate a data resource URL
+        """
+        log.debug('op_validateDataResource: \n'+str(content))
+        worker = ValidateDataResource(self)
+        log.debug('op_validateDataResource: calling worker')
+        response = yield worker.validate(content);
+        yield self.reply_ok(msg, response)
+
 
     @defer.inlineCallbacks
     def op_createDataResourceSubscription(self, content, headers, msg):
@@ -242,6 +254,7 @@ class AppIntegrationService(ServiceProcess):
         log.debug('op_updateDataResourceSubscription: calling worker')
         response = yield worker.update(content);
         yield self.reply_ok(msg, response)
+
 
 
 class AppIntegrationServiceClient(ServiceClient):
@@ -391,6 +404,10 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def createDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('createDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResource', message)
         log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
@@ -399,6 +416,10 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def updateDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('updateDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
         log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
@@ -407,11 +428,29 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def deleteDataResource(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('deleteDataResource: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
         log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
+    @defer.inlineCallbacks
+    def validateDataResource(self, message):
+        yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('validateDataResource: ' + result.error_str)
+            defer.returnValue(result)
+        log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('validateDataResource', message)
+        log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+
+
     @defer.inlineCallbacks
     def createDataResourceSubscription(self, message):
         yield self._check_init()
@@ -447,7 +486,9 @@ class AppIntegrationServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def CheckRequest(self, request):
-        # Check for correct request protocol buffer type
+        """
+        @brief Check for correct request GPB type -- this is good for ALL AIS requests
+        """
         if request.MessageType != AIS_REQUEST_MSG_TYPE:
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')

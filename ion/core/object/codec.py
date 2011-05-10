@@ -90,20 +90,24 @@ def pack_structure(content):
     if repo is None:
         raise CodecError('Pack Structure received content which does not have a valid Repository')
 
-
     if not repo.status == repo.UPTODATE:
         comment='Commiting to send message with wrapper object'
         repo.commit(comment=comment)
 
+    # only put StructureElements in this, please.
     obj_set=set()
 
-
     # Get the serialized root object
-    root_obj_key = repo.root_object.MyId
-    root_obj = repo.index_hash.get(root_obj_key)
+    root_obj = repo.root_object
+    root_obj_se = repo.index_hash.get(root_obj.MyId)
 
     items = set([root_obj])
 
+    # extract the excluded_object_types list if we have one!
+    excluded_object_types = []
+    if hasattr(content, 'excluded_object_types') and len(content.excluded_object_types) > 0:
+        log.debug("Codec pack_structure has %d excluded_object_types" % len(content.excluded_object_types))
+        excluded_object_types = [x.GPBMessage for x in content.excluded_object_types]
 
     # Recurse through the DAG and add the keys to a set - obj_set.
     while len(items) > 0:
@@ -112,24 +116,29 @@ def pack_structure(content):
 
             # Add this item to the set we are sending
             if item not in obj_set:
-                obj_set.add(item)
 
-                for key in item.ChildLinks:
+                for link in item.ChildLinks:
 
-                    obj = repo.index_hash.get(key,None)
-                    if not obj:
-                        # Debugging exception - remove later
-                        raise CodecError('Hashed CREF not found! Please call David')
+                    # if this link's key is not in the index_hash, then its type must be in the excluded_type list we
+                    # pull out of the message above. if not, we have an error.
 
-                    child_items.add(obj)
+                    hashobj = repo.index_hash.get(link.key, None)
+                    if hashobj is None:
+                        # link is a CASRef to a GPBType
+                        if link.GPBMessage.type not in excluded_object_types:
+                            raise CodecError("Hashed CREF not found (and not excluded)! Please call David")
+                    else:
+                        # store the object we just pulled out of the index_hash for passing to the _pack_container method
+                        obj_set.add(hashobj)
+
+                        # load this object so we can examine its childlinks - should be simple extraction from
+                        # repo._workspace, but use the public method.
+                        subobj = repo.get_linked_object(link)
+                        child_items.add(subobj)
 
         items = child_items
 
-    # Only send the root object once
-    obj_set.discard(root_obj)
-
-    container_structure = _pack_container(root_obj, obj_set)
-
+    container_structure = _pack_container(root_obj_se, obj_set)
     serialized = container_structure.SerializeToString()
 
     log.debug('pack_structure: Packing Complete!')
@@ -189,8 +198,19 @@ def unpack_structure(serialized_container):
 
     repo.branch(nickname='master')
 
+    # attempt to extract a list of excluded objects, if the message contains the field 'excluded_object_types'
+    excluded_types = []
+    if hasattr(root_obj, 'message_object') and hasattr(root_obj.message_object, 'excluded_object_types'):
+        log.debug("Codec unpack_structure has %d excluded_object_types set in field" % len(root_obj.message_object.excluded_object_types))
+        excluded_types = [x.GPBMessage for x in root_obj.message_object.excluded_object_types]
+
     # Now load the rest of the linked objects - down to the leaf nodes.
-    repo.load_links(root_obj)
+    repo.load_links(root_obj, excluded_types)
+
+    # append the excluded object types in the repo (load links no longer does this)
+    for extype in excluded_types:
+        if extype not in repo.excluded_types:
+            repo.excluded_types.append(extype)
 
     # Create a commit to record the state when the message arrived
     cref = repo.commit(comment='Message for you Sir!')

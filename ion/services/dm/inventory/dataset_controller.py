@@ -10,19 +10,22 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync
+from ion.core import ioninit
+
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-
 from ion.core.exception import ApplicationError
-
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-
 from ion.core.object import object_utils
-
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
+    HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
+SCHEDULER_ADD_REQ_TYPE = object_utils.create_type_identifier(object_id=2601, version=1)
+RSYNC_TYPE = object_utils.create_type_identifier(object_id=2402, version=1)
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
@@ -34,6 +37,9 @@ message Dataset {
    optional net.ooici.core.link.CASRef root_group = 1;
 }
 """
+
+CMD_GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+
 
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 """
@@ -77,6 +83,8 @@ PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, ver
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 
+CONF = ioninit.config(__name__)
+
 class DatasetControllerError(ApplicationError):
     """
     An exception class for the Dataset Controller Service
@@ -92,18 +100,66 @@ class DatasetController(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='dataset_controller',
                                              version='0.1.0',
-                                             dependencies=[])
+                                             dependencies=['scheduler'])
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
 
         # Can be called in __init__ or in slc_init... no yield required
         self.resource_client = ResourceClient(proc=self)
-
+        self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
 
+        # As per DS, pull config from spawn args first and config file(s) second
+        self.private_key = self.spawn_args.get('private_key' ,
+                                               CONF.getValue('private_key'))
+        self.public_key = self.spawn_args.get('public_key' ,
+                                              CONF.getValue('public_key'))
+        self.server_url = self.spawn_args.get('thredds_ncml_url',
+                                              CONF.getValue('thredds_ncml_url',
+                                              default='datactlr@thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))
+        self.update_interval = self.spawn_args.get('update_interval',
+                                                   CONF.getValue('update_interval', default=5.0))
+        self.ncml_path = self.spawn_args.get('ncml_path',
+                                            CONF.getValue('ncml_path', default='/tmp'))
+
+        log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
+        log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
+
+        #log.debug('Creating new message receiver for scheduler')
+
+        #log.debug('Scheduling periodic rsync')
         log.info('SLC_INIT Dataset Controller')
 
+    @defer.inlineCallbacks
+    def _create_scheduled_event(self):
+        log.debug('creating scheduled event')
+
+        msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
+        msg.interval_seconds = self.update_interval
+        msg.payload = msg.CreateObject(RSYNC_TYPE)
+
+        log.debug('Sending request to scheduler')
+        yield self.ssc.add_task(msg)
+        log.debug('got response')
+
+    #noinspection PyUnusedLocal
+    @defer.inlineCallbacks
+    def do_ncml_sync(self, request, headers, msg):
+        """
+        @brief On receipt of scheduler message, do rsync with server, moving
+        any new ncml files over.
+        """
+
+        # @todo fstat the ncml directory to check for new files
+        log.debug('rsync scheduled beginning now')
+
+        yield do_complete_rsync(self.ncml_path, self.server_url,
+                                self.private_key, self.public_key)
+
+        log.debug('rsync complete')
+        
+    #noinspection PyUnusedLocal
     @defer.inlineCallbacks
     def op_create_dataset_resource(self, request, headers, msg):
         """
@@ -119,7 +175,7 @@ class DatasetController(ServiceProcess):
 
         # Check only the type received and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != None:
+        if request.MessageType is not None:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise DatasetControllerError('Expected Null message type, received %s'
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
@@ -129,9 +185,12 @@ class DatasetController(ServiceProcess):
                                                               ResourceName='CDM Dataset Resource',
                                                               ResourceDescription='None')
 
+        resource.root_group = resource.CreateObject(CMD_GROUP_TYPE)
+
+
         # What state should this be in at this point?
         #resource.ResourceLifeCycleState = resource.DEVELOPED
-        #yield self.rc.put_instance(resource)
+        yield self.resource_client.put_instance(resource)
 
         log.info(str(resource))
 
@@ -145,7 +204,11 @@ class DatasetController(ServiceProcess):
 
         # Set a response code in the message envelope
         response.MessageResponseCode = response.ResponseCodes.OK
-        
+
+        # pfh - create local ncml file as well. These accumulate and are
+        # harvested by the scheduled rsync
+        create_ncml(response.key, self.ncml_path)
+
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
 

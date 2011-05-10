@@ -13,7 +13,7 @@ Based on Porter - Duff Alpha Composite rules
 def GetValue(self, *args):
     """
     @Brief Get a value from an array structure by its indices
-    @param self - a cdm array structure object
+    @param self - a cdm variable object
     @param args - a list of integer indices for the value to extract
 
     usage for a 3Dimensional variable:
@@ -59,7 +59,7 @@ def GetValue(self, *args):
 def GetIntersectingBoundedArrays(self, bounded_array):
     """
     @brief get the SHA1 id of the bounded arrays which intersect the give coverage.
-    @param self - a cdm array structure object
+    @param self - a cdm variable object
     @param bounded_array - a bounded array which specifies an index space coverage of interest
 
     usage for a 3Dimensional variable:

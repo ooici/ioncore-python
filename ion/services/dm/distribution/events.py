@@ -30,12 +30,14 @@ DEL_SUBSCRIPTION_EVENT_MESSAGE_TYPE         = object_utils.create_type_identifie
 DATA_EVENT_MESSAGE_TYPE                     = object_utils.create_type_identifier(object_id=2329, version=1)
 DATASOURCE_UNAVAILABLE_EVENT_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=2330, version=1)
 DATASET_SUPPLEMENT_ADDED_EVENT_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=2331, version=1)
+INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=4303, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
 CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
 DATASOURCE_UPDATE_EVENT_ID = 1101
+INSTRUMENT_SAMPLE_DATA_EVENT_ID = 1102
 DATASOURCE_UNAVAILABLE_EVENT_ID = 1102
 DATASET_SUPPLEMENT_ADDED_EVENT_ID = 1111
 BUSINESS_STATE_MODIFICATION_EVENT_ID = 1112
@@ -46,6 +48,7 @@ LOGGING_INFO_EVENT_ID = 3003
 LOGGING_ERROR_EVENT_ID = 3002
 LOGGING_CRITICAL_EVENT_ID = 3001
 DATABLOCK_EVENT_ID = 4001
+
 
 
 class EventPublisher(Publisher):
@@ -359,6 +362,15 @@ class DataBlockEventPublisher(DataEventPublisher):
     The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
+
+class InstrumentSampleDataEventPublisher(DataEventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = INSTRUMENT_SAMPLE_DATA_EVENT_ID
+    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 #
 #
 # ################################################################################
@@ -542,4 +554,13 @@ class DataBlockEventSubscriber(DataEventSubscriber):
     The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
+
+class InstrumentSampleDataEventSubscriber(DataEventSubscriber):
+    """
+    Event Notification Subscriber for Instrument Data.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_id = INSTRUMENT_SAMPLE_DATA_EVENT_ID
+    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 
