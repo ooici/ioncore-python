@@ -34,7 +34,7 @@ from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, SAMPLE_CONNECTICUT_RIVER_GAUGE_DATASET_ID, SAMPLE_WHOTS1_DATASET_ID, SAMPLE_NTAS1_DATASET_ID, SAMPLE_SPLIT_HYCOM_DATASET_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
@@ -346,8 +346,7 @@ class DataStoreTest(IonTestCase):
         msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
 
         idref = msg.CreateObject(IDREF_TYPE)
-        #idref.key = SAMPLE_PROFILE_DATASET_ID
-        idref.key = SAMPLE_SPLIT_HYCOM_DATASET_ID
+        idref.key = SAMPLE_PROFILE_DATASET_ID
 
         msg.object_id = idref
 
