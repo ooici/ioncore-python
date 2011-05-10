@@ -110,8 +110,8 @@ class AISValidateDataResourceTest(IonTestCase):
         """
         raise unittest.SkipTest("Buildbot doesn't seem to have netCDF validator installed properly")
 
+        r1 = yield self._validateDataResource("http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc")
 
-        r1 = yield self._validateDataResource("http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day")
         res = r1.dataResourceSummary
         
         self.failUnlessEqual(res.title, "Analysed foundation sea surface temperature, global")
@@ -128,7 +128,7 @@ class AISValidateDataResourceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_validateDataResourceNegative(self):
-        raise unittest.SkipTest("All I need is a data source URL that's known to be non-NetCDF compliant")
+        raise unittest.SkipTest("Buildbot doesn't seem to have netCDF validator installed properly")
 
         log.info("Creating and wrapping validation request")
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -136,8 +136,7 @@ class AISValidateDataResourceTest(IonTestCase):
         ais_req_msg.message_parameters_reference = validate_req_msg
 
 
-        validate_req_msg.data_resource_url = 'http://tashtego.marine.rutgers.edu:8080/thredds/dodsC/cool/avhrr/bigbight'
-
+        validate_req_msg.data_resource_url = "http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day"
         result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
 
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
