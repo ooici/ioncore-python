@@ -6,7 +6,6 @@
 @brief Driver code for SeaBird SBE-37 CTD
 """
 
-
 import re
 import time
 
@@ -25,6 +24,8 @@ from ion.agents.instrumentagents.instrument_constants import DriverState
 from ion.agents.instrumentagents.instrument_constants import DriverEvent
 from ion.agents.instrumentagents.instrument_constants import DriverAnnouncement
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import DriverStatus
+from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.instrument_constants import BaseEnum
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.exception import ApplicationError
@@ -47,12 +48,14 @@ SBE37_PROMPT = 'S>'
 SBE37_NEWLINE = '\r\n'
 SBE37_BAD_COMMAND = '?cmd S>'
 
+
 # Device states.
 class SBE37State(DriverState):
     """
     Add sbe37 specific states here.
     """
     pass
+
 
 # Device events.
 class SBE37Event(DriverEvent):
@@ -61,12 +64,27 @@ class SBE37Event(DriverEvent):
     """
     pass
 
+
 # Device commands.
 class SBE37Command(DriverCommand):
     """
     Add sbe37 specific commands here.
     """
-    pass
+    ACQUIRE_SAMPLE_TS = 'ACQUIRE_SAMPLE_SBE37_TS'
+    ACQUIRE_SAMPLE_TSR = 'ACQUIRE_SAMPLE_SBE37_TSR'
+    ACQUIRE_SAMPLE_TSS = 'ACQUIRE_SAMPLE_SBE37_TSS'
+    ACQUIRE_SAMPLE_TSSON = 'ACQUIRE_SAMPLE_SBE37_TSSON'
+    ACQUIRE_SAMPLE_SLT = 'ACQUIRE_SAMPLE_SBE37_SLT'
+    ACQUIRE_SAMPLE_SLTR = 'ACQUIRE_SAMPLE_SBE37_SLTR'
+    ACQUIRE_SAMPLE_SL = 'ACQUIRE_SAMPLE_SBE37_SL'
+    TEST_TT = 'TEST_SBE37_TT'
+    TEST_TC = 'TEST_SBE37_TC'
+    TEST_TP = 'TEST_SBE37_TP'
+    TEST_TTR = 'TEST_SBE37_TTR'
+    TEST_TCR = 'TEST_SBE37_TCR'
+    TEST_TPR = 'TEST_SBE37_TPR'
+    TEST_TR = 'TEST_SBE37_TR'
+
 
 # Device channels / transducers.
 class SBE37Channel(BaseEnum):
@@ -78,43 +96,21 @@ class SBE37Channel(BaseEnum):
     PRESSURE = DriverChannel.PRESSURE
     CONDUCTIVITY = DriverChannel.CONDUCTIVITY
 
+
 class SBE37Announcement(DriverAnnouncement):
     """
     Add sbe37 specific announcements here.
     """
     pass
 
+
+class SBE37Status(DriverStatus):
+    """
+    Add sbe37 statuses here.
+    """
+    pass
+
 # Add a parameters enum for sbe37 specific params.
-
-###############################################################################
-# To do. Use of these constants needs design.
-###############################################################################
-
-"""
-Command acquire sample arguments.
-"""
-sbe37_cmd_acquire_sample_args = [
-    'TS',
-    'TSR',
-    'TSS',
-    'TSSON',
-    'SLT',
-    'SLTR',
-    'SL'
-]
-     
-"""
-Command test arguments. 
-"""
-sbe37_cmd_test_args = [
-    'TT',
-    'TC',
-    'TP',
-    'TTR',
-    'TCR',
-    'TPR',
-    'TR'
-]
 
 
 ###############################################################################
@@ -216,6 +212,18 @@ class SBE37Driver(InstrumentDriver):
     """
     Implements the abstract InstrumentDriver interface for the SBE37.
     """
+    
+    """
+    The software version of the SBE37 driver.
+    """
+    version = '0.1.0'
+    
+    @classmethod
+    def get_version(cls):
+        """
+        Return the software version of the instrument agent.
+        """
+        return cls.version
 
 
     def __init__(self, *args, **kwargs):
@@ -316,6 +324,11 @@ class SBE37Driver(InstrumentDriver):
         device to try and get the prompt.
         """
         self._wakeup_scheduler = None
+        
+        """
+        List of active driver alarm conditions.
+        """
+        self._alarms = []
         
         """
         Dictionary of instrument parameters. Each parameter object knows
@@ -622,7 +635,6 @@ class SBE37Driver(InstrumentDriver):
                 }
         }
         
-        
         """
         Instrument state handlers
         """
@@ -641,7 +653,7 @@ class SBE37Driver(InstrumentDriver):
         """
         Instrument state machine.
         """
-        self.fsm = InstrumentFSM(SBE37State,SBE37Event,self.state_handlers,
+        self._fsm = InstrumentFSM(SBE37State,SBE37Event,self.state_handlers,
                                  SBE37Event.ENTER,SBE37Event.EXIT)
 
 
@@ -666,7 +678,8 @@ class SBE37Driver(InstrumentDriver):
         self._debug_print(event)
         if event == SBE37Event.ENTER:
             # Announce the state change to agent.                        
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.UNCONFIGURED}
             self.send(self.proc_supid,'driver_event_occurred',content)
             self._initialize()
@@ -703,7 +716,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)
             
@@ -712,7 +726,8 @@ class SBE37Driver(InstrumentDriver):
             # in response to a disconnect comment. Fire the deferred with
             # reply to indicate successful disconnect.
             if self._connection_complete_deferred:
-                d,self._connection_complete_deferred = self._connection_complete_deferred,None
+                d,self._connection_complete_deferred = \
+                    self._connection_complete_deferred,None
                 reply = {'success':InstErrorCode.OK,'result':None}
                 d.callback(reply)
             
@@ -747,7 +762,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTING}
             self.send(self.proc_supid,'driver_event_occurred',content)
 
@@ -785,7 +801,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
             
@@ -822,7 +839,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
             
@@ -831,7 +849,8 @@ class SBE37Driver(InstrumentDriver):
             # to a connect command. Send the reply to indicate successful
             # connection.
             if self._connection_complete_deferred:
-                d,self._connection_complete_deferred = self._connection_complete_deferred,None
+                d,self._connection_complete_deferred = \
+                    self._connection_complete_deferred,None
                 reply = {'success':InstErrorCode.OK,'result':None}
                 d.callback(reply)
             
@@ -886,7 +905,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
                         
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.ACQUIRE_SAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
                         
@@ -945,7 +965,8 @@ class SBE37Driver(InstrumentDriver):
                                 
         elif event == SBE37Event.DATA_RECEIVED:
 
-            #content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            #content = {'type':SBE37Announcement.STATE_CHANGE,
+            # 'transducer':SBE37Channel.INSTRUMENT,
             #           'value':SBE37State.UNCONFIGURED}
             #self.send(self.proc_supid,'driver_event_occurred',content)
         
@@ -989,7 +1010,8 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
 
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,'transducer':SBE37Channel.INSTRUMENT,
+            content = {'type':SBE37Announcement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.AUTOSAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
 
@@ -1157,7 +1179,7 @@ class SBE37Driver(InstrumentDriver):
                     
             # Announce the config change to agent. This assumes
             # that param updates occur one-to-one with config changes.
-            paramdict = self.get_parameters()
+            paramdict = self.get_parameter_dict()
             content = {'type':SBE37Announcement.CONFIG_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':paramdict}
@@ -1293,7 +1315,7 @@ class SBE37Driver(InstrumentDriver):
         yield
         
         # Set initial state.
-        self.fsm.start(SBE37State.UNCONFIGURED)
+        self._fsm.start(SBE37State.UNCONFIGURED)
                 
 
     @defer.inlineCallbacks
@@ -1324,9 +1346,9 @@ class SBE37Driver(InstrumentDriver):
         
         if self._instrument_connection:
             self._instrument_connection.transport.setTcpNoDelay(1)
-            self.fsm.on_event(SBE37Event.CONNECTION_COMPLETE)
+            self._fsm.on_event(SBE37Event.CONNECTION_COMPLETE)
         else:
-            self.fsm.on_event(SBE37Event.CONNECTION_FAILED)
+            self._fsm.on_event(SBE37Event.CONNECTION_FAILED)
 
 
     def gotConnected(self, instrument):
@@ -1350,7 +1372,7 @@ class SBE37Driver(InstrumentDriver):
         """
 
         self._instrument_connection = None
-        self.fsm.on_event(SBE37Event.DISCONNECT_COMPLETE)
+        self._fsm.on_event(SBE37Event.DISCONNECT_COMPLETE)
 
 
     def gotData(self, dataFrag):
@@ -1397,19 +1419,19 @@ class SBE37Driver(InstrumentDriver):
         
         # If new complete lines are detected, send an EVENT_DATA_RECEIVED.
         if new_lines:
-            self.fsm.on_event(SBE37Event.DATA_RECEIVED)
+            self._fsm.on_event(SBE37Event.DATA_RECEIVED)
         
         # If a normal or bad command prompt is detected, send an
         # EVENT_PROMPTED
         if (self._line_buffer == SBE37_PROMPT or
             self._line_buffer == SBE37_BAD_COMMAND):
-            self.fsm.on_event(SBE37Event.PROMPTED)
+            self._fsm.on_event(SBE37Event.PROMPTED)
             
         # If a stop autosample type prompt is detected, send an
         # EVENT_PROMPTED.
         elif (self._line_buffer == '' and
               (len(self._data_lines)>0 and self._data_lines[-1] == SBE37_PROMPT)):
-            self.fsm.on_event(SBE37Event.PROMPTED)
+            self._fsm.on_event(SBE37Event.PROMPTED)
 
 
     ###########################################################################
@@ -1736,6 +1758,32 @@ class SBE37Driver(InstrumentDriver):
 
 
     @defer.inlineCallbacks
+    def op_execute_direct(self, content, headers, msg):
+        """
+        Execute untraslated commands on the device.
+        @param content A dict with a bytestring containing the raw device
+            commands and optional timeout: {'bytes':bytes,'timeout':timeout}
+        @retval Reply message with a dict containing success value and
+            raw bytes result.
+            {'success':success,'result':result}.        
+        """
+        assert(isinstance(content,dict)), 'Expected dict content.'
+        params = content.get('bytes',None)
+        assert(isinstance(params,str)), 'Expected bytes string.'
+        
+        # Timeout not implemented for this op.
+        timeout = content.get('timeout',None)
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+        
+        # The method is not implemented.
+        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
     def op_get_metadata(self, content, headers, msg):
         """
         Retrieve metadata for the device, its transducers and parameters.
@@ -1792,8 +1840,7 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
 
-        # The method is not implemented.
-        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
+        reply = self._get_status(params)
         yield self.reply_ok(msg, reply)
 
 
@@ -1842,7 +1889,7 @@ class SBE37Driver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success':None,'result':None}         
-        success = self.fsm.on_event(SBE37Event.INITIALIZE)
+        success = self._fsm.on_event(SBE37Event.INITIALIZE)
         
         # Set success and send reply. Unsuccessful initialize means the
         # event is not handled in the current state.
@@ -1888,7 +1935,7 @@ class SBE37Driver(InstrumentDriver):
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if the event is not handled in the current
         # state.
-        reply['success'] = self.fsm.on_event(SBE37Event.CONFIGURE,params)
+        reply['success'] = self._fsm.on_event(SBE37Event.CONFIGURE,params)
 
         yield self.reply_ok(msg, reply)
 
@@ -1939,6 +1986,13 @@ class SBE37Driver(InstrumentDriver):
         yield self.reply_ok(msg,reply)
 
 
+    @defer.inlineCallbacks
+    def publish(self, topic, transducer, data):
+        """
+        """
+        yield
+
+
     ###########################################################################
     # Nonstandard interface methods.
     ###########################################################################
@@ -1954,7 +2008,7 @@ class SBE37Driver(InstrumentDriver):
         """
         
         # Get current state from the state machine and reply.
-        cur_state = self.fsm.current_state
+        cur_state = self._fsm.current_state
         yield self.reply_ok(msg, cur_state)
 
 
@@ -2035,7 +2089,7 @@ class SBE37Driver(InstrumentDriver):
         self._connection_complete_deferred = d
         
         # Fire EVENT_CONNECT. If the event fails the state is wrong.
-        success = self.fsm.on_event(SBE37Event.CONNECT)
+        success = self._fsm.on_event(SBE37Event.CONNECT)
         if InstErrorCode.is_error(success):
             reply = {'success':success,'result':None}
             d,self._connection_complete_deferred = self._connection_complete_deferred,None
@@ -2058,7 +2112,7 @@ class SBE37Driver(InstrumentDriver):
         self._connection_complete_deferred = d
         
         # Fire EVENT_DISCONNECT. If the event fails the state is wrong.
-        success = self.fsm.on_event(SBE37Event.DISCONNECT)
+        success = self._fsm.on_event(SBE37Event.DISCONNECT)
         #if not success:
         if InstErrorCode.is_error(success):
             reply = {'success':success,'result':None}
@@ -2117,27 +2171,139 @@ class SBE37Driver(InstrumentDriver):
                                                      command_spec,self)                    
         
         # Fire the command received event and return deferred.
-        if self.fsm.on_event(event):
+        if self._fsm.on_event(event):
             return d
         else:
             reply = {'success':InstErrorCode.INCORRECT_STATE,'result':None}
             del self._driver_command_buffer[-1]
             return reply            
         
+
+    def _get_status(self,params):
+        """
+        Get the instrument and channel status.
+        @params A list of (channel,status) keys.
+        @retval A dict containing success and status results:
+            {'success':success,'result':
+            {(chan,arg):(success,val),...,(chan,arg):(success,val)}}
+        """
+        
+        # Set up the reply message.
+        reply = {'success':None,'result':None}
+        result = {}
+        get_errors = False
+
+        for (chan,arg) in params:
+            if (SBE37Channel.has(chan) or chan.lower() == 'all') and \
+                (SBE37Status.has(arg) or arg.lower() == 'all'):
+                # If instrument channel or all.
+                if chan == SBE37Channel.INSTRUMENT or chan.lower() == 'all':
+                    if arg == SBE37Status.DRIVER_STATE or arg.lower() == 'all':
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_STATE)] = \
+                            (InstErrorCode.OK,self._fsm.get_current_state())
+                    
+                    if arg == SBE37Status.OBSERVATORY_STATE or arg.lower() == 'all':
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.OBSERVATORY_STATE)] = \
+                            (InstErrorCode.OK,self._get_observatory_state())
+                    
+                    if arg == SBE37Status.DRIVER_ALARMS or arg.lower() == 'all':
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_ALARMS)] = \
+                            (InstErrorCode.OK,self._alarms)
+                    
+                    if arg == SBE37Status.DRIVER_VERSION or arg.lower() == 'all':
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_VERSION)] = \
+                            (InstErrorCode.OK,self.get_version())
+    
+                # If conductivity channel or all.            
+                if chan == SBE37Channel.CONDUCTIVITY or chan.lower() == 'all':
+                    if arg == 'all':
+                        pass
+                        
+                    # Conductivity channel does not support this status.
+                    else:
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
+                        get_errors = True
+                        
+                if chan == SBE37Channel.PRESSURE or chan.lower() == 'all':
+                    if arg == 'all':
+                        pass
+
+                    # Pressure channel does not support this status.                        
+                    else:
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
+                        get_errors = True
+    
+                # If pressure channel or all.
+                if chan == SBE37Channel.TEMPERATURE or chan.lower() == 'all':
+                    if arg == 'all':
+                        pass
+                        
+                    # Temp channel does not support this status.
+                    else:
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
+                        get_errors = True
+                 
+            # Status or channel key or both invalid.       
+            else:
+                result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
+                get_errors = True
+
+        reply['result'] = result
             
-    @defer.inlineCallbacks
-    def publish(self, topic, transducer, data):
+        # Set the overall error state.
+        if get_errors:
+            reply['success'] = InstErrorCode.GET_DEVICE_ERR
+
+        else:
+            reply['success'] = InstErrorCode.OK
+            
+        return reply
+
+
+    def _get_observatory_state(self):
         """
+        Return the observatory state of the instrument.
         """
-        yield
+        
+        curstate = self._fsm.get_current_state()
+        if curstate == SBE37State.DISCONNECTED:
+            return ObservatoryState.NONE
+        
+        elif curstate == SBE37State.CONNECTING:
+            return ObservatoryState.NONE
+
+        elif curstate == SBE37State.DISCONNECTING:
+            return ObservatoryState.NONE
+
+        elif curstate == SBE37State.ACQUIRE_SAMPLE:
+            return ObservatoryState.ACQUIRING
+
+        elif curstate == SBE37State.CONNECTED:
+            return ObservatoryState.STANDBY
+
+        elif curstate == SBE37State.CALIBRATE:
+            return ObservatoryState.CALIBRATING
+
+        elif curstate == SBE37State.AUTOSAMPLE:
+            return ObservatoryState.STREAMING
+
+        elif curstate == SBE37State.SET:
+            return ObservatoryState.UPDATING
+
+        elif curstate == SBE37State.TEST:
+            return ObservatoryState.TESTING
+
+        elif curstate == SBE37State.UNCONFIGURED:
+            return ObservatoryState.NONE
+
+        elif curstate == SBE37State.UPDATE_PARAMS:
+            return ObservatoryState.UPDATING
+
+        else:
+            return ObservatoryState.UNKNOWN
 
 
-    ###########################################################################
-    # Other.
-    ###########################################################################
-
-
-    def get_parameters(self):
+    def get_parameter_dict(self):
         """
         Return a dict with all driver paramters.
         """
@@ -2485,7 +2651,7 @@ class SBE37Driver(InstrumentDriver):
         Dump state and event status to stdio.
         """
         if DEBUG_PRINT:
-            print self.fsm.current_state + '  ' + event
+            print self._fsm.current_state + '  ' + event
             if isinstance(data,dict):
                 for (key,val) in data.iteritems():
                     print str(key), '  ', str(val)

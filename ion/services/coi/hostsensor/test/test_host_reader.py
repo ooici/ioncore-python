@@ -38,5 +38,5 @@ class HostStatusTest(IonTestCase):
         reader = HostReader('localhost', 161, 'ccagent', 'ooicinet')
         report = reader.get('all')
         log.debug(report)
-        #status = reader.pprint(report)
-        #log.debug(status)
+        status = reader.pprint(report)
+        log.debug(status)

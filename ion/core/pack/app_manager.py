@@ -18,6 +18,9 @@ from ion.core.pack.application import AppLoader, AppDefinition
 from ion.core.pack.release import ReleaseLoader
 from ion.util.state_object import BasicLifecycleObject
 
+from ion.util.path import adjust_dir
+
+
 CONF = ioninit.config(__name__)
 CF_app_dir_path = CONF['app_dir_path']
 CF_rel_dir_path = CONF['rel_dir_path']
@@ -131,6 +134,8 @@ class AppManager(BasicLifecycleObject):
                 log.debug("Locating app '%s' in file: '%s'" % (app_name, app_filename))
             else:
                 log.info("Starting app: '%s'" % app_filename)
+
+            app_filename = adjust_dir(app_filename)
 
             if app_filename is None or not os.path.isfile(app_filename):
                 raise StartupError("App file '%s' not found" % (
