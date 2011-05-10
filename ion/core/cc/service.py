@@ -19,6 +19,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.cc import container
+from ion.util.path import adjust_dir
 
 class Options(usage.Options):
     """
@@ -147,9 +148,7 @@ class CapabilityContainer(service.Service):
 
         # Try two script locations, one for IDEs and another for shell.
         for script in self.config['scripts']:
-            script = os.path.abspath(script)
-            if not os.path.isfile(script):
-                script = os.path.join(os.path.dirname(ion.__file__), script)
+            script = adjust_dir(script)
             if not os.path.isfile(script):
                 log.error('Bad startup script path: %s' % script)
             else:
