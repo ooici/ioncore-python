@@ -844,7 +844,7 @@ class TestInstrumentAgent(IonTestCase):
     @defer.inlineCallbacks
     def test_publish(self):
         
-        raise unittest.SkipTest("Temp skip.")
+        #raise unittest.SkipTest("Temp skip.")
         
         # Setup a subscriber to an event topic
         class TestEventSubscriber(InfoLoggingEventSubscriber):
