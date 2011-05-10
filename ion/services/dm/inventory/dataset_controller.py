@@ -5,6 +5,7 @@
 @author David Stuebe
 @brief An example service definition that can be used as template for resource management.
 """
+import uuid
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -21,11 +22,12 @@ from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.distribution.events import ScheduleEventSubscriber
+
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
     HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
 
 SCHEDULER_ADD_REQ_TYPE = object_utils.create_type_identifier(object_id=2601, version=1)
-RSYNC_TYPE = object_utils.create_type_identifier(object_id=2402, version=1)
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
@@ -91,6 +93,21 @@ class DatasetControllerError(ApplicationError):
     """
 
 
+class RscncHandler(ScheduleEventSubscriber):
+    """
+    This class provides the messaging hooks to invoke rsync on receipt
+    of scheduler messages.
+    """
+    def __init__(self, queue_name, hook_fn, *args, **kwargs):
+        self.queue_name = queue_name
+        self.hook_fn = hook_fn
+        ScheduleEventSubscriber.__init__(self, *args, **kwargs)
+
+    @defer.inlineCallbacks
+    def ondata(self, data):
+        log.debug('Got a scheduled message, task id: %s' % data.task_id)
+        yield self.hook_fn()
+
 class DatasetController(ServiceProcess):
     """
     The Dataset Controller service
@@ -102,13 +119,18 @@ class DatasetController(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=['scheduler'])
 
+    @defer.inlineCallbacks
     def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
+        """
+        Service life cycle state. Initialize service here. Can use yields.
 
-        # Can be called in __init__ or in slc_init... no yield required
+        Can be called in __init__ or in slc_init... no yield required
+        """
         self.resource_client = ResourceClient(proc=self)
         self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
+
+        self.task_id = str(uuid.uuid4())
 
         # As per DS, pull config from spawn args first and config file(s) second
         self.private_key = self.spawn_args.get('private_key' ,
@@ -122,13 +144,24 @@ class DatasetController(ServiceProcess):
                                                    CONF.getValue('update_interval', default=5.0))
         self.ncml_path = self.spawn_args.get('ncml_path',
                                             CONF.getValue('ncml_path', default='/tmp'))
+        # Which Q to receiver scheduler messages?
+        self.queue_name = self.spawn_args.get('queue_name',
+                                            CONF.getValue('queue_name', default='data_controller_scheduler'))
 
         log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
+        log.debug('Scheduler queue name: %s' % self.queue_name)
 
-        #log.debug('Creating new message receiver for scheduler')
+        # Check for singleton
+        if self.spawn_args.get('do-init', False):
+            log.debug('I am the walrus.')
+            yield self._create_scheduled_event()
 
-        #log.debug('Scheduling periodic rsync')
+        log.debug('Creating new message receiver for scheduler')
+        self.sesc = RscncHandler(self.queue_name, self.do_ncml_sync,
+                                origin=str(self.svc_name),
+                                process=self)
+
         log.info('SLC_INIT Dataset Controller')
 
     @defer.inlineCallbacks
@@ -136,16 +169,16 @@ class DatasetController(ServiceProcess):
         log.debug('creating scheduled event')
 
         msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
-        msg.interval_seconds = self.update_interval
-        msg.payload = msg.CreateObject(RSYNC_TYPE)
+        msg.interval_seconds = int(self.update_interval)
+        msg.task_id = self.task_id
 
         log.debug('Sending request to scheduler')
         yield self.ssc.add_task(msg)
-        log.debug('got response')
+        log.debug('got scheduler response OK')
 
     #noinspection PyUnusedLocal
     @defer.inlineCallbacks
-    def do_ncml_sync(self, request, headers, msg):
+    def do_ncml_sync(self):
         """
         @brief On receipt of scheduler message, do rsync with server, moving
         any new ncml files over.

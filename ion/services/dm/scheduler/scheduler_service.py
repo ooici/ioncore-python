@@ -413,15 +413,6 @@ class SchedulerService(ServiceProcess):
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
         self._schedule_event(None, int(tdef['interval_seconds']), task_id)
 
-        """
-        Update last-invoked timestamp in registry
-        @bug This code is commented out as it causes a run-time race condition with op_rm_task -
-        splitting the read and this write fails quite often.
-
-#        log.debug('Updating last-run time')
-#        tdef['last_run'] = time.time()
-#        self.store.put(task_id, tdef)
-        """
         log.debug('Task %s rescheduled for %s seconds OK' % (task_id, tdef['interval_seconds']))
 
 class SchedulerServiceClient(ServiceClient):
