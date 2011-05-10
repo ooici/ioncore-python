@@ -49,6 +49,11 @@ class AISValidateDataResourceTest(IonTestCase):
                 'module':'ion.integration.ais.app_integration_service',
                 'class':'AppIntegrationService'
             },
+#            {
+#                'name':'cdm_validation',
+#                'module': 'on.integration.eoi.validation.cdm_validation_service',
+#                'class': 'CdmValidationClient'
+#            },
             ]
 
         log.debug('AppIntegrationTest.setUp(): spawning processes')
@@ -103,7 +108,10 @@ class AISValidateDataResourceTest(IonTestCase):
         """
         @brief try to validate a sample data sources
         """
-        r1 = yield self._validateDataResource("http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day")
+        raise unittest.SkipTest("Buildbot doesn't seem to have netCDF validator installed properly")
+
+        r1 = yield self._validateDataResource("http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc")
+
         res = r1.dataResourceSummary
         
         self.failUnlessEqual(res.title, "Analysed foundation sea surface temperature, global")
@@ -116,6 +124,26 @@ class AISValidateDataResourceTest(IonTestCase):
         self.failUnlessEqual(res.ion_geospatial_lat_max, 89.956055)
         self.failUnlessEqual(res.ion_geospatial_lon_min, -179.95605)
         self.failUnlessEqual(res.ion_geospatial_lon_max, 179.95605)
+
+
+    @defer.inlineCallbacks
+    def test_validateDataResourceNegative(self):
+        raise unittest.SkipTest("Buildbot doesn't seem to have netCDF validator installed properly")
+
+        log.info("Creating and wrapping validation request")
+        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        validate_req_msg  = ais_req_msg.CreateObject(VALIDATE_DATASOURCE_REQ)
+        ais_req_msg.message_parameters_reference = validate_req_msg
+
+
+        validate_req_msg.data_resource_url = "http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day"
+        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
+
+        self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
+                             "validateDataResource passed a known-bad URL")
+
+
+
 
     @defer.inlineCallbacks
     def _validateDataResource(self, data_source_url):

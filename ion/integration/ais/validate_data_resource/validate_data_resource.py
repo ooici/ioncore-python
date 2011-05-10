@@ -22,6 +22,8 @@ from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 
+from ion.integration.eoi.validation.cdm_validation_service import CdmValidationClient
+
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
@@ -140,8 +142,8 @@ class ValidateDataResource(object):
 
     def __init__(self, ais):
         log.debug('Validatedataresource.__init__()')
-        self.mc    = ais.mc
-
+        self.mc  = ais.mc
+        self.vc  = CdmValidationClient(proc=ais)
 
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
@@ -180,6 +182,32 @@ class ValidateDataResource(object):
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
+
+
+            cdm_result = yield self.vc.validate(msg.data_resource_url)
+            
+            if not cdm_result.response_type == content.ResponseType.PASS:
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                
+                cr = cdm_result.ResponseType
+                why = {cr.NONE: 'No response',
+                       cr.PASS: 'Validation Passed!',
+                       cr.CDM_FAILURE: 'CDM (time-axis) validation failed',
+                       cr.CF_FAILURE: 'CF compliance failed x%d' % content.cf_error_count,
+                       cr.ERROR: "'Other' error: %s" % content.err_msg,
+                       }[cdm_result.response_type]
+
+
+                errtext = "ValidateDataResource.validate(): INVALID: %s." % why
+
+
+                log.info(errtext)
+                Response.error_num =  Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+
+
+
 
 
 

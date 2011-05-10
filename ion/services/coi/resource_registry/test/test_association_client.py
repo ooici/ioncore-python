@@ -88,7 +88,13 @@ class AssociationClientTest(IonTestCase):
         self.assertIn(association, ds_resource.ResourceAssociationsAsSubject)
         self.assertIn(association, type_resource.ResourceAssociationsAsObject)
 
-        # Put the association and the resources in the datastore
+        # Put the association and the resources in the datastore.  The association
+        # gets put into the registry as a side effect of putting the resources into the
+        # registry using the put_resource_transaction() method.
+        # Use put_resource_transaction() if both the subject and object resources have
+        # changed, as in the test code above where the ResourceNames were modified.
+        # If neither of the resources were modified you can just use put_instance() on
+        # the association.
         yield rc.put_resource_transaction([ds_resource, type_resource])
 
         ### Now get these from a completely separate process!
