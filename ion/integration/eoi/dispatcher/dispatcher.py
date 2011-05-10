@@ -118,12 +118,12 @@ class DispatcherProcess(Process):
     
     
     @defer.inlineCallbacks
-    def plc_init(self):
+    def plc_activate(self):
         """
         Initializes the Dispatching Service when spawned
         (Yields ALLOWED)
         """
-        log.info('plc_init(): LCO (process) initializing...')
+        log.info('plc_activate(): LCO (process) initializing...')
         
         # Step 0: Initialize dependencies
         temp_proc=Process()
@@ -151,7 +151,7 @@ class DispatcherProcess(Process):
             id = f.read().strip()
             # @todo: ensure this resource exists in the ResourceRepo
         except IOError:
-             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
+             log.warn('plc_activate(): Dispatcher ID could not be found.  One will be created instead')
         finally:
             if f is not None:
                 f.close()
@@ -175,7 +175,7 @@ class DispatcherProcess(Process):
         
         # Step 3: Store the new ID locally -- later used to create Subscription Subscribers
         self.dispatcher_id = id
-        log.info('\n\n__init__(): Retrieved dispatcher_id "%s"\n\n' % id)
+        log.info('\n\nplc_activate(): Retrieved dispatcher_id "%s"\n\n' % id)
         
 
         # Step 4: Generate Subscription Event Subscribers
@@ -199,7 +199,7 @@ class DispatcherProcess(Process):
         self._ac = None
         self._irc = None
 
-        log.debug('plc_init(): ******** COMPLETE ********')
+        log.debug('plc_activate(): ******** COMPLETE ********')
         
     
     @defer.inlineCallbacks
