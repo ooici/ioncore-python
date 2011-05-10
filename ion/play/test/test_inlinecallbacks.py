@@ -18,9 +18,7 @@ class Yields(unittest.TestCase):
         #print 'i: %d' % (self.incrementer)
 
     def _defer_thing(self):
-        d = defer.Deferred()
-        d.addCallback(self._thing)
-        reactor.callLater(0, d.callback, self.incrementer)
+        d = defer.maybeDeferred(self._thing, self.incrementer)
         return d
 
     @defer.inlineCallbacks
