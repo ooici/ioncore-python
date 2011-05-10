@@ -250,8 +250,12 @@ class InstrumentAgent(Process):
         """
         Buffer to hold instrument data for periodic transmission.
         """
-        #TODO driver integration. I think this is a list of strings.
         self._data_buffer = []
+        
+        """
+        The number of samples to keep in the data buffer before publicaiton.
+        """
+        self._data_buffer_limit = 0
     
         """
         List of current alarm conditions. Tuple of (ID,description).
@@ -309,6 +313,8 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.POWERED_DOWN)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -334,7 +340,8 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state="test")
             pass
         
         elif event == AgentEvent.EXIT:
@@ -379,6 +386,8 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
+            #yield self._state_publisher.create_and_publish_event(\
+            #   state=AgentState.INACTIVE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -436,6 +445,8 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.STOPPED)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -505,8 +516,9 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.IDLE)
             pass
-        
 
         elif event == AgentEvent.EXIT:
             pass
@@ -570,6 +582,8 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.OBSERVATORY_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -640,6 +654,8 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.DIRECT_ACCESS_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -2149,6 +2165,54 @@ class InstrumentAgent(Process):
             yield self.reply_err(msg,
                         'driver event occured evoked from a non-child process')
             return
+        
+        if type == DriverAnnouncement.DATA_RECEIVED:
+            if len(value) > 0:
+                strval = "{"
+                for (key,val) in value.iteritems():
+                    strval += "'"+key+"':"+str(val)+","
+                strval = strval[:-1]
+                strval += "}"
+            origin = "%s.%s" % (transducer,self.event_publisher_origin)
+            yield self._data_publisher.create_and_publish_event(origin=origin,
+                                                            description=strval)
+            
+        elif type == DriverAnnouncement.CONFIG_CHANGE:
+            pass
+        
+        elif type == DriverAnnouncement.ERROR:
+            pass
+        
+        elif type == DriverAnnouncement.STATE_CHANGE:
+            pass
+        
+        elif type == DriverAnnouncement.EVENT_OCCURRED:
+            pass
+            
+        else:
+            pass
+
+
+        """
+        content = {'type':DriverAnnouncement.DATA_RECEIVED,
+            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
+        self.send(self.proc_supid,'driver_event_occurred',content)                                                
+
+        
+        if (content["Type"] == publish_msg_type["Data"]):
+            yield self._data_publisher.create_and_publish_event( \
+                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                description=content["Value"])
+        elif ((content["Type"] == publish_msg_type["Error"])
+            or (content["Value"] == "ConfigChange")):
+            yield self._log_publisher.create_and_publish_event( \
+            origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+            description=content["Value"])
+        elif (content["Type"] == publish_msg_type["StateChange"]):
+            yield self._state_publisher.create_and_publish_event( \
+                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                description=content["Value"])
+        """
         
         self._debug_print_driver_event(type,transducer,value)
         

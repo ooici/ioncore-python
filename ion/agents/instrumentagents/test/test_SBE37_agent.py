@@ -54,7 +54,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # automatically. 
 SKIP_TESTS = [
     #'test_execute_instrument',
-    #'test_state_transitions',
+    'test_state_transitions',
     'dummy'
 ]    
 

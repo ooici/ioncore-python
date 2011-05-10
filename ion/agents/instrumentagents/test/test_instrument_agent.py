@@ -581,7 +581,6 @@ class TestInstrumentAgent(IonTestCase):
         self.assertIsInstance(result_1[AgentStatus.AGENT_VERSION][1],str)
         self.assertIsInstance(result_1[AgentStatus.PENDING_TRANSACTIONS][1],(list,tuple))
 
-
         # Get all observatory vals using explicit list.
         params_2 = AgentStatus.list()
         reply_2 = yield self.ia_client.get_observatory_status(params_2,'none')
@@ -707,7 +706,6 @@ class TestInstrumentAgent(IonTestCase):
 
         #raise unittest.SkipTest("Temp skip.")
 
-
         # Get all capabilities with the 'all' syntax.
         params = ['all']
         reply = yield self.ia_client.get_capabilities(params,'none')
@@ -728,7 +726,6 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_PARAMS][1])),True)
         self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_STATUSES][1])),True)
         
-
         # Get all capabilities with an explicit list.
         params = AgentCapability.list()
         reply = yield self.ia_client.get_capabilities(params,'none')
@@ -791,7 +788,6 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(result,None)
         self.assertEqual(transaction_id,None)
         
-        
         # Try to get capabilities with implicit transaction.
         params = ['all']
         reply = yield self.ia_client.get_capabilities(params,'create')
@@ -802,8 +798,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result,None)
         self.assertEqual(transaction_id,None)
-        
-        
+                
         # Try to get capabilities with bad transaction ID.
         bad_tid = str(uuid.uuid4())
         params = ['all']
@@ -816,7 +811,6 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(result,None)
         self.assertEqual(transaction_id,None)
         
-        
         # Get capabilities with correct transaction ID.
         params = ['all']
         reply = yield self.ia_client.get_capabilities(params,transaction_id_4)
@@ -826,7 +820,6 @@ class TestInstrumentAgent(IonTestCase):
         transaction_id_8 = transaction_id
         result_8 = result
         
-
         self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result_8,result_1)
         self.assertEqual(transaction_id_8,transaction_id_4)
@@ -836,9 +829,6 @@ class TestInstrumentAgent(IonTestCase):
         success = reply['success']
         
         self.assert_(InstErrorCode.is_ok(success))
-        
-
-
 
  
     @defer.inlineCallbacks
@@ -855,6 +845,8 @@ class TestInstrumentAgent(IonTestCase):
             def ondata(self, data):
                 log.debug("TestEventSubscriber received a message with name: %s",
                           data['content'].name)
+                print 'TestEventSubscriber received a message with name %s' % \
+                    data['content'].name
                 self.msgs.append(data)
                 
         subproc = Process()
@@ -872,36 +864,8 @@ class TestInstrumentAgent(IonTestCase):
         # check the event
         yield pu.asleep(1.0)
         self.assertEqual(len(testsub.msgs), 1)
-        self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!") 
- 
-    """
-    reply_ = yield self.ia_client.get_observatory(instrument_agent.ci_param_list,'none')
-    success_ = reply_['success']
-    result_ = reply_['result']
-    transaction_id_ = reply_['transaction_id']
-
-    self.assertEqual(success_[0],'OK')
-    self.assertEqual(type(transaction_id_),str)
-    self.assertEqual(len(transaction_id_),36)
-
-    self.assertEqual(success_[0],'ERROR') 
-    self.assertEqual(result_,None)
-    self.assertEqual(transaction_id_,None)
-    
-    print success_
-    print result_
-    print transaction_id_
-    
-    """
- 
-    """
-    def test_something(self):
-        pass
+        #print testsub.msgs[0]
+        #print testsub.msgs[0]['content']
+        #self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!")
         
-        #raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
-    """     
-    
-    
-
-
-
+        
