@@ -47,7 +47,7 @@ class AttributeStoreClient(store_service.StoreServiceClient):
             kwargs['targetname'] = "attributestore"
         ServiceClient.__init__(self, proc, **kwargs)
 
-        self.mc = proc.message_client
+        self.mc = self.proc.message_client
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AttributeStoreService)

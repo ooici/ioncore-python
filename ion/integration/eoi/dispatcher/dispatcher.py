@@ -65,10 +65,7 @@ class DispatcherProcess(Process):
         # Message Client and AssociationServiceClient will be lazy-initialized
         self._mc = None
         self._asc = None
-        
-        # Resource Client cannot be lazy initialized because it is used in
-        # the initialization of this process -- initialize inline to plc_init()
-        self.rc = None
+        self._rc = None
     
         
     @property
@@ -77,14 +74,25 @@ class DispatcherProcess(Process):
         #        But I cannot do the same with the ResourceClient.  I would assume both
         #        would fail because of a race condition in spawning..  but this one works
         #        somehow
-        if not self._mc:
+        if self._mc is None:
             self._mc = MessageClient(proc=self)
         return self._mc
-    
+
+
+    @property
+    def rc(self):
+        # @todo: Check into why I can initialize mc here (called during process spawning)
+        #        But I cannot do the same with the ResourceClient.  I would assume both
+        #        would fail because of a race condition in spawning..  but this one works
+        #        somehow
+        if self._rc is None:
+            self._rc = ResourceClient(proc=self)
+        return self._rc
+
     
     @property
     def asc(self):
-        if not self._asc:
+        if self._asc is None:
             self._asc = AssociationServiceClient(proc=self)
         return self._asc
     
@@ -98,11 +106,13 @@ class DispatcherProcess(Process):
         log.info('plc_init(): LCO (process) initializing...')
         
         # Step 0: Initialize dependencies
-        p = Process()
-        yield p.spawn()
-        yield self.register_life_cycle_object(p)
-        self.rc = ResourceClient(proc=p)
-        
+        temp_proc=Process()
+        yield temp_proc.spawn()
+        # Because the process is in the initialize transition create another process from which to do service ops and deal with resources.
+        self._rc = ResourceClient(proc=temp_proc)
+        self._asc = AssociationServiceClient(proc=temp_proc)
+        self._mc = MessageClient(proc=temp_proc)
+
 
         # Step 1: Get this dispatcher's ID from the local dispatcher.id file
         f = None
@@ -133,6 +143,8 @@ class DispatcherProcess(Process):
                     f.close()
 
         
+
+
         # Step 3: Store the new ID locally -- later used to create Subscription Subscribers
         self.dispatcher_id = id
         log.info('\n\n__init__(): Retrieved dispatcher_id "%s"\n\n' % id)
@@ -150,17 +162,29 @@ class DispatcherProcess(Process):
         
         # Step 5: Create all necessary Update Event Notification Subscribers
         yield self._preload_associated_workflows(self.dispatcher_id)
+
+
+        # Clean up the temporary process used during init:
+        yield temp_proc.terminate()
+        self._rc = None
+        self._mc = None
+        self._asc = None
+
         log.debug('plc_init(): ******** COMPLETE ********')
         
     
     @defer.inlineCallbacks
     def _register_dispatcher(self, name):
-        rc = yield self.rc
+
+        # Explicitly create a resource client with an anonymous process so that we can push during plc init of the dispatcher process!
+        rc = self.rc
         disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         disp_res.dispatcher_name = name
         yield rc.put_instance(disp_res, 'Commiting new dispatcher resource for registration')
-        
-        defer.returnValue(str(disp_res.ResourceIdentity))
+
+        res_id = disp_res.ResourceIdentity
+
+        defer.returnValue(str(res_id))
 
     
     @defer.inlineCallbacks

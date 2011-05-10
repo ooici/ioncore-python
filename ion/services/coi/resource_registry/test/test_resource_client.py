@@ -13,6 +13,7 @@ from twisted.trial import unittest
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
+from ion.core.process.process import Process
 
 from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
@@ -58,6 +59,20 @@ class ResourceClientTest(IonTestCase):
     def tearDown(self):
         yield self._shutdown_processes()
         yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_resource_client_in_proc_init(self):
+
+        p = Process()
+        yield p.initialize()
+
+        rc = ResourceClient(proc=p)
+
+        resource = yield rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+
+        self.assertEqual(resource.ResourceName, 'Test AddressLink Resource')
+
 
     @defer.inlineCallbacks
     def test_create_resource(self):
