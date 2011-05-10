@@ -16,6 +16,7 @@ Sample Dataset are configure and loaded like so:
 """
 import tarfile
 import random
+import time
 from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -496,8 +497,8 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     gmtuple = time.gmtime(end_time)
     etime = time.strftime("%Y-%m-%dT%H:%M:%S", gmtuple)
 
-    attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime.time_str,])
-    attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime.time_str,])
+    attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime,])
+    attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime,])
 
     attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', [str(lat)])
     attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', [str(lat)])
