@@ -431,14 +431,31 @@ class IngestionService(ServiceProcess):
         try:
             agg_dim = root.FindDimensionByName(merge_agg_dim.name)
             agg_offset = agg_dim.length
-        except OOIObjectError, oie:
-            log.debug(oie)
+        except OOIObjectError, oe:
+            log.debug('No Dimension found in current dataset:' + str(oe))
+
+        print 'KDNSKSNSKNSKSNKSNKS'
+
+        try:
+            string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
+            print 'string_time',string_time.GetValue()
+            print 'KDNSKSNSKNSKSNKSNKS'
+            supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+        except OOIObjectError, oe:
+            log.debug('No start time attribute found in dataset supplement!' + str(oe))
+            raise IngestionError('No start time attribute found in dataset supplement!')
 
 
         try:
-            current_etime = root.FindAttributeByName('ion_time_coverage_end')
-            calendar.timegm(time.strptime(val, '%Y-%m-%dT%H:%M:%SZ'))
-        
+            string_time = root.FindAttributeByName('ion_time_coverage_end')
+            current_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+            if current_etime == supplement_stime:
+                agg_offset -= 1
+
+        except OOIObjectError, oe:
+            log.debug(oe)
 
 
 
