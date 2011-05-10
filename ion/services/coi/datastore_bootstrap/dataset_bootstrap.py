@@ -486,8 +486,16 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     attrib_references = _create_string_attribute(dataset, 'references', ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
     attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
 
-    stime = IonTime(start_time * 1000)
-    etime = IonTime(end_time * 1000)
+    # Don't use internal time tool - we don't want fractional seconds or 'T'
+    #stime = IonTime(start_time * 1000)
+    #etime = IonTime(end_time * 1000)
+
+    gmtuple = time.gmtime(start_time)
+    stime = time.strftime("%Y-%m-%dT%H:%M:%S", gmtuple)
+
+    gmtuple = time.gmtime(end_time)
+    etime = time.strftime("%Y-%m-%dT%H:%M:%S", gmtuple)
+
     attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime.time_str,])
     attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime.time_str,])
 

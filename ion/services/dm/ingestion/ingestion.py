@@ -12,11 +12,9 @@ To test this with the Java CC!
 > scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
-import time
+import time, calendar
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
 import ion.util.ionlog
-
-log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.python import reflect
 
@@ -36,11 +34,14 @@ from ion.services.coi import datastore
 
 from ion.core.exception import ReceivedApplicationError, ReceivedError, ReceivedContainerError
 
+from ion.core.object.gpb_wrapper import OOIObjectError
+
 from ion.core import ioninit
+from ion.core.object import object_utils
 
 CONF = ioninit.config(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.object import object_utils
 
 CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
@@ -402,10 +403,42 @@ class IngestionService(ServiceProcess):
 
         merge_root = self.dataset.Merge[0].root_group
 
+        dimension_order = []
+
         for var in merge_root.variables:
 
-            print var
+            print '\n\n\n\n\n\n'
+            print var.name
+            print var.shape.PPrint()
 
+            for dim in reversed(var.shape):
+
+                if dim not in dimension_order:
+                    print 'adding dimension name: %s '% dim.name
+
+                    dimension_order.insert(0, dim)
+
+        print 'FINAL DIM ORDER'
+        print [ dim.name for dim in dimension_order]
+
+
+        merge_agg_dim = dimension_order[0]
+
+
+        root = self.dataset.root_group
+
+        agg_offset = 0
+        try:
+            agg_dim = root.FindDimensionByName(merge_agg_dim.name)
+            agg_offset = agg_dim.length
+        except OOIObjectError, oie:
+            log.debug(oie)
+
+
+        try:
+            current_etime = root.FindAttributeByName('ion_time_coverage_end')
+            calendar.timegm(time.strptime(val, '%Y-%m-%dT%H:%M:%SZ'))
+        
 
 
 
@@ -488,23 +521,3 @@ class IngestionClient(ServiceClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IngestionService)
-
-'''
-
-#----------------------------#
-# Application Startup
-#----------------------------#
-:: bash ::
-bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
-
-
-#----------------------------#
-# Begin_Ingest Testing
-#----------------------------#
-from ion.services.dm.ingestion.ingestion import IngestionClient
-client = IngestionClient()
-spawn('ingestion')
-
-client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
-
-'''
