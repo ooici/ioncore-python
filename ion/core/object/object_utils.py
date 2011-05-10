@@ -159,7 +159,13 @@ def build_gpb_lookup(rootpath):
                             for val in enum_type.values:
                                 if val.name == ENUM_ID_NAME:
                                     if gpb_id_to_class.has_key(val.number):
-                                        raise ObjectUtilException('Duplicate _MessageTypeIdentifier for ID# %s' % str(val.number))
+                                        old_def = str(gpb_id_to_class[val.number].__module__)
+                                        new_def = str(msg_class.__module__)
+                                        gpb_num = str(val.number)
+                                        raise ObjectUtilException('Duplicate _MessageTypeIdentifier for '\
+                                                                      + 'ID# %s in %s; original definition in %s' \
+                                                                      % (gpb_num, new_def, old_def))
+
                                     gpb_id_to_class[val.number] = msg_class
                                 elif val.name == ENUM_VERSION_NAME:
                                     # Eventually this will implement versioning...

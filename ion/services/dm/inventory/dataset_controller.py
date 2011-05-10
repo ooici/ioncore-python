@@ -10,7 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, rsa_to_dot_ssh
+from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync
 from ion.core import ioninit
 
 from ion.core.process.process import ProcessFactory
@@ -20,8 +20,12 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
 from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
     HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID, ANONYMOUS_USER_ID
+
+SCHEDULER_ADD_REQ_TYPE = object_utils.create_type_identifier(object_id=2601, version=1)
+RSYNC_TYPE = object_utils.create_type_identifier(object_id=2402, version=1)
 
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
@@ -80,8 +84,6 @@ LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1
 
 
 CONF = ioninit.config(__name__)
-NCML_PATH = CONF['ncml_path']
-THREDDS_NCML_URL = CONF['thredds_ncml_url']
 
 class DatasetControllerError(ApplicationError):
     """
@@ -105,25 +107,58 @@ class DatasetController(ServiceProcess):
 
         # Can be called in __init__ or in slc_init... no yield required
         self.resource_client = ResourceClient(proc=self)
-
+        self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
 
         # As per DS, pull config from spawn args first and config file(s) second
-        self.rsa_key = self.spawn_args.get('rsa_key', CONF.getValue('rsa_key', default=None))
+        self.private_key = self.spawn_args.get('private_key' ,
+                                               CONF.getValue('private_key'))
+        self.public_key = self.spawn_args.get('public_key' ,
+                                              CONF.getValue('public_key'))
         self.server_url = self.spawn_args.get('thredds_ncml_url',
                                               CONF.getValue('thredds_ncml_url',
-                                              default='thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))
-        self.update_interval = self.spawn_args.get('update_interval', CONF.getValue('update_interval', default=5.0))
-        log.debug('rsa key: %s Update: %f URL: %s' % (self.rsa_key, self.update_interval, self.server_url))
+                                              default='datactlr@thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))
+        self.update_interval = self.spawn_args.get('update_interval',
+                                                   CONF.getValue('update_interval', default=5.0))
+        self.ncml_path = self.spawn_args.get('ncml_path',
+                                            CONF.getValue('ncml_path', default='/tmp'))
 
-        if self.rsa_key:
-            rsa_to_dot_ssh(self.rsa_key)
-        log.debug('Creating new message receiver for scheduler')
+        log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
+        log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
 
-        log.debug('Scheduling periodic rsync')
-            
+        #log.debug('Creating new message receiver for scheduler')
+
+        #log.debug('Scheduling periodic rsync')
         log.info('SLC_INIT Dataset Controller')
 
+    @defer.inlineCallbacks
+    def _create_scheduled_event(self):
+        log.debug('creating scheduled event')
+
+        msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
+        msg.interval_seconds = self.update_interval
+        msg.payload = msg.CreateObject(RSYNC_TYPE)
+
+        log.debug('Sending request to scheduler')
+        yield self.ssc.add_task(msg)
+        log.debug('got response')
+
+    #noinspection PyUnusedLocal
+    @defer.inlineCallbacks
+    def do_ncml_sync(self, request, headers, msg):
+        """
+        @brief On receipt of scheduler message, do rsync with server, moving
+        any new ncml files over.
+        """
+
+        # @todo fstat the ncml directory to check for new files
+        log.debug('rsync scheduled beginning now')
+
+        yield do_complete_rsync(self.ncml_path, self.server_url,
+                                self.private_key, self.public_key)
+
+        log.debug('rsync complete')
+        
     #noinspection PyUnusedLocal
     @defer.inlineCallbacks
     def op_create_dataset_resource(self, request, headers, msg):
@@ -170,10 +205,9 @@ class DatasetController(ServiceProcess):
         # Set a response code in the message envelope
         response.MessageResponseCode = response.ResponseCodes.OK
 
-        # pfh - create local ncml file as well
-        create_ncml(response.key, NCML_PATH)
-        # Push to server
-        #yield rsync_ncml(NCML_PATH, THREDDS_NCML_URL)
+        # pfh - create local ncml file as well. These accumulate and are
+        # harvested by the scheduled rsync
+        create_ncml(response.key, self.ncml_path)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)

@@ -18,7 +18,8 @@ import ion.util.ionlog
 from ion.util.itv_decorator import itv
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, rsa_to_dot_ssh, ssh_add, do_complete_rsync
+from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, \
+    rsa_to_dot_ssh, ssh_add, do_complete_rsync
 from ion.services.dm.inventory import ncml_generator
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -28,7 +29,7 @@ class PSAT(IonTestCase):
     def setUp(self):
         self.old_cmd = ncml_generator.RSYNC_CMD
 
-        self.server_url = 'thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'
+        self.server_url = 'datactlr@thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'
         self.filedir = tempfile.mkdtemp()
 
     def tearDown(self):
@@ -50,11 +51,7 @@ class PSAT(IonTestCase):
         # Switch to a no-op command
         ncml_generator.RSYNC_CMD = 'echo'
 
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
+        self._make_some_datafiles(5)
 
         yield rsync_ncml(self.filedir, self.server_url)
 
@@ -63,15 +60,15 @@ class PSAT(IonTestCase):
     @defer.inlineCallbacks
     def test_with_rsync(self):
         raise unittest.SkipTest('Does not work without account on amoeba')
-        
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
-        create_ncml(str(uuid4()), self.filedir)
+
+        self._make_some_datafiles(5)
 
         yield rsync_ncml(self.filedir, self.server_url)
 
+
+    def _make_some_datafiles(self, num_files):
+        for idx in range(num_files):
+            create_ncml(str(uuid4()), self.filedir)
 
     def _get_rsa_key(self):
         rsa_key_fn = os.path.join(os.path.dirname(__file__), 'data', 'id_rsa')
@@ -114,8 +111,28 @@ class PSAT(IonTestCase):
 
     @defer.inlineCallbacks
     def test_complete(self):
+        # Switch to a no-op command
+        ncml_generator.RSYNC_CMD = 'echo'
+
         pubkey = self._get_public_key()
         privkey= self._get_rsa_key()
 
         yield do_complete_rsync(self.filedir, self.server_url, privkey, pubkey)
 
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_complete_realkey(self):
+
+        rsa_key_fn = os.path.join(os.path.dirname(__file__), 'data', 'datactlr.rsa')
+
+        # Only run this test iff you have the required keyfile locally.
+        if not os.path.exists(rsa_key_fn):
+            raise unittest.SkipTest('Missing RSA key %s' % rsa_key_fn)
+        
+        privkey = open(rsa_key_fn, 'r').read()
+        rsa_key_fn = os.path.join(os.path.dirname(__file__), 'data', 'datactlr.pub')
+        pubkey = open(rsa_key_fn, 'r').read()
+
+        self._make_some_datafiles(5)
+
+        yield do_complete_rsync(self.filedir, self.server_url, privkey, pubkey)
