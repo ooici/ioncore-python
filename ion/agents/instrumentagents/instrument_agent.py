@@ -205,13 +205,7 @@ class InstrumentAgent(Process):
         the current transaction ends.
         """
         self._pending_transactions = []
-        
-        """
-        An integer in seconds for how long to wait to acquire a new
-        transaction if a value is not explicitly given.
-        """
-        #self._default_acq_timeout = 20   
-        
+                
         """
         An integer in seconds for the maximum allowable timeout to wait for
         a new transaction.
@@ -256,8 +250,12 @@ class InstrumentAgent(Process):
         """
         Buffer to hold instrument data for periodic transmission.
         """
-        #TODO driver integration. I think this is a list of strings.
         self._data_buffer = []
+        
+        """
+        The number of samples to keep in the data buffer before publicaiton.
+        """
+        self._data_buffer_limit = 0
     
         """
         List of current alarm conditions. Tuple of (ID,description).
@@ -289,11 +287,11 @@ class InstrumentAgent(Process):
         A finite state machine to track and manage agent state according to
         the general instrument state model.
         """
-        self.fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
+        self._fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
                                  AgentEvent.ENTER,AgentEvent.EXIT)
        
         # Set initial state.
-        self.fsm.start(AgentState.UNINITIALIZED)
+        self._fsm.start(AgentState.UNINITIALIZED)
 
 
     ############################################################################
@@ -312,9 +310,11 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.POWERED_DOWN)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -336,11 +336,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state="test")
             pass
         
         elif event == AgentEvent.EXIT:
@@ -381,10 +382,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
+            #yield self._state_publisher.create_and_publish_event(\
+            #   state=AgentState.INACTIVE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -438,10 +441,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.STOPPED)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -507,12 +512,13 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.IDLE)
             pass
-        
 
         elif event == AgentEvent.EXIT:
             pass
@@ -573,9 +579,11 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.OBSERVATORY_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -643,9 +651,11 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            #yield self._state_publisher.create_and_publish_event(\
+            #    state=AgentState.DIRECT_ACCESS_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -944,7 +954,6 @@ class InstrumentAgent(Process):
             else:
                 return False
         
-        
         # Allow only gets without a current or created transaction.
         if tid == 'none' and self.transaction_id == None and optype == 'get':
             return True
@@ -1020,7 +1029,7 @@ class InstrumentAgent(Process):
                     reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
 
                 else:
-                    reply['success'] = yield self.fsm.on_event_async(cmd[1])
+                    reply['success'] = yield self._fsm.on_event_async(cmd[1])
                         
             # TRANSMIT DATA command.
             elif cmd[0] == AgentCommand.TRANSMIT_DATA:
@@ -1498,17 +1507,7 @@ class InstrumentAgent(Process):
             
             get_errors = False
             result = {}
-            
-            """
-            AGENT_STATE = 'AGENT_STATUS_AGENT_STATE' # Basic agent state.
-            CONNECTION_STATE = 'AGENT_STATUS_CONNECTION_STATE'
-            OBSERVATORY_STATE = 'AGENT_STATUS_OBSERVATORY_STATE'
-            ALARMS = 'AGENT_STATUS_ALARMS'
-            TIME_STATUS = 'AGENT_STATUS_TIME_STATUS'
-            BUFFER_SIZE = 'AGENT_STATUS_BUFFER_SIZE'
-            AGENT_VERSION = 'AGENT_STATUS_AGENT_VERSION'
-            """
-            
+                        
             # Set up the result message.
             for arg in params:
 
@@ -1521,7 +1520,7 @@ class InstrumentAgent(Process):
                 # Agent state.
                 if arg == AgentStatus.AGENT_STATE or arg == 'all':
                     result[AgentStatus.AGENT_STATE] = \
-                        (InstErrorCode.OK,self.fsm.get_current_state())
+                        (InstErrorCode.OK,self._fsm.get_current_state())
 
                 # Connection state.                        
                 if arg == AgentStatus.CONNECTION_STATE or arg == 'all':
@@ -1548,7 +1547,7 @@ class InstrumentAgent(Process):
                     result[AgentStatus.AGENT_VERSION] = \
                         (InstErrorCode.OK,self.get_version())                
                     
-                # Agent software version.
+                # Pending transactions.
                 if arg == AgentStatus.PENDING_TRANSACTIONS or arg == 'all':
                     result[AgentStatus.PENDING_TRANSACTIONS] = \
                         (InstErrorCode.OK,self._pending_transactions)                
@@ -1593,7 +1592,8 @@ class InstrumentAgent(Process):
         params = content['params']
         tid = content['transaction_id']
         
-        assert(isinstance(params,(tuple,list))), 'Expected a parameter list or tuple.'
+        assert(isinstance(params,(tuple,list))), 'Expected a parameter list \
+            or tuple.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
@@ -1651,7 +1651,8 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_COMMANDS or arg == 'all':
                     #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_command_1','device_command_2'])
+                    dvr_val = (InstErrorCode.OK,
+                               ['device_command_1','device_command_2'])
                     result[AgentCapability.DEVICE_COMMANDS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
@@ -1659,7 +1660,8 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_PARAMS or arg == 'all':
                     #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_param_1','device_param_2','device_param_3'])
+                    dvr_val = (InstErrorCode.OK,['device_param_1',
+                        'device_param_2','device_param_3'])
                     result[AgentCapability.DEVICE_PARAMS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
@@ -1667,7 +1669,8 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_STATUSES or arg == 'all':
                     #TODO driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_status_1','device_status_2','device_status_3'])
+                    dvr_val = (InstErrorCode.OK,['device_status_1',
+                        'device_status_2','device_status_3'])
                     result[AgentCapability.DEVICE_STATUSES] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
@@ -1707,7 +1710,7 @@ class InstrumentAgent(Process):
             {'channels':[chan_arg,...,chan_arg],'command':[command,arg,...,argN],
             'transaction_id':transaction_id}
         @retval A reply message with a dict
-            {'success':success,'result':{chan_arg:(success,command_specific_values),
+            {'success':success,'result':{chan_arg:(success,command_specific),
             ...,chan_arg:(success,command_specific_values)},
             'transaction_id':transaction_id}. 
         """
@@ -1751,7 +1754,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
 
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
@@ -1823,7 +1826,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -1894,7 +1897,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
@@ -1961,7 +1964,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
          
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.DIRECT_ACCESS_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
@@ -2034,7 +2037,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -2107,7 +2110,7 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -2162,6 +2165,54 @@ class InstrumentAgent(Process):
             yield self.reply_err(msg,
                         'driver event occured evoked from a non-child process')
             return
+        
+        if type == DriverAnnouncement.DATA_RECEIVED:
+            if len(value) > 0:
+                strval = "{"
+                for (key,val) in value.iteritems():
+                    strval += "'"+key+"':"+str(val)+","
+                strval = strval[:-1]
+                strval += "}"
+            origin = "%s.%s" % (transducer,self.event_publisher_origin)
+            yield self._data_publisher.create_and_publish_event(origin=origin,
+                                                            description=strval)
+            
+        elif type == DriverAnnouncement.CONFIG_CHANGE:
+            pass
+        
+        elif type == DriverAnnouncement.ERROR:
+            pass
+        
+        elif type == DriverAnnouncement.STATE_CHANGE:
+            pass
+        
+        elif type == DriverAnnouncement.EVENT_OCCURRED:
+            pass
+            
+        else:
+            pass
+
+
+        """
+        content = {'type':DriverAnnouncement.DATA_RECEIVED,
+            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
+        self.send(self.proc_supid,'driver_event_occurred',content)                                                
+
+        
+        if (content["Type"] == publish_msg_type["Data"]):
+            yield self._data_publisher.create_and_publish_event( \
+                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                description=content["Value"])
+        elif ((content["Type"] == publish_msg_type["Error"])
+            or (content["Value"] == "ConfigChange")):
+            yield self._log_publisher.create_and_publish_event( \
+            origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+            description=content["Value"])
+        elif (content["Type"] == publish_msg_type["StateChange"]):
+            yield self._state_publisher.create_and_publish_event( \
+                origin="%s.%s" % (content["Transducer"], self.event_publisher_origin),
+                description=content["Value"])
+        """
         
         self._debug_print_driver_event(type,transducer,value)
         
@@ -2284,7 +2335,8 @@ class InstrumentAgent(Process):
                 # Driver and client constructed. Set client object.
                 else:
                     self._driver_client = driver_client
-                    self._debug_print('constructed driver client',str(self._driver_client))
+                    self._debug_print('constructed driver client',
+                                      str(self._driver_client))
                     
 
     def _condemn_driver(self):
@@ -2347,7 +2399,7 @@ class InstrumentAgent(Process):
         """
             
         if ((self._driver_pid != None) and (self._driver_client != None)):
-            curstate = self.fsm.get_current_state()
+            curstate = self._fsm.get_current_state()
             
             if curstate == AgentState.POWERED_DOWN:
                 return AgentConnectionState.POWERED_DOWN

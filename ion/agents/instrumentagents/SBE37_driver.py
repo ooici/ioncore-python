@@ -97,13 +97,6 @@ class SBE37Channel(BaseEnum):
     CONDUCTIVITY = DriverChannel.CONDUCTIVITY
 
 
-class SBE37Announcement(DriverAnnouncement):
-    """
-    Add sbe37 specific announcements here.
-    """
-    pass
-
-
 class SBE37Status(DriverStatus):
     """
     Add sbe37 statuses here.
@@ -678,7 +671,7 @@ class SBE37Driver(InstrumentDriver):
         self._debug_print(event)
         if event == SBE37Event.ENTER:
             # Announce the state change to agent.                        
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.UNCONFIGURED}
             self.send(self.proc_supid,'driver_event_occurred',content)
@@ -716,7 +709,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)
@@ -762,7 +755,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTING}
             self.send(self.proc_supid,'driver_event_occurred',content)
@@ -801,7 +794,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
@@ -839,7 +832,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTED}
             self.send(self.proc_supid,'driver_event_occurred',content)            
@@ -905,7 +898,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
                         
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.ACQUIRE_SAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
@@ -965,7 +958,7 @@ class SBE37Driver(InstrumentDriver):
                                 
         elif event == SBE37Event.DATA_RECEIVED:
 
-            #content = {'type':SBE37Announcement.STATE_CHANGE,
+            #content = {'type':DriverAnnouncement.STATE_CHANGE,
             # 'transducer':SBE37Channel.INSTRUMENT,
             #           'value':SBE37State.UNCONFIGURED}
             #self.send(self.proc_supid,'driver_event_occurred',content)
@@ -980,7 +973,7 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]                
                 self._debug_print('received samples',samples)
-                content = {'type':SBE37Announcement.DATA_RECEIVED,
+                content = {'type':DriverAnnouncement.DATA_RECEIVED,
                            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
                 self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
@@ -1010,7 +1003,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
 
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.AUTOSAMPLE}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
@@ -1114,7 +1107,7 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]
                 self._debug_print('received samples',samples)
-                content = {'type':SBE37Announcement.DATA_RECEIVED,
+                content = {'type':DriverAnnouncement.DATA_RECEIVED,
                            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
                 self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
@@ -1143,7 +1136,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.UPDATE_PARAMS}
             self.send(self.proc_supid,'driver_event_occurred',content)                                    
@@ -1180,7 +1173,7 @@ class SBE37Driver(InstrumentDriver):
             # Announce the config change to agent. This assumes
             # that param updates occur one-to-one with config changes.
             paramdict = self.get_parameter_dict()
-            content = {'type':SBE37Announcement.CONFIG_CHANGE,
+            content = {'type':DriverAnnouncement.CONFIG_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':paramdict}
             self.send(self.proc_supid,'driver_event_occurred',content)                                                
@@ -1240,7 +1233,7 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            content = {'type':SBE37Announcement.STATE_CHANGE,
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.SET}
             self.send(self.proc_supid,'driver_event_occurred',content)                                                
