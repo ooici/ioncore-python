@@ -27,9 +27,12 @@ class Yields(unittest.TestCase):
     def _yield_thing(self):
         yield self._defer_thing()
 
+    def flat_call(self):
+        [self._thing(0) for i in xrange(self.runs)]
+
     @defer.inlineCallbacks
-    def flat(self):
-        ds = [self._defer_thing() for i in range(self.runs)]
+    def flat_defer(self):
+        ds = [self._defer_thing() for i in xrange(self.runs)]
         yield defer.DeferredList(ds)
 
     @defer.inlineCallbacks
@@ -45,7 +48,7 @@ class Yields(unittest.TestCase):
             return func
 
         func = multiwrap(self._defer_thing, 10)
-        ds = [func() for i in range(self.runs)]
+        ds = [func() for i in xrange(self.runs)]
         yield defer.DeferredList(ds)
 
     @defer.inlineCallbacks
@@ -62,11 +65,11 @@ class Yields(unittest.TestCase):
             return func
 
         func = multiwrap(self._defer_thing, 10)
-        ds = [func() for i in range(self.runs)]
+        ds = [func() for i in xrange(self.runs)]
         yield defer.DeferredList(ds)
 
     @defer.inlineCallbacks
     def wrap1yield(self):
-        ds = [self._yield_thing() for i in range(self.runs)]
+        ds = [self._yield_thing() for i in xrange(self.runs)]
         yield defer.DeferredList(ds)
     
