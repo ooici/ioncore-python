@@ -22,14 +22,15 @@ from ion.core import ioninit
 from ion.core.intercept import interceptor
 from ion.core.security import authentication
 from ion.util import procutils as pu
+from ion.util.path import adjust_dir
 
 
 # Configuration
 CONF = ioninit.config(__name__)
 msg_sign = CONF.getValue('msg_sign', True)
 #XXX HACKS
-_priv_key_path = CONF.getValue('priv_key_path')
-_cert_path = CONF.getValue('cert_path')
+_priv_key_path = adjust_dir(CONF.getValue('priv_key_path'))
+_cert_path = adjust_dir(CONF.getValue('cert_path'))
 
 
 class DigitalSignatureInterceptor(interceptor.EnvelopeInterceptor):

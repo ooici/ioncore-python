@@ -19,6 +19,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.cc import container
+from ion.util.path import adjust_dir
 
 class Options(usage.Options):
     """
@@ -146,13 +147,8 @@ class CapabilityContainer(service.Service):
         """
 
         # Try two script locations, one for IDEs and another for shell.
-
         for script in self.config['scripts']:
-
-            #script = os.path.abspath(script)
-            if not os.path.isfile(script):
-                # @TODO fix this hack so that res is accesible as part of a package...
-                script = os.path.join(os.path.dirname(ion.__file__), '../'+script)
+            script = adjust_dir(script)
             if not os.path.isfile(script):
                 log.error('Bad startup script path: %s' % script)
             else:
@@ -163,8 +159,6 @@ class CapabilityContainer(service.Service):
                 else:
                     log.info("Executing script %s ..." % script)
                     execfile(script, {})
-
-
 
     def run_boot_script(self):
         """
