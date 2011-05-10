@@ -2429,29 +2429,26 @@ class InstrumentAgent(Process):
             intermittant wetside agent component.
         """
             
-        if ((self._driver_pid != None) and (self._driver_client != None)):
-            curstate = self._fsm.get_current_state()
-            
-            if curstate == AgentState.POWERED_DOWN:
-                return AgentConnectionState.POWERED_DOWN
-            elif curstate == AgentState.UNINITIALIZED:
-                return AgentConnectionState.NO_DRIVER
-            elif curstate == AgentState.INACTIVE:
-                return AgentConnectionState.DISCONNECTED
-            elif curstate == AgentState.IDLE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.STOPPED:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.OBSERVATORY_MODE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.DIRECT_ACCESS_MODE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.UNKNOWN:
-                return AgentConnectionState.UNKOWN
-            else:
-                return AgentConnectionState.UNKOWN
-        else:
+        curstate = self._fsm.get_current_state()
+        
+        if curstate == AgentState.POWERED_DOWN:
+            return AgentConnectionState.POWERED_DOWN
+        elif curstate == AgentState.UNINITIALIZED:
             return AgentConnectionState.NO_DRIVER
+        elif curstate == AgentState.INACTIVE:
+            return AgentConnectionState.DISCONNECTED
+        elif curstate == AgentState.IDLE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.STOPPED:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.OBSERVATORY_MODE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.DIRECT_ACCESS_MODE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.UNKNOWN:
+            return AgentConnectionState.UNKOWN
+        else:
+            return AgentConnectionState.UNKOWN
         
         
     def _is_child_process(self, name):
