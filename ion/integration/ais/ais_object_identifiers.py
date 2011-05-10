@@ -8,6 +8,10 @@ AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, versi
 AIS_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9002, version=1)
 AIS_RESPONSE_ERROR_TYPE = object_utils.create_type_identifier(object_id=9003, version=1)
 
+
+VALIDATE_DATASOURCE_REQ = object_utils.create_type_identifier(object_id=9010, version=1)
+VALIDATE_DATASOURCE_RSP = object_utils.create_type_identifier(object_id=9011, version=1)
+
 # AisDataResourceMetadata GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_resource_metadata.proto
 AIS_DATASET_METADATA_TYPE = object_utils.create_type_identifier(object_id=9021, version=1)
 """
