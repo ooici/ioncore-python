@@ -135,7 +135,7 @@ class ManageDataResource(object):
                                                                   dataset_resource.ResourceIdentity,
                                                                   datasrc_resource.ResourceIdentity)
 
-                    log.info("got this from scheduler: " + str(sched_task))
+                    #log.info("got this from scheduler: " + str(sched_task))
 
                     log.info("associating scheduler task info with this resource")
                     sched_task_rsrc = yield self.rc.create_instance(DATA_RESOURCE_SCHEDULED_TASK_TYPE,
@@ -364,7 +364,7 @@ class ManageDataResource(object):
             tmp = yield self.dscc.create_dataset_resource(dataset_req)
             my_dataset_id = tmp.key
             dataset_resource = yield self.rc.get_instance(my_dataset_id)
-            log.info("created data set " + str(dataset_resource))
+            log.info("created data set ") # + str(dataset_resource))
 
             # create topics
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
@@ -382,12 +382,18 @@ class ManageDataResource(object):
             if (msg.IsFieldSet("update_interval_seconds") and \
                     msg.IsFieldSet("update_start_datetime_millis") and \
                     msg.update_interval_seconds > 0):
+
+                #record values
+                datasrc_resource.update_interval_seconds       = msg.update_interval_seconds
+                datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
+
+
                 # set up the scheduled task
                 sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
                                                               msg.update_start_datetime_millis,
                                                               my_dataset_id,
                                                               my_datasrc_id)
-                log.info("got this from scheduler: " + str(sched_task))
+                #log.info("got this from scheduler: " + str(sched_task))
 
                 sched_task_rsrc = yield self.rc.create_instance(DATA_RESOURCE_SCHEDULED_TASK_TYPE,
                                                                 ResourceName="ScheduledTask resource")
@@ -396,6 +402,7 @@ class ManageDataResource(object):
                 association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
+
 
             #mark lifecycle states, public by default
             if (msg.IsFieldSet("is_public") and not msg.is_public):
@@ -536,7 +543,7 @@ class ManageDataResource(object):
 
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
-        log.info("created data source " + str(datasrc_resource))
+        log.info("created data source ") # + str(datasrc_resource))
 
         defer.returnValue(datasrc_resource)
 

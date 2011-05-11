@@ -473,12 +473,13 @@ class AISManageDataResourceTest(IonTestCase):
         self.failUnlessEqual(cm.request_type,                  dr.request_type)
         self.failUnlessEqual(cm.ion_description,               dr.ion_description)
         self.failUnlessEqual(cm.ion_institution_id,            dr.ion_institution_id)
+        self.failUnlessEqual(cm.update_interval_seconds,       dr.update_interval_seconds)
         self.failUnlessEqual(cm.update_start_datetime_millis,  dr.update_start_datetime_millis)
         self.failUnlessEqual(cm.ion_title,                     dr.ion_title)
         self.failUnlessEqual(cm.dataset_url,                   dr.dataset_url)
 
-        #test default value for max ingest millis
-        self.failUnlessEqual(DEFAULT_MAX_INGEST_MILLIS,        dr.max_ingest_millis)
+        #test default value for max ingest millis, 1 second less than update interval
+        self.failUnlessEqual((cm.update_interval_seconds - 1) * 1000, dr.max_ingest_millis)
 
         #fixme, check association with cm.user_id ... but resource registry handles this?
 
