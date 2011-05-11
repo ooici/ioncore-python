@@ -521,6 +521,18 @@ class InstErrorCode(BaseEnum):
         else:
             return list(x)            
         
+    @classmethod
+    def get_string(cls,x):
+        """
+        Convert an error code to a printable string.
+        """
+        if cls.has(x):
+            strval = ''
+            for item in x:
+                strval += str(item) + ', '
+            strval = strval[:-2]
+            return strval
 
-
-
+        else:
+            return None
+        
