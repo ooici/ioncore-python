@@ -405,18 +405,19 @@ class IngestionService(ServiceProcess):
 
         dimension_order = []
 
-        for var in merge_root.variables:
+        for merge_var in merge_root.variables:
 
             print '\n\n\n\n\n\n'
-            print var.name
-            print var.shape.PPrint()
+            print merge_var.name
+            print merge_var.shape.PPrint()
 
-            for dim in reversed(var.shape):
+            # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
+            for merge_dim in reversed(merge_var.shape):
 
-                if dim not in dimension_order:
-                    print 'adding dimension name: %s '% dim.name
+                if merge_dim not in dimension_order:
+                    print 'adding dimension name: %s '% merge_dim.name
 
-                    dimension_order.insert(0, dim)
+                    dimension_order.insert(0, merge_dim)
 
         print 'FINAL DIM ORDER'
         print [ dim.name for dim in dimension_order]
@@ -431,15 +432,13 @@ class IngestionService(ServiceProcess):
         try:
             agg_dim = root.FindDimensionByName(merge_agg_dim.name)
             agg_offset = agg_dim.length
+            log.info('Aggregation offset from current dataset: %d' % agg_offset)
+
         except OOIObjectError, oe:
             log.debug('No Dimension found in current dataset:' + str(oe))
 
-        print 'KDNSKSNSKNSKSNKSNKS'
-
         try:
             string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
-            print 'string_time',string_time.GetValue()
-            print 'KDNSKSNSKNSKSNKSNKS'
             supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
 
         except OOIObjectError, oe:
@@ -453,9 +452,54 @@ class IngestionService(ServiceProcess):
 
             if current_etime == supplement_stime:
                 agg_offset -= 1
+                log.info('Aggregation offset decremented by one - supplement overlaps: %d' % agg_offset)
+            else:
+                log.info('Aggregation offset unchanged - supplement does not overlap.')
 
         except OOIObjectError, oe:
             log.debug(oe)
+            log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
+
+
+        for merge_var in merge_root.variables:
+            var_name = merge_var.name
+
+
+            if merge_agg_dim not in merge_var.shape:
+                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
+                continue
+
+
+
+            try:
+                var = root.FindVariableByName(var_name)
+            except OOIObjectError, oe:
+                log.debug(oe)
+                log.info('Variable %s does not yet exist in the dataset!' % var_name)
+
+                v_link = root.variables.add()
+                v_link.SetLink(merge_var)
+
+                log.info('Copied Variable %s into the dataset!' % var_name)
+                continue
+
+
+            print 'MERGEING VAR %s' % var_name
+            print var.content.PPrint()
+
+            for merge_ba in merge_var.content.bounded_arrays:
+                ba = var.Repository.copy_object(merge_ba, deep_copy=False)
+
+                ba.bounds[0].origin += agg_offset
+
+            log.info('Merged Variable %s into the dataset!' % var_name)
+
+
+            print 'MERGEING Complete %s' % var_name
+            print var.content.PPrint()
+
+            
+            
 
 
 
