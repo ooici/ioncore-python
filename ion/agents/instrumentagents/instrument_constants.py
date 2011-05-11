@@ -526,6 +526,7 @@ class InstErrorCode(BaseEnum):
         """
         Convert an error code to a printable string.
         """
+        x = cls.get_list_val(x)
         if cls.has(x):
             strval = ''
             for item in x:
