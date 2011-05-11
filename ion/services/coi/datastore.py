@@ -5,7 +5,8 @@
 @author David Stuebe
 @author Matt Rodriguez
 @author Dave Foster <dfoster@asascience.com>
-@TODO
+@TODO Deal with preload issue - must be possible to run preload with partial datastore. IE if predicates are already
+there but resource types are not...
 
 """
 import math
