@@ -336,6 +336,7 @@ class FindDataResources(object):
                     # datasets that are registered (in fact, I'm only including
                     # datasets thare are either public or private).
                     #
+                    dSet = yield self.rc.get_instance(dSetResID)
                     if ((dSet.ResourceLifeCycleState == dSource.ACTIVE) or
                        (dSet.ResourceLifeCycleState == dSource.COMMISSIONED)):
                         rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
