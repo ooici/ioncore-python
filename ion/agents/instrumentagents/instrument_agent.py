@@ -135,10 +135,11 @@ class InstrumentAgent(Process):
         """
 	The PubSub origin for the event publisher that this instrument agent uses to
         distribute messages related to generic events that it handles. One queue
-        sends all messages, each tagged with an event ID number and optionally
-        a channel name if applicable (delimited by "."). If there is no channel name,
-        the event applies to the agent. If the channel is a "*", the event applies
-        to the instrument as a whole or all channels on the instrument
+        sends all messages, each tagged with an event ID number and the "agent"
+        keyword or channel name if applicable (delimited by "."). If "agent"
+        keyword is used, the publication applies to the agent. If the
+        channel is a "*", the event applies to the instrument as a whole or
+        all channels on the instrument
         For example: 3003.chan1.machine_example_org_14491.357
         @see    ion/services/dm/distribution/events.py
         @see    https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
@@ -742,7 +743,7 @@ class InstrumentAgent(Process):
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_start_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin="%s.%s" % ('', self.event_publisher_origin)
+            origin="agent.%s" % self.event_publisher_origin
             yield self._log_publisher.create_and_publish_event(origin=origin,
                 description=desc_str)
             
@@ -891,7 +892,7 @@ class InstrumentAgent(Process):
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_end_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin="%s.%s" % ('', self.event_publisher_origin)
+            origin="agent.%s" % self.event_publisher_origin
             yield self._log_publisher.create_and_publish_event(origin=origin,
                 description=desc_str)
         
@@ -990,7 +991,7 @@ class InstrumentAgent(Process):
         if InstErrorCode.is_error(success):
             desc_str = 'Error in verify_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin="%s.%s" % ('', self.event_publisher_origin)
+            origin="agent.%s" % self.event_publisher_origin
             yield self._log_publisher.create_and_publish_event(origin=origin,
                 description=desc_str)
             
@@ -1094,14 +1095,14 @@ class InstrumentAgent(Process):
             if success == None:
                 desc_str = 'Error in op_execute_observatory: ' + \
                     InstErrorCode.get_string(InstErrorCode.UNKNOWN_ERROR)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
                 
             elif InstErrorCode.is_error(success):
                 desc_str = 'Error in op_execute_observatory: ' + \
                     InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -1225,7 +1226,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_observatory: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
 
@@ -1417,13 +1418,13 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_set_observatory: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
 
             # Publish the new agent configuration.
             if set_successes:
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 config = self._get_parameters()
                 strval = self._get_data_string(config)
                 yield self._log_publisher.create_and_publish_event(origin=origin,
@@ -1494,7 +1495,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_observatory_metadata: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -1611,7 +1612,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_observatory_status: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -1736,7 +1737,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_observatory_status: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
                        
@@ -1827,7 +1828,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_execute_device: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -1906,7 +1907,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_device: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -1982,7 +1983,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_execute_device: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -2059,7 +2060,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_execute_device_direct: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -2140,7 +2141,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_device_metadata: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
@@ -2221,7 +2222,7 @@ class InstrumentAgent(Process):
             if InstErrorCode.is_error(success):
                 desc_str = 'Error in op_get_device_metadata: ' + \
                            InstErrorCode.get_string(success)
-                origin="%s.%s" % ('', self.event_publisher_origin)
+                origin="agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=origin,
                     description=desc_str)
             
