@@ -70,6 +70,7 @@ class Config(object):
         return self._getValue(value, key3, default)
 
     def update_from_file(self, filename):
+        filename = adjust_dir(filename)
         if os.path.isfile(filename):
             # Load config override from filename
             filecontent = open(filename,).read()
