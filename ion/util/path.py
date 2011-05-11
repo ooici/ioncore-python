@@ -10,7 +10,7 @@ def adjust_dir(filename):
 
     resolved_file = None
 
-    if filename.startswith('ion.'): # Looking for a package
+    if not '/' in filename: # Looking for a package
         resolved_file = filename
     else:
         # First try relative to the local directory

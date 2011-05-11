@@ -19,8 +19,10 @@ except ImportError:
 from ion import __version__ as version
 
 # Workaround a bug in "package_data" that ignores directories. Build flattened list of all files.
-resFiles = [os.path.join(path, file) for path,file in
-            chain(*(izip(repeat(root), files) for root,dirs,files in os.walk('res')))]
+excludeFiles = set(['res/config/ionlocal.config', 'res/logging/loglevelslocal.cfg'])
+resFiles = [file for file in (os.path.join(path, file) for path,file in
+            chain(*(izip(repeat(root), files) for root,dirs,files in os.walk('res'))))
+            if file not in excludeFiles]
 
 setup( name = 'ioncore',
        version = version,
