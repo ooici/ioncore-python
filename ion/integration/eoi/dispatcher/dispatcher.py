@@ -30,8 +30,10 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient#, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
+from ion.core.exception import ReceivedApplicationError, ApplicationError
 
 
 DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
@@ -39,6 +41,8 @@ DISPATCHER_WORKFLOW_RESOURCE_TYPE = object_utils.create_type_identifier(object_i
 CHANGE_EVENT_MESSAGE = object_utils.create_type_identifier(object_id=7001, version=1)
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 
 class DispatcherProcess(Process):
     """
@@ -65,10 +69,9 @@ class DispatcherProcess(Process):
         # Message Client and AssociationServiceClient will be lazy-initialized
         self._mc = None
         self._asc = None
-        
-        # Resource Client cannot be lazy initialized because it is used in
-        # the initialization of this process -- initialize inline to plc_init()
-        self.rc = None
+        self._rc = None
+        self._ac = None
+        self._irc = None
     
         
     @property
@@ -77,34 +80,69 @@ class DispatcherProcess(Process):
         #        But I cannot do the same with the ResourceClient.  I would assume both
         #        would fail because of a race condition in spawning..  but this one works
         #        somehow
-        if not self._mc:
+        if self._mc is None:
             self._mc = MessageClient(proc=self)
         return self._mc
-    
+
+
+    @property
+    def rc(self):
+        # @todo: Check into why I can initialize mc here (called during process spawning)
+        #        But I cannot do the same with the ResourceClient.  I would assume both
+        #        would fail because of a race condition in spawning..  but this one works
+        #        somehow
+        if self._rc is None:
+            self._rc = ResourceClient(proc=self)
+        return self._rc
+
     
     @property
     def asc(self):
-        if not self._asc:
+        if self._asc is None:
             self._asc = AssociationServiceClient(proc=self)
         return self._asc
     
     
+    @property
+    def ac(self):
+        if self._ac is None:
+            self._ac = AssociationClient(proc=self)
+        return self._ac
+    
+    
+    @property
+    def irc(self):
+        if self._irc is None:
+            self._irc = IdentityRegistryClient(proc=self)
+        return self._irc
+    
+    
     @defer.inlineCallbacks
-    def plc_init(self):
+    def plc_activate(self):
         """
         Initializes the Dispatching Service when spawned
         (Yields ALLOWED)
         """
-        log.info('plc_init(): LCO (process) initializing...')
+        log.info('plc_activate(): LCO (process) initializing...')
         
         # Step 0: Initialize dependencies
-        p = Process()
-        yield p.spawn()
-        yield self.register_life_cycle_object(p)
-        self.rc = ResourceClient(proc=p)
-        
+        temp_proc=Process()
+        yield temp_proc.spawn()
+        # Because the process is in the initialize transition create another process from which to do service ops and deal with resources.
+        self._rc = ResourceClient(proc=temp_proc)
+        self._asc = AssociationServiceClient(proc=temp_proc)
+        self._mc = MessageClient(proc=temp_proc)
+        self._ac = AssociationClient(proc=temp_proc)
+        self._irc = IdentityRegistryClient(proc=temp_proc)
 
-        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
+
+         # TODO: remove the dispatcher.id file and replace it with a search of all the
+        # associations for all the users in the dispatcher_users.id file.  If any of the
+        # users have an association to a dispatcher then that dispatcher should be
+        # this one, and we can get the dispatcher ID from that association.  Also if
+        # any of the users have a different dispatcher that should be logged as an error.
+        
+        # Step 1: Get this dispatcher's ID from the local dispatcher.id file 
         f = None
         id = None
         
@@ -113,7 +151,7 @@ class DispatcherProcess(Process):
             id = f.read().strip()
             # @todo: ensure this resource exists in the ResourceRepo
         except IOError:
-             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
+             log.warn('plc_activate(): Dispatcher ID could not be found.  One will be created instead')
         finally:
             if f is not None:
                 f.close()
@@ -131,11 +169,13 @@ class DispatcherProcess(Process):
             finally:
                 if f is not None:
                     f.close()
+            # create all user HAS_A associations for this dispatcher
+            yield self._make_user_associations(id)
 
         
         # Step 3: Store the new ID locally -- later used to create Subscription Subscribers
         self.dispatcher_id = id
-        log.info('\n\n__init__(): Retrieved dispatcher_id "%s"\n\n' % id)
+        log.info('\n\nplc_activate(): Retrieved dispatcher_id "%s"\n\n' % id)
         
 
         # Step 4: Generate Subscription Event Subscribers
@@ -150,17 +190,91 @@ class DispatcherProcess(Process):
         
         # Step 5: Create all necessary Update Event Notification Subscribers
         yield self._preload_associated_workflows(self.dispatcher_id)
-        log.debug('plc_init(): ******** COMPLETE ********')
+
+        # Clean up the temporary process used during init:
+        yield temp_proc.terminate()
+        self._rc = None
+        self._mc = None
+        self._asc = None
+        self._ac = None
+        self._irc = None
+
+        log.debug('plc_activate(): ******** COMPLETE ********')
         
     
     @defer.inlineCallbacks
+    def _make_user_associations(self, DispatcherID):
+        # TODO:  Make this routine more intelligent by checking each user's associations for an already existing
+        # dispatcher, and only creating a dispatcher association for users w/o a dispatcher
+        
+        # get dispatcher resource for making associations
+        DispatcherRes = yield self.rc.get_instance(DispatcherID)
+        
+        # open and read users file
+        f = None
+        try:
+            f = open('dispatcher_users.id', 'r')
+            Users = f.readlines()
+        except IOError:
+            log.warn("_make_user_associations: Dispatcher's users file could not be read, no associations will be made")
+            defer.returnValue(None)
+        finally:
+            if f is not None:
+                f.close()
+        
+        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
+        for User in Users:
+            User = User.strip(" \n\r")
+            log.info('_make_user_associations: making assosiation for user <%s>'%User)
+            
+            # get User's resource ID
+            IdentityRequest.configuration.subject = User
+            try:
+                UserID = yield self.irc.get_ooiid_for_user(IdentityRequest)
+            except ReceivedApplicationError, ex:
+                log.warn('_make_user_associations: can not get ID for user '+User)
+                continue
+            log.info('_make_user_associations: got id %s for user %s'%(UserID.resource_reference.ooi_id, User))
+            
+            # get User instance
+            try:
+                UserRes = yield self.rc.get_instance(UserID.resource_reference.ooi_id)
+            except ApplicationError, ex:
+                log.warn('_make_user_associations: can not get instance for UserID '+UserID.resource_reference.ooi_id)
+            
+            # Create an association between the user and the dispatcher
+            try:
+                association = yield self.ac.create_association(UserRes, HAS_A_ID, DispatcherRes)
+                """
+                log.debug('UserRes.ResourceAssociationsAsSubject:'+str(UserRes.ResourceAssociationsAsSubject))
+                if association not in UserRes.ResourceAssociationsAsSubject:
+                    log.error('Error: subject not in association!')
+                    continue
+                if association not in DispatcherRes.ResourceAssociationsAsObject:
+                    log.error('Error: object not in association')
+                    continue
+                """
+                # Put the association in datastore
+                log.debug('_make_user_associations: Storing association: ' + str(association))
+                yield self.rc.put_instance(association)
+            except ApplicationError, ex:
+                errString = 'Error creating assocation between UserRes: ' + UserID.resource_reference.ooi_id + ' and DispatcherID: ' + DispatcherID + '. ex: ' + str(ex)
+                log.error(errString)
+ 
+
+    @defer.inlineCallbacks
     def _register_dispatcher(self, name):
-        rc = yield self.rc
+
+        # Explicitly create a resource client with an anonymous process so that we can push during plc init of the dispatcher process!
+        rc = self.rc
         disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         disp_res.dispatcher_name = name
         yield rc.put_instance(disp_res, 'Commiting new dispatcher resource for registration')
-        
-        defer.returnValue(str(disp_res.ResourceIdentity))
+
+        res_id = disp_res.ResourceIdentity
+
+        defer.returnValue(str(res_id))
 
     
     @defer.inlineCallbacks

@@ -10,8 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
+
 from ion.core.process.process import ProcessFactory, ProcessDesc
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
@@ -19,10 +18,16 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.services.coi.resource_registry.association_client import AssociationClientError
 import ion.util.procutils as pu
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
-from ion.services.dm.distribution.events import DataEventSubscriber
+from ion.services.dm.distribution.events import DataEventSubscriber, InstrumentSampleDataEventSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.agents.instrumentagents.instrument_constants import AgentCommand
+from ion.agents.instrumentagents.instrument_constants import AgentEvent
+from ion.agents.instrumentagents.instrument_constants import AgentStatus
+from ion.agents.instrumentagents.instrument_constants import AgentState
+from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 from ion.core.process.process import Process
 from ion.core.process.process import ProcessDesc
@@ -38,125 +43,20 @@ INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
-INSTRUMENTDATA_EVENT_ID = 5001
-
-
-line_template = '''
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
-    <title>
-      OOICI Message Count Consumer Visualization
-    </title>
-    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
-    <script type="text/javascript">
-      google.load('visualization', '1', {packages: ['corechart']});
-    </script>
-    <script type="text/javascript">
-      function drawVisualization() {
-        // Create and populate the data table.
-        var data = new google.visualization.DataTable(%(json)s);
-
-        // Create and draw the visualization.
-        new google.visualization.LineChart(document.getElementById('visualization')).
-            draw(data, {curveType: "function",
-                        width: 800, height: 600,
-                        vAxis: {maxValue: 10}}
-                );
-      }
-
-
-      google.setOnLoadCallback(drawVisualization);
-    </script>
-    <script language="JavaScript">
-    <!--
-
-    var sURL = unescape(window.location.pathname);
-
-    function doLoad()
-    {
-        // the timeout value should be the same as in the "refresh" meta-tag
-        setTimeout( "refresh()", 2*1000 );
-    }
-
-    function refresh()
-    {
-        //  This version of the refresh function will cause a new
-        //  entry in the visitor's history.  It is provided for
-        //  those browsers that only support JavaScript 1.0.
-        //
-        window.location.href = sURL;
-    }
-    //-->
-    </script>
-
-    <script language="JavaScript1.1">
-    <!--
-    function refresh()
-    {
-        //  This version does NOT cause an entry in the browser's
-        //  page view history.  Most browsers will always retrieve
-        //  the document from the web-server whether it is already
-        //  in the browsers page-cache or not.
-        //
-        window.location.replace( sURL );
-    }
-    //-->
-    </script>
-
-    <script language="JavaScript1.2">
-    <!--
-    function refresh()
-    {
-        //  This version of the refresh function will be invoked
-        //  for browsers that support JavaScript version 1.2
-        //
-
-        //  The argument to the location.reload function determines
-        //  if the browser should retrieve the document from the
-        //  web-server.  In our example all we need to do is cause
-        //  the JavaScript block in the document body to be
-        //  re-evaluated.  If we needed to pull the document from
-        //  the web-server again (such as where the document contents
-        //  change dynamically) we would pass the argument as 'true'.
-        //
-        window.location.reload( false );
-    }
-    //-->
-</script>
-
-
-  </head>
-  <body onload="doLoad()" style="font-family: Arial;border: 0 none;">
-    <div id="visualization" style="width: 800px; height: 600px;"></div>
-    %(msg)s
-  </body>
-</html>
-'''
-
-
-
-class InstrumentDataEventSubscriber(DataEventSubscriber):
-    """
-    Event Notification Subscriber for Instrument Data.
-
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
-    """
-    event_id = INSTRUMENTDATA_EVENT_ID
 
  # Setup a subscriber to an event topic
-class SBE37DataEventSubscriber(InstrumentDataEventSubscriber):
+class SBE37DataEventSubscriber(InstrumentSampleDataEventSubscriber):
     def __init__(self, *args, **kwargs):
-        self.msgs = []
-        self.pdata=[]
-        DataEventSubscriber.__init__(self, *args, **kwargs)
-        self.max_points=50
+        #self.msgs = []
+        #self.pdata=[]
+        #self.max_points=50
+        InstrumentSampleDataEventSubscriber.__init__(self, *args, **kwargs)
 
     def ondata(self, data):
         msg = data['content'];
-        log.info("IMSSRVC SBE37DataEventSubscriber additional info: %s", msg.additional_data.data_block)
+        log.info("IMSSRVC SBE37DataEventSubscriber additional info: %s", msg.additional_data.date)
 
+        """
         self.msgs.append(data)
         #convert the incoming string into a dict
         list = msg.additional_data.data_block.split(';')
@@ -187,6 +87,7 @@ class SBE37DataEventSubscriber(InstrumentDataEventSubscriber):
         #log.info("IMSSRVC SBE37DataEventSubscriber page: %s", page)
 
         #self.queue_result(queue,page,'Google Viz of message counts')
+        """
         
 class InstrumentManagementService(ServiceProcess):
     """
@@ -300,82 +201,84 @@ class InstrumentManagementService(ServiceProcess):
         Service operation: Execute a command on an instrument.
         """
 
-        """
-        # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
-
-        if 'instrumentID' in commandInput:
-            inst_id = str(commandInput['instrumentID'])
+        log.info("IMSSRVC op_execute_command start")
+        if 'instrument_agent_id' in content:
+            instrument_agent_id = str(content['instrument_agent_id'])
         else:
-            raise ValueError("Input for instrumentID not present")
+            raise ValueError("Input for instrument agent resource ID not present")
 
-        command = []
-        if 'command' in commandInput:
-            command_op = str(commandInput['command'])
+        if 'command' in content:
+            command = str(content['command'])
         else:
             raise ValueError("Input for command not present")
 
-        command.append(command_op)
+        # Step 1: Extract the arguments from the UI generated message content
+        #commandInput = content['commandInput']
 
-        arg_idx = 0
-        while True:
-            argname = 'cmdArg'+str(arg_idx)
-            arg_idx += 1
-            if argname in commandInput:
-                command.append(str(commandInput[argname]))
-            else:
-                break
+        log.info("IMSSRVC op_execute_command instAgent_resrc__id: %s", instrument_agent_id)
 
-        # Step 2: Find the agent id for the given instrument id
-        agent_pid  = yield self.get_agent_pid_for_instrument(inst_id)
-        if not agent_pid:
-            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
-            defer.returnValue(None)
+        #Retreieve the instrument agent resource from the RR
+        instAgent_resrc = yield self.rc.get_instance(instrument_agent_id)
 
-        # Step 3: Interact with the agent to execute the command
-        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        commandlist = [command,]
-        log.info("Sending command to IA: "+str(commandlist))
-        cmd_result = yield iaclient.execute_instrument(commandlist)
-        """
+        log.info("IMSSRVC op_execute_command instAgent_resource: %s", instAgent_resrc)
 
-        yield self.reply_ok(msg, cmd_result)
+        #create the client for this instrumnet agent
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=instAgent_resrc.process_id )
+
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction(0)
+        tid = reply['transaction_id']
+        log.info("IMSSRVC op_execute_command start_transaction id: %s", tid)
+
+        #Execute the command
+        log.info("IMSSRVC op_execute_command command list: %s", content['command'])
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [content['command']]
+        execReply = yield self.ia_client.execute_device(chans,cmd,tid)
+        log.info("IMSSRVC op_execute_command execute_device: %s", execReply)
+
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
+        log.info("IMSSRVC op_execute_command end_transaction: %s", reply)
+
+        yield self.reply_ok(msg, execReply)
 
     @defer.inlineCallbacks
     def op_get_instrument_state(self, content, headers, msg):
         """
         Service operation: .
         """
-        # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
-
-        """
-        if 'instrumentID' in commandInput:
-            inst_id = str(commandInput['instrumentID'])
+        log.info("IMSSRVC op_get_instrument_state start")
+        if 'instrument_agent_id' in content:
+            instrument_agent_id = str(content['instrument_agent_id'])
         else:
-            raise ValueError("Input for instrumentID not present")
+            raise ValueError("Input for instrument agent resource ID not present")
 
-        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
-        if not agent_pid:
-            raise StandardError("No agent found for instrument "+str(inst_id))
+        # Step 1: Extract the arguments from the UI generated message content
+        #commandInput = content['commandInput']
 
-        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        inst_cap = yield iaclient.get_capabilities()
-        if not inst_cap:
-            raise StandardError("No capabilities available for instrument "+str(inst_id))
+        log.info("IMSSRVC op_get_instrument_state instAgent_resrc__id: %s", instrument_agent_id)
 
-        ci_commands = inst_cap['ci_commands']
-        instrument_commands = inst_cap['instrument_commands']
-        instrument_parameters = inst_cap['instrument_parameters']
-        ci_parameters = inst_cap['ci_parameters']
+        #Retreieve the instrument agent resource from the RR
+        instAgent_resrc = yield self.rc.get_instance(instrument_agent_id)
 
-        values = yield iaclient.get_from_instrument(instrument_parameters)
-        resvalues = {}
-        if values:
-            resvalues = values
-        """
+        log.info("IMSSRVC op_get_instrument_state instAgent_resource: %s", instAgent_resrc)
 
-        yield self.reply_ok(msg, resvalues)
+        #create the client for this instrumnet agent
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=instAgent_resrc.process_id )
+
+        log.info("IMSSRVC op_get_instrument_state ia_client created")
+
+        # Check agent state upon creation. No transaction needed for
+        # get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params)
+        result = reply['result']
+        log.info("IMSSRVC op_get_instrument_state get_observatory_status result %s", result)
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+
+        yield self.reply_ok(msg, result)
 
 
     @defer.inlineCallbacks
@@ -468,14 +371,6 @@ class InstrumentManagementService(ServiceProcess):
         log.info("IMSSRVC op_start_instrument_agent get ia_client")
 
         #self.ia_client.register_resource(content['instrumentResourceID'])
-
-        """
-        reply_1 = yield self.ia_client.start_transaction(0)
-        log.info("IMSSRVC op_start_instrument_agent start trans %s", reply_1)
-        transaction_id_1 = reply_1['transaction_id']
-        reply_3 = yield self.ia_client.end_transaction(transaction_id_1)
-        log.info("IMSSRVC op_start_instrument_agent end trans %s", reply_3)
-        """
 
         log.info("IMSSRVC op_start_instrument_agent register resource")
         #store the new instrument agent in the resource registry
@@ -644,30 +539,32 @@ class InstrumentManagementClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-    def get_instrument_state(self, instrumentID):
+    def get_instrument_state(self, instrument_agent_id):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        reqcont['commandInput'] = commandInput
+        #commandInput = {}
+        reqcont['instrument_agent_id'] = instrument_agent_id
+        #reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('get_instrument_state', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('get_instrument_state', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def execute_command(self, instrumentID, command, arglist):
+    def execute_command(self, instrument_agent_id, cmd):
         reqcont = {}
         commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        commandInput['command'] = command
-        if arglist:
-            argnum = 0
-            for arg in arglist:
-                commandInput['cmdArg'+str(argnum)] = arg
-                argnum += 1
-        reqcont['commandInput'] = commandInput
+        reqcont['instrument_agent_id'] = instrument_agent_id
+        reqcont['command'] = cmd
+        #commandInput['instrumentID'] = instrumentID
+        #commandInput['command'] = command
+        #if arglist:
+        #    argnum = 0
+        #    for arg in arglist:
+        #        commandInput['cmdArg'+str(argnum)] = arg
+        #        argnum += 1
+        #reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('execute_command', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('execute_command', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def _base_command(self, op, content):
