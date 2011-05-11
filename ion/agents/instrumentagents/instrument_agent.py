@@ -218,7 +218,7 @@ class InstrumentAgent(Process):
         An integer in seconds giving the maximum allowable time a transaction
         may be open.
         """
-        self._max_exp_timeout = 600
+        self._max_exp_timeout = 1800
         
         """
         Upon transaction expire timeout, this flag indicates if the transaction
@@ -265,7 +265,7 @@ class InstrumentAgent(Process):
         """
         Agent state handlers
         """
-        self.state_handlers = {
+        self._state_handlers = {
             AgentState.POWERED_DOWN : self.state_handler_powered_down,
             AgentState.UNINITIALIZED : self.state_handler_uninitialized,
             AgentState.INACTIVE : self.state_handler_inactive,
@@ -279,7 +279,7 @@ class InstrumentAgent(Process):
         A finite state machine to track and manage agent state according to
         the general instrument state model.
         """
-        self._fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
+        self._fsm = InstrumentFSM(AgentState,AgentEvent,self._state_handlers,
                                  AgentEvent.ENTER,AgentEvent.EXIT)
        
         # Set initial state.
@@ -1328,84 +1328,71 @@ class InstrumentAgent(Process):
                             self._time_source = val
                             # Logic here when new time source set.
                             # And test for successful switch.
-                            success = InstErrorCode.OK
+                            result[arg] = InstErrorCode.OK
                             set_successes = True
                             
                         else:
-                            success = InstErrorCode.OK
+                            result[arg] = InstErrorCode.OK
                             
                     else:
                         set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
-                        
-                    result[arg] = success
-                    
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
+                                            
                 elif arg == AgentParameter.CONNECTION_METHOD :
                     if ConnectionMethod.has(val):
                         if val != self._connection_method:
                             self._connection_method = val
                             # Logic here when new connection method set.
                             # And test for successful switch.
-                            success = InstErrorCode.OK
+                            result[arg] = InstErrorCode.OK
                             set_successes = True
 
                         else:
-                            success = InstErrorCode.OK
+                            result[arg] = InstErrorCode.OK
 
                     else:
-                        set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
 
-                    result[arg] = success
-                    
                 elif arg == AgentParameter.MAX_ACQ_TIMEOUT :
                     if isinstance(val,int) and val >= 0:
                         self._max_acq_timeout = val
-                        success = InstErrorCode.OK
+                        result[arg] = InstErrorCode.OK
                         set_successes = True
 
                     else:
                         set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE                        
-                        
-                    result[arg] = success
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE                        
     
                 elif arg == AgentParameter.DEFAULT_EXP_TIMEOUT :
                     if isinstance(val,int) and val >= self._min_exp_timeout \
                         and val <= self._max_exp_timeout:
                         self._default_exp_timeout = val
-                        success = InstErrorCode.OK
+                        result[arg] = InstErrorCode.OK
                         set_successes = True
                         
                     else:
                         set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
-                        
-                    result[arg] = success
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
 
                 elif arg == AgentParameter.MAX_EXP_TIMEOUT :
                     if isinstance(val,int) and val > self._min_exp_timeout:
                         self._max_exp_timeout = val
-                        success = InstErrorCode.OK
+                        result[arg] = InstErrorCode.OK
                         set_successes = True
 
                     else:
                         set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
-
-                    result[arg] = success
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
 
                 elif arg == AgentParameter.BUFFER_SIZE :
                     if isinstance(val,int) and val >= 0:
                         self._data_buffer_limit = val
-                        success = InstErrorCode.OK
+                        result[arg] = InstErrorCode.OK
                         set_successes = True
 
                     else:
                         set_errors = True
-                        success = InstErrorCode.INVALID_PARAM_VALUE
-
-                    result[arg] = success 
+                        result[arg] = InstErrorCode.INVALID_PARAM_VALUE
 
         # Unknown error.
         except:
