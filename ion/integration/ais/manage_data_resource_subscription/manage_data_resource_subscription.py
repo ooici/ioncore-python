@@ -32,6 +32,7 @@ from ion.util.iontime import IonTime
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
+from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
 from ion.core.intercept.policy import get_dispatcher_id_for_user
 
 from ion.core.object import object_utils
@@ -486,8 +487,16 @@ class ManageDataResourceSubscription(object):
             defer.returnValue(Response)
 
         #
+        # Instantiate a bounds object, and load it up with the given bounds
+        # info
+        #
+        bounds = SpatialTemporalBounds()
+        bounds.loadBounds(msg.message_parameters_reference.dataBounds)
+
+        #
         # Now iterate through the list, filtering by the bounds
         #
+        
 
         defer.returnValue(reply)
 
