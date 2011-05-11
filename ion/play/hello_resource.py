@@ -423,9 +423,6 @@ class HelloResource(ServiceProcess):
         elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Develop:
            resource.ResourceLifeCycleState = resource.DEVELOPED
 
-        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.PUBLISH:
-           resource.ResourceLifeCycleState = resource.PUBLISHED
-
         yield self.rc.put_instance(resource)
         
         # Just reply ok...
