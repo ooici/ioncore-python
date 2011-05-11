@@ -110,11 +110,19 @@ class ManageDataResource(object):
             datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
             log.info("These should be equal: %s %s" % (msg.data_source_resource_id, datasrc_resource.ResourceIdentity))
 
-            if msg.IsFieldSet("update_interval_seconds") and msg.IsFieldSet("update_start_datetime_millis"):
-                yield self._deleteAllScheduledEvents(datasrc_resource)
-                datasrc_resource.update_interval_seconds = msg.update_interval_seconds
-                datasrc_resource.update_start_datetime_millis = msg.update_start_datetime_millis
-                if 0 < msg.update_interval_seconds:
+            if msg.IsFieldSet("update_interval_seconds"):
+
+                #if we are rescheduling or turning off updates, delete scheduled events
+                if 0 >= msg.update_interval_seconds or msg.IsFieldSet("update_start_datetime_millis"):
+                    yield self._deleteAllScheduledEvents(datasrc_resource)
+                    datasrc_resource.update_interval_seconds = 0
+                    datasrc_resource.update_start_datetime_millis = 0
+
+                # if update_interval is sane, create the new schedule
+                if 0 < msg.update_interval_seconds and msg.IsFieldSet("update_start_datetime_millis"):
+                    datasrc_resource.update_interval_seconds = msg.update_interval_seconds
+                    datasrc_resource.update_start_datetime_millis = msg.update_start_datetime_millis
+
                     #get the things we need to set up the scheduler message
                     log.info("Looking up data set resource")
                     dataset_resource = yield self._getOneAssociationObject(datasrc_resource, 
