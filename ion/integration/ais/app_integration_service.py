@@ -59,6 +59,7 @@ class AppIntegrationService(ServiceProcess):
         self.metadataCache = MetadataCache(self)
         log.debug('Instantiated AIS Metadata Cache Object')
         yield self.metadataCache.loadDataSets()
+        yield self.metadataCache.loadDataSources()
         
     def getMetadataCache(self):
         return self.metadataCache

@@ -45,14 +45,6 @@ DNLD_FILE_TYPE = '.ncml.html'
 
 class FindDataResources(object):
 
-    #
-    # these are the mappings from resource life cycle states to the view
-    # permission states of a dataset
-    # 
-    REGISTERED = 'Registered'
-    PRIVATE    = 'Private'
-    PUBLIC     = 'Public'
-    UNKOWNN    = 'Unknown'
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
@@ -265,8 +257,8 @@ class FindDataResources(object):
             log.debug('Working on dataset: ' + dSetResID)
 
             if self.bUseMetadataCache:            
-                minMetaData = self.metadataCache.getMetadata(dSetResID)
-                if minMetaData is None:
+                dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
+                if dSetMetadata is None:
                     log.error('metadata not found for datasetID: ' + dSetResID)
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
@@ -284,14 +276,14 @@ class FindDataResources(object):
                     Response.error_str = "Dataset not found."
                     defer.returnValue(Response)        
     
-                minMetaData = {}
-                self.__loadMinMetaData(dSet, minMetaData)
+                dSetMetadata = {}
+                self.__loadMinMetaData(dSet, dSetMetadata)
 
             #
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if bounds.isInBounds(minMetaData):                
+            if bounds.isInBounds(dSetMetadata):                
 
                 dSourceResID = yield self.getAssociatedSource(dSetResID)
                 if dSourceResID is None:
@@ -302,16 +294,28 @@ class FindDataResources(object):
                     Response.error_str = "Datasource not found."
                     defer.returnValue(Response)        
 
-                try:
-                    dSource = yield self.rc.get_instance(dSourceResID)
-                
-                except ResourceClientError: 
-                    log.error('ResourceClientError Exception!')
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                          MessageName='AIS findDataResources error response')
-                    Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Datasource not found."
-                    defer.returnValue(Response)        
+
+                if self.bUseMetadataCache:            
+                    dSource = self.metadataCache.getDSetMetadata(dSourceResID)
+                    if dSetMetadata is None:
+                        log.error('metadata not found for datasourceID: ' + dSourceResID)
+                        Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                              MessageName='AIS findDataResources error response')
+                        Response.error_num = Response.ResponseCodes.NOT_FOUND
+                        Response.error_str = "Metadata not found."
+                        defer.returnValue(Response)
+                    
+                else:
+                    try:
+                        dSource = yield self.rc.get_instance(dSourceResID)
+                    
+                    except ResourceClientError: 
+                        log.error('ResourceClientError Exception!')
+                        Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                              MessageName='AIS findDataResources error response')
+                        Response.error_num = Response.ResponseCodes.NOT_FOUND
+                        Response.error_str = "Datasource not found."
+                        defer.returnValue(Response)        
 
                 #
                 # Added this for Tim and Tom; not sure we need it yet...
@@ -328,19 +332,24 @@ class FindDataResources(object):
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
-                    self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
+                    #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
+                    self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, dSetMetadata, ownerID, dSetResID)
                 else:
                     #
                     # This was a findDataResourcesByUser request; do not include
                     # datasets that are registered (in fact, I'm only including
                     # datasets thare are either public or private).
                     #
-                    dSet = yield self.rc.get_instance(dSetResID)
+                    """
                     if ((dSet.ResourceLifeCycleState == dSource.ACTIVE) or
                        (dSet.ResourceLifeCycleState == dSource.COMMISSIONED)):
                         rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
-                        self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSet, dSource)
+                        self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], dSetMetadata, ownerID, dSet, dSource)
+                    """                        
+
+                    rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
+                    self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], dSetMetadata, ownerID, dSource)
 
 
                 #self.__printRootAttributes(dSet)
@@ -463,39 +472,39 @@ class FindDataResources(object):
         defer.returnValue(result)
 
 
-    def __loadMinMetaData(self, dSet, minMetaData):
+    def __loadMinMetaData(self, dSet, dSetMetadata):
         for attrib in dSet.root_group.attributes:
             #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
             if attrib.name == 'title':
-                minMetaData['title'] = attrib.GetValue()
+                dSetMetadata['title'] = attrib.GetValue()
             elif attrib.name == 'institution':                
-                minMetaData['institution'] = attrib.GetValue()
+                dSetMetadata['institution'] = attrib.GetValue()
             elif attrib.name == 'source':                
-                minMetaData['source'] = attrib.GetValue()
+                dSetMetadata['source'] = attrib.GetValue()
             elif attrib.name == 'references':                
-                minMetaData['references'] = attrib.GetValue()
+                dSetMetadata['references'] = attrib.GetValue()
             elif attrib.name == 'ion_time_coverage_start':                
-                minMetaData['ion_time_coverage_start'] = attrib.GetValue()
+                dSetMetadata['ion_time_coverage_start'] = attrib.GetValue()
             elif attrib.name == 'ion_time_coverage_end':                
-                minMetaData['ion_time_coverage_end'] = attrib.GetValue()
+                dSetMetadata['ion_time_coverage_end'] = attrib.GetValue()
             elif attrib.name == 'summary':                
-                minMetaData['summary'] = attrib.GetValue()
+                dSetMetadata['summary'] = attrib.GetValue()
             elif attrib.name == 'comment':                
-                minMetaData['comment'] = attrib.GetValue()
+                dSetMetadata['comment'] = attrib.GetValue()
             elif attrib.name == 'ion_geospatial_lat_min':                
-                minMetaData['ion_geospatial_lat_min'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_lat_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lat_max':                
-                minMetaData['ion_geospatial_lat_max'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_lat_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lon_min':                
-                minMetaData['ion_geospatial_lon_min'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_lon_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_lon_max':                
-                minMetaData['ion_geospatial_lon_max'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_lon_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_min':                
-                minMetaData['ion_geospatial_vertical_min'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_vertical_min'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_max':                
-                minMetaData['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
+                dSetMetadata['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
             elif attrib.name == 'ion_geospatial_vertical_positive':                
-                minMetaData['ion_geospatial_vertical_positive'] = attrib.GetValue()
+                dSetMetadata['ion_geospatial_vertical_positive'] = attrib.GetValue()
 
 
     def __printDownloadURL(self):
@@ -518,52 +527,58 @@ class FindDataResources(object):
 
 
     def __printSourceMetadata(self, dSource):
-        log.debug('source_type: ' + str(dSource.source_type))
-        for property in dSource.property:
+        #log.debug('source_type: ' + str(dSource.source_type))
+        log.debug('source_type: ' + str(dSource['source_type']))
+        #for property in dSource.property:
+        for property in dSource['property']:
             log.debug('Property: ' + property)
-        for sid in dSource.station_id:
+        #for sid in dSource.station_id:
+        for sid in dSource['station_id']:
             log.debug('Station ID: ' + sid)
-        log.debug('request_type: ' + str(dSource.request_type))
-        log.debug('base_url: ' + dSource.base_url)
-        log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
+        #log.debug('request_type: ' + str(dSource.request_type))
+        #log.debug('base_url: ' + dSource.base_url)
+        #log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
+        log.debug('request_type: ' + str(dSource['request_type']))
+        log.debug('base_url: ' + dSource['base_url'])
+        log.debug('max_ingest_millis: ' + str(dSource['max_ingest_millis']))
 
 
-    def __loadRspPayload(self, rootAttributes, minMetaData, userID, dSetResID):
+    def __loadRspPayload(self, rootAttributes, dSetMetadata, userID, dSetResID):
         rootAttributes.user_ooi_id = userID
         rootAttributes.data_resource_id = dSetResID
         rootAttributes.download_url = self.__createDownloadURL(dSetResID)
-        for attrib in minMetaData:
-            log.debug('Root Attribute: %s = %s'  % (attrib, minMetaData[attrib]))
+        for attrib in dSetMetadata:
+            log.debug('Root Attribute: %s = %s'  % (attrib, dSetMetadata[attrib]))
             if  attrib == 'title':
-                rootAttributes.title = minMetaData[attrib]
+                rootAttributes.title = dSetMetadata[attrib]
             elif attrib == 'institution':                
-                rootAttributes.institution = minMetaData[attrib]
+                rootAttributes.institution = dSetMetadata[attrib]
             elif attrib == 'source':                
-                rootAttributes.source = minMetaData[attrib]
+                rootAttributes.source = dSetMetadata[attrib]
             elif attrib == 'references':                
-                rootAttributes.references = minMetaData[attrib]
+                rootAttributes.references = dSetMetadata[attrib]
             elif attrib == 'ion_time_coverage_start':                
-                rootAttributes.ion_time_coverage_start = minMetaData[attrib]
+                rootAttributes.ion_time_coverage_start = dSetMetadata[attrib]
             elif attrib == 'ion_time_coverage_end':                
-                rootAttributes.ion_time_coverage_end = minMetaData[attrib]
+                rootAttributes.ion_time_coverage_end = dSetMetadata[attrib]
             elif attrib == 'summary':                
-                rootAttributes.summary = minMetaData[attrib]
+                rootAttributes.summary = dSetMetadata[attrib]
             elif attrib == 'comment':                
-                rootAttributes.comment = minMetaData[attrib]
+                rootAttributes.comment = dSetMetadata[attrib]
             elif attrib == 'ion_geospatial_lat_min':                
-                rootAttributes.ion_geospatial_lat_min = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_lat_min = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_lat_max':                
-                rootAttributes.ion_geospatial_lat_max = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_lat_max = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_lon_min':                
-                rootAttributes.ion_geospatial_lon_min = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_lon_min = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_lon_max':                
-                rootAttributes.ion_geospatial_lon_max = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_lon_max = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_vertical_min':                
-                rootAttributes.ion_geospatial_vertical_min = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_vertical_min = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_vertical_max':                
-                rootAttributes.ion_geospatial_vertical_max = float(minMetaData[attrib])
+                rootAttributes.ion_geospatial_vertical_max = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_vertical_positive':                
-                rootAttributes.ion_geospatial_vertical_positive = minMetaData[attrib]
+                rootAttributes.ion_geospatial_vertical_positive = dSetMetadata[attrib]
 
 
     def __createDownloadURL(self, dSetResID):
@@ -581,15 +596,19 @@ class FindDataResources(object):
         
         return self.downloadURL
 
-    def __loadRspByOwnerPayload(self, rspPayload, minMetaData, userID, dSet, dSource):
-        rspPayload.data_resource_id = dSet.ResourceIdentity
-        rspPayload.title = minMetaData['title']
-        rspPayload.date_registered = dSource.registration_datetime_millis
-        rspPayload.ion_title = dSource.ion_title
+    def __loadRspByOwnerPayload(self, rspPayload, dSetMetadata, userID, dSource):
+        rspPayload.data_resource_id = dSetMetadata['ResourceIdentity']
+        rspPayload.title = dSetMetadata['title']
+        #rspPayload.date_registered = dSource.registration_datetime_millis
+        rspPayload.date_registered = dSource['registration_datetime_millis']
+        #rspPayload.ion_title = dSource.ion_title
+        rspPayload.ion_title = dSource['ion_title']
         #rspPayload.activation_state = dSource.ResourceLifeCycleState
         #
         # Set the activate state based on the resource lcs
         #
+        """
+        FIXME FIXME FIXME: there needs to be an element in dSource representing state
         if dSource.ResourceLifeCycleState == dSource.NEW:
             rspPayload.activation_state = self.REGISTERED
         elif dSource.ResourceLifeCycleState == dSource.ACTIVE:
@@ -598,6 +617,9 @@ class FindDataResources(object):
             rspPayload.activation_state = self.PUBLIC
         else:
             rspPayload.activation_state = self.UNKNOWN
-        rspPayload.update_interval_seconds = dSource.update_interval_seconds
+        """            
+        rspPayload.activation_state = dSource['lcs']
+        #rspPayload.update_interval_seconds = dSource.update_interval_seconds
+        rspPayload.update_interval_seconds = dSource['update_interval_seconds']
         
 
