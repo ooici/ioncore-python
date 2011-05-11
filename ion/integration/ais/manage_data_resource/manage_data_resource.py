@@ -344,7 +344,10 @@ class ManageDataResource(object):
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
             if not msg.IsFieldSet("max_ingest_millis"):
-                msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
+                if msg.IsFieldSet("update_interval_seconds"):
+                    msg.max_ingest_millis = (msg.update_interval_seconds - 1) * 1000
+                else:
+                    msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
 
 
             # get user resource so we can associate it later
