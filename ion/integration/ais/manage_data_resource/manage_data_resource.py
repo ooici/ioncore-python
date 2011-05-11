@@ -137,7 +137,7 @@ class ManageDataResource(object):
                     association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                     sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                     yield self.rc.put_instance(sched_task_rsrc)
-
+                    
 
 
             if msg.IsFieldSet("ion_title"):
@@ -149,13 +149,17 @@ class ManageDataResource(object):
             if msg.IsFieldSet("max_ingest_millis"):
                 datasrc_resource.max_ingest_millis = msg.max_ingest_millis
 
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
+            dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
+
+            #FIXME: this needs to be on a delay
             if msg.IsFieldSet("is_public"):
                 if not msg.is_public:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                     dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
                 else:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
+                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
+                    dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
 
             yield self.rc.put_instance(datasrc_resource)
@@ -181,6 +185,14 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0].success = True
         defer.returnValue(Response)
 
+
+    @defer.inlineCallbacks
+    def _onFirstIngestEvent(self, msgcontent):
+        # do stuff here
+
+        # all done, cleanup
+        yield self._subscriber.terminate()
+        self._subscriber = None
 
 
     @defer.inlineCallbacks
@@ -275,11 +287,11 @@ class ManageDataResource(object):
 
 
 
-
+    
     @defer.inlineCallbacks
     def create(self, msg_wrapped):
         """
-        @brief create a data resource
+        @brief create a data resource.  URL IS ASSUMED TO BE VALID NETCDF
         @param msg GPB, 9211/1,
         @GPB{Input,9211,1}
         @GPB{Returns,9212,1}
@@ -320,8 +332,6 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-
-            #FIXME: need to do cfchecker validation before we proceed. 
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
@@ -381,8 +391,8 @@ class ManageDataResource(object):
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                 dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
             else:
-                datasrc_resource.ResourceLifeCycleState = datasrc_resource.PUBLISHED
-                dataset_resource.ResourceLifeCycleState = dataset_resource.PUBLISHED
+                datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
+                dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
 
             yield self.rc.put_resource_transaction(resource_transaction)
