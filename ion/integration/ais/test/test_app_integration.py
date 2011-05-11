@@ -1024,6 +1024,20 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
+        yield self.createUser()        
+        msg.message_parameters_reference.ooi_id = self.user_id   #created identity
+        reply = yield self.aisc.getResource(msg)
+        log.debug('getResource returned:\n'+str(reply))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        if reply.message_parameters_reference[0].ObjectType != GET_RESOURCE_RESPONSE_TYPE:
+            self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
+        if not reply.message_parameters_reference[0].IsFieldSet('resource'):
+            self.fail('response to getResourcesOfType has no resource field')
+        log.debug('getResource returned:\n')
+        for item in reply.message_parameters_reference[0].resource:
+            log.debug(str(item)+'\n')
+
 
     @defer.inlineCallbacks
     def __register_dispatcher(self, name):
@@ -1594,6 +1608,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = self.user_id
         msg.message_parameters_reference.email_address = "mmmanning@ucsd.edu"
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[0].name = "profile item 1 name"
+        msg.message_parameters_reference.profile[0].value = "profile item 1 value"
+        msg.message_parameters_reference.profile.add()
+        msg.message_parameters_reference.profile[1].name = "profile item 2 name"
+        msg.message_parameters_reference.profile[1].value = "profile item 2 value"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
         except ReceivedApplicationError, ex:
