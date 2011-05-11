@@ -329,12 +329,23 @@ class ManageResources(object):
          To.resource[0].name = 'subject'
          To.resource[0].value = From.subject
          To.resource.add()
-         To.resource[1].name = 'dispatcher_queue'
-         To.resource[1].value = From.dispatcher_queue
+         To.resource[1].name = 'name'
+         To.resource[1].value = From.name
          To.resource.add()
-         To.resource[2].name = 'email'
-         To.resource[2].value = From.email
+         To.resource[2].name = 'institution'
+         To.resource[2].value = From.institution
          To.resource.add()
+         To.resource[3].name = 'authenticating organization'
+         To.resource[3].value = From.authenticating_organization
+         To.resource.add()
+         To.resource[4].name = 'email'
+         To.resource[4].value = From.email
+         i = 5
+         for item in From.profile:
+            To.resource.add()
+            To.resource[i].name = item.name
+            To.resource[i].value = item.value
+            i = i + 1
       
       except:
          estr = 'Object ERROR!'
