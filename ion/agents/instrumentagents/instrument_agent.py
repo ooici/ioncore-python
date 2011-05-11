@@ -41,14 +41,6 @@ ci_param_metadata = {
         {MetadataParameter.DATATYPE : Datatype.PUBSUB_ORIGIN,
          MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
          MetadataParameter.FRIENDLY_NAME : 'Event Publisher Origin'},
-    AgentParameter.DRIVER_ADDRESS :
-        {MetadataParameter.DATATYPE : Datatype.ADDRESS,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.FRIENDLY_NAME : 'Driver Address'},
-    AgentParameter.RESOURCE_ID :
-        {MetadataParameter.DATATYPE : Datatype.RESOURCE_ID,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.FRIENDLY_NAME : 'Resource ID'},
     AgentParameter.TIME_SOURCE :
         {MetadataParameter.DATATYPE : Datatype.ENUM,
          MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
@@ -77,12 +69,6 @@ ci_param_metadata = {
          MetadataParameter.MINIMUM_VALUE : 0,
          MetadataParameter.UNITS : 'Seconds',
          MetadataParameter.FRIENDLY_NAME : 'Max Transaction Acquire Timeout'},
-    AgentParameter.DEFAULT_ACQ_TIMEOUT :
-        {MetadataParameter.DATATYPE : Datatype.INT,
-         MetadataParameter.LAST_CHANGE_TIMESTAMP : (0,0),
-         MetadataParameter.MINIMUM_VALUE : 0,
-         MetadataParameter.UNITS : 'Seconds',
-         MetadataParameter.FRIENDLY_NAME : 'Default Transaction Acquire Timeout'}    
 }
 
         
@@ -181,6 +167,12 @@ class InstrumentAgent(Process):
                                     origin=self.event_publisher_origin)
     
         """
+        The transducer of the last data received event. Used to publish
+        left over buffer contents on end of a streaming session.
+        """
+        self._prev_data_transducer = None
+    
+        """
         A UUID specifying the current transaction. None
         indicates no current transaction.
         """
@@ -205,13 +197,7 @@ class InstrumentAgent(Process):
         the current transaction ends.
         """
         self._pending_transactions = []
-        
-        """
-        An integer in seconds for how long to wait to acquire a new
-        transaction if a value is not explicitly given.
-        """
-        #self._default_acq_timeout = 20   
-        
+                
         """
         An integer in seconds for the maximum allowable timeout to wait for
         a new transaction.
@@ -256,8 +242,12 @@ class InstrumentAgent(Process):
         """
         Buffer to hold instrument data for periodic transmission.
         """
-        #TODO driver integration. I think this is a list of strings.
         self._data_buffer = []
+        
+        """
+        The number of samples to keep in the data buffer before publicaiton.
+        """
+        self._data_buffer_limit = 0
     
         """
         List of current alarm conditions. Tuple of (ID,description).
@@ -289,11 +279,11 @@ class InstrumentAgent(Process):
         A finite state machine to track and manage agent state according to
         the general instrument state model.
         """
-        self.fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
+        self._fsm = InstrumentFSM(AgentState,AgentEvent,self.state_handlers,
                                  AgentEvent.ENTER,AgentEvent.EXIT)
        
         # Set initial state.
-        self.fsm.start(AgentState.UNINITIALIZED)
+        self._fsm.start(AgentState.UNINITIALIZED)
 
 
     ############################################################################
@@ -312,9 +302,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.POWERED_DOWN)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -336,11 +329,13 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.UNINITIALIZED)
             pass
         
         elif event == AgentEvent.EXIT:
@@ -381,10 +376,13 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.INACTIVE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -438,10 +436,13 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.STOPPED)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -507,12 +508,14 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.IDLE)
             pass
-        
 
         elif event == AgentEvent.EXIT:
             pass
@@ -573,9 +576,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.OBSERVATORY_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -643,9 +649,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
-        self._debug_print(self.fsm.get_current_state(),event)
+        self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
+            origin = '%s.%s' % ('',self.event_publisher_origin)
+            yield self._state_publisher.create_and_publish_event(origin=origin,
+                                        description=AgentState.DIRECT_ACCESS_MODE)
             pass
 
         elif event == AgentEvent.EXIT:
@@ -728,6 +737,14 @@ class InstrumentAgent(Process):
         (success,tid) = yield self._request_transaction(acq_timeout,exp_timeout)
         result['success'] = success
         result['transaction_id'] = tid
+            
+        # Publish any errors.
+        if InstErrorCode.is_error(success):
+            desc_str = 'Error in op_start_transaction: ' + \
+                       InstErrorCode.get_string(success)
+            origin="%s.%s" % ('', self.event_publisher_origin)
+            yield self._log_publisher.create_and_publish_event(origin=origin,
+                description=desc_str)
             
         yield self.reply_ok(msg,result)
         
@@ -868,6 +885,16 @@ class InstrumentAgent(Process):
             
 	# Publish an end transaction message...mainly as a test for now
         yield self._log_publisher.create_and_publish_event(name="Transaction ended!")
+
+        # Publish any errors.
+        success = result['success']
+        if InstErrorCode.is_error(success):
+            desc_str = 'Error in op_end_transaction: ' + \
+                       InstErrorCode.get_string(success)
+            origin="%s.%s" % ('', self.event_publisher_origin)
+            yield self._log_publisher.create_and_publish_event(origin=origin,
+                description=desc_str)
+        
         yield self.reply_ok(msg,result)
                 
     
@@ -918,7 +945,7 @@ class InstrumentAgent(Process):
 
         return result
 
-    
+    @defer.inlineCallbacks
     def _verify_transaction(self,tid,optype):
         """
         Verify the passed transaction ID is currently open, or open an
@@ -934,23 +961,41 @@ class InstrumentAgent(Process):
         assert(isinstance(tid,str)), 'Expected transaction ID str.'
         assert(isinstance(optype,str)), 'Expected str optype.'
 
+        success = None
+        if tid != 'create' and tid != 'none' and len(tid) != 36:
+            success = InstErrorCode.INVALID_TRANSACTION_ID
+
         # Try to start an implicit transaction if tid is 'create'
-        if tid == 'create':
+        elif tid == 'create':
             (success,tid) = self._start_transaction(self._default_exp_timeout)
 
             if InstErrorCode.is_ok(success):
-                return True
+                success = InstErrorCode.OK
 
             else:
-                return False
-        
+                success = InstErrorCode.LOCKED_RESOURCE
         
         # Allow only gets without a current or created transaction.
-        if tid == 'none' and self.transaction_id == None and optype == 'get':
-            return True
+        elif tid == 'none' and self.transaction_id == None and optype == 'get':
+            success = InstErrorCode.OK 
                 
         # Otherwise, the given ID must match the outstanding one
-        return (tid == self.transaction_id)
+        elif (tid == self.transaction_id):
+            success = InstErrorCode.OK
+            
+        else:
+            success = InstErrorCode.LOCKED_RESOURCE
+            
+        # Publish any errors.
+        if InstErrorCode.is_error(success):
+            desc_str = 'Error in verify_transaction: ' + \
+                       InstErrorCode.get_string(success)
+            origin="%s.%s" % ('', self.event_publisher_origin)
+            yield self._log_publisher.create_and_publish_event(origin=origin,
+                description=desc_str)
+            
+            
+        defer.returnValue(success)
 
     
     ############################################################################
@@ -985,27 +1030,16 @@ class InstrumentAgent(Process):
     
         reply = {'success':None,'result':None,'transaction_id':None}
     
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
-        # Set up the transaction
-        result = yield self._verify_transaction(tid,'execute')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        # Set up the transaction.
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
           
         reply['transaction_id'] = self.transaction_id    
+        success = None
+        result = None
         
         try:
             # TRANSITION command.
@@ -1013,40 +1047,64 @@ class InstrumentAgent(Process):
 
                 # Verify required parameter present.
                 if len(cmd) < 2:
-                    reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+                    success = InstErrorCode.REQUIRED_PARAMETER
                 
                 # Verify required parameter valid.
                 elif not AgentEvent.has(cmd[1]):
-                    reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
+                    success = InstErrorCode.INVALID_PARAM_VALUE
 
                 else:
-                    reply['success'] = yield self.fsm.on_event_async(cmd[1])
+                    success = yield self._fsm.on_event_async(cmd[1])
                         
             # TRANSMIT DATA command.
             elif cmd[0] == AgentCommand.TRANSMIT_DATA:
-                reply['success'] = InstErrorCode.NOT_IMPLEMENTED
+                success = InstErrorCode.NOT_IMPLEMENTED
             
             # SLEEP command.
             elif cmd[0] == AgentCommand.SLEEP:
                 if len(cmd) < 2:
-                    reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+                    success = InstErrorCode.REQUIRED_PARAMETER
                     
                 else:
                     time = cmd[1]
                     if not isinstance(time,int):
-                        reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
+                        success = InstErrorCode.INVALID_PARAM_VALUE
 
                     elif time <=0:
-                        reply['success'] = InstErrorCode.INVALID_PARAM_VALUE
+                        success = InstErrorCode.INVALID_PARAM_VALUE
                     else:
                         yield pu.asleep(time)
-                        reply['success'] = InstErrorCode.OK
+                        success = InstErrorCode.OK
                 
             else:
-                reply['success'] = InstErrorCode.UNKNOWN_COMMAND
+                success = InstErrorCode.UNKNOWN_COMMAND
 
-        # Transaction clean up. End implicit or expired transactions.        
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
+            reply['success'] = success
+                    
+        # Publish errors, clean up transaction.
         finally:
+                        
+            if success == None:
+                desc_str = 'Error in op_execute_observatory: ' + \
+                    InstErrorCode.get_string(InstErrorCode.UNKNOWN_ERROR)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+                
+            elif InstErrorCode.is_error(success):
+                desc_str = 'Error in op_execute_observatory: ' + \
+                    InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1080,39 +1138,26 @@ class InstrumentAgent(Process):
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'get')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
+        result = {}                    
+        get_errors = False
                         
         try:                        
                             
-            result = {}                    
-            get_errors = False
-                    
             # Add each observatory parameter given in params list.
             for arg in params:
                 if (not AgentParameter.has(arg)) and arg != 'all':
                     result[arg] = (InstErrorCode.INVALID_PARAMETER, None)
                     get_errors = True                
                     continue
+                
                 if arg == AgentParameter.EVENT_PUBLISHER_ORIGIN or arg=='all':                            
                     if self.event_publisher_origin == None:
                         result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
@@ -1120,16 +1165,7 @@ class InstrumentAgent(Process):
                     else:
                         result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
                             (InstErrorCode.OK,self.event_publisher_origin)
-                
-                if arg == AgentParameter.DRIVER_ADDRESS or arg=='all':
-                    if self._driver_client:
-                        result[AgentParameter.DRIVER_ADDRESS] = \
-                            (InstErrorCode.OK,str(self._driver_client.target))
-                    else:
-                        get_errors = True
-                        result[AgentParameter.DRIVER_ADDRESS] = \
-                            (InstErrorCode.INVALID_DRIVER,None)
-                
+                                
                 if arg == AgentParameter.DRIVER_DESC or arg == 'all':
                     result[AgentParameter.DRIVER_DESC] = \
                         (InstErrorCode.OK,self._driver_desc)
@@ -1142,9 +1178,6 @@ class InstrumentAgent(Process):
                     result[AgentParameter.DRIVER_CONFIG] = \
                         (InstErrorCode.OK,self._driver_config)                
 
-                if arg == AgentParameter.RESOURCE_ID or arg=='all':
-                    result[AgentParameter.RESOURCE_ID] = (InstErrorCode.OK,None)
-                
                 if arg == AgentParameter.TIME_SOURCE or arg=='all':
                     result[AgentParameter.TIME_SOURCE] = \
                         (InstErrorCode.OK,self._time_source)
@@ -1165,17 +1198,38 @@ class InstrumentAgent(Process):
                     result[AgentParameter.MAX_EXP_TIMEOUT] = \
                         (InstErrorCode.OK,self._max_exp_timeout)
                     
+                if arg == AgentParameter.BUFFER_SIZE or arg=='all':
+                    result[AgentParameter.BUFFER_SIZE] = \
+                        (InstErrorCode.OK,self._data_buffer_limit)
+        
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
-                
+                    
             else:
                 success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
-        
-        # Transaction clean up. End implicit or expired transactions.        
+            
+        # Publish errors, clean up transaction.
         finally:
+            
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_observatory: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+
+            # Transaction clean up. End implicit or expired transactions.        
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1210,32 +1264,19 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
         
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'set')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'set')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
+        result = {}
+        set_errors = False
+        set_successes = False
  
         try:
-            
-            result = {}
-            set_errors = False
             
             # Add each observatory parameter given in params list.
             # Note: it seems like all the current params should be read only by
@@ -1247,10 +1288,6 @@ class InstrumentAgent(Process):
                     continue
                 
                 val = params[arg]
-                
-                if arg == AgentParameter.DRIVER_ADDRESS :
-                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
-                    set_errors = True
                     
                 if arg == AgentParameter.DRIVER_DESC:
                     if not isinstance(val,dict):
@@ -1261,8 +1298,9 @@ class InstrumentAgent(Process):
                     else:
                         self._driver_desc = val
                         result[arg] = InstErrorCode.OK
-
-                if arg == AgentParameter.DRIVER_CLIENT_DESC:
+                        set_successes = True
+                        
+                elif arg == AgentParameter.DRIVER_CLIENT_DESC:
                     if not isinstance(val,dict):
                         # Better checking here.
                         result[arg] = InstErrorCode.INVALID_PARAM_VALUE
@@ -1271,8 +1309,9 @@ class InstrumentAgent(Process):
                     else:
                         self._client_desc = val
                         result[arg] = InstErrorCode.OK
+                        set_successes = True
 
-                if arg == AgentParameter.DRIVER_CONFIG:
+                elif arg == AgentParameter.DRIVER_CONFIG:
                     if not isinstance(val,dict):
                         # Better checking here.
                         result[arg] = InstErrorCode.INVALID_PARAM_VALUE
@@ -1281,11 +1320,8 @@ class InstrumentAgent(Process):
                     else:
                         self._driver_config = val
                         result[arg] = InstErrorCode.OK
-                
-                elif arg == AgentParameter.RESOURCE_ID :
-                    result[arg] = InstErrorCode.NOT_IMPLEMENTED
-                    set_errors = True
-                
+                        set_successes = True
+                                
                 elif arg == AgentParameter.TIME_SOURCE :
                     if TimeSource.has(val):
                         if val != self._time_source:
@@ -1293,6 +1329,7 @@ class InstrumentAgent(Process):
                             # Logic here when new time source set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
+                            set_successes = True
                             
                         else:
                             success = InstErrorCode.OK
@@ -1310,6 +1347,7 @@ class InstrumentAgent(Process):
                             # Logic here when new connection method set.
                             # And test for successful switch.
                             success = InstErrorCode.OK
+                            set_successes = True
 
                         else:
                             success = InstErrorCode.OK
@@ -1324,6 +1362,7 @@ class InstrumentAgent(Process):
                     if isinstance(val,int) and val >= 0:
                         self._max_acq_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
 
                     else:
                         set_errors = True
@@ -1336,6 +1375,7 @@ class InstrumentAgent(Process):
                         and val <= self._max_exp_timeout:
                         self._default_exp_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
                         
                     else:
                         set_errors = True
@@ -1347,24 +1387,61 @@ class InstrumentAgent(Process):
                     if isinstance(val,int) and val > self._min_exp_timeout:
                         self._max_exp_timeout = val
                         success = InstErrorCode.OK
+                        set_successes = True
 
                     else:
                         set_errors = True
                         success = InstErrorCode.INVALID_PARAM_VALUE
 
                     result[arg] = success
-    
+
+                elif arg == AgentParameter.BUFFER_SIZE :
+                    if isinstance(val,int) and val >= 0:
+                        self._data_buffer_limit = val
+                        success = InstErrorCode.OK
+                        set_successes = True
+
+                    else:
+                        set_errors = True
+                        success = InstErrorCode.INVALID_PARAM_VALUE
+
+                    result[arg] = success 
+
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
             if set_errors:
-                success = InstErrorCode.SET_OBSERVATORY_ERR
-                
+                success = InstErrorCode.GET_OBSERVATORY_ERR
+                    
             else:
                 success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
-            
-        # Transaction clean up. End implicit or expired transactions.        
+                    
+        # Publish errors, clean up transaction.
         finally:
+            
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_set_observatory: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+
+            # Publish the new agent configuration.
+            if set_successes:
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                config = self._get_parameters()
+                strval = self._get_data_string(config)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                        description=strval)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1399,50 +1476,42 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'get')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
-
+        get_errors = False
+        result = {}
 
         try:
-                    
-            """
-            get_errors = False
-            result = {}
-            
-            if get_errors:
-                success = InstErrorCode.GET_OBSERVATORY_ERR
-                
-            else:
-                success = InstErrorCode.OK
-                
-            reply['success'] = success
-            reply['result'] = result
-            """
-            
-            # The method is not implemented.
-            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
+            pass
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
+            success = InstErrorCode.NOT_IMPLEMENTED
+            reply['success'] = success
+        
+        # Publish errors, clean up transaction.
         finally:
+
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_observatory_metadata: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1476,42 +1545,18 @@ class InstrumentAgent(Process):
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'get')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
+        get_errors = False
+        result = {}
 
         try:
-            
-            get_errors = False
-            result = {}
-            
-            """
-            AGENT_STATE = 'AGENT_STATUS_AGENT_STATE' # Basic agent state.
-            CONNECTION_STATE = 'AGENT_STATUS_CONNECTION_STATE'
-            OBSERVATORY_STATE = 'AGENT_STATUS_OBSERVATORY_STATE'
-            ALARMS = 'AGENT_STATUS_ALARMS'
-            TIME_STATUS = 'AGENT_STATUS_TIME_STATUS'
-            BUFFER_SIZE = 'AGENT_STATUS_BUFFER_SIZE'
-            AGENT_VERSION = 'AGENT_STATUS_AGENT_VERSION'
-            """
             
             # Set up the result message.
             for arg in params:
@@ -1525,7 +1570,7 @@ class InstrumentAgent(Process):
                 # Agent state.
                 if arg == AgentStatus.AGENT_STATE or arg == 'all':
                     result[AgentStatus.AGENT_STATE] = \
-                        (InstErrorCode.OK,self.fsm.get_current_state())
+                        (InstErrorCode.OK,self._fsm.get_current_state())
 
                 # Connection state.                        
                 if arg == AgentStatus.CONNECTION_STATE or arg == 'all':
@@ -1552,22 +1597,37 @@ class InstrumentAgent(Process):
                     result[AgentStatus.AGENT_VERSION] = \
                         (InstErrorCode.OK,self.get_version())                
                     
-                # Agent software version.
+                # Pending transactions.
                 if arg == AgentStatus.PENDING_TRANSACTIONS or arg == 'all':
                     result[AgentStatus.PENDING_TRANSACTIONS] = \
                         (InstErrorCode.OK,self._pending_transactions)                
 
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
-
             else:
                 success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Publish errors, clean up transaction.
         finally:
+            
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_observatory_status: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1597,37 +1657,24 @@ class InstrumentAgent(Process):
         params = content['params']
         tid = content['transaction_id']
         
-        assert(isinstance(params,(tuple,list))), 'Expected a parameter list or tuple.'
+        assert(isinstance(params,(tuple,list))), 'Expected a parameter list \
+            or tuple.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'get')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
+        get_errors = False
+        result = {}
         
         try:
-            
-            get_errors = False
-            result = {}
             
             # Do the work here.
             # Set up the result message.
@@ -1655,7 +1702,8 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_COMMANDS or arg == 'all':
                     #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_command_1','device_command_2'])
+                    dvr_val = (InstErrorCode.OK,
+                               ['device_command_1','device_command_2'])
                     result[AgentCapability.DEVICE_COMMANDS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
@@ -1663,7 +1711,8 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_PARAMS or arg == 'all':
                     #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_param_1','device_param_2','device_param_3'])
+                    dvr_val = (InstErrorCode.OK,['device_param_1',
+                        'device_param_2','device_param_3'])
                     result[AgentCapability.DEVICE_PARAMS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
@@ -1671,24 +1720,39 @@ class InstrumentAgent(Process):
                     
                 if arg == AgentCapability.DEVICE_STATUSES or arg == 'all':
                     #TODO driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_status_1','device_status_2','device_status_3'])
+                    dvr_val = (InstErrorCode.OK,['device_status_1',
+                        'device_status_2','device_status_3'])
                     result[AgentCapability.DEVICE_STATUSES] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
-
-            
+        
+        # Unkonwn error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
             if get_errors:
                 success = InstErrorCode.GET_OBSERVATORY_ERR
-
             else:
                 success = InstErrorCode.OK
                 
             reply['success'] = success
             reply['result'] = result
-        
-        # Transaction clean up. End implicit or expired transactions.        
+            
+        # Publish errors, clean up transaction.
         finally:
+
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_observatory_status: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+                       
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1711,7 +1775,7 @@ class InstrumentAgent(Process):
             {'channels':[chan_arg,...,chan_arg],'command':[command,arg,...,argN],
             'transaction_id':transaction_id}
         @retval A reply message with a dict
-            {'success':success,'result':{chan_arg:(success,command_specific_values),
+            {'success':success,'result':{chan_arg:(success,command_specific),
             ...,chan_arg:(success,command_specific_values)},
             'transaction_id':transaction_id}. 
         """
@@ -1733,45 +1797,53 @@ class InstrumentAgent(Process):
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'execute')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
 
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
             return
 
         timeout = 20
-                    
+        success = None
+        result = None
+        
         try:
             
             dvr_result = yield self._driver_client.execute(channels,command,
                                                           timeout)
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
-                                    
-        # Transaction clean up. End implicit or expired transactions.        
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)                
+                
+        # Unknown error.        
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+        
+        # Set reply values.
+        else:
+            reply['success'] = success
+            reply['result'] = result          
+            
+        # Publish errors, clean up transaction.
         finally:
+            
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_execute_device: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1805,29 +1877,16 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -1835,15 +1894,35 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg,reply)
             return
 
+        success = None
+        result = None
+        
         try:
             
             dvr_result = yield self._driver_client.get(params)
-            
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)                
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Unkonwn error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
+
+        # Set reply values.        
+        else:
+            reply['success'] = success
+            reply['result'] = result
+            
+        # Publish errors, clean up transaction.
         finally:
+                
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_device: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1876,43 +1955,50 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'set')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
             return
-
+    
+        success = None
+        result = None
+        
         try:
             
             dvr_result = yield self._driver_client.set(params)
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)
             
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            raise
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Set reply values.
+        else:
+            reply['success'] = success
+            reply['result'] = result
+            
+        # Publish errors, clean up transaction.
         finally:
+                
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_execute_device: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -1943,45 +2029,53 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
          
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.DIRECT_ACCESS_MODE:
             reply['success'] = InstErrorCode.INCORRECT_STATE
             yield self.reply_ok(msg,reply)
             return
 
         timeout = 20
-                    
+        
+        success = None            
+        result = None
+        
         try:                    
                     
             dvr_result = yield self._driver_client.execute_direct(bytes,timeout)
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)
         
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKOWN_ERROR
+            raise
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Set reply values.
+        else:
+            reply['success'] = success
+            reply['result'] = result
+            
+        # Publish errors, clean up transaction.
         finally:
+                
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_execute_device_direct: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -2016,29 +2110,16 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -2046,16 +2127,37 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg,reply)
             return
         
+        success = None
+        result = None
+        
         try:
             
             dvr_content = {'params':params}
             dvr_result = yield self._driver_client.get_metadata(dvr_content)
-            
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)
         
-        # Transaction clean up. End implicit or expired transactions.        
+        # Unkown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+         
+        # Set reply values.   
+        else:
+            reply['success'] = success
+            reply['result'] = result
+            
+        # Publish errors, clean up transaction.
         finally:
+                
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_device_metadata: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -2089,29 +2191,16 @@ class InstrumentAgent(Process):
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
-        if tid != 'create' and tid != 'none' and len(tid) != 36:
-            reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-            yield self.reply_ok(msg,reply)
-            return
-
         # Set up the transaction
-        result = yield self._verify_transaction(tid,'get')
-        if not result:
-            if tid == 'none':
-                reply['success'] = InstErrorCode.TRANSACTION_REQUIRED
-
-            elif tid=='create':
-                reply['success'] = InstErrorCode.LOCKED_RESOURCE
-
-            else:
-                reply['success'] = InstErrorCode.INVALID_TRANSACTION_ID
-
+        success = yield self._verify_transaction(tid,'execute')
+        if InstErrorCode.is_error(success):
+            reply['success'] = success
             yield self.reply_ok(msg,reply)
             return
 
         reply['transaction_id'] = self.transaction_id
                     
-        agent_state = self.fsm.get_current_state()
+        agent_state = self._fsm.get_current_state()
         if agent_state != AgentState.OBSERVATORY_MODE and \
                           agent_state != AgentState.IDLE and \
                           agent_state != AgentState.STOPPED:
@@ -2119,16 +2208,36 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg,reply)
             return
 
+        success = None
+        result = None
+        
         try:
             
             dvr_content = {'params':params}
             dvr_result = yield self._driver_client.get_status(dvr_content)
+            success = dvr_result.get('success',None)
+            result = dvr_result.get('result',None)
         
-            reply['success'] = dvr_result['success']
-            reply['result'] = dvr_result['result']
-        
-        # Transaction clean up. End implicit or expired transactions.        
+        # Unknown error.
+        except:
+            success = InstErrorCode.UNKNOWN_ERROR
+            
+        # Set reply values.
+        else:
+            reply['success'] = success
+            reply['result'] = result
+                
+        # Publish errors, clean up transaction.
         finally:
+                
+            # Publish any errors.
+            if InstErrorCode.is_error(success):
+                desc_str = 'Error in op_get_device_metadata: ' + \
+                           InstErrorCode.get_string(success)
+                origin="%s.%s" % ('', self.event_publisher_origin)
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=desc_str)
+            
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
             self._in_protected_function = False
@@ -2166,6 +2275,67 @@ class InstrumentAgent(Process):
             yield self.reply_err(msg,
                         'driver event occured evoked from a non-child process')
             return
+        
+        # If data received, coordinate buffering and publishing.
+        if type == DriverAnnouncement.DATA_RECEIVED:
+            
+            # Get the driver observatory state.
+            key = (DriverChannel.INSTRUMENT,DriverStatus.OBSERVATORY_STATE)
+            reply = yield self._driver_client.get_status([key])
+            success = reply['success']
+            result = reply['result']
+            obs_status = result.get(key,None)
+            strval = ''
+            
+            # If in streaming mode, buffer data and publish at intervals.
+            if InstErrorCode.is_ok(success) and obs_status != None:
+                if obs_status[1] == ObservatoryState.STREAMING:
+                    self._data_buffer.append(value)
+                    if len(self._data_buffer) > self._data_buffer_limit:
+                        strval = self._get_data_string(self._data_buffer)
+                        self._data_buffer = []
+            
+            # If not in streaming mode, always publish data upon receipt.   
+            else:
+                strval = self._get_data_string(value)
+
+            if len(strval)>0:
+                self._prev_data_transducer = transducer
+                origin = "%s.%s" % (transducer,self.event_publisher_origin)
+                yield self._data_publisher.create_and_publish_event(\
+                    origin=origin,description=strval)
+
+        # Driver configuration changed, publish config.                
+        elif type == DriverAnnouncement.CONFIG_CHANGE:
+            
+            #
+            reply = yield self._driver_client.get([('all','all')])
+            success = reply['success']
+            result = reply['result']
+            if InstErrorCode.is_ok(success) and len(result)>0:
+                strval = self._get_data_string(result)
+                origin="%s.%s" % (transducer, self.event_publisher_origin)            
+                yield self._log_publisher.create_and_publish_event(origin=origin,
+                    description=strval)
+        
+        elif type == DriverAnnouncement.ERROR:
+            pass
+        
+        # If the driver state changed, publish any buffered data remaining.
+        elif type == DriverAnnouncement.STATE_CHANGE:
+
+            strval = self._get_data_string(self._data_buffer)
+            if len(strval) > 0:    
+                origin = "%s.%s" % (self._prev_data_transducer,
+                                    self.event_publisher_origin)
+                yield self._data_publisher.create_and_publish_event(\
+                    origin=origin,description=strval)
+        
+        elif type == DriverAnnouncement.EVENT_OCCURRED:
+            pass
+            
+        else:
+            pass
         
         self._debug_print_driver_event(type,transducer,value)
         
@@ -2288,7 +2458,8 @@ class InstrumentAgent(Process):
                 # Driver and client constructed. Set client object.
                 else:
                     self._driver_client = driver_client
-                    self._debug_print('constructed driver client',str(self._driver_client))
+                    self._debug_print('constructed driver client',
+                                      str(self._driver_client))
                     
 
     def _condemn_driver(self):
@@ -2350,29 +2521,26 @@ class InstrumentAgent(Process):
             intermittant wetside agent component.
         """
             
-        if ((self._driver_pid != None) and (self._driver_client != None)):
-            curstate = self.fsm.get_current_state()
-            
-            if curstate == AgentState.POWERED_DOWN:
-                return AgentConnectionState.POWERED_DOWN
-            elif curstate == AgentState.UNINITIALIZED:
-                return AgentConnectionState.NO_DRIVER
-            elif curstate == AgentState.INACTIVE:
-                return AgentConnectionState.DISCONNECTED
-            elif curstate == AgentState.IDLE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.STOPPED:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.OBSERVATORY_MODE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.DIRECT_ACCESS_MODE:
-                return AgentConnectionState.CONNECTED
-            elif curstate == AgentState.UNKNOWN:
-                return AgentConnectionState.UNKOWN
-            else:
-                return AgentConnectionState.UNKOWN
-        else:
+        curstate = self._fsm.get_current_state()
+        
+        if curstate == AgentState.POWERED_DOWN:
+            return AgentConnectionState.POWERED_DOWN
+        elif curstate == AgentState.UNINITIALIZED:
             return AgentConnectionState.NO_DRIVER
+        elif curstate == AgentState.INACTIVE:
+            return AgentConnectionState.DISCONNECTED
+        elif curstate == AgentState.IDLE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.STOPPED:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.OBSERVATORY_MODE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.DIRECT_ACCESS_MODE:
+            return AgentConnectionState.CONNECTED
+        elif curstate == AgentState.UNKNOWN:
+            return AgentConnectionState.UNKOWN
+        else:
+            return AgentConnectionState.UNKOWN
         
         
     def _is_child_process(self, name):
@@ -2399,6 +2567,49 @@ class InstrumentAgent(Process):
         return sum(map(lambda x: len(x),self._data_buffer))
         
         
+    def _get_data_string(self,data):
+        """
+        Convert a sample dictionary or list of sample dictionaries into a
+        publishable string value.
+        @param data A dictionary containing an instrument data sample in
+            key-value pairs or a list of such dictionaries representing a
+            buffered set of samples.
+        @retval A string representation of the data to be published.
+        """
+        
+        assert(isinstance(data,(list,tuple,dict))), 'Expected a data dict, \
+            or a list or tuple of data dicts'
+        
+        if isinstance(data,dict):
+            return str(data)
+        else:
+            strval = ''
+            for item in data:
+                strval += str(item) + ','
+                
+            strval = strval[:-1]
+            return strval
+        
+    def _get_parameters(self):
+        """
+        Get a dictionary of agent parameter values.
+        @retval A dict containing the agent parameters as key-value pairs.
+        """
+
+        params = {}
+        params[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
+            self.event_publisher_origin
+        params[AgentParameter.TIME_SOURCE] = self._time_source
+        params[AgentParameter.CONNECTION_METHOD] = self._connection_method
+        params[AgentParameter.MAX_ACQ_TIMEOUT] = self._max_acq_timeout
+        params[AgentParameter.DEFAULT_EXP_TIMEOUT] = self._default_exp_timeout
+        params[AgentParameter.MAX_EXP_TIMEOUT] = self._max_exp_timeout
+        params[AgentParameter.DRIVER_DESC] = self._driver_desc
+        params[AgentParameter.DRIVER_CLIENT_DESC] = self._client_desc
+        params[AgentParameter.DRIVER_CONFIG] = self._driver_config
+        params[AgentParameter.BUFFER_SIZE] = self._data_buffer_limit
+        return params
+                
     def _debug_print_driver_event(self,type,transducer,value):
         """
         Print debug driver events to stdio.
