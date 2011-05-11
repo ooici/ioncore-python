@@ -1902,8 +1902,10 @@ class Wrapper(object):
 
 
         output += 'Wrapper Type: %s \n' % str(self._gpb_type)
-        output += 'Wrapper current value:\n'
-        output += str(self) + '\n'
+        # DO NOT UNCOMMENT THE FOLLOWING LINES unless you know what you are doing and you will recomment them!
+        # They are more expensive than you can possibly imagine
+        #output += 'Wrapper current value:\n'
+        #output += str(self) + '\n'
         if self._source is not self:
             output += '================== Has Other source! =========================\n'
             output += self._source.Debug()
