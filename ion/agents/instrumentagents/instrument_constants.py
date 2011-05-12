@@ -134,6 +134,15 @@ class DriverStatus(BaseEnum):
     OBSERVATORY_STATE = 'DRIVER_STATUS_OBSERVATORY_STATE'
     DRIVER_ALARMS = 'DRIVER_STATUS_DRIVER_ALARMS'
 
+"""
+Common driver parameters.
+"""
+class DriverParameter(BaseEnum):
+    """
+    Common driver parameter enum.
+    """
+    pass
+
     
 """
 Common observatory statuses.
@@ -361,18 +370,31 @@ class AlarmType(BaseEnum):
 """
 Names of observatory and device capability lists.
 """
-class AgentCapability(BaseEnum):
+class ObservatoryCapability(BaseEnum):
     """
-    Common agent and device capabilities enum.
+    Common agent observatory capabilies enum.
     """
     OBSERVATORY_COMMANDS = 'CAP_OBSERVATORY_COMMANDS' # Common and specific observatory command names.
     OBSERVATORY_PARAMS = 'CAP_OBSERVATORY_PARAMS' # Common and specific observatory parameter names.
     OBSERVATORY_STATUSES = 'CAP_OBSERVATORY_STATUSES' # Common and specific observatory status names.
-    METADATA = 'CAP_METADATA' # Common and specific metadata names.
+    OBSERVATORY_METADATA = 'CAP_OBSERVATORY_METADATA' # Common and specific metadata names.
+    
+    
+class DriverCapability(BaseEnum):
+    """
+    Common device capabilities enum.
+    """
+    DEVICE_METADATA = 'CAP_DEVICE_METADATA' # Common and specific metadata names.
     DEVICE_COMMANDS = 'CAP_DEVICE_COMMANDS' # Common and specific device command names.
     DEVICE_PARAMS = 'CAP_DEVICE_PARAMS' # Common and specific device parameter names.
     DEVICE_STATUSES = 'CAP_DEVICE_STATUSES' # Common and specific device status names.    
-
+    
+    
+class InstrumentCapability(ObservatoryCapability,DriverCapability):
+    """
+    Comination of agent and device capabilities enum.
+    """
+    pass
 
 
 """

@@ -1662,58 +1662,69 @@ class InstrumentAgent(Process):
         get_errors = False
         result = {}
         
+        
         try:
             
             # Do the work here.
             # Set up the result message.
             for arg in params:
-                if not AgentCapability.has(arg) and arg != 'all':
+                if not InstrumentCapability.has(arg) and arg != 'all':
                     result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
                     get_errors = True
                     continue
                 
-                if arg == AgentCapability.OBSERVATORY_COMMANDS or arg == 'all':
-                    result[AgentCapability.OBSERVATORY_COMMANDS] = \
+                if arg == InstrumentCapability.OBSERVATORY_COMMANDS or arg == 'all':
+                    result[InstrumentCapability.OBSERVATORY_COMMANDS] = \
                         (InstErrorCode.OK,AgentCommand.list())
                     
-                if arg == AgentCapability.OBSERVATORY_PARAMS or arg == 'all':
-                    result[AgentCapability.OBSERVATORY_PARAMS] = \
+                if arg == InstrumentCapability.OBSERVATORY_PARAMS or arg == 'all':
+                    result[InstrumentCapability.OBSERVATORY_PARAMS] = \
                         (InstErrorCode.OK,AgentParameter.list())
                     
-                if arg == AgentCapability.OBSERVATORY_STATUSES or arg == 'all':
-                    result[AgentCapability.OBSERVATORY_STATUSES] = \
+                if arg == InstrumentCapability.OBSERVATORY_STATUSES or arg == 'all':
+                    result[InstrumentCapability.OBSERVATORY_STATUSES] = \
                         (InstErrorCode.OK,AgentStatus.list())
                     
-                if arg == AgentCapability.METADATA or arg == 'all':
-                    result[AgentCapability.METADATA] = \
+                if arg == InstrumentCapability.OBSERVATORY_METADATA or arg == 'all':
+                    result[InstrumentCapability.OBSERVATORY_METADATA] = \
                         (InstErrorCode.OK,MetadataParameter.list())
                     
-                if arg == AgentCapability.DEVICE_COMMANDS or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_COMMANDS or arg == 'all':
                     #TDOD driver integration.
                     dvr_val = (InstErrorCode.OK,
                                ['device_command_1','device_command_2'])
-                    result[AgentCapability.DEVICE_COMMANDS] = dvr_val
+                    result[InstrumentCapability.DEVICE_COMMANDS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == AgentCapability.DEVICE_PARAMS or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_PARAMS or arg == 'all':
                     #TDOD driver integration.
                     dvr_val = (InstErrorCode.OK,['device_param_1',
                         'device_param_2','device_param_3'])
-                    result[AgentCapability.DEVICE_PARAMS] = dvr_val
+                    result[InstrumentCapability.DEVICE_PARAMS] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == AgentCapability.DEVICE_STATUSES or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_STATUSES or arg == 'all':
                     #TODO driver integration.
                     dvr_val = (InstErrorCode.OK,['device_status_1',
                         'device_status_2','device_status_3'])
-                    result[AgentCapability.DEVICE_STATUSES] = dvr_val
+                    result[InstrumentCapability.DEVICE_STATUSES] = dvr_val
 
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
+
+                if arg == InstrumentCapability.DEVICE_METADATA or arg == 'all':
+                    #TODO driver integration.
+                    dvr_val = (InstErrorCode.OK,['device_metadata_1',
+                        'device_metadata_2','device_metadata_3'])
+                    result[InstrumentCapability.DEVICE_METADATA] = dvr_val
+
+                    if InstErrorCode.is_error(dvr_val[0]):
+                        get_errors = True
+
         
         # Unkonwn error.
         except:

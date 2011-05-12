@@ -676,8 +676,11 @@ class TestSBE37(IonTestCase):
         reply = yield self.driver_client.get_capabilities(params)
         success = reply['success']
         result = reply['result']        
-        self.assert_(InstErrorCode.is_equal(success,
-                                            InstErrorCode.NOT_IMPLEMENTED))
+        #self.assert_(InstErrorCode.is_equal(success,
+        #                                    InstErrorCode.NOT_IMPLEMENTED))
+        
+        print 'result'
+        print result
         
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()

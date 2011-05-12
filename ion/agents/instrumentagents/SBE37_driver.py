@@ -25,6 +25,9 @@ from ion.agents.instrumentagents.instrument_constants import DriverEvent
 from ion.agents.instrumentagents.instrument_constants import DriverAnnouncement
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverStatus
+from ion.agents.instrumentagents.instrument_constants import DriverParameter
+from ion.agents.instrumentagents.instrument_constants import MetadataParameter
+from ion.agents.instrumentagents.instrument_constants import DriverCapability
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.instrument_constants import BaseEnum
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
@@ -41,12 +44,14 @@ IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
 ###############################################################################
 
 
-"""
-Device prompts.
-"""
-SBE37_PROMPT = 'S>'
-SBE37_NEWLINE = '\r\n'
-SBE37_BAD_COMMAND = '?cmd S>'
+# Device prompts.
+class SBE37Prompt(BaseEnum):
+    """
+    SBE37 io prompts.
+    """
+    PROMPT = 'S>'
+    NEWLINE = '\r\n'
+    BAD_COMMAND = '?cmd S>'
 
 
 # Device states.
@@ -97,9 +102,70 @@ class SBE37Channel(BaseEnum):
     CONDUCTIVITY = DriverChannel.CONDUCTIVITY
 
 
+# Device specific parameters.
+class SBE37Parameter(DriverParameter):
+    """
+    Add sbe37 specific parameters here.
+    """
+    OUTPUTSAL = 'OUTPUTSAL'
+    OUTPUTSV = 'OUTPUTSV'
+    NAVG = 'NAVG'
+    SAMPLENUM = 'SAMPLENUM'
+    INTERVAL = 'INTERVAL'
+    STORETIME = 'STORETIME'
+    TXREALTIME = 'TXREALTIME'
+    SYNCMODE = 'SYNCMODE'
+    SYNCWAIT = 'SYNCWAIT'
+    TCALDATE = 'TCALDATE'
+    TA0 = 'TA0'
+    TA1 = 'TA1'
+    TA2 = 'TA2'
+    TA3 = 'TA3'
+    CCALDATE = 'CCALDATE'
+    CG = 'CG'
+    CH = 'CH'
+    CI = 'CI'
+    CJ = 'CJ'
+    WBOTC = 'WBOTC'
+    CTCOR = 'CTCOR'
+    CPCOR = 'CPCOR'
+    PCALDATE = 'PCALDATE'
+    PA0 = 'PA0'
+    PA1 = 'PA1'
+    PA2 = 'PA2'
+    PTCA0 = 'PTCA0'
+    PTCA1 = 'PTCA1'
+    PTCA2 = 'PTCA2'
+    PTCB0 = 'PTCB0'
+    PTCB1 = 'PTCB1'
+    PTCB2 = 'PTCB2'
+    POFFSET = 'POFFSET'
+    RCALDATE = 'RCALDATE'
+    RTCA0 = 'RTCA0'
+    RTCA1 = 'RTCA1'
+    RTCA2 = 'RTCA2'
+    
+    
+# Device specific statuses.
 class SBE37Status(DriverStatus):
     """
     Add sbe37 statuses here.
+    """
+    pass
+
+
+# Device specific capabilities.
+class SBE37Capability(DriverCapability):
+    """
+    Add sbe37 capabilities here.
+    """
+    pass
+
+
+# Device specific metadata parameters.
+class SBE37MetadataParameter(MetadataParameter):
+    """
+    Add sbe37 metadata types here.
     """
     pass
 
@@ -351,14 +417,14 @@ class SBE37Driver(InstrumentDriver):
             #    'parser': None,
             #    'default':'9600'
             #    },
-            (SBE37Channel.INSTRUMENT,'OUTPUTSAL'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSAL):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?output salinity with each sample',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'OUTPUTSV'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSV):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?output sound velocity with each sample',
@@ -366,56 +432,56 @@ class SBE37Driver(InstrumentDriver):
                     self._true_false_to_string)
                 },
             # TBD how does this get handled?
-            #(SBE37Channel.INSTRUMENT,'FORMAT'):{
+            #(SBE37Channel.INSTRUMENT,SBE37Parameter.FORMAT):{
             #    'value': None,
             #    'parser': DeviceIOParser(
             #        r'',
             #        lambda match : 0 ),
             #    'default':1
             #    },
-            (SBE37Channel.INSTRUMENT,'NAVG'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.NAVG):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'number of samples to average = (\d+)',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                 },
-            (SBE37Channel.INSTRUMENT,'SAMPLENUM'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.SAMPLENUM):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'samplenumber = (\d+), free = \d+',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                 },
-            (SBE37Channel.INSTRUMENT,'INTERVAL'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.INTERVAL):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'sample interval = (\d+) seconds',
                     lambda match : int(match.group(1)),
                     self._int_to_string)       
                  },
-            (SBE37Channel.INSTRUMENT,'STORETIME'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.STORETIME):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?store time with each sample',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'TXREALTIME'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.TXREALTIME):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'(do not )?transmit real-time data',
                     lambda match : False if match.group(1) else True,
                     self._true_false_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'SYNCMODE'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.SYNCMODE):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'serial sync mode (enabled|disabled)',
                     lambda match : False if (match.group(1)=='disabled') else True,
                     self._true_false_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'SYNCWAIT'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.SYNCWAIT):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'wait time after serial sync sampling = (\d+) seconds',
@@ -423,7 +489,7 @@ class SBE37Driver(InstrumentDriver):
                     self._int_to_string)
                 },
             # Should cal dates be parameters or metadata?
-            (SBE37Channel.INSTRUMENT,'TCALDATE'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.TCALDATE):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'temperature: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -431,28 +497,28 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            (SBE37Channel.TEMPERATURE,'TA0'):{
+            (SBE37Channel.TEMPERATURE,SBE37Parameter.TA0):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.TEMPERATURE,'TA1'):{
+            (SBE37Channel.TEMPERATURE,SBE37Parameter.TA1):{
                 'value': None,
                 'parser': DeviceIOParser(
                    r' +TA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.TEMPERATURE,'TA2'):{
+            (SBE37Channel.TEMPERATURE,SBE37Parameter.TA2):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.TEMPERATURE,'TA3'):{
+            (SBE37Channel.TEMPERATURE,SBE37Parameter.TA3):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +TA3 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -460,7 +526,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            (SBE37Channel.CONDUCTIVITY,'CCALDATE'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CCALDATE):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'conductivity: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -468,49 +534,49 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CG'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CG):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +G = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CH'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CH):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +H = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CI'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CI):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +I = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CJ'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CJ):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +J = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'WBOTC'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.WBOTC):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +WBOTC = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CTCOR'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CTCOR):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +CTCOR = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.CONDUCTIVITY,'CPCOR'):{
+            (SBE37Channel.CONDUCTIVITY,SBE37Parameter.CPCOR):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +CPCOR = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -518,7 +584,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            (SBE37Channel.PRESSURE,'PCALDATE'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PCALDATE):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'pressure .+ ((\d+)-([a-zA-Z]+)-(\d+))',
@@ -526,70 +592,70 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PA0'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PA0):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PA1'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PA1):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PA2'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PA2):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCA0'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCA0):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCA1'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCA1):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCA2'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCA2):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCB0'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCB0):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCB1'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCB1):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'PTCB2'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.PTCB2):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +PTCSB2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.PRESSURE,'POFFSET'):{
+            (SBE37Channel.PRESSURE,SBE37Parameter.POFFSET):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +POFFSET = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -597,7 +663,7 @@ class SBE37Driver(InstrumentDriver):
                     self._float_to_string)
                 },
             # Should cal dates be parameters or metadata?                
-            (SBE37Channel.INSTRUMENT,'RCALDATE'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.RCALDATE):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r'rtc: +((\d+)-([a-zA-Z]+)-(\d+))',
@@ -605,21 +671,21 @@ class SBE37Driver(InstrumentDriver):
                                                         '%d-%b-%y'),
                     self._date_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'RTCA0'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.RTCA0):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA0 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'RTCA1'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.RTCA1):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA1 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
                     lambda match : float(match.group(1)),
                     self._float_to_string)
                 },
-            (SBE37Channel.INSTRUMENT,'RTCA2'):{
+            (SBE37Channel.INSTRUMENT,SBE37Parameter.RTCA2):{
                 'value': None,
                 'parser': DeviceIOParser(
                     r' +RTCA2 = (-?\d.\d\d\d\d\d\de[-+]\d\d)',
@@ -631,7 +697,7 @@ class SBE37Driver(InstrumentDriver):
         """
         Instrument state handlers
         """
-        self.state_handlers = {
+        self._state_handlers = {
             SBE37State.UNCONFIGURED : self.state_handler_unconfigured,
             SBE37State.DISCONNECTED : self.state_handler_disconnected,
             SBE37State.CONNECTING : self.state_handler_connecting,
@@ -646,7 +712,7 @@ class SBE37Driver(InstrumentDriver):
         """
         Instrument state machine.
         """
-        self._fsm = InstrumentFSM(SBE37State,SBE37Event,self.state_handlers,
+        self._fsm = InstrumentFSM(SBE37State,SBE37Event,self._state_handlers,
                                  SBE37Event.ENTER,SBE37Event.EXIT)
 
 
@@ -954,7 +1020,7 @@ class SBE37Driver(InstrumentDriver):
             # Write the device command.
             else:
                 
-                self._write_command(cmd+SBE37_NEWLINE)
+                self._write_command(cmd+SBE37Prompt.NEWLINE)
                                 
         elif event == SBE37Event.DATA_RECEIVED:
 
@@ -1061,7 +1127,7 @@ class SBE37Driver(InstrumentDriver):
                 # Write autosample device command, remove command spec
                 # from buffer, set result and fire the reply deferred.
                 else:
-                    self._write_command(cmd+SBE37_NEWLINE)
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
                     self._driver_command_buffer.pop(0)
                     command_spec.set_success(InstErrorCode.OK,
                                              InstErrorCode.ACQUIRE_SAMPLE_ERR)
@@ -1084,7 +1150,7 @@ class SBE37Driver(InstrumentDriver):
 
                 # Write the autosample stop device command.                
                 else:
-                    self._write_command(cmd+SBE37_NEWLINE)
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
                     
         elif event == SBE37Event.STOP_AUTOSAMPLE:
 
@@ -1203,7 +1269,7 @@ class SBE37Driver(InstrumentDriver):
     
                 # Write command to device.
                 else:
-                    self._write_command(cmd+SBE37_NEWLINE)
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
                 
         elif event == SBE37Event.DATA_RECEIVED:
             pass
@@ -1260,7 +1326,7 @@ class SBE37Driver(InstrumentDriver):
             
             # Validate previous response.
             command_spec = self._driver_command_buffer[0]
-            if self._line_buffer == SBE37_PROMPT:
+            if self._line_buffer == SBE37Prompt.PROMPT:
                 prev_result = InstErrorCode.OK
             else:
                 prev_result = InstErrorCode.BAD_DRIVER_COMMAND
@@ -1284,7 +1350,7 @@ class SBE37Driver(InstrumentDriver):
                 
                 command_spec.previous_key = set_key
                 #print 'writing command '+set_cmd
-                self._write_command(set_cmd+SBE37_NEWLINE)
+                self._write_command(set_cmd+SBE37Prompt.NEWLINE)
 
         elif event == SBE37Event.DATA_RECEIVED:
             pass                
@@ -1388,26 +1454,26 @@ class SBE37Driver(InstrumentDriver):
         # If the line buffer has newlines, extract complete lines and add
         # to the data buffer. Keep the tail fragment if any in the line buffer
         # to append further incomming data to.
-        if SBE37_NEWLINE in self._line_buffer:
-            lines = self._line_buffer.split(SBE37_NEWLINE)
+        if SBE37Prompt.NEWLINE in self._line_buffer:
+            lines = self._line_buffer.split(SBE37Prompt.NEWLINE)
             self._line_buffer = lines[-1]
             self._data_lines += lines[0:-1]
             new_lines = True
 
         # If the linebuffer ends with a prompt, extract and append the
         # prefix data to the data buffer. Keep the prompt in the line buffer.
-        if self._line_buffer.endswith(SBE37_PROMPT):
-            self._data_lines.append(self._line_buffer.replace(SBE37_PROMPT,''))
-            self._line_buffer = SBE37_PROMPT
+        if self._line_buffer.endswith(SBE37Prompt.PROMPT):
+            self._data_lines.append(self._line_buffer.replace(SBE37Prompt.PROMPT,''))
+            self._line_buffer = SBE37Prompt.PROMPT
             new_lines = True
         
         # If the line buffer ends with a bad command prompt, extract and
         # append the prefix data to the data buffer. Keep the prompt in the
         # line buffer.
-        elif self._line_buffer.endswith(SBE37_BAD_COMMAND):
+        elif self._line_buffer.endswith(SBE37Prompt.BAD_COMMAND):
             self._data_lines.append(self._line_buffer.
-                                    replace(SBE37_BAD_COMMAND,''))
-            self._line_buffer = SBE37_BAD_COMMAND
+                                    replace(SBE37Prompt.BAD_COMMAND,''))
+            self._line_buffer = SBE37Prompt.BAD_COMMAND
             new_lines = True
         
         # If new complete lines are detected, send an EVENT_DATA_RECEIVED.
@@ -1416,14 +1482,14 @@ class SBE37Driver(InstrumentDriver):
         
         # If a normal or bad command prompt is detected, send an
         # EVENT_PROMPTED
-        if (self._line_buffer == SBE37_PROMPT or
-            self._line_buffer == SBE37_BAD_COMMAND):
+        if (self._line_buffer == SBE37Prompt.PROMPT or
+            self._line_buffer == SBE37Prompt.BAD_COMMAND):
             self._fsm.on_event(SBE37Event.PROMPTED)
             
         # If a stop autosample type prompt is detected, send an
         # EVENT_PROMPTED.
         elif (self._line_buffer == '' and
-              (len(self._data_lines)>0 and self._data_lines[-1] == SBE37_PROMPT)):
+              (len(self._data_lines)>0 and self._data_lines[-1] == SBE37Prompt.PROMPT)):
             self._fsm.on_event(SBE37Event.PROMPTED)
 
 
@@ -1861,7 +1927,7 @@ class SBE37Driver(InstrumentDriver):
             pass
 
         # The method is not implemented.
-        reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
+        reply = self._get_capabilities(params)
         yield self.reply_ok(msg, reply)
 
 
@@ -2253,6 +2319,51 @@ class SBE37Driver(InstrumentDriver):
         return reply
 
 
+    def _get_capabilities(self,params):
+        """
+        Return the driver capabilities.
+        @param params a list of capability arguments.
+        @retval reply message with the requested capability results.
+        """
+        # Set up the reply message.
+        reply = {'success':None,'result':None}
+        result = {}
+        get_errors = False
+
+        for arg in params:
+            if SBE37Capability.has(arg) or arg.lower() == 'all':
+                
+                if arg == SBE37Capability.DEVICE_COMMANDS or arg == 'all':
+                    result[SBE37Capability.DEVICE_COMMANDS] = \
+                        (InstErrorCode.OK,SBE37Command.list())
+                
+                if arg == SBE37Capability.DEVICE_METADATA or arg == 'all':
+                    result[SBE37Capability.DEVICE_METADATA] = \
+                        (InstErrorCode.OK,SBE37MetadataParameter.list())
+                
+                if arg == SBE37Capability.DEVICE_PARAMS or arg == 'all':
+                    result[SBE37Capability.DEVICE_PARAMS] = \
+                        (InstErrorCode.OK,self.parameters.keys())
+                
+                if arg == SBE37Capability.DEVICE_STATUSES or arg == 'all':
+                    result[SBE37Capability.DEVICE_STATUSES] = \
+                        (InstErrorCode.OK,SBE37Status.list())
+            
+            else:
+                result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
+                get_errors = True
+
+        if get_errors:
+            reply['success'] = InstErrorCode.GET_DEVICE_ERR
+        else:
+            reply['success'] = InstErrorCode.OK
+        reply['result'] = result
+
+                
+        return reply
+
+
+
     def _get_observatory_state(self):
         """
         Return the observatory state of the instrument.
@@ -2304,7 +2415,7 @@ class SBE37Driver(InstrumentDriver):
         return paramdict
 
 
-    def _wakeup(self,wakeup_string=SBE37_NEWLINE,reps=1):
+    def _wakeup(self,wakeup_string=SBE37Prompt.NEWLINE,reps=1):
         """
         Send a wakeup attempt to the device.
         """
@@ -2491,9 +2602,9 @@ class SBE37Driver(InstrumentDriver):
             sample_data['salinity'] = float(match.group(5))
             sample_data['sound velocity'] = float(match.group(7))
         elif match.group(5):
-            if self.parameters.get('OUTPUTSAL')['value']:
+            if self.parameters.get(SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSAL)['value']:
                 sample_data['salinity'] = float(match.group(5))
-            elif self.parameters.get('OUTPUTSV')['value']:
+            elif self.parameters.get(SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSV)['value']:
                 sample_data['sound velocity'] = match.group(5)
         
         # Extract date and time if present.

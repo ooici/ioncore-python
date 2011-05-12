@@ -26,7 +26,7 @@ from ion.agents.instrumentagents.instrument_constants import TimeSource
 from ion.agents.instrumentagents.instrument_constants import ConnectionMethod
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
-from ion.agents.instrumentagents.instrument_constants import AgentCapability
+from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
 from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import MetadataParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
@@ -717,17 +717,18 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(transaction_id,None)
         self.assertEqual(type(result),dict)
-        self.assertEqual(result.keys().sort(),AgentCapability.list().sort())
-        self.assertEqual(all(map(lambda x: AgentCommand.has(x),result[AgentCapability.OBSERVATORY_COMMANDS][1])),True)
-        self.assertEqual(all(map(lambda x: AgentParameter.has(x),result[AgentCapability.OBSERVATORY_PARAMS][1])),True)
-        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[AgentCapability.OBSERVATORY_STATUSES][1])),True)
-        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[AgentCapability.METADATA][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_COMMANDS][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_PARAMS][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_STATUSES][1])),True)
+        self.assertEqual(result.keys().sort(),InstrumentCapability.list().sort())
+        self.assertEqual(all(map(lambda x: AgentCommand.has(x),result[InstrumentCapability.OBSERVATORY_COMMANDS][1])),True)
+        self.assertEqual(all(map(lambda x: AgentParameter.has(x),result[InstrumentCapability.OBSERVATORY_PARAMS][1])),True)
+        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[InstrumentCapability.OBSERVATORY_STATUSES][1])),True)
+        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[InstrumentCapability.OBSERVATORY_METADATA][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_COMMANDS][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_PARAMS][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_STATUSES][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_METADATA][1])),True)
         
         # Get all capabilities with an explicit list.
-        params = AgentCapability.list()
+        params = InstrumentCapability.list()
         reply = yield self.ia_client.get_capabilities(params,'none')
         success = reply['success']
         result = reply['result']
@@ -741,9 +742,9 @@ class TestInstrumentAgent(IonTestCase):
         
         # Attempt to get some capabilities, including bad ones.
         params = [
-            AgentCapability.OBSERVATORY_STATUSES,
-            AgentCapability.METADATA,
-            AgentCapability.DEVICE_COMMANDS,
+            InstrumentCapability.OBSERVATORY_STATUSES,
+            InstrumentCapability.OBSERVATORY_METADATA,
+            InstrumentCapability.DEVICE_COMMANDS,
             'CAP_BAD_CAPABILITY_1',
             'CAP_BAD_CAPABILITY_2'
         ]
@@ -756,12 +757,12 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(type(result),dict)
         self.assertEqual(transaction_id,None)
-        self.assert_(InstErrorCode.is_ok(result[AgentCapability.OBSERVATORY_STATUSES][0]))
-        self.assert_(InstErrorCode.is_ok(result[AgentCapability.METADATA][0]))
-        self.assert_(InstErrorCode.is_ok(result[AgentCapability.DEVICE_COMMANDS][0]))
-        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[AgentCapability.OBSERVATORY_STATUSES][1])),True)
-        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[AgentCapability.METADATA][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[AgentCapability.DEVICE_COMMANDS][1])),True)        
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_STATUSES][0]))
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_METADATA][0]))
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.DEVICE_COMMANDS][0]))
+        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[InstrumentCapability.OBSERVATORY_STATUSES][1])),True)
+        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[InstrumentCapability.OBSERVATORY_METADATA][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_COMMANDS][1])),True)        
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_1'][0]))
         self.assertEqual(result['CAP_BAD_CAPABILITY_1'][1],None)
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_2'][0]))
