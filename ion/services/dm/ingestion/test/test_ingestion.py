@@ -14,6 +14,9 @@ from twisted.trial import unittest
 from ion.util import procutils as pu
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID
 
+from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber
+
+
 from ion.core.process import process
 from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE
 from ion.test.iontest import IonTestCase
@@ -30,9 +33,48 @@ class IngestionTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
         services = [
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}},
-            {'name':'ingestion1','module':'ion.services.dm.ingestion.ingestion','class':'IngestionService'}]
+            {   'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                'spawnargs':
+                        {PRELOAD_CFG:
+                                 {ION_DATASETS_CFG:True}
+                        }
+            },
+
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}
+            },
+
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            {
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
+            },
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+
+            {   'name':'ingestion1',
+                'module':'ion.services.dm.ingestion.ingestion',
+                'class':'IngestionService'
+            },
+
+            ]
+
+        # ADD PUBSUB AND EMS
+
         self.sup = yield self._spawn_processes(services)
 
         self.proc = process.Process()
@@ -216,11 +258,10 @@ class IngestionTest(IonTestCase):
         yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
 
 
+    @defer.inlineCallbacks
+    def test_notify_unavailable(self):
 
 
-
-        # Now send a done message and watch the magic happen...
-
-
+        yield self.ingest._prepare_ingest(content)
 
 

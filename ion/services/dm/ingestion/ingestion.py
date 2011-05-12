@@ -13,7 +13,7 @@ To test this with the Java CC!
 """
 
 import time, calendar
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
 import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
@@ -76,31 +76,52 @@ class IngestionError(ApplicationError):
     pass
 
 
+# Declare a few strings:
+OK              = 'OK'
+UNAVAILABLE     = 'EXTERNAL_SERVER_UNAVAILABLE'
+SERVER_ERROR    = 'EXTERNAL_SERVER_ERROR'
+NO_NEW_DATA     = 'NO_NEW_DATA'
+AGENT_ERROR     = 'AGENT_ERROR'
+
+
+# Supplememt added event message dict:
+
+EM_DATA_SOURCE  = 'datasource_id'
+EM_DATASET      = 'dataset_id'
+EM_TITLE        = 'title'
+EM_URL          = 'url'
+EM_START_DATE   = 'start_datetime_millis'
+EM_END_DATE     = 'end_datetime_millis'
+EM_TIMESTEPS    = 'number_of_timesteps'
+
+EM_ERROR        = 'error_explanation'
+
+
+
+
 class IngestionService(ServiceProcess):
     """
-    Place holder to move data between EOI and the datastore
+    DM R1 Ingestion service.
     """
 
     # Declaration of service
     declare = ServiceProcess.service_declare(name='ingestion', version='0.1.0', dependencies=[])
 
-    #TypeClassType = gpb_wrapper.get_type_from_obj(type_pb2.ObjectType())
-
-
+    # Declare the excluded types for repository operations
     excluded_data_array_types = (CDM_SINT_ARRAY_TYPE, CDM_UINT_ARRAY_TYPE, CDM_LSINT_ARRAY_TYPE, CDM_LUINT_ARRAY_TYPE,
                                  CDM_DOUBLE_ARRAY_TYPE, CDM_FLOAT_ARRAY_TYPE, CDM_STRING_ARRAY_TYPE,
                                  CDM_OPAQUE_ARRAY_TYPE)
 
+
+
+
+
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
 
-        #assert isinstance(backend, store.IStore)
-        #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        #self.push = self.workbench.push
-        #self.pull = self.workbench.pull
-        #self.fetch_blobs = self.workbench.fetch_blobs
+
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
@@ -109,14 +130,22 @@ class IngestionService(ServiceProcess):
         self.mc = MessageClient(proc=self)
 
         self._pscclient = PubSubClient(proc=self)
-        self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher,
-                                                       process=self)
 
         self.dsc = datastore.DataStoreClient(proc=self)
 
         self.dataset = None
 
         log.info('IngestionService.__init__()')
+
+    @defer.inlineCallbacks
+    def slc_activate(self):
+
+        pub_factory = PublisherFactory(process=self)
+
+        self._notify_ingest_publisher = yield pub_factory.build(publisher_type=DatasetSupplementAddedEventPublisher)
+
+        self._notify_unavailable_publisher = yield pub_factory.build(publisher_type=DatasourceUnavailableEventPublisher)
+
 
 
     @defer.inlineCallbacks
@@ -179,12 +208,36 @@ class IngestionService(ServiceProcess):
         # Get the current state of the dataset:
         self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
 
+        # Get the bounded arrays but not the ndarrays
         ba_links = []
         for var in self.dataset.root_group.variables:
             var_links = var.content.bounded_arrays.GetLinks()
             ba_links.extend(var_links)
 
         self.dataset.Repository.fetch_links(ba_links)
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('title')
+            title = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            title = 'None Given'
+
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('references')
+            references = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            references = 'None Given'
+
+
+
+        data_details = {EM_TITLE:title,
+                       EM_URL:references,
+                       EM_DATA_SOURCE:content.datasource_id,
+                       EM_DATASET:content.dataset_id,
+                       }
 
 
         # TODO: replace this from the msg itself with just dataset id
@@ -202,6 +255,10 @@ class IngestionService(ServiceProcess):
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
 
+
+        defer.returnValue(data_details)
+
+
     @defer.inlineCallbacks
     def op_ingest(self, content, headers, msg):
         """
@@ -215,7 +272,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        yield self._prepare_ingest(content)
+        data_details = yield self._prepare_ingest(content)
 
 
         def _timeout():
@@ -256,12 +313,6 @@ class IngestionService(ServiceProcess):
         if ingest_res:
             log.debug("Ingest succeeded, respond to original request")
 
-            data_details = {'title':'',
-                           'url':'',
-                           'datasource_id':content.datasource_id,
-                           'dataset_id':content.dataset_id,
-                           }
-
             ingest_res.update(data_details)
 
             # send notification we performed an ingest
@@ -279,14 +330,17 @@ class IngestionService(ServiceProcess):
         """
         Generate a notification/event that an ingest succeeded.
         """
-        pub = yield self._notify_ingest_factory.build()
-
-        # creates the event notification for us and sends it
-
-        # Specialize for success or failure!
 
         dataset_id = ingest_res['dataset_id']
-        yield pub.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+        if ingest_res.has_key(EM_ERROR):
+            # Report an error with the data source
+            dataset_id = ingest_res[EM_DATA_SOURCE]
+            yield self._notify_unavailable_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+        else:
+            # Report a successful update to the dataset
+            dataset_id = ingest_res[EM_DATASET]
+            yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
 
 
 
@@ -298,10 +352,6 @@ class IngestionService(ServiceProcess):
         if content.MessageType != CDM_DATASET_TYPE:
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
-
-        #print '===== Content ==== \n', content
-
-        #print '===== Dataset ======\n', self.dataset
 
         if self.dataset is None:
             raise IngestionError('Calling recv_dataset in an invalid state. No Dataset checked out to ingest.')
@@ -332,8 +382,6 @@ class IngestionService(ServiceProcess):
             else:
                 var.content = resource_instance.CreateObject(array_structure_type)
 
-        #print '===== Dataset Updated ======\n',self.dataset.Resource.PPrint()
-
         yield msg.ack()
 
     @defer.inlineCallbacks
@@ -343,10 +391,7 @@ class IngestionService(ServiceProcess):
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
-            #print '===== Content ==== \n', content
-
-        #print '===== Dataset ======\n', self.dataset
-
+            
         if self.dataset is None:
             raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
 
@@ -406,19 +451,19 @@ class IngestionService(ServiceProcess):
         if content.status != content.StatusCode.OK:
             result = {}
 
-            result['status_body'] = content.status_body
-
             st = content.status
             if st == 1:
-                result['status'] = 'EXTERNAL_SERVER_UNAVAILABLE'
+                status = UNAVAILABLE
             elif st == 2:
-                result['status'] = 'EXTERNAL_SERVER_ERROR'
+                status = SERVER_ERROR
             elif st == 3:
-                result['status'] = 'NO_NEW_DATA'
+                status = NO_NEW_DATA
             elif st == 4:
-                result['status'] = 'AGENT_ERROR'
+                status = AGENT_ERROR
             else:
                 raise IngestionError('Unexpected StatusCode Enum value in Data Acquisition Complete Message')
+
+            result[EM_ERROR] = '%s: %s' % (status, content.status_body)
 
             self._defer_ingest.callback(result)
 
@@ -431,6 +476,7 @@ class IngestionService(ServiceProcess):
         # this is NOT rpc
         yield msg.ack()
 
+        defer.returnValue(None)
         
 
     @defer.inlineCallbacks
@@ -714,11 +760,9 @@ class IngestionService(ServiceProcess):
         #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
 
 
-        result = {'status'      :'OK',
-                  'status_body' :'',
-                  'start_datetime_millis':supplement_stime*1000,
-                  'end_datetime_millis':supplement_etime*1000,
-                  'number_of_timesteps':supplement_length}
+        result = {EM_START_DATE:supplement_stime*1000,
+                  EM_END_DATE:supplement_etime*1000,
+                  EM_TIMESTEPS:supplement_length}
 
 
         # trigger the op_perform_ingest to complete!
