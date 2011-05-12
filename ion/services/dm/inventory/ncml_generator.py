@@ -174,7 +174,7 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
 
     if not private_key or not public_key:
         log.error('Missing required key')
-        return
+        defer.returnValue(None)
         
     # Generate a private key, add to ssh agent
     skey, pkey  = rsa_to_dot_ssh(private_key, public_key)

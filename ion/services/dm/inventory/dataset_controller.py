@@ -83,6 +83,7 @@ message QueryResult{
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
+RMTASK_REQ_TYPE      = object_utils.create_type_identifier(object_id=2603, version=1)
 
 
 CONF = ioninit.config(__name__)
@@ -104,7 +105,7 @@ class RsyncHandler(ScheduleEventSubscriber):
 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug('Got a scheduled message')
+        log.debug('Got a rsync update message from the scheduler')
         yield self.hook_fn()
 
 class DatasetController(ServiceProcess):
@@ -117,6 +118,16 @@ class DatasetController(ServiceProcess):
     declare = ServiceProcess.service_declare(name='dataset_controller',
                                              version='0.1.0',
                                              dependencies=['scheduler'])
+
+    @defer.inlineCallbacks
+    def slc_deactivate(self):
+        if not self.walrus:
+            defer.returnValue(None)
+
+        log.debug('Removing scheduled task')
+        msg = yield self.message_client.create_instance(RMTASK_REQ_TYPE)
+        msg.task_id = self.sched_task_id
+        yield self.ssc.rm_task(msg)
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -149,7 +160,7 @@ class DatasetController(ServiceProcess):
                                             CONF.getValue('task_id',
                                                           default=str(uuid.uuid4())))
 
-        log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
+        log.debug('Update interval: %f' % self.update_interval)
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
         log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
 
@@ -164,7 +175,10 @@ class DatasetController(ServiceProcess):
         # Check for singleton
         if self.spawn_args.get('do-init', False):
             log.debug('I am the walrus.')
+            self.walrus = True
             yield self._create_scheduled_event()
+        else:
+            self.walrus = False
 
         log.info('SLC_INIT Dataset Controller')
 
@@ -178,7 +192,9 @@ class DatasetController(ServiceProcess):
         msg.desired_origin = SCHEDULE_TYPE_DSC_RSYNC
 
         log.debug('Sending request to scheduler')
-        yield self.ssc.add_task(msg)
+        resp = yield self.ssc.add_task(msg)
+        self.sched_task_id = resp.task_id
+        
         log.debug('got scheduler response OK')
 
     #noinspection PyUnusedLocal
