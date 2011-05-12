@@ -84,9 +84,79 @@ class InstrumentIntegrationService(ServiceProcess):
         self.rc = ResourceClient(proc=self)
         self.ac    = AssociationClient(proc=self)
 
+        
+    @defer.inlineCallbacks
+    def op_prepInstrument(self):
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        tid = reply['transaction_id']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+
+        # Initialize the agent to bring up the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+
+        # Connect to the driver.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+
+        # Enter observatory mode.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        #self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
+        success = reply['success']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+        
+    @defer.inlineCallbacks
+    def op_cleanupInstrument(self):
+        # Reset the agent to disconnect and bring down the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        result = reply['result']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        if not success:
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return     
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
+        success = reply['success']
+        self.assert_(InstErrorCode.is_ok(success))
+
+   
 
     @defer.inlineCallbacks
-    def op_create_new_instrument(self, content, headers, msg):
+    def op_createNewInstrument(self, content, headers, msg):
         """
         Service operation: Accepts a dictionary containing user inputs.
         Updates the instrument registry.
@@ -126,28 +196,99 @@ class InstrumentIntegrationService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_execute_command(self, content, headers, msg):
+    def op_startAutoSampling(self, content, headers, msg):
         """
         Service operation: Execute a command on an instrument.
+
+        # Start autosampling.
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [DriverCommand.START_AUTO_SAMPLING]
+        reply = yield self.ia_client.execute_device(chans,cmd,tid)
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+
+
         """
 
-
-        yield self.reply_ok(msg, cmd_result)
+        res_value = {'result':'success' }
+        yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
-    def op_get_instrument_state(self, content, headers, msg):
+    def op_stopAutoSampling(self, content, headers, msg):
+        """
+        Service operation: Execute a command on an instrument.
+
+        # Stop autosampling.
+        chans = [DriverChannel.INSTRUMENT]
+        cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
+        while True:
+            reply = yield self.ia_client.execute_device(chans,cmd,tid)
+            success = reply['success']
+            result = reply['result']
+
+            if InstErrorCode.is_ok(success):
+                break
+
+            #elif success == InstErrorCode.TIMEOUT:
+            elif InstErrorCode.is_equal(success,InstErrorCode.TIMEOUT):
+                pass
+
+            else:
+                self.fail('Stop autosample failed with error: '+str(success))
+
+        """
+
+        res_value = {'result':'success' }
+        yield self.reply_ok(msg, res_value)
+
+    @defer.inlineCallbacks
+    def op_getInstrumentState(self, content, headers, msg):
         """
         Service operation: .
         """
         # Step 1: Extract the arguments from the UI generated message content
         commandInput = content['commandInput']
 
+       # Put the instrument in a state to accept commands
+        reply = yield self.op_prepInstrument()
 
-        yield self.reply_ok(msg, resvalues)
+        # Get driver parameters.
+        #params = [('all','all')]
+        #reply = yield self.ia_client.get_device(params,tid)
+        #success = reply['success']
+        #result = reply['result']
+
+        
+        res_value = {'result':'success' }
+        yield self.reply_ok(msg, res_value)
+
+    @defer.inlineCallbacks
+    def op_setInstrumentState(self, content, headers, msg):
+        """
+        Service operation:
+
+        reply = yield self.ia_client.set_device(params,tid)
+        success = reply['success']
+        result = reply['result']
+        setparams = params
+
+
+        """
+        # Step 1: Extract the arguments from the UI generated message content
+        commandInput = content['commandInput']
+
+       # Put the instrument in a state to accept commands
+       #reply = yield self.op_prepInstrument()
+
+
+        res_value = {'result':'success' }
+        yield self.reply_ok(msg, res_value)
 
 
     @defer.inlineCallbacks
-    def op_start_instrument_agent(self, content, headers, msg):
+    def op_startInstrumentAgent(self, content, headers, msg):
         """
         Service operation: Starts an instrument agent for a type of
         instrument.
@@ -285,7 +426,7 @@ class InstrumentIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
-    def op_stop_instrument_agent(self, content, headers, msg):
+    def op_stopInstrumentAgent(self, content, headers, msg):
         """
         Service operation: Starts direct access mode.
         """
@@ -293,21 +434,21 @@ class InstrumentIntegrationService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_start_direct_access(self, content, headers, msg):
+    def op_startDirectAccess(self, content, headers, msg):
         """
         Service operation: Starts direct access mode.
         """
         yield self.reply_err(msg, "Not yet implemented")
 
     @defer.inlineCallbacks
-    def op_stop_direct_access(self, content, headers, msg):
+    def op_stopDirectAccess(self, content, headers, msg):
         """
         Service operation: Stops direct access mode.
         """
         yield self.reply_err(msg, "Not yet implemented")
 
     @defer.inlineCallbacks
-    def get_agent_desc_for_instrument(self, instrument_id):
+    def getAgentDescForInstrument(self, instrument_id):
         log.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
         """
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
@@ -323,7 +464,7 @@ class InstrumentIntegrationService(ServiceProcess):
         """
 
     @defer.inlineCallbacks
-    def get_agent_for_instrument(self, inst_resource_id):
+    def getAgentForInstrument(self, inst_resource_id):
 
         result = None
         instrument_resource = yield self.rc.get_instance(inst_resource_id)
@@ -358,7 +499,7 @@ class InstrumentIntegrationService(ServiceProcess):
         """
 
     @defer.inlineCallbacks
-    def get_agent_pid_for_instrument(self, instrument_id):
+    def getAgentPidForInstrument(self, instrument_id):
         """
         agent_res = yield self.get_agent_for_instrument(instrument_id)
         if not agent_res:
@@ -378,56 +519,80 @@ class InstrumentIntegrationClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def create_new_instrument(self, userInput):
+    def createNewInstrument(self, userInput):
         reqcont = {}
         reqcont['userInput'] = userInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
+        (cont, hdrs, msg) = yield self.rpc_send('createNewInstrument', reqcont)
         defer.returnValue(cont)
 
 
     @defer.inlineCallbacks
-    def start_instrument_agent(self, instrumentID, instrumentResourceID, model):
+    def startInstrumentAgent(self, instrumentID, instrumentResourceID, model):
         reqcont = {}
         reqcont['instrumentID'] = instrumentID
         reqcont['instrumentResourceID'] = instrumentResourceID
         reqcont['model'] = model
         #result = yield self._base_command('start_instrument_agent', reqcont)
-        (cont, hdrs, msg)  = yield self.rpc_send('start_instrument_agent', reqcont)
+        (cont, hdrs, msg)  = yield self.rpc_send('startInstrumentAgent', reqcont)
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def stop_instrument_agent(self, instrumentID):
+    def stopInstrumentAgent(self, instrumentID):
         reqcont = {}
         reqcont['instrumentID'] = instrumentID
-        result = yield self._base_command('stop_instrument_agent', reqcont)
+        result = yield self._base_command('stopInstrumentAgent', reqcont)
         defer.returnValue(result)
 
 
     @defer.inlineCallbacks
-    def get_instrument_state(self, instrumentID):
+    def getInstrumentState(self, instrumentID):
         reqcont = {}
         commandInput = {}
         commandInput['instrumentID'] = instrumentID
         reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('get_instrument_state', reqcont)
+        result = yield self._base_command('getInstrumentState', reqcont)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def execute_command(self, instrumentID, command, arglist):
+    def setInstrumentState(self, instrumentID):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        reqcont['commandInput'] = commandInput
+
+        result = yield self._base_command('setInstrumentState', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def getInstrumentList(self, instrumentID):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        reqcont['commandInput'] = commandInput
+
+        result = yield self._base_command('getInstrumentState', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def startAutoSampling(self, instrumentID, command, arglist):
         reqcont = {}
         commandInput = {}
         commandInput['instrumentID'] = instrumentID
         commandInput['command'] = command
-        if arglist:
-            argnum = 0
-            for arg in arglist:
-                commandInput['cmdArg'+str(argnum)] = arg
-                argnum += 1
-        reqcont['commandInput'] = commandInput
 
-        result = yield self._base_command('execute_command', reqcont)
+        result = yield self._base_command('startAutoSampling', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def stopAutoSampling(self, instrumentID, command, arglist):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        commandInput['command'] = command
+
+        result = yield self._base_command('startAutoSampling', reqcont)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
