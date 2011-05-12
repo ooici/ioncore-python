@@ -103,8 +103,7 @@ class MetadataCache(object):
 
         i = 0
         while (i < numDSets):
-            dSet = yield self.rc.get_instance(dSetResults.idrefs[i])
-            self.__loadDSetMetadata(dSet)
+            yield self.putDSetMetadata(dSetResults.idrefs[i])
             i = i + 1
             
         defer.returnValue(True)
@@ -130,8 +129,7 @@ class MetadataCache(object):
 
         i = 0
         while (i < numDSources):
-            dSource = yield self.rc.get_instance(dSourceResults.idrefs[i])
-            self.__loadDSourceMetadata(dSource)
+            yield self.putDSourceMetadata(dSourceResults.idrefs[i])
             i = i + 1
             
         defer.returnValue(True)
@@ -169,6 +167,22 @@ class MetadataCache(object):
         self.__loadDSetMetadata(dSet)
                     
     
+    def deleteDSetMetadata(self, dSetID):
+        """
+        Delete the dictionary entry for the data set represented by the given
+        resource ID (dSetID).
+        """
+        
+        log.debug('deleteDSetMetadata')
+
+        try:
+            self.__metadata.pop(dSetID)
+            return True
+        except KeyError:
+            log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
+            return False
+                    
+    
     def getDSourceMetadata(self, dSourceID):
         """
         Get the dictionary entry containing the metadata from the data source
@@ -200,6 +214,22 @@ class MetadataCache(object):
         dSource = yield self.rc.get_instance(dSourceID)
         self.__loadDSourceMetadata(dSource)
                     
+
+    def deleteDSourceMetadata(self, dSourceID):
+        """
+        Delete the dictionary entry for the data source represented by the given
+        resource ID (dSourceID).
+        """
+        
+        log.debug('deleteDSourceMetadata')
+
+        try:
+            self.__metadata.pop(dSourceID)
+            return True
+        except KeyError:
+            log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
+            return False
+    
     
     def __loadDSetMetadata(self, dSet):
         """
