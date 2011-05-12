@@ -20,6 +20,7 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.services.coi.datastore import DataStoreWorkBenchError
 
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
+from ion.integration.ais.common.metadata_cache import  MetadataCache
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
@@ -38,9 +39,9 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE, \
                                                        FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE
 
-DNLD_BASE_THREDDS_URL = 'http://localhost:8081/thredds'
-DNLD_DIR_PATH = '/dodsC/scanData/'
-DNLD_FILE_TYPE = '.ncml'
+DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
+DNLD_DIR_PATH = '/dodsC/ooiciData/'
+DNLD_FILE_TYPE = '.ncml.html'
 
 class FindDataResources(object):
 
@@ -58,9 +59,10 @@ class FindDataResources(object):
         self.ais = ais
         self.rc = ResourceClient(proc=ais)
         self.mc = ais.mc
-        #self.dscc = DatasetControllerClient(proc=ais)
         self.asc = AssociationServiceClient()
         self.ac = AssociationClient(proc=ais)
+        self.metadataCache = ais.getMetadataCache()
+        self.bUseMetadataCache = True
 
     @defer.inlineCallbacks
     def findDataResources(self, msg):
@@ -261,18 +263,29 @@ class FindDataResources(object):
         while i < len(dSetResults.idrefs):
             dSetResID = dSetResults.idrefs[i].key
             log.debug('Working on dataset: ' + dSetResID)
-            
-            dSet = yield self.rc.get_instance(dSetResID)
-            if dSet is None:
-                log.error('dSet is None')
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                      MessageName='AIS findDataResources error response')
-                Response.error_num = Response.ResponseCodes.NOT_FOUND
-                Response.error_str = "Dataset not found."
-                defer.returnValue(Response)        
 
-            minMetaData = {}
-            self.__loadMinMetaData(dSet, minMetaData)
+            if self.bUseMetadataCache:            
+                minMetaData = self.metadataCache.getMetadata(dSetResID)
+                if minMetaData is None:
+                    log.error('metadata not found for datasetID: ' + dSetResID)
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                          MessageName='AIS findDataResources error response')
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    Response.error_str = "Metadata not found."
+                    defer.returnValue(Response)
+                    
+            else:                    
+                dSet = yield self.rc.get_instance(dSetResID)
+                if dSet is None:
+                    log.error('dSet is None')
+                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                          MessageName='AIS findDataResources error response')
+                    Response.error_num = Response.ResponseCodes.NOT_FOUND
+                    Response.error_str = "Dataset not found."
+                    defer.returnValue(Response)        
+    
+                minMetaData = {}
+                self.__loadMinMetaData(dSet, minMetaData)
 
             #
             # If the dataset's data is within the given criteria, include it
@@ -309,7 +322,9 @@ class FindDataResources(object):
 
                 if userID is None:
                     #
-                    # This was a findDataResources request
+                    # This was a findDataResources request; the list should only
+                    # include datasets that public (so "registered" is not a
+                    # problem).
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
@@ -317,10 +332,14 @@ class FindDataResources(object):
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, minMetaData, ownerID, dSetResID)
                 else:
                     #
-                    # This was a findDataResourcesByUser request
+                    # This was a findDataResourcesByUser request; do not include
+                    # datasets that are registered (in fact, I'm only including
+                    # datasets thare are either public or private).
                     #
-                    rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
-                    self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSet, dSource)
+                    if ((dSet.ResourceLifeCycleState == dSource.ACTIVE) or
+                       (dSet.ResourceLifeCycleState == dSource.COMMISSIONED)):
+                        rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
+                        self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], minMetaData, ownerID, dSet, dSource)
 
 
                 #self.__printRootAttributes(dSet)
