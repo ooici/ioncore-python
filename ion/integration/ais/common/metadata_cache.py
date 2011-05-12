@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+"""
+@file ion/integration/ais/common/metadata_cache.py
+@author David Everett
+@brief Class to cache metadata contained in data sets and data sources.  This
+is just an in-memory cache (non-persistent); it uses a dictionary of
+dictionaries (multi-dimensional dictionary).  The rows are dictionaries of
+either data set metadata for data source metadata; they are indexed by the
+resourceID.
+"""
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -72,14 +82,15 @@ class MetadataCache(object):
         self.asc = AssociationServiceClient(proc = ais)
         self.rc = ResourceClient(proc = ais)
 
-        """
-        self.ais = ais
-        #self.dscc = DatasetControllerClient(proc=ais)
-        self.ac = AssociationClient(proc=ais)
-        """
 
     @defer.inlineCallbacks
     def loadDataSets(self):
+        """
+        Find all resources of type DATASET_RESOURCE_TYPE_ID and load their
+        metadata.  The private __loadDSetMetadata method will only load
+        the metadata if the data set is in the Active (Private) or
+        Commissioned (Public) state.
+        """
         
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
@@ -101,6 +112,12 @@ class MetadataCache(object):
 
     @defer.inlineCallbacks
     def loadDataSources(self):
+        """
+        Find all resources of type DATASOURCE_RESOURCE_TYPE_ID and load their
+        metadata.  The private __loadDSetMetadata method will only load
+        the metadata if the data source is in the Active (Private) or
+        Commissioned (Public) state.
+        """
         
         # Get the list of datasource resource IDs
         dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
@@ -121,6 +138,11 @@ class MetadataCache(object):
 
 
     def getDSetMetadata(self, dSetID):
+        """
+        Get the dictionary entry containing the metadata from the data set
+        represented by the given ResourceID (dSetID).
+        """
+        
         log.debug('getDSetMetadata')
                     
         try:
@@ -132,8 +154,27 @@ class MetadataCache(object):
         
         return metadata
 
+
+    @defer.inlineCallbacks
+    def putDSetMetadata(self, dSetID):
+        """
+        Get the instance of the data set represented by the given resource
+        ID (dSetID) and call the private __loadDSetMetadata method with the
+        data set as an argument. 
+        """
+        
+        log.debug('putDSetMetadata')
+
+        dSet = yield self.rc.get_instance(dSetID)
+        self.__loadDSetMetadata(dSet)
+                    
     
     def getDSourceMetadata(self, dSourceID):
+        """
+        Get the dictionary entry containing the metadata from the data source
+        represented by the given ResourceID (dSourceID).
+        """
+        
         log.debug('getDSourceMetadata')
                     
         try:
@@ -146,7 +187,28 @@ class MetadataCache(object):
         return metadata
     
     
+    @defer.inlineCallbacks
+    def putDSourceMetadata(self, dSourceID):
+        """
+        Get the instance of the data source represented by the given resource
+        ID (dSourceID) and call the private __loadDSourceMetadata method with the
+        data source as an argument. 
+        """
+        
+        log.debug('putDSourceMetadata')
+
+        dSource = yield self.rc.get_instance(dSourceID)
+        self.__loadDSourceMetadata(dSource)
+                    
+    
     def __loadDSetMetadata(self, dSet):
+        """
+        Create and load a dictionary entry with the metadata from the given
+        data set, and insert the entry into the __metadata dictionary (a
+        dictionary of dictionaries).  Only do this if the data set is Private
+        or Public.
+        """
+        
         #
         # Only cache the metadata if the data set is in the ACTIVE or
         # COMMISSIONED state.
@@ -204,6 +266,13 @@ class MetadataCache(object):
 
 
     def __loadDSourceMetadata(self, dSource):
+        """
+        Create and load a dictionary entry with the metadata from the given
+        data source, and insert the entry into the __metadata dictionary (a
+        dictionary of dictionaries).  Only do this if the data source is Private
+        or Public.
+        """
+        
         #
         # Only cache the metadata if the data source is in the ACTIVE or
         # COMMISSIONED state.
@@ -239,16 +308,11 @@ class MetadataCache(object):
             log.info('data source ' + dSource.ResourceIdentity + ' is not Private or Public.')
 
 
-    def __printMetadata(self, res):
-        log.debug('Metadata for ' + res.ResourceIdentity + ':')
-        for key in self.__metadata[res.ResourceIdentity].keys():
-            log.debug('key: ' + key)
-        for value in self.__metadata[res.ResourceIdentity].values():
-            log.debug('value: ' + str(value))
-
-        
     @defer.inlineCallbacks
     def __findResourcesOfType(self, resourceType):
+        """
+        A utility method to find all resources of the given type (resourceType).
+        """
 
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
@@ -278,7 +342,15 @@ class MetadataCache(object):
             log.error('__findResourcesOfType: association error!')
             defer.returnValue(None)
 
-        
         defer.returnValue(result)
 
+
+    def __printMetadata(self, res):
+        log.debug('Metadata for ' + res.ResourceIdentity + ':')
+        for key in self.__metadata[res.ResourceIdentity].keys():
+            log.debug('key: ' + key)
+        for value in self.__metadata[res.ResourceIdentity].values():
+            log.debug('value: ' + str(value))
+
+        
     
