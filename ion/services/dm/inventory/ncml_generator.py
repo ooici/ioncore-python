@@ -128,9 +128,9 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
         fh.close()
         
         log.debug('Wrote keys OK')
-    except IOError, ioe:
+    except IOError:
         log.exception('Error writing ssh keys')
-        raise ioe
+        raise
 
     return rsa_filename, pubkey_filename
 
