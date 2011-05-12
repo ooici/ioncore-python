@@ -322,8 +322,6 @@ class FindDataResources(object):
                 #
                 ownerID = yield self.getAssociatedOwner(dSetResID)
 
-                self.__createDownloadURL(dSetResID)
-
                 if userID is None:
                     #
                     # This was a findDataResources request; the list should only

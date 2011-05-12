@@ -1530,6 +1530,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
             if not datasetMetadata.IsFieldSet('download_url'):
                 self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
+            else:
+                log.debug('Download URL: ' + datasetMetadata.download_url)
             i = i + 1                
 
 

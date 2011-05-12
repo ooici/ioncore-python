@@ -147,51 +147,67 @@ class MetadataCache(object):
     
     
     def __loadDSetMetadata(self, dSet):
-        dSetMetadata = {}
-        for attrib in dSet.root_group.attributes:
-            #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
-            dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
-            if attrib.name == TITLE:
-                dSetMetadata[TITLE] = attrib.GetValue()
-            elif attrib.name == INSTITUTION:                
-                dSetMetadata[INSTITUTION] = attrib.GetValue()
-            elif attrib.name == SOURCE:                
-                dSetMetadata[SOURCE] = attrib.GetValue()
-            elif attrib.name == REFERENCES:                
-                dSetMetadata[REFERENCES] = attrib.GetValue()
-            elif attrib.name == TIME_START:                
-                dSetMetadata[TIME_START] = attrib.GetValue()
-            elif attrib.name == TIME_END:                
-                dSetMetadata[TIME_END] = attrib.GetValue()
-            elif attrib.name == SUMMARY:                
-                dSetMetadata[SUMMARY] = attrib.GetValue()
-            elif attrib.name == COMMENT:                
-                dSetMetadata[COMMENT] = attrib.GetValue()
-            elif attrib.name == LAT_MIN:                
-                dSetMetadata[LAT_MIN] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == LAT_MAX:                
-                dSetMetadata[LAT_MAX] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == LON_MIN:                
-                dSetMetadata[LON_MIN] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == LON_MAX:                
-                dSetMetadata[LON_MAX] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == VERT_MIN:                
-                dSetMetadata[VERT_MIN] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == VERT_MAX:                
-                dSetMetadata[VERT_MAX] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == VERT_POS:                
-                dSetMetadata[VERT_POS] = attrib.GetValue()
-        
-        log.debug('keys: ' + str(dSetMetadata.keys()))
         #
-        # Store this dSetMetadata in the dictionary, indexed by the resourceID
+        # Only cache the metadata if the data set is in the ACTIVE or
+        # COMMISSIONED state.
         #
-        self.__metadata[dSet.ResourceIdentity] = dSetMetadata
-
-        self.__printMetadata(dSet)
+        if ((dSet.ResourceLifeCycleState == dSet.ACTIVE) or 
+            (dSet.ResourceLifeCycleState == dSet.COMMISSIONED)):
+            dSetMetadata = {}
+            for attrib in dSet.root_group.attributes:
+                #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+                dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
+                if attrib.name == TITLE:
+                    dSetMetadata[TITLE] = attrib.GetValue()
+                elif attrib.name == INSTITUTION:                
+                    dSetMetadata[INSTITUTION] = attrib.GetValue()
+                elif attrib.name == SOURCE:                
+                    dSetMetadata[SOURCE] = attrib.GetValue()
+                elif attrib.name == REFERENCES:                
+                    dSetMetadata[REFERENCES] = attrib.GetValue()
+                elif attrib.name == TIME_START:                
+                    dSetMetadata[TIME_START] = attrib.GetValue()
+                elif attrib.name == TIME_END:                
+                    dSetMetadata[TIME_END] = attrib.GetValue()
+                elif attrib.name == SUMMARY:                
+                    dSetMetadata[SUMMARY] = attrib.GetValue()
+                elif attrib.name == COMMENT:                
+                    dSetMetadata[COMMENT] = attrib.GetValue()
+                elif attrib.name == LAT_MIN:                
+                    dSetMetadata[LAT_MIN] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == LAT_MAX:                
+                    dSetMetadata[LAT_MAX] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == LON_MIN:                
+                    dSetMetadata[LON_MIN] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == LON_MAX:                
+                    dSetMetadata[LON_MAX] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == VERT_MIN:                
+                    dSetMetadata[VERT_MIN] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == VERT_MAX:                
+                    dSetMetadata[VERT_MAX] = Decimal(str(attrib.GetValue()))
+                elif attrib.name == VERT_POS:                
+                    dSetMetadata[VERT_POS] = attrib.GetValue()
+            if dSet.ResourceLifeCycleState == dSet.ACTIVE:
+                dSetMetadata[LCS] = self.PRIVATE
+            elif dSet.ResourceLifeCycleState == dSet.COMMISSIONED:
+                dSetMetadata[LCS] = self.PUBLIC
+            
+            log.debug('keys: ' + str(dSetMetadata.keys()))
+            #
+            # Store this dSetMetadata in the dictionary, indexed by the resourceID
+            #
+            self.__metadata[dSet.ResourceIdentity] = dSetMetadata
+    
+            self.__printMetadata(dSet)
+        else:
+            log.info('data set ' + dSet.ResourceIdentity + ' is not Private or Public.')
 
 
     def __loadDSourceMetadata(self, dSource):
+        #
+        # Only cache the metadata if the data source is in the ACTIVE or
+        # COMMISSIONED state.
+        #
         if ((dSource.ResourceLifeCycleState == dSource.ACTIVE) or 
             (dSource.ResourceLifeCycleState == dSource.COMMISSIONED)):
             dSourceMetadata = {}
@@ -207,13 +223,10 @@ class MetadataCache(object):
             dSourceMetadata[MAX_INGEST_MILLIS] = dSource.max_ingest_millis
             dSourceMetadata[ION_TITLE] = dSource.ion_title
             dSourceMetadata[UPDATE_INTERVAL_SECONDS] = dSource.update_interval_seconds
-            
             if dSource.ResourceLifeCycleState == dSource.ACTIVE:
                 dSourceMetadata[LCS] = self.PRIVATE
             elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
                 dSourceMetadata[LCS] = self.PUBLIC
-            else:            
-                dSourceMetadata[LCS] = self.UNKNOWN
             
             log.debug('keys: ' + str(dSourceMetadata.keys()))
             #
@@ -222,6 +235,8 @@ class MetadataCache(object):
             self.__metadata[dSource.ResourceIdentity] = dSourceMetadata
     
             self.__printMetadata(dSource)
+        else:
+            log.info('data source ' + dSource.ResourceIdentity + ' is not Private or Public.')
 
 
     def __printMetadata(self, res):
