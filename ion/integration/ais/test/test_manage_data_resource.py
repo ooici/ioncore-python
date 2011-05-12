@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/integration/test_app_integration.py
+@file ion/integration/ais/test/test_manage_data_resource.py
 @test ion.integration.app_integration_service
-@author David Everett
+@author Ian Katz
 """
 
 from twisted.trial import unittest

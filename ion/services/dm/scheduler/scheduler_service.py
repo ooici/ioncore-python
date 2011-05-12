@@ -38,6 +38,7 @@ CONF = ioninit.config(__name__)
 # constants from https://confluence.oceanobservatories.org/display/syseng/Scheduler+Events
 # import these and use them to schedule your events, they should be in the "desired origin" field
 SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE="1001"
+SCHEDULE_TYPE_DSC_RSYNC = '1002'
 
 ADDTASK_REQ_TYPE  = object_utils.create_type_identifier(object_id=2601, version=1)
 """
@@ -413,15 +414,6 @@ class SchedulerService(ServiceProcess):
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
         self._schedule_event(None, int(tdef['interval_seconds']), task_id)
 
-        """
-        Update last-invoked timestamp in registry
-        @bug This code is commented out as it causes a run-time race condition with op_rm_task -
-        splitting the read and this write fails quite often.
-
-#        log.debug('Updating last-run time')
-#        tdef['last_run'] = time.time()
-#        self.store.put(task_id, tdef)
-        """
         log.debug('Task %s rescheduled for %s seconds OK' % (task_id, tdef['interval_seconds']))
 
 class SchedulerServiceClient(ServiceClient):

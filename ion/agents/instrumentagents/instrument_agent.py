@@ -2650,9 +2650,9 @@ class InstrumentAgentClient(ProcessClient):
         @retval Transaction ID UUID string.
         """
 
-        assert(acq_timeout==None or isinstance(acq_timeout,int)), \
+        assert(acq_timeout is None or isinstance(acq_timeout,int)), \
             'Expected int or None acquisition timeout.'
-        assert(exp_timeout==None or isinstance(exp_timeout,int)), \
+        assert(exp_timeout is None or isinstance(exp_timeout,int)), \
             'Expected int or None expire timeout.'
         
         params = {
@@ -2660,7 +2660,7 @@ class InstrumentAgentClient(ProcessClient):
             'exp_timeout': exp_timeout
         }
         
-        if acq_timeout != None and acq_timeout > 0:
+        if acq_timeout is not None and acq_timeout > 0:
             rpc_timeout = acq_timeout + 10
             (content,headers,message) = \
                 yield self.rpc_send('start_transaction',params,timeout=rpc_timeout)

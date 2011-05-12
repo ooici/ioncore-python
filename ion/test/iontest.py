@@ -66,7 +66,7 @@ class IonTestCase(unittest.TestCase):
         if start_apps and type(start_apps) in (tuple, list):
             apps = []
             for app in start_apps:
-                apps.append("../res/apps/%s.app" % app)
+                apps.append("res/apps/%s.app" % app)
             mopt['scripts'] = apps
         elif CONF['start_app']:
             mopt['scripts'] = [CONF['start_app']]

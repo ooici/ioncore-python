@@ -11,6 +11,7 @@ from twisted.internet.defer import inlineCallbacks, Deferred, returnValue
 
 from ion.core import ioninit
 from ion.util import ionlog
+from ion.util.path import adjust_dir
 
 CONF = ioninit.config(__name__)
 log = ionlog.getLogger(__name__)  
@@ -22,20 +23,9 @@ class BrokerController:
   
     def __init__(self, *args, **kwargs):
         self._privileged_broker = CONF.getValue('privileged_broker_connection')
-        spec_path = os.path.join(
-                os.getcwd(),
-                CONF.getValue('amqp_spec')
-            )
+        spec_path = adjust_dir(CONF.getValue('amqp_spec'))
         if not os.path.isfile(spec_path):
-            # the working directory is obscured by 
-            # _trial_tmp on the command-line
-            spec_path = os.path.join(
-                os.getcwd(),
-                '..',
-                CONF.getValue('amqp_spec')
-            )
-        if not os.path.isfile(spec_path):
-            log.critical('Could not locate AMQP spec file at: ' + CONF.getValue('amqp_spec'))
+            log.critical('Could not locate AMQP spec file at: ' + spec_path)
 
         self._amqp_spec = txamqp.spec.load(spec_path)
         self.queues = []

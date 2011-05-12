@@ -106,7 +106,7 @@ def set_log_levels(levelfilekey=None):
         levellistkey = ion_config.getValue2(__name__, levelfilekey, None)
         levellist = None
         try:
-            filecontent = open(levellistkey,).read()
+            filecontent = open(adjust_dir(levellistkey),).read()
             # Eval file content in the namespace of the logging module, such
             # that constants like DEBUG are resolved correctly
             levellist = eval(filecontent, logging.__dict__)

@@ -53,6 +53,11 @@ setup( name = 'ioncore',
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
+<<<<<<< HEAD
+=======
+           'ply==3.4',
+           'pysnmp>=4.1',
+>>>>>>> e602eb9f5f059c6ca5d8
            'ionproto>=0.3.21',
                           ],
        entry_points = {

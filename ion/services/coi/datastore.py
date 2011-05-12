@@ -794,13 +794,7 @@ class DataStoreWorkbench(WorkBench):
 
         response = yield self._process.message_client.create_instance(DATA_REPLY_MESSAGE_TYPE)
 
-        # begin to build the response BA
-        targetba = response.CreateObject(CDM_BOUNDED_ARRAY_TYPE)
-        response.bounded_arrays = targetba
-        for bounds in request.request_bounds:
-            newbounds = targetba.bounds.add()
-            newbounds.origin = bounds.origin
-            newbounds.size = bounds.size
+        log.debug("Extract data request bounds: %s", ["%d+%d" % (x.origin, x.size) for x in request.request_bounds])
 
         # create an anonymous repo to load things into
         repo = self.create_repository(root_type=ARRAY_STRUCTURE_TYPE)
@@ -842,16 +836,11 @@ class DataStoreWorkbench(WorkBench):
 
         # get the type of bounded array we have here
         assert len(obj.bounded_arrays) > 0
-        ndlink = obj.bounded_arrays[0].GetLink("ndarray")
-
-        # and make it in the response
-        #targetndarray = response.CreateObject(ndlink.type)
-        #targetba.ndarray = targetndarray
 
         # a list of matching bounded arrays (@TODO: soon to be the intersection ranges as well)
         bounded_includes_list = []
-        totalshape = [x.size for x in request.request_bounds]
-        totalelems = reduce(lambda x,y: x*y, totalshape)
+        targetshape = [x.size for x in request.request_bounds]
+        totalelems = reduce(lambda x,y: x*y, targetshape, 1) # if no dimensions (scalar), yields 1 total value
 
         # fill the entire thing in with Nones so setting slices doesn't kill things
         #targetndarray.value.extend([-1] * totalelems)
@@ -864,8 +853,8 @@ class DataStoreWorkbench(WorkBench):
             if not len(ba.bounds) == len(request.request_bounds):
                 raise DataStoreWorkBenchError("Bounds dimensionality mismatch: this ba has %d dims, our request has %d" % (len(ba.bounds), len(request.request_bounds)))
 
-            effective_range = []
-            ba_range = []
+            target_range = []
+            src_range = []
 
             # this for loop is doing a few things:
             # - checking to see if the ranges intersect for each dimension.  If one does not intersect, the whole array
@@ -875,7 +864,7 @@ class DataStoreWorkbench(WorkBench):
             #   an array as being a required to copy array along with the ranges in both target and source.
             for reqbounds, babounds in zip(request.request_bounds, ba.bounds):
 
-                log.debug("Cur bounds: %d+%d, Req bounds: %d+%d" % (babounds.origin, babounds.size, reqbounds.origin, reqbounds.size))
+                #log.debug("Cur bounds: %d+%d, Req bounds: %d+%d" % (babounds.origin, babounds.size, reqbounds.origin, reqbounds.size))
 
                 # this bounds is below our target range
                 # requested end is lower than this bounds start (exclusive)
@@ -898,48 +887,16 @@ class DataStoreWorkbench(WorkBench):
                 ba_end = isec_end - babounds.origin
 
                 # append those intersections - each entry represents a range into a dimension
-                effective_range.append((effective_start, effective_end))
-                ba_range.append((ba_start, ba_end))
+                target_range.append((effective_start, effective_end))
+                src_range.append((ba_start, ba_end))
 
             else:
                 # all bounds are included, this bounded array is good to go
                 # format: (bounded array, target range of data (multidim), source bounded array range (multidim))
-                bounded_includes_list.append((ba, effective_range, ba_range))
+                bounded_includes_list.append((ba, target_range, src_range))
 
-                '''
-                # ok, actually get the ndarray from the DS now!
-                # @TODO: naive, remove this in a bit
-                ndlink = ba.GetLink("ndarray")
-
-                # get actual data blobs into the repo
-                def nofilter(x):
-                    return True
-
-                ndblobs = yield self._get_blobs(repo, [ndlink.key], nofilter)
-                repo.index_hash.update(ndblobs)
-
-                # get element pointed to by key
-                ndse = repo.index_hash[ndlink.key]
-                assert ndse
-                ndobj = repo._load_element(ndse)
-
-                # calc all slices we must copy
-
-                # get dims of this bounded array
-                ba_shape = [x.size for x in ba.bounds]
-
-                log.debug("BEGIN NAIVE DATA COPY")
-                for targetslice, srcslice in self._get_slices(totalshape, ba_shape, effective_range, ba_range):
-                    log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
-
-                    targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
-
-                log.debug("END NAIVE DATA COPY")
-                '''
-
-
-        # @TODO: non-naive approach: retrieve and extract slices from each matching array, build data chunk messages,
-        # send them to requester before sending response to this rpc method
+        # retrieve and extract slices from each matching array, build data chunk messages, send them to requester
+        # before sending response to this rpc method
 
         log.debug("Matching Bounded Arrays: %d" % len(bounded_includes_list))
 
@@ -952,10 +909,6 @@ class DataStoreWorkbench(WorkBench):
         ndblobs = yield self._get_blobs(repo, ndarrayset, lambda x: True)
         repo.index_hash.update(ndblobs)
 
-        # @TODO: sort these clowns
-
-
-
         # loop through matching bounded arrays, load ndarray, extract data
         for batuple in bounded_includes_list:
             ba, targetranges, srcranges = batuple
@@ -965,23 +918,28 @@ class DataStoreWorkbench(WorkBench):
             assert ndse
             ndobj = repo._load_element(ndse)
 
-            # get slices out of it
-            # get dims of this bounded array
-            ba_shape = [x.size for x in ba.bounds]
+            # is this a scalar? is there anything to slice?
+            if len(targetshape) == 0:
+                # scalar value: shortcut this mess, just copy the one value
+                log.debug("detected scalar value, copying it")
+                targetarray[0] = ndobj.value[0]
+            else:
 
-            log.debug("BEGIN NAIVE DATA COPY")
-            for targetslice, srcslice in self._get_slices(totalshape, ba_shape, targetranges, srcranges):
-                log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
+                # get slices out of it
+                # get dims of this bounded array
+                ba_shape = [x.size for x in ba.bounds]
 
-                #targetndarray.value[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
-                targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+                log.debug("BEGIN DATA COPY")
+                for targetslice, srcslice in self._get_slices(targetshape, ba_shape, targetranges, srcranges):
+                    log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
 
-            log.debug("END NAIVE DATA COPY")
+                    targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+
+            log.debug("END DATA COPY")
 
         # CREATE RESPONSE CHUNKS OUT OF BIG ORIGINAL RESPONSE MESSAGE
 
-
-        CHUNK_FACTOR = 100
+        CHUNK_FACTOR = 10000
         totalchunks = int(math.ceil(totalelems / float(CHUNK_FACTOR)))
 
         log.debug("Chunking %d values into %d messages (factor %d)" % (totalelems, totalchunks, CHUNK_FACTOR))
@@ -994,7 +952,7 @@ class DataStoreWorkbench(WorkBench):
             chunkmsg.seq_max = totalchunks
 
             curoffset = i * CHUNK_FACTOR
-            slicelen = min(CHUNK_FACTOR, totalchunks - curoffset)
+            slicelen = min(CHUNK_FACTOR, totalelems - curoffset)
 
             log.debug("Chunk #%d: offset %d, length %d" % (i, curoffset, slicelen))
 
@@ -1003,11 +961,10 @@ class DataStoreWorkbench(WorkBench):
             chunkmsg.done = (i==totalchunks-1)      # last chunk message?  set the done flag
 
             # create the ndarray in this chunk
-            #print "losiemp", dir(targetndarray)
             chunkndarray = chunkmsg.CreateObject(bounded_includes_list[0][0].GetLink('ndarray').type)
 
-            # slice data out of the big object, stick it in this one
-            #chunkndarray.value[0:slicelen] = targetndarray.value[curoffset:curoffset+slicelen]
+            # these lines blow up with a TypeError if we screwed up the bounds and didn't fill in the targetarray fully,
+            # aka it contains Nones
             chunkndarray.value[0:slicelen] = targetarray[curoffset:curoffset+slicelen]
             chunkmsg.ndarray = chunkndarray
 
@@ -1024,14 +981,15 @@ class DataStoreWorkbench(WorkBench):
         testing via monkeypatching this method.
         """
         log.debug("_send_data_chunk to %s" % data_routing_key)
-        print "DEBIG", chunkmsg
-        yield self._process.send(data_routing_key, 'what_operation', chunkmsg)
+        yield self._process.send(data_routing_key, 'noop', chunkmsg)
 
 
     def _double_xrange(self, start1, end1, start2, end2):
         """
         This is a method just like xrange, but it operates on two diff ranges at once.
         Used by extract_data when mapping slice ranges for data extraction.
+
+        @NOTE: This is a generator method, not to be confused with one that needs defer.inlineCallbacks decoration!
         """
         counter1 = start1
         counter2 = start2
@@ -1045,6 +1003,8 @@ class DataStoreWorkbench(WorkBench):
         """
         Returns a tuple of slice ranges (as tuples) that you can use to extract data from slices
         inside an ndarray. This is used by extract_data.
+
+        @NOTE: This is a generator method, not to be confused with one that needs defer.inlineCallbacks decoration!
 
         @param  targetdimextents    The dimensional extents of the target bounded array.
         @param  srcdimextents       The dimensional extents of the source bounded array.
@@ -1060,33 +1020,57 @@ class DataStoreWorkbench(WorkBench):
         @returns                    On each yield, a tuple containing two tuples: a range to the target,
                                     and a range to copy from the source.
         """
-        curtargetrange=targetranges[0]
-        cursrcrange=srcranges[0]
 
-        if len(targetranges) == 1:
-            # add current targetranges to indices
-            finaltarget = (curtargetrange[0] + targetidx, curtargetrange[1] + targetidx)
-            finalsrc = (cursrcrange[0] + srcidx, cursrcrange[1] + srcidx)
-            yield (finaltarget, finalsrc)
-        else:
+        # build index extent arrays
+        targetidxextents = [None] * len(targetdimextents)
+        srcidxextents = [None] * len(srcdimextents)
 
-            lefttargetranges=targetranges[1:]
-            leftsrcranges=srcranges[1:]
+        targetidxextents[-1] = 1
+        srcidxextents[-1] = 1
 
-            for i, j in self._double_xrange(curtargetrange[0], curtargetrange[1], cursrcrange[0], cursrcrange[1]):
+        for x in range(len(targetidxextents)-2, -1, -1):
+            targetidxextents[x] = reduce(lambda x,y: x*y, targetdimextents[x+1:])
 
-                # calc current indexes
+        for x in range(len(srcidxextents)-2, -1, -1):
+            srcidxextents[x] = reduce(lambda x, y: x*y, srcdimextents[x+1:])
 
-                # number of items in this dimension
-                totaltargetitems=reduce(lambda x,y: x*y, targetdimextents[len(targetdimextents)-len(targetranges):])
-                totalsrcitems=reduce(lambda x,y: x*y, srcdimextents[len(srcdimextents)-len(srcranges):])
+        def recslice(trs, srs, ts, ss, cts=0, css=0, rc=0):
+            """
+            Recursive slice finder.
+            @param  trs     Target ranges.
+            @param  srs     Source ranges.
+            @param  ts      Target slice (last dimension).
+            @param  ss      Source slice (last dimension).
+            @param  cts     Current target sum, aka index into target array.
+            @param  css     Current source sum, aka index into source array.
+            @param  rc      Recursion count, used to index into targetidxextents/srcidxextents.
+            """
+            if len(trs) == 0:
+                # exit case: traversed all dimensions, we're on the last dimension, extract our slices
+                yield ((cts+ts[0], cts+ts[1]),
+                       (css+ss[0], css+ss[1]))
+            else:
+                # iterative case: look at current dimension, co-iterate over the ranges in target/src,
+                #                 recurse into recslice again one dimension up until we run out.
+                ctr = trs[0]
+                csr = srs[0]
 
-                newtargetidx = i * totaltargetitems + targetidx
-                newsrcidx = j * totalsrcitems + srcidx
+                for tv, sv in self._double_xrange(ctr[0], ctr[1], csr[0], csr[1]):
+                    for xx in recslice(trs[1:],
+                                       srs[1:],
+                                       ts,
+                                       ss,
+                                       cts+(tv * targetidxextents[rc]),     # calculate actual index offset here and pass it
+                                       css+(sv * srcidxextents[rc]),        # calculate actual index offset here and pass it
+                                       rc+1):
+                        yield xx
 
-                for xx in self._get_slices(targetdimextents, srcdimextents, lefttargetranges, leftsrcranges, newtargetidx, newsrcidx):
-                    yield xx
-
+        # iterate through all recslice generated slicepairs
+        for x in recslice(targetranges[:-1],
+                          srcranges[:-1],
+                          targetranges[-1],
+                          srcranges[-1]):
+            yield x
 
     @defer.inlineCallbacks
     def op_get_object(self, request, headers, message):
@@ -1140,7 +1124,7 @@ class DataStoreWorkbench(WorkBench):
 
         yield self._process.reply_ok(message, response)
 
-        log.debug("/op_get_object")
+        log.info("/op_get_object")
 
 class DataStoreError(ApplicationError):
     """

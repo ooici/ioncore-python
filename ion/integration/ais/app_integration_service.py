@@ -28,6 +28,7 @@ from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownlo
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 from ion.integration.ais.ManageResources.ManageResources import ManageResources
 from ion.integration.ais.manage_data_resource.manage_data_resource import ManageDataResource
+from ion.integration.ais.validate_data_resource.validate_data_resource import ValidateDataResource
 from ion.integration.ais.manage_data_resource_subscription.manage_data_resource_subscription import ManageDataResourceSubscription
 
 
@@ -204,6 +205,17 @@ class AppIntegrationService(ServiceProcess):
         worker = ManageDataResource(self)
         log.debug('op_deleteDataResource: calling worker')
         response = yield worker.delete(content);
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_validateDataResource(self, content, headers, msg):
+        """
+        @brief validate a data resource URL
+        """
+        log.debug('op_validateDataResource: \n'+str(content))
+        worker = ValidateDataResource(self)
+        log.debug('op_validateDataResource: calling worker')
+        response = yield worker.validate(content);
         yield self.reply_ok(msg, response)
 
 
@@ -433,6 +445,20 @@ class AppIntegrationServiceClient(ServiceClient):
         log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
+    @defer.inlineCallbacks
+    def validateDataResource(self, message):
+        yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('validateDataResource: ' + result.error_str)
+            defer.returnValue(result)
+        log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('validateDataResource', message)
+        log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
+        defer.returnValue(content)
+        
+
+
     @defer.inlineCallbacks
     def createDataResourceSubscription(self, message):
         yield self._check_init()

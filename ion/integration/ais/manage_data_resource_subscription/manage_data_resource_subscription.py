@@ -526,9 +526,9 @@ class ManageDataResourceSubscription(object):
         #
         try:
             association = yield self.ac.create_association(dispatcherRes, HAS_A_ID, dwfRes)
-            if association not in self.userRes.ResourceAssociationsAsSubject:
+            if association not in dispatcherRes.ResourceAssociationsAsSubject:
                 log.error('Error: subject not in association!')
-            if association not in dispatcherRes.ResourceAssociationsAsObject:
+            if association not in dwfRes.ResourceAssociationsAsObject:
                 log.error('Error: object not in association')
             
             #

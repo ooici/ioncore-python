@@ -11,26 +11,24 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process import process
-
 from ion.test.iontest import IonTestCase
-
 from ion.services.coi.resource_registry import resource_client
-
 from ion.core.messaging.message_client import MessageClient
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 
 # Message types
-from ion.services.dm.inventory.dataset_controller import QUERYRESULTS_TYPE, FINDDATASETREQUEST_TYPE, IDREF_TYPE, DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
+from ion.services.dm.inventory.dataset_controller import FINDDATASETREQUEST_TYPE, \
+    DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
 
 
 
-class DateSetControllerTest(IonTestCase):
+class DatasetControllerTest(IonTestCase):
     """
     Testing example hello resource service.
     This example shows how it is possible to create and send resource requests.
     """
 
+    #noinspection PyUnusedLocal
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -49,7 +47,13 @@ class DateSetControllerTest(IonTestCase):
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
 
-            {'name':'dataset_controller','module':'ion.services.dm.inventory.dataset_controller','class':'DataSetController'},
+            {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
+             'class': 'SchedulerService'},
+
+            {'name':'dataset_controller',
+             'module':'ion.services.dm.inventory.dataset_controller',
+             'class':'DataSetController',
+             'spawnargs': {'do-init' : True}},
         ]
 
 
@@ -60,14 +64,11 @@ class DateSetControllerTest(IonTestCase):
         yield self.proc.spawn()
 
         self.mc = MessageClient(proc=self.proc)
-
         self.rc = resource_client.ResourceClient(proc=self.proc)
 
 
     @defer.inlineCallbacks
     def tearDown(self):
-
-
         yield self._shutdown_processes()
         yield self._stop_container()
 
