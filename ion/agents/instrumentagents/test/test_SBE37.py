@@ -21,6 +21,7 @@ from ion.agents.instrumentagents.SBE37_driver import SBE37State
 from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
 from ion.agents.instrumentagents.SBE37_driver import SBE37Status
+from ion.agents.instrumentagents.SBE37_driver import SBE37Capability
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 
@@ -676,11 +677,8 @@ class TestSBE37(IonTestCase):
         reply = yield self.driver_client.get_capabilities(params)
         success = reply['success']
         result = reply['result']        
-        #self.assert_(InstErrorCode.is_equal(success,
-        #                                    InstErrorCode.NOT_IMPLEMENTED))
-        
-        print 'result'
-        print result
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result.keys().sort(),SBE37Capability.list().sort())
         
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
