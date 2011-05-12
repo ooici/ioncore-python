@@ -591,7 +591,7 @@ class WrapperType(type):
             @return: The attribute being created (as a convenience)
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
