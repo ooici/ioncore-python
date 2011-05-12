@@ -26,6 +26,8 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
+from ion.services.dm.ingestion import cdm_attribute_methods
+
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
@@ -185,7 +187,6 @@ class IngestionService(ServiceProcess):
         self.dataset.Repository.fetch_links(ba_links)
 
 
-
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
 
@@ -220,7 +221,10 @@ class IngestionService(ServiceProcess):
         def _timeout():
             # trigger execution to continue below with a False result
             log.info("Timed out in op_perform_ingest")
-            self._defer_ingest.callback(False)
+
+            result = {'status'      :'Internal Timeout',
+                      'status_body' :'Time out in communication between the JAW and the Ingestion service'}
+            self._defer_ingest.callback(result)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
@@ -238,6 +242,9 @@ class IngestionService(ServiceProcess):
 
         # common cleanup
 
+        # we succeeded, cancel the timeout
+        timeoutcb.cancel()
+
         # reset ingestion deferred so we can use it again
         self._defer_ingest = defer.Deferred()
 
@@ -249,8 +256,17 @@ class IngestionService(ServiceProcess):
         if ingest_res:
             log.debug("Ingest succeeded, respond to original request")
 
-            # we succeeded, cancel the timeout
-            timeoutcb.cancel()
+            data_details = {'title':'',
+                           'url':'',
+                           'datasource_id':content.datasource_id,
+                           'dataset_id':content.dataset_id,
+                           }
+
+            ingest_res.update(data_details)
+
+            # send notification we performed an ingest
+            yield self._notify_ingest(ingest_res)
+
 
             # now reply ok to the original message
             yield self.reply_ok(msg)
@@ -259,19 +275,20 @@ class IngestionService(ServiceProcess):
             raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
 
     @defer.inlineCallbacks
-    def _notify_ingest(self, content):
+    def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
         """
         pub = yield self._notify_ingest_factory.build()
 
         # creates the event notification for us and sends it
-        # @TODO: fields below
-        yield pub.create_and_publish_event(origin=content.dataset_id,
-                                           dataset_id=content.dataset_id,
-                                           datasource_id="TODO",
-                                           title="TODO",
-                                           url="TODO")
+
+        # Specialize for success or failure!
+
+        dataset_id = ingest_res['dataset_id']
+        yield pub.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):
@@ -378,55 +395,100 @@ class IngestionService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
+        """
+        @TODO deal with FMRC datasets and supplements
+        """
         log.info("op_recv_done(%s)" % type(content))
         if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        if len(self.dataset.Repository.branches) != 2:
+        if content.status != content.StatusCode.OK:
+            result = {}
 
+            result['status_body'] = content.status_body
+
+            st = content.status
+            if st == 1:
+                result['status'] = 'EXTERNAL_SERVER_UNAVAILABLE'
+            elif st == 2:
+                result['status'] = 'EXTERNAL_SERVER_ERROR'
+            elif st == 3:
+                result['status'] = 'NO_NEW_DATA'
+            elif st == 4:
+                result['status'] = 'AGENT_ERROR'
+            else:
+                raise IngestionError('Unexpected StatusCode Enum value in Data Acquisition Complete Message')
+
+            self._defer_ingest.callback(result)
+
+        else:
+
+            #@TODO ask dave for help here - how can I chain these callbacks?
+            yield self._merge_supplement()
+
+
+        # this is NOT rpc
+        yield msg.ack()
+
+        
+
+    @defer.inlineCallbacks
+    def _merge_supplement(self):
+
+        # A little sanity check on entering recv_done...
+        if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
 
-
+        # Commit the current state of the supplement - ingest of new content is complete
         self.dataset.Repository.commit('Ingest received complete notification.')
 
+        # The current branch on entering recv done is the supplement branch
         merge_branch = self.dataset.Repository.current_branch_key()
-
-
+        # Merge it with the current state of the dataset in the datastore
         yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
 
-        #Remove the head for the update!
+        #Remove the head for the supplement - there is only one current state once the merge is complete!
         self.dataset.Repository.remove_branch(merge_branch)
 
-        print self.dataset.Repository
+
+        # Get the root group of the current state of the dataset
+        root = self.dataset.root_group
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+
+        #print root.PPrint()
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
 
 
+        # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
 
+        # Determine the inner most dimension on which we are aggregating
         dimension_order = []
-
         for merge_var in merge_root.variables:
-
-            print '\n\n\n\n\n\n'
-            print merge_var.name
-            print merge_var.shape.PPrint()
 
             # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
             for merge_dim in reversed(merge_var.shape):
 
                 if merge_dim not in dimension_order:
-                    print 'adding dimension name: %s '% merge_dim.name
-
                     dimension_order.insert(0, merge_dim)
 
-        print 'FINAL DIM ORDER'
-        print [ dim.name for dim in dimension_order]
+        #print 'FINAL DIMENSION ORDER:'
+        #print [ dim.name for dim in dimension_order]
 
-
+        # This is the inner most!
         merge_agg_dim = dimension_order[0]
 
-
-        root = self.dataset.root_group
+        supplement_length = merge_agg_dim.length
 
         agg_offset = 0
         try:
@@ -437,15 +499,20 @@ class IngestionService(ServiceProcess):
         except OOIObjectError, oe:
             log.debug('No Dimension found in current dataset:' + str(oe))
 
+        # Get the start time of the supplement
         try:
             string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
             supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+            string_time = merge_root.FindAttributeByName('ion_time_coverage_end')
+            supplement_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
 
         except OOIObjectError, oe:
             log.debug('No start time attribute found in dataset supplement!' + str(oe))
             raise IngestionError('No start time attribute found in dataset supplement!')
 
 
+        # Get the end time of the current dataset
         try:
             string_time = root.FindAttributeByName('ion_time_coverage_end')
             current_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
@@ -453,6 +520,11 @@ class IngestionService(ServiceProcess):
             if current_etime == supplement_stime:
                 agg_offset -= 1
                 log.info('Aggregation offset decremented by one - supplement overlaps: %d' % agg_offset)
+
+            elif current_etime > supplement_stime:
+
+                raise IngestionError('Can not aggregate dataset supplements which overlap by more than one timestep.')
+
             else:
                 log.info('Aggregation offset unchanged - supplement does not overlap.')
 
@@ -461,15 +533,36 @@ class IngestionService(ServiceProcess):
             log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
 
 
+
+        ###
+        ### Add the dimensions from the supplement to the current state if they are not already there
+        ###
+        merge_dims = {}
+        for merge_dim in merge_root.dimensions:
+            merge_dims[merge_dim.name] = merge_dim
+
+        dims = {}
+        for dim in root.dimensions:
+            dims[dim.name] = dim
+
+        if merge_dims.keys() != dims.keys():
+            if len(dims) != 0:
+                raise IngestionError('Can not ingest supplement with different dimensions than the dataset')
+            else:
+                for merge_dim in merge_root.dimensions:
+                    dim_link = root.dimensions.add()
+                    dim_link.SetLink(merge_dim)
+
+        else:
+            # We are appending an existing dataset - adjust the length of the aggregation dimension
+            agg_dim = dims[merge_agg_dim.name]
+            agg_dim.length += agg_offset
+
+
+
+
         for merge_var in merge_root.variables:
             var_name = merge_var.name
-
-
-            if merge_agg_dim not in merge_var.shape:
-                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
-                continue
-
-
 
             try:
                 var = root.FindVariableByName(var_name)
@@ -481,37 +574,155 @@ class IngestionService(ServiceProcess):
                 v_link.SetLink(merge_var)
 
                 log.info('Copied Variable %s into the dataset!' % var_name)
-                continue
+                continue # Go to next variable...
 
 
-            print 'MERGEING VAR %s' % var_name
-            print var.content.PPrint()
+            if merge_agg_dim not in merge_var.shape:
+                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
+                continue # Ignore this variable...
+
+
+            # @TODO check attributes for variables which are not aggregated....
+
+
+
+            #print 'MERGEING VAR %s' % var_name
+            #print var.content.PPrint()
 
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
 
                 ba.bounds[0].origin += agg_offset
 
+                ba_link = var.content.bounded_arrays.add()
+                ba_link.SetLink(ba)
+
             log.info('Merged Variable %s into the dataset!' % var_name)
 
+            #print 'MERGED VAR....'
+            #print var.content.PPrint()
+            #print 'MERGEING Complete %s' % var_name
 
-            print 'MERGEING Complete %s' % var_name
-            print var.content.PPrint()
+            merge_att_ids = set()
+            for merge_att in merge_var.attributes:
+                merge_att_ids.add(merge_att.MyId)
 
-            
-            
+            att_ids = set()
+            for att in var.attributes:
+                att_ids.add(att.MyId)
+
+            if att_ids != merge_att_ids:
+                raise ImportError('Variable %s attributes are not the same in the supplement!' % var_name)
+
+
+        # @TODO Get the vertical positive 'direction!' Deal with attributes accordingly.
 
 
 
-        # send notification we performed an ingest
-        #yield self._notify_ingest(content)
+        try:
+            merge_att = merge_root.FindAttributeByName('ion_geospatial_vertical_positive')
+            merge_vertical_positive = merge_att.GetValue()
+        except OOIObjectError, oe:
+            log.debug(oe)
+            merge_vertical_positive = None
+
+        try:
+            att = root.FindAttributeByName('ion_geospatial_vertical_positive')
+            vertical_positive = att.GetValue()
+        except OOIObjectError, oe:
+            log.debug(oe)
+            vertical_positive = None
+
+        if merge_vertical_positive is not None and vertical_positive is not None:
+            if merge_vertical_positive != vertical_positive:
+                raise IngestionError('Can not merge a data supplement that switches vertical positive!')
+
+        else:
+            # Take which ever one is not None
+            vertical_positive = vertical_positive or merge_vertical_positive
 
 
-        # this is NOT rpc
-        yield msg.ack()
+        for merge_att in merge_root.attributes:
+
+            att_name = merge_att.name
+
+            if att_name == 'ion_time_coverage_start':
+                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+            elif att_name == 'ion_time_coverage_end':
+                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lat_min':
+                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lat_max':
+                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lon_min':
+                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lon_max':
+                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+
+            elif att_name == 'ion_geospatial_vertical_min':
+
+                if vertical_positive == 'down':
+                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+                elif vertical_positive == 'up':
+                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+                else:
+                    raise OOIObjectError('Invalid value for Vertical Positive')
+
+
+            elif att_name == 'ion_geospatial_vertical_max':
+
+                if vertical_positive == 'down':
+                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+                elif vertical_positive == 'up':
+                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+                else:
+                    raise OOIObjectError('Invalid value for Vertical Positive')
+
+
+            elif att_name == 'history':
+                # @TODO is this the correct treatment for history?
+                cdm_attribute_methods.MergeAttDstOver(root, att_name, merge_root)
+
+            else:
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+
+        #print root.PPrint()
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+
+
+        result = {'status'      :'OK',
+                  'status_body' :'',
+                  'start_datetime_millis':supplement_stime*1000,
+                  'end_datetime_millis':supplement_etime*1000,
+                  'number_of_timesteps':supplement_length}
+
 
         # trigger the op_perform_ingest to complete!
-        self._defer_ingest.callback(True)
+        self._defer_ingest.callback(result)
 
 
 class IngestionClient(ServiceClient):
