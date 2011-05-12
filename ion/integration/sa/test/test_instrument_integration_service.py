@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 INSTRUMENTDATA_EVENT_ID = 5001
 
-from ion.services.sa.instrument_integration_service import InstrumentIntegrationClient
+from ion.integration.sa.instrument_integration_service import InstrumentIntegrationClient
 from ion.test.iontest import IonTestCase
 from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient, ResourceRegistryError
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
@@ -81,20 +81,20 @@ class InstrumentIntegrationServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_create_instrument(self):
+    def test_createInstrument(self):
         """
         Accepts an dictionary containing updates to the instrument registry.
         Updates are made to the registries.
         """
 
-        log.info("IIServiceTest test_create_instrument Now testing: Create instrument from UI")
+        log.info("IIServiceTest test_createInstrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
                  'model' : "unknown model",
                  'serial_num' : "1234",
                  'fw_version' : "1"}
 
         result = yield self.imc.create_new_instrument(userUpdate)
-        log.info("IIServiceTest test_create_instrument  instrument id: %s ", result['instrument_id'] )
+        log.info("IIServiceTest test_createInstrument  instrument id: %s ", result['instrument_id'] )
 
 
         """
@@ -109,11 +109,11 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
 
 
-        log.info("IIServiceTest test_create_instrument Finished testing: Create instrument from UI")
+        log.info("IIServiceTest test_createInstrument Finished testing: Create instrument from UI")
 
 
     #@defer.inlineCallbacks
-    def test_direct_access(self):
+    def test_directAccess(self):
         """
         Switches direct_access mode to ON in the instrument registry.
         """
@@ -168,36 +168,36 @@ class TestInstMgmtRT(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def Xtest_get_status(self):
+    def test_getStatus(self):
         #Get status back from instrument agent associated with instrument id
         #res = yield self.imc.get_instrument_state(self.inst_id)
         #self.assertNotEqual(res, None)
         #log.info("Instrument status: " +str(res))
-        log.info("IIServiceTest test_get_status completed")
+        log.info("IIServiceTest test_getStatus completed")
 
     @defer.inlineCallbacks
-    def Xtest_execute_command(self):
+    def test_AutoSampling(self):
         #Execute command through instrument agent associated with instrument id
 
         #res = yield self.imc.execute_command(self.inst_id, 'start', [1])
         #log.info("Command result 1" +str(res))
     
-        log.info("IIServiceTest test_execute_command completed")
+        log.info("IIServiceTest test_AutoSampling completed")
 
     @defer.inlineCallbacks
-    def test_start_agent(self):
+    def test_startAgent(self):
         #Start the agent with all
 
-        log.info("IIServiceTest test_create_instrument Now testing: Create instrument from UI")
+        log.info("IIServiceTest test_startAgent Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
                  'model' : "SBE37",
                  'serial_num' : "1234",
                  'fw_version' : "1"}
 
-        result = yield self.imc.create_new_instrument(userUpdate)
-        log.info("IIServiceTest test_create_instrument  instrument id: %s ", result['instrument_id'] )
+        result = yield self.imc.createNewInstrument(userUpdate)
+        log.info("IIServiceTest test_startAgent  instrument id: %s ", result['instrument_id'] )
 
-        result = yield self.imc.start_instrument_agent("SeaBird Electronics", result['instrument_id'], "SBE37")
+        result = yield self.imc.startInstrumentAgent("SeaBird Electronics", result['instrument_id'], "SBE37")
         log.info("IIServiceTest test_create_instrument  instrument agent id: %s ", result['instrument_agent_id'] )
 
         dataDict = "conductivity:0.3444;pressure:0.3732;temperature:28.0;sound velocity:3838.3;salinity:0.993;time:(15,33,30);date:(2011,5,5)"
@@ -206,7 +206,7 @@ class TestInstMgmtRT(IonTestCase):
         yield pubDataEvent.initialize()
         yield pubDataEvent.activate()
 
-        log.info("IIServiceTest test_create_instrument  publish event")
+        log.info("IIServiceTest test_startAgent  publish event")
 
         yield pubDataEvent.create_and_publish_event(origin=result['instrument_agent_id'],
                                            datasource_id="dataresrc123",
@@ -216,6 +216,6 @@ class TestInstMgmtRT(IonTestCase):
                                            datasource_id="dataresrc123",
                                            data_block=dataDict)
 
-        log.info("IIServiceTest test_create_instrument  publish event completed")
+        log.info("IIServiceTest test_startAgent  publish event completed")
 
         yield pu.asleep(3.0)
