@@ -103,7 +103,7 @@ class MetadataCache(object):
 
         i = 0
         while (i < numDSets):
-            yield self.putDSetMetadata(dSetResults.idrefs[i])
+            yield self.putDSetMetadata(dSetResults.idrefs[i].key)
             i = i + 1
             
         defer.returnValue(True)
@@ -129,7 +129,7 @@ class MetadataCache(object):
 
         i = 0
         while (i < numDSources):
-            yield self.putDSourceMetadata(dSourceResults.idrefs[i])
+            yield self.putDSourceMetadata(dSourceResults.idrefs[i].key)
             i = i + 1
             
         defer.returnValue(True)
