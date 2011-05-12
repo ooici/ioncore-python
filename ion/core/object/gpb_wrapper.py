@@ -1050,7 +1050,7 @@ class WrapperType(type):
             Specialized method for CDM variables to retrieve the number of bounded arrays used in
             defining this variables content
             """
-            return len(self.shape)
+            return len(self.content.bounded_arrays)
             
 
         #------------------------------------------------------------------------#
