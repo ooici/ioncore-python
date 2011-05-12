@@ -15,6 +15,7 @@ from ion.test.iontest import IonTestCase
 from ion.services.coi.resource_registry import resource_client
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+from ion.util.procutils import asleep
 
 # Message types
 from ion.services.dm.inventory.dataset_controller import FINDDATASETREQUEST_TYPE, \
@@ -87,7 +88,7 @@ class DatasetControllerTest(IonTestCase):
 
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
-
+        yield asleep(15.0)
 
     @defer.inlineCallbacks
     def test_find_dataset(self):

@@ -159,6 +159,8 @@ class DatasetController(ServiceProcess):
                                 origin=SCHEDULE_TYPE_DSC_RSYNC,
                                 process=self)
 
+        self.sesc.initialize()
+        self.sesc.activate()
         # Check for singleton
         if self.spawn_args.get('do-init', False):
             log.debug('I am the walrus.')
@@ -173,6 +175,7 @@ class DatasetController(ServiceProcess):
         msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
         msg.interval_seconds = int(self.update_interval)
         msg.task_id = self.task_id
+        msg.desired_origin = SCHEDULE_TYPE_DSC_RSYNC
 
         log.debug('Sending request to scheduler')
         yield self.ssc.add_task(msg)

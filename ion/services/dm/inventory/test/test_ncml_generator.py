@@ -55,17 +55,6 @@ class PSAT(IonTestCase):
 
         yield rsync_ncml(self.filedir, self.server_url)
 
-    #noinspection PyUnreachableCode
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def test_with_rsync(self):
-        raise unittest.SkipTest('Does not work without account on amoeba')
-
-        self._make_some_datafiles(5)
-
-        yield rsync_ncml(self.filedir, self.server_url)
-
-
     def _make_some_datafiles(self, num_files):
         for idx in range(num_files):
             create_ncml(str(uuid4()), self.filedir)
