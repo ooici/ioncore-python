@@ -48,6 +48,8 @@ STRINGARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, version=
 FLOAT32ARRAY_TYPE = object_utils.create_type_identifier(object_id=10013, version=1)
 INT32ARRAY_TYPE = object_utils.create_type_identifier(object_id=10009, version=1)
 
+SEARCH_PATTERN_TYPE = object_utils.create_type_identifier(object_id=4505, version=1)
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -725,6 +727,15 @@ def bootstrap_hycom_data_source(datasource, *args, **kwargs):
     datasource.ion_title = "HyCom Data Source"
     datasource.ion_description = "Data HyCom"
 
+    # Add Search Pattern parameters
+    search_pattern = datasource.Repository.create_object(SEARCH_PATTERN_TYPE)
+    
+    search_pattern.dir_pattern = "%yyyy%/%DDD%/"
+    search_pattern.file_pattern = "%yyyy%%MM%%dd%-MODIS_A-JPL-L2P-A%yyyy%%DDD%%HH%%mm%%ss%\\.L2_LAC_GHRSST_[a-zA-Z]-v01\\.nc\\.bz2"
+    search_pattern.join_name = "time"
+    
+    datasource.search_pattern = search_pattern
+    
     return True
 
 

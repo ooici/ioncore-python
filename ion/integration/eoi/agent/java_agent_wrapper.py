@@ -22,6 +22,7 @@ import ion.util.ionlog
 import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 from ion.services.dm.ingestion.ingestion import IngestionClient
+from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 
 from ion.core import ioninit
@@ -31,9 +32,19 @@ CONF = ioninit.config(__name__)
 import datetime
 
 # Imports: Message object creation
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
 CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
 PERFORM_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
+
+ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
+
+DATA_SOURCE_TYPE = object_utils.create_type_identifier(object_id=4503, version=1)
+DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -165,6 +176,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self)
         self.rc = ResourceClient(proc=self)
+        self._asc = None   # Access using the property self.asc
         
         # Step 2: Spawn the associated external child process (if not already done)
         res = yield defer.maybeDeferred(self._spawn_dataset_agent)
@@ -312,6 +324,12 @@ class JavaAgentWrapper(ServiceProcess):
         
         defer.returnValue(result)
 
+    @property
+    def asc(self):
+        if self._asc is None:
+            self._asc == AssociationServiceClient(proc=self)
+        return self._asc
+
     def _osp_terminate_callback(self, result):
         log.info('External child process has terminated; Wrapper Service shutting down...')
         self.deactivate()
@@ -381,6 +399,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Create the PerformIngestMessage
         begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
         begin_msg.dataset_id                = content.dataset_id
+        begin_msg.data_source_id            = content.data_source_id
         begin_msg.reply_to                  = reply_to
         begin_msg.ingest_timeout            = ingest_timeout
 
@@ -453,6 +472,13 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
         log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
+        # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
+        if datasetID and not dataSourceID:
+            dataSourceID = self._get_associated_data_source_id(datasetID)
+        if dataSourceID and not datasetID:
+            datasetID = self._get_associated_dataset_id(dataSourceID)
+        
+        
         log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
         
@@ -463,8 +489,8 @@ class JavaAgentWrapper(ServiceProcess):
         msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
         
         
-        # @SEE ion.play.hello_message.py for create message object instances
-        # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
+        # @see: ion.play.hello_message.py for create message object instances
+        # @see: use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
         # Create an instance of the EoiDataContext message
 
 
@@ -500,8 +526,92 @@ class JavaAgentWrapper(ServiceProcess):
         if datasource.FieldIsSet('authentication'):
             msg.authentication = datasource.authentication
 
+        if datasource.FieldIsSet('search_pattern'):
+            msg.search_pattern = datasource.search_pattern
         
         defer.returnValue(msg)
+
+    def _get_associated_data_source_id(dataset_id):
+        result = ""
+        
+        # Step 1: Build the request Predicate Object Query message
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = request.pairs.add()
+        
+        # Step 2: Create the predicate and object for the query
+        predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        object   = request.CreateObject(IDREF_TYPE) 
+        predicate.key = HAS_A_ID
+        object.key   = dataset_id
+        
+        pair.object   = object
+        pair.predicate = predicate
+        
+        # Step 3: Make the request
+        # @attention: In future implementations, get_subjects will allow us to specify
+        #             that we only want to return DataSourceResource objects -- for now
+        #             we have to manually check the object types returned...
+        log.info('Loading all associated DataSourceResource objects...')
+        associations = yield self.asc.get_subjects(request)
+
+        # Step 4:
+        if associations is None or associations.idrefs is None:
+            log.info('No prior DataSourceResource associated with this DatasetResource')
+            result = ""
+        else:
+            for idref in associations.idrefs:
+                try:
+                    id = idref.key
+                    res = yield self.rc.get_instance(id)
+                    if res.ResourceObjectType == DATA_SOURCE_TYPE:
+                        result = res.ResourceIdentity
+                        break
+                except Exception, ex:
+                    log.error('Error retrieving associated resource "%s":  %s' % (str(id), str(ex)))
+
+
+        return result
+    
+    def _get_associated_dataset_id(data_source_id):
+        result = ""
+        
+        # Step 1: Build the request Subject Predicate Query message
+        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+        pair = request.pairs.add()
+        
+        # Step 2: Create the predicate and subject for the query
+        predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        subject   = request.CreateObject(IDREF_TYPE) 
+        predicate.key = HAS_A_ID
+        subject.key   = data_source_id
+        
+        pair.subject   = subject
+        pair.predicate = predicate
+        
+        # Step 3: Make the request
+        # @attention: In future implementations, get_objects will allow us to specify
+        #             that we only want to return DatasetResource objects -- for now
+        #             we have to manually check the object types returned...
+        log.info('Loading all associated DatasetResource objects...')
+        associations = yield self.asc.get_objects(request)
+
+        # Step 4:
+        if associations is None or associations.idrefs is None:
+            log.info('No prior DatasetResource associated with this DataSourceResource')
+            result = ""
+        else:
+            for idref in associations.idrefs:
+                try:
+                    id = idref.key
+                    res = yield self.rc.get_instance(id)
+                    if res.ResourceObjectType == DATASET_TYPE:
+                        result = res.ResourceIdentity
+                        break
+                except Exception, ex:
+                    log.error('Error retrieving associated resource "%s":  %s' % (str(id), str(ex)))
+
+
+        return result
 
     @property
     def agent_phandle(self):
