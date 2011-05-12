@@ -104,7 +104,7 @@ class RsyncHandler(ScheduleEventSubscriber):
 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug('Got a scheduled message, task id: %s' % data.task_id)
+        log.debug('Got a scheduled message')
         yield self.hook_fn()
 
 class DatasetController(ServiceProcess):
@@ -158,9 +158,9 @@ class DatasetController(ServiceProcess):
                                 queue_name=self.queue_name,
                                 origin=SCHEDULE_TYPE_DSC_RSYNC,
                                 process=self)
-
-        self.sesc.initialize()
-        self.sesc.activate()
+        yield self.sesc.initialize()
+        yield self.sesc.activate()
+        
         # Check for singleton
         if self.spawn_args.get('do-init', False):
             log.debug('I am the walrus.')
@@ -188,7 +188,6 @@ class DatasetController(ServiceProcess):
         @brief On receipt of scheduler message, do rsync with server, moving
         any new ncml files over.
         """
-
         # @todo fstat the ncml directory to check for new files
         log.debug('rsync scheduled beginning now')
 

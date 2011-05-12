@@ -88,7 +88,7 @@ class DatasetControllerTest(IonTestCase):
 
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
-        yield asleep(15.0)
+        yield asleep(2.0)
 
     @defer.inlineCallbacks
     def test_find_dataset(self):

@@ -103,6 +103,10 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
     @retval Tuple of filenames - private and public key
     @note Raises IOError if necessary
     """
+
+    assert private_key
+    assert public_key
+    
     ssh_dir = path.join(path.expanduser('~'), '.ssh')
     rsa_filename = path.join(ssh_dir, 'rsync_ncml.rsa')
     pubkey_filename = path.join(ssh_dir, 'rsync_ncml.pub')
@@ -168,6 +172,10 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     Needs the inlineCallbacks to serialise.
     """
 
+    if not private_key or not public_key:
+        log.error('Missing required key')
+        return
+        
     # Generate a private key, add to ssh agent
     skey, pkey  = rsa_to_dot_ssh(private_key, public_key)
     yield ssh_add(skey)
