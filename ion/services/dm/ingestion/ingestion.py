@@ -315,6 +315,8 @@ class IngestionService(ServiceProcess):
 
             ingest_res.update(data_details)
 
+            self.rc.put_instance(self.dataset)
+
             # send notification we performed an ingest
             yield self._notify_ingest(ingest_res)
 
@@ -331,12 +333,10 @@ class IngestionService(ServiceProcess):
         Generate a notification/event that an ingest succeeded.
         """
 
-        dataset_id = ingest_res['dataset_id']
-
         if ingest_res.has_key(EM_ERROR):
             # Report an error with the data source
-            dataset_id = ingest_res[EM_DATA_SOURCE]
-            yield self._notify_unavailable_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+            datasource_id = ingest_res[EM_DATA_SOURCE]
+            yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
         else:
             # Report a successful update to the dataset
             dataset_id = ingest_res[EM_DATASET]

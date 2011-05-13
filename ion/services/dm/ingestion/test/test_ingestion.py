@@ -12,13 +12,13 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.util import procutils as pu
-from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
 
 from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber
 
 
 from ion.core.process import process
-from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE
+from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE
 from ion.test.iontest import IonTestCase
 
 from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE
@@ -259,9 +259,61 @@ class IngestionTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_notify_unavailable(self):
+    def test_notify(self):
+
+        ### Test the unavailable notification
+        sub_unavailable = DatasourceUnavailableEventSubscriber(process=self.proc, origin=SAMPLE_PROFILE_DATA_SOURCE_ID)
+        yield sub_unavailable.initialize()
+        yield sub_unavailable.activate()
+
+        test_deferred = defer.Deferred()
+
+        sub_unavailable.ondata = lambda msg: test_deferred.callback( msg['content'].additional_data.error_explanation)
+
+        data_details = {EM_TITLE:'title',
+                       EM_URL:'references',
+                       EM_DATA_SOURCE:SAMPLE_PROFILE_DATA_SOURCE_ID,
+                       EM_DATASET:SAMPLE_PROFILE_DATASET_ID,
+                       EM_ERROR:'ERROR # 1',
+                       }
+        yield self.ingest._notify_ingest(data_details)
+        errors_received = yield test_deferred
+
+        self.assertEqual(errors_received, 'ERROR # 1')
 
 
-        yield self.ingest._prepare_ingest(content)
+        test_deferred = defer.Deferred()
+
+        data_details = {EM_TITLE:'title',
+                       EM_URL:'references',
+                       EM_DATA_SOURCE:SAMPLE_PROFILE_DATA_SOURCE_ID,
+                       EM_DATASET:SAMPLE_PROFILE_DATASET_ID,
+                       EM_ERROR:'ERROR # 2',
+                       }
+        yield self.ingest._notify_ingest(data_details)
+        errors_received = yield test_deferred
+
+        self.assertEqual(errors_received, 'ERROR # 2')
 
 
+        ### Test the Data Supplement notification
+        sub_added = DatasetSupplementAddedEventSubscriber(process=self.proc, origin=SAMPLE_PROFILE_DATASET_ID)
+        yield sub_added.initialize()
+        yield sub_added.activate()
+
+        sub_added.ondata = lambda msg: test_deferred.callback( msg['content'].additional_data.number_of_timesteps)
+
+        test_deferred = defer.Deferred()
+
+        data_details = {EM_TITLE:'title',
+                        EM_URL:'references',
+                        EM_DATA_SOURCE:SAMPLE_PROFILE_DATA_SOURCE_ID,
+                        EM_DATASET:SAMPLE_PROFILE_DATASET_ID,
+                        EM_START_DATE:59,
+                        EM_END_DATE:69,
+                        EM_TIMESTEPS:7
+                        }
+        yield self.ingest._notify_ingest(data_details)
+        nsteps = yield test_deferred
+
+        self.assertEqual(nsteps, 7)
