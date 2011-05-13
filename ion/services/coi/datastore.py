@@ -673,86 +673,9 @@ class DataStoreWorkbench(WorkBench):
         
         
 
-        for repo_key, repo in self._repos.items():
+        for repo in self._repos.itervalues():
 
-            # any objects in the data structure that were transmitted have already
-            # been updated now it is time to set update the commits
-            #
-
-            commit_keys = repo._commit_index.keys()
-
-
-            branch_names = []
-            for branch in repo.branches:
-                branch_names.append(branch.branchkey)
-
-            head_keys = []
-            for cref in repo.current_heads():
-                head_keys.append( cref.MyId )
-
-            for key in commit_keys:
-
-                # Set the repository name for the commit
-                attributes = {REPOSITORY_KEY : str(repo_key)}
-                # Set a default branch name to empty
-                attributes[BRANCH_NAME] = ''
-
-                cref = repo._commit_index.get(key)
-
-                link = cref.GetLink('objectroot')
-                root_type = link.type.GPBMessage
-
-                if root_type == ASSOCIATION_TYPE:
-                    attributes[SUBJECT_KEY] = cref.objectroot.subject.key
-                    attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
-                    attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
-
-                    attributes[PREDICATE_KEY] = cref.objectroot.predicate.key
-                    attributes[PREDICATE_BRANCH] = cref.objectroot.predicate.branch
-                    attributes[PREDICATE_COMMIT] = cref.objectroot.predicate.commit
-
-                    attributes[OBJECT_KEY] = cref.objectroot.object.key
-                    attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
-                    attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
-
-                elif root_type == RESOURCE_TYPE:
-
-                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
-                    attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
-
-
-                elif  root_type == TERMINOLOGY_TYPE:
-                    attributes[KEYWORD] = cref.objectroot.word
-
-                # get the wrapped structure element to put in...
-                wse = self._workbench_cache.get(key)
-
-
-                if key not in head_keys:
-
-                    defd = self._commit_store.put(key = key,
-                                       value = wse.serialize(),
-                                       index_attributes = attributes)
-                    def_list.append(defd)
-
-                else:
-
-                    # We know it is a head - but we need to get the branch name again
-                    for branch in  repo.branches:
-                        # If this is currently the head commit - set the branch name attribute
-                        if cref in branch.commitrefs:
-                            # If this is currently the head commit - set the branch name
-                            if attributes[BRANCH_NAME] == '':
-                                attributes[BRANCH_NAME] = branch.branchkey
-                            else:
-                                attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
-
-
-                    # Now commit it!
-                    defd = self._commit_store.put(key = key,
-                                       value = wse.serialize(),
-                                       index_attributes = attributes)
-                    def_list.append(defd)
+            def_list.append(self.flush_repo_to_backend(repo))
 
         yield defer.DeferredList(def_list)
 
@@ -767,6 +690,100 @@ class DataStoreWorkbench(WorkBench):
 
         # Now clear the in memory workbench
         self.clear()
+
+
+
+    def flush_repo_to_backend(self, repo):
+        """
+        Flush any repositories in the backend to the the workbench backend storage
+        """
+
+
+        # This is simpler than a push - all of these are guaranteed to be new objects!
+        # now put any new commits that are not at the head
+        def_list = []
+
+        # any objects in the data structure that were transmitted have already
+        # been updated now it is time to set update the commits
+        #
+
+        commit_keys = repo._commit_index.keys()
+
+
+        branch_names = []
+        for branch in repo.branches:
+            branch_names.append(branch.branchkey)
+
+        head_keys = []
+        for cref in repo.current_heads():
+            head_keys.append( cref.MyId )
+
+        for key in commit_keys:
+
+            # Set the repository name for the commit
+            attributes = {REPOSITORY_KEY : str(repo.repository_key)}
+            # Set a default branch name to empty
+            attributes[BRANCH_NAME] = ''
+
+            cref = repo._commit_index.get(key)
+
+            link = cref.GetLink('objectroot')
+            root_type = link.type.GPBMessage
+
+            if root_type == ASSOCIATION_TYPE:
+                attributes[SUBJECT_KEY] = cref.objectroot.subject.key
+                attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
+                attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
+
+                attributes[PREDICATE_KEY] = cref.objectroot.predicate.key
+                attributes[PREDICATE_BRANCH] = cref.objectroot.predicate.branch
+                attributes[PREDICATE_COMMIT] = cref.objectroot.predicate.commit
+
+                attributes[OBJECT_KEY] = cref.objectroot.object.key
+                attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
+                attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+            elif root_type == RESOURCE_TYPE:
+
+                attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
+                attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
+
+
+            elif  root_type == TERMINOLOGY_TYPE:
+                attributes[KEYWORD] = cref.objectroot.word
+
+            # get the wrapped structure element to put in...
+            wse = self._workbench_cache.get(key)
+
+
+            if key not in head_keys:
+
+                defd = self._commit_store.put(key = key,
+                                   value = wse.serialize(),
+                                   index_attributes = attributes)
+                def_list.append(defd)
+
+            else:
+
+                # We know it is a head - but we need to get the branch name again
+                for branch in  repo.branches:
+                    # If this is currently the head commit - set the branch name attribute
+                    if cref in branch.commitrefs:
+                        # If this is currently the head commit - set the branch name
+                        if attributes[BRANCH_NAME] == '':
+                            attributes[BRANCH_NAME] = branch.branchkey
+                        else:
+                            attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
+
+
+                # Now commit it!
+                defd = self._commit_store.put(key = key,
+                                   value = wse.serialize(),
+                                   index_attributes = attributes)
+                def_list.append(defd)
+        return defer.DeferredList(def_list)
+
+
 
 
     @defer.inlineCallbacks
