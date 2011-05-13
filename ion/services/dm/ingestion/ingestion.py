@@ -205,7 +205,7 @@ class IngestionService(ServiceProcess):
         Factor out the preparation for ingestion so that we can unit test functionality
         """
 
-        log.info('Prepare ingest Start:')
+        log.info('Prepare ingest: Start')
 
         # Get the current state of the dataset:
         self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
@@ -259,7 +259,7 @@ class IngestionService(ServiceProcess):
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
-        log.info('Prepare ingest complete!')
+        log.info('Prepare ingest: complete!')
 
 
         defer.returnValue(data_details)
