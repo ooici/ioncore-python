@@ -331,8 +331,8 @@ anonymous_name:{ID_CFG:'A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8',
                                        'certificate':'',
                                        'rsa_private_key':'',
                                        'name':'Anonymous User',
-                                       'institution':'',
-                                       'email':'',
+                                       'institution':'OOICI',
+                                       'email':'ooici-anonymous@ucsd.edu',
                                        'authenticating_organization':''}
                         },
 
@@ -399,8 +399,8 @@ root_name:{ID_CFG:'E15CADEA-4605-4AFD-AF80-8FC3BC54D2A3',
                                        'certificate':'',
                                        'rsa_private_key':'',
                                        'name':'Root User',
-                                       'institution':'',
-                                       'email':'',
+                                       'institution':'OOICI',
+                                       'email':'ooici-root@ucsd.edu',
                                        'authenticating_organization':''}
                         },
 
