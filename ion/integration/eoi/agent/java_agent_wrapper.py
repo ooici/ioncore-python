@@ -474,9 +474,9 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
         if datasetID and not dataSourceID:
-            dataSourceID = self._get_associated_data_source_id(datasetID)
+            dataSourceID = yield self._get_associated_data_source_id(datasetID)
         if dataSourceID and not datasetID:
-            datasetID = self._get_associated_dataset_id(dataSourceID)
+            datasetID = yield self._get_associated_dataset_id(dataSourceID)
         
         
         log.debug("  |--->  Retrieving dataset instance")
@@ -531,6 +531,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         defer.returnValue(msg)
 
+    @defer.inlineCallbacks
     def _get_associated_data_source_id(dataset_id):
         result = ""
         
@@ -570,8 +571,9 @@ class JavaAgentWrapper(ServiceProcess):
                     log.error('Error retrieving associated resource "%s":  %s' % (str(id), str(ex)))
 
 
-        return result
-    
+        defer.returnValue( result)
+
+    @defer.inlineCallbacks
     def _get_associated_dataset_id(data_source_id):
         result = ""
         
@@ -611,7 +613,7 @@ class JavaAgentWrapper(ServiceProcess):
                     log.error('Error retrieving associated resource "%s":  %s' % (str(id), str(ex)))
 
 
-        return result
+        defer.returnValue(result)
 
     @property
     def agent_phandle(self):
