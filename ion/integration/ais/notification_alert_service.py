@@ -383,6 +383,7 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.op_addSubscription complete')
         yield self.reply_ok(msg, respMsg)
 
+
     @defer.inlineCallbacks
     def op_removeSubscription(self, content, headers, msg):
         """
@@ -426,6 +427,84 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService..op_removeSubscription complete')
         yield self.reply_ok(msg, respMsg)
 
+
+    @defer.inlineCallbacks
+    def op_getSubscription(self, content, headers, msg):
+        """
+        @brief return a subscription from the list
+        @param
+        @retval a list with 1 item
+        """
+        log.debug('NotificationAlertService.op_getSubscription: \n'+str(content))
+
+        # Check only the type received
+        if content.MessageType != AIS_REQUEST_MSG_TYPE:
+            raise NotificationAlertError('Expected message class AIS_REQUEST_MSG_TYPE, received %s'% str(content))
+
+        # check that subscriptionInfo is present in GPB
+        if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
+
+        if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
+
+        if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
+            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+                                            content.ResponseCodes.BAD_REQUEST)
+
+        log.info('NotificationAlertService.op_getSubscription  Returning subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
+
+        self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
+        log.info("NotificationAlertService.op_getSubscription key: %s ", self.keyval)
+
+        if not ( yield self.index_store.has_key(self.keyval) ):
+            raise NotificationAlertException('Invalid request, subscription does not exist',
+                                             content.ResponseCodes.BAD_REQUEST)
+        query = Query()
+        query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.subscriptionInfo.user_ooi_id)
+        query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
+        rows = yield self.index_store.query(query)
+        log.info("NotificationAlertService.op_getSubscription rows: %s ", str(rows))
+
+        # create the AIS response GPB
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        respMsg.message_parameters_reference.add()
+        respMsg.message_parameters_reference[0] = respMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
+        for key, row in rows.iteritems ( ) :
+            respMsg.message_parameters_reference[0].subscriptionListResults.add()
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.user_ooi_id = rows[key]['user_ooi_id']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.data_src_id = rows[key]['data_src_id']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.subscription_type = rows[key]['subscription_type']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.email_alerts_filter = rows[key]['email_alerts_filter']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.date_registered = rows[key]['date_registered']
+    
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.data_resource_id = rows[key]['data_src_id']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.title = rows[key]['dispatcher_script_path']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.institution = rows[key]['title']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.source = rows[key]['source']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.references = rows[key]['references']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.summary = rows[key]['summary']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.conventions = rows[key]['conventions']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.comment = rows[key]['comment']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_time_coverage_start = rows[key]['ion_time_coverage_start']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_time_coverage_end = rows[key]['ion_time_coverage_end']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_min = rows[key]['ion_geospatial_lat_min']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_max = rows[key]['ion_geospatial_lat_max']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_min = rows[key]['ion_geospatial_lon_min']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_max = rows[key]['ion_geospatial_lon_max']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_min = rows[key]['ion_geospatial_vertical_min']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_max = rows[key]['ion_geospatial_vertical_max']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_positive = rows[key]['ion_geospatial_vertical_positive']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.download_url = rows[key]['download_url']
+        respMsg.result = respMsg.ResponseCodes.OK
+
+        log.info('NotificationAlertService..op_getSubscription complete')
+        yield self.reply_ok(msg, respMsg)
 
 
     @defer.inlineCallbacks
@@ -570,8 +649,6 @@ class NotificationAlertService(ServiceProcess):
     """
 
 
-
-
 class NotificationAlertServiceClient(ServiceClient):
     """
     This is a service client for NotificationAlertService.
@@ -604,6 +681,15 @@ class NotificationAlertServiceClient(ServiceClient):
         log.debug('NAS_client.getSubscriptionList: sending following message to getSubscriptionList:\n%s' % str(message))
         (content, headers, payload) = yield self.rpc_send('getSubscriptionList', message)
         log.debug('NAS_client.getSubscriptionList: reply:\n' + str(content))
+        defer.returnValue(content)
+
+
+    @defer.inlineCallbacks
+    def getSubscription(self, message):
+        yield self._check_init()
+        log.debug('NAS_client.getSubscription: sending following message to getSubscription:\n%s' % str(message))
+        (content, headers, payload) = yield self.rpc_send('getSubscription', message)
+        log.debug('NAS_client.getSubscription: reply:\n' + str(content))
         defer.returnValue(content)
 
 
