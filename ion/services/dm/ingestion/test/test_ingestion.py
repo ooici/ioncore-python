@@ -12,7 +12,7 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.util import procutils as pu
-from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, TYPE_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, ID_CFG
 
 from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber
 
@@ -23,6 +23,11 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE
 
+from ion.core.object.object_utils import create_type_identifier
+
+DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
+DATASOURCE_TYPE = create_type_identifier(object_id=4503, version=1)
+GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 
 class IngestionTest(IonTestCase):
     """
@@ -256,6 +261,75 @@ class IngestionTest(IonTestCase):
 
         complete_msg.status = complete_msg.StatusCode.OK
         yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+
+
+
+    @defer.inlineCallbacks
+    def test_ingest_on_new_dataset(self):
+        """
+        This is a test method for the recv dataset operation of the ingestion service
+        """
+
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+
+        def create_dataset(dataset, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            group = dataset.CreateObject(GROUP_TYPE)
+            dataset.root_group = group
+            return True
+
+        data_set_description = {ID_CFG:new_dataset_id,
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:'Blank dataset for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:create_dataset,
+                      }
+
+        self.datastore._create_resource(data_set_description)
+
+        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
+
+
+        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
+
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        # ============================================
+        # Don't need a real data source at this time!
+        # ============================================
+
+        log.info('Created Dataset Resource for test.')
+
+        # Receive a dataset to get setup...
+        content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id = new_dataset_id
+        content.datasource_id = new_datasource_id
+
+        yield self.ingest._prepare_ingest(content)
+
+
+        # Now fake the receipt of the dataset message
+        cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
+        yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
+
+        log.info('Calling Receive Dataset')
+
+        # Call the op of the ingest process directly
+        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+
+        log.info('Calling Receive Dataset: Complete')
+
+        complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
+
+        log.info('Calling Receive Done')
+
+        complete_msg.status = complete_msg.StatusCode.OK
+        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+
+        log.info('Calling Receive Done: Complete!')
+
+
 
 
     @defer.inlineCallbacks

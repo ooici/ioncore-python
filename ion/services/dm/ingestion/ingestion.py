@@ -205,8 +205,12 @@ class IngestionService(ServiceProcess):
         Factor out the preparation for ingestion so that we can unit test functionality
         """
 
+        log.info('Prepare ingest Start:')
+
         # Get the current state of the dataset:
         self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+
+        log.info('Got dataset resource')
 
         # Get the bounded arrays but not the ndarrays
         ba_links = []
@@ -239,6 +243,7 @@ class IngestionService(ServiceProcess):
                        EM_DATASET:content.dataset_id,
                        }
 
+        log.info('Created dataset details, Now setup subscriber...')
 
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
@@ -254,6 +259,7 @@ class IngestionService(ServiceProcess):
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
+        log.info('Prepare ingest complete!')
 
 
         defer.returnValue(data_details)
