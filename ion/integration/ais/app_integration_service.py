@@ -63,7 +63,7 @@ class AppIntegrationService(ServiceProcess):
         yield self.metadataCache.loadDataSources()
         self.subscriber = DataResourceUpdateSubscriber()
         self.subscriber.subscribe()
-
+        
         
     def getMetadataCache(self):
         return self.metadataCache

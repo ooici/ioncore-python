@@ -20,11 +20,12 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
-            DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
+            DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, HAS_A_ID
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
@@ -33,6 +34,7 @@ PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, ver
 #
 KEY          = 'key'
 RESOURCE_ID  = 'ResourceIdentity'
+DSOURCE_ID   = 'DSourceID'
 TITLE        = 'title'
 INSTITUTION  = 'institution'
 SOURCE       = 'source'
@@ -81,6 +83,7 @@ class MetadataCache(object):
         self.mc = MessageClient(proc = ais)
         self.asc = AssociationServiceClient(proc = ais)
         self.rc = ResourceClient(proc = ais)
+        self.ac = AssociationClient(proc = ais)
 
 
     @defer.inlineCallbacks
@@ -164,7 +167,7 @@ class MetadataCache(object):
         log.debug('putDSetMetadata')
 
         dSet = yield self.rc.get_instance(dSetID)
-        self.__loadDSetMetadata(dSet)
+        yield self.__loadDSetMetadata(dSet)
                     
     
     def deleteDSetMetadata(self, dSetID):
@@ -231,6 +234,7 @@ class MetadataCache(object):
             return False
     
     
+    @defer.inlineCallbacks
     def __loadDSetMetadata(self, dSet):
         """
         Create and load a dictionary entry with the metadata from the given
@@ -246,9 +250,10 @@ class MetadataCache(object):
         if ((dSet.ResourceLifeCycleState == dSet.ACTIVE) or 
             (dSet.ResourceLifeCycleState == dSet.COMMISSIONED)):
             dSetMetadata = {}
+            dSetMetadata[DSOURCE_ID] = yield self.__getAssociatedSource(dSet)
+            dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
             for attrib in dSet.root_group.attributes:
                 #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
-                dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
                 if attrib.name == TITLE:
                     dSetMetadata[TITLE] = attrib.GetValue()
                 elif attrib.name == INSTITUTION:                
@@ -373,6 +378,30 @@ class MetadataCache(object):
             defer.returnValue(None)
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def __getAssociatedSource(self, dSet):
+        """
+        Worker class method to get the data source that associated with a given
+        data set.  
+        """
+        log.debug('__getAssociatedSource() entry')
+
+        try:
+            results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('AssociationError')
+            defer.returnValue(None)
+
+        for association in results:
+            log.debug('Associated Source for Dataset: ' + \
+                      association.ObjectReference.key + \
+                      ' is: ' + association.SubjectReference.key)
+
+        log.debug('__getAssociatedSource() exit')
+
+        defer.returnValue(association.SubjectReference.key)
 
 
     def __printMetadata(self, res):
