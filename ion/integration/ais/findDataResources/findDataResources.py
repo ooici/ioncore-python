@@ -24,6 +24,8 @@ from ion.integration.ais.common.metadata_cache import  MetadataCache
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber
+
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
 
@@ -43,8 +45,28 @@ DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
 DNLD_DIR_PATH = '/dodsC/ooiciData/'
 DNLD_FILE_TYPE = '.ncml.html'
 
-class FindDataResources(object):
 
+class DataResourceUpdateSubscriber(object):
+    def subscribe(self):
+        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
+        log.info('AIS DataResourceUpdateSubscriber')
+        self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
+        yield self.sub.register()
+        yield self.sub.initialize()
+        yield self.sub.activate()
+        log.info('DataResourceUpdateSubscriber.subscribe complete')
+        
+    @defer.inlineCallbacks
+    def handle_update_event(self, content):
+            log.info('DataResourceUpdateSubscriber.handle_update_event notification event received')
+            #Check that the item is in the store
+            log.info('DataResourceUpdateSubscriber.handle_update_event content   : %s', content)
+
+            msg = content['content'];
+
+
+    
+class FindDataResources(object):
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
@@ -151,7 +173,7 @@ class FindDataResources(object):
         data set.  This is a public method because it can be called from the
         findDataResourceDetail worker class.
         """
-        log.debug('getAssociatedSource()')
+        log.debug('getAssociatedSource() entry')
 
         try: 
             ds = yield self.rc.get_instance(dSetResID)
@@ -172,6 +194,8 @@ class FindDataResources(object):
                       association.ObjectReference.key + \
                       ' is: ' + association.SubjectReference.key)
 
+        log.debug('getAssociatedSource() exit')
+
         defer.returnValue(association.SubjectReference.key)
 
                       
@@ -182,7 +206,7 @@ class FindDataResources(object):
         This is a public method because it can be called from the
         findDataResourceDetail worker class.
         """
-        log.debug('getAssociatedOwner()')
+        log.debug('getAssociatedOwner() entry')
 
         request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
 
@@ -218,6 +242,7 @@ class FindDataResources(object):
             log.error('Owner not found!')
             defer.returnValue('OWNER NOT FOUND!')
         elif len(result.idrefs) == 1:
+            log.debug('getAssociatedOwner() exit')
             defer.returnValue(result.idrefs[0].key)
         else:
             log.error('More than 1 owner found!')
@@ -232,6 +257,8 @@ class FindDataResources(object):
         if so, add it to the response GPB.
         """
 
+        log.debug('__getDataResources entry')
+        
         #
         # Instantiate a bounds object, and load it up with the given bounds
         # info
@@ -285,16 +312,15 @@ class FindDataResources(object):
             #
             if bounds.isInBounds(dSetMetadata):                
 
-                dSourceResID = yield self.getAssociatedSource(dSetResID)
+                dSourceResID = dSetMetadata['DSourceID']
                 if dSourceResID is None:
                     log.error('dSourceResID is None')
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
                     Response.error_str = "Datasource not found."
-                    defer.returnValue(Response)        
-
-
+                    defer.returnValue(Response)
+                    
                 if self.bUseMetadataCache:            
                     dSource = self.metadataCache.getDSetMetadata(dSourceResID)
                     if dSetMetadata is None:
@@ -320,7 +346,8 @@ class FindDataResources(object):
                 #
                 # Added this for Tim and Tom; not sure we need it yet...
                 #
-                ownerID = yield self.getAssociatedOwner(dSetResID)
+                #ownerID = yield self.getAssociatedOwner(dSetResID)
+                ownerID = 'Is this used?'
 
                 if userID is None:
                     #
@@ -362,10 +389,14 @@ class FindDataResources(object):
             
             i = i + 1
 
+        log.debug('__getDataResources exit')
+
 
     @defer.inlineCallbacks
     def __findResourcesOfType(self, resourceType):
 
+        log.debug('__findResourcesOfType() entry')
+        
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
         #
@@ -412,6 +443,7 @@ class FindDataResources(object):
             log.error('__findResourcesOfType: association error!')
             defer.returnValue(None)
 
+        log.debug('__findResourcesOfType() exit')
         
         defer.returnValue(result)
 
