@@ -284,10 +284,26 @@ class CdmValidationService(ServiceProcess):
         cf_result_dict['cf_exitcode'] = exitcode
         cf_result_dict['cf_output'] = cf_output_string
         
+        #--------------------------------------------------------------------------------
+        # IMPORTANT NOTE!!
+        # exitcode 0 means success
+        # exitcode 255 is returned from shell when cfchecks returns an invalid exit code.
+        # .. this is expected behavior because when there are no errors but warnings are
+        #    present, cfchecks will return a negative exit code -- negative exit codes
+        #    are considered invalid by shell -- ergo exitcode 255 means warnings ONLY
+        #
+        # @todo: FIX THIS!
+        #    In the future we must find a solution which does not result in the loss of
+        #    warning codes.  Also, if there are 255 or more error codes the hack below
+        #    will regard those errors as a success.  THIS IS NOT ACCEPTABLE.
+        #--------------------------------------------------------------------------------
+        #
+        if exitcode == 255: exitcode = 0
+        
         if exitcode != 0 and cf_result_dict.get('cf_errors', 0) == 0:
             # There are no cf_errors because processing terminated with
             # an exitcode..
-            cf_result_dict['exception'] = 'Recieved failure exitcode during CF Validation.  Please check the CF Checker configuration.  Inner exception: %s' % cf_output_string
+            cf_result_dict['exception'] = 'Recieved failure exitcode (%i) during CF Validation.  Please check the CF Checker configuration.  Inner exception: %s' % (exitcode, cf_output_string)
             cf_result_dict['cf_errors'] = 1
         
         return cf_result_dict
@@ -440,6 +456,7 @@ client = cvc()
 
 
 # PICK ONE of the following
+res_d = client.validate('http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc')
 res_d = client.validate('http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day')
 res_d = client.validate('http://tashtego.marine.rutgers.edu:8080/thredds/dodsC/cool/avhrr/bigbight')
 
