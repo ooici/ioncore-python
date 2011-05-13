@@ -8,6 +8,8 @@
 import base64
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE
+from ion.core.process.process import Process
+from ion.services.dm.ingestion.test.test_cdm_variable_methods import CDM_ARRAY_STRUC_TYPE, CDM_F64_ARRAY_TYPE
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -32,7 +34,7 @@ from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
 from telephus.cassandra.ttypes import InvalidRequestException
 
-from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient, CDM_BOUNDED_ARRAY_TYPE
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
@@ -390,60 +392,6 @@ class DataStoreTest(IonTestCase):
         self.failUnless(CDM_ARRAY_FLOAT32_TYPE in obj2.Repository.excluded_types)
 
     @defer.inlineCallbacks
-    def test_extract_data(self):
-        """
-        @TODO: daf: this is not a full test yet, just test code.
-        """
-        from ion.core.process.process import Process
-        p = Process()
-        yield p.spawn()
-
-        #keylist = ['Ue+mAFyoKxcRjaH9trKNc/ROk/4=', 'Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
-        #keylist = ['Qhp9eG0X+htDp/qTcOO+KsgzHLg=', 'Z1b4dvegF3/lRCA5vBhnfHchjkw=', 'A+ZNsGWngctrNkI7eflGUqHYBAc=', 'npIXn/VT1fNMIQeMxW4E0f0S+lA=', 'ZeQhNnctnolg5LPtoAYTnhhHvyI=']
-
-        @defer.inlineCallbacks
-        def datahandler(data, msg):
-            print "GOT A DATA", data['content'].ndarray.value
-            yield msg.ack()
-
-        consumer_config = { 'exchange' : 'magnet.topic',
-                'exchange_type' : 'topic',
-                'durable': False,
-                'auto_delete': True,
-                'mandatory': True,
-                'immediate': False,
-                'warn_if_exists': False,
-                'routing_key' : 'fake_java_process',      # may be None, if so, no binding is made to the queue (routing_key is incorrectly named in the dict used by Receiver)
-                'queue' : None,              # may be None, if so, the queue is made anonymously (and stored in receiver's consumer.queue attr)
-              }
-
-        datarec = WorkerReceiver('fake_java_process', process=p, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
-        yield datarec.attach()
-
-        # this key is from an array in SAMPLE_PROFILE_DATASET
-        keylist=['npIXn/VT1fNMIQeMxW4E0f0S+lA=']
-
-        for key in keylist:
-            msg = yield p.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
-
-            print "REQUESTING", key
-            import base64
-            msg.structure_array_ref = base64.decodestring(key)
-            msg.data_routing_key = 'fake_java_process'
-            bounds = msg.request_bounds.add()
-            bounds.origin = 1
-            bounds.size = 2
-
-            dsc = DataStoreClient()
-
-            ret = yield dsc.extract_data(msg)
-
-            print "GOT A RET: ", str(ret)
-
-        yield datarec.terminate()
-
-
-    @defer.inlineCallbacks
     def test_push_clear_pull(self):
 
         log.info('DataStore1 Push addressbook to DataStore1')
@@ -737,5 +685,439 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         yield DataStoreTest.tearDown(self)
 
 
+class DataStoreExtractDataTest(IonTestCase):
+    services = [
+        {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+         'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True}}
+            },
+        {'name':'workbench_test1',
+         'module':'ion.core.object.test.test_workbench',
+         'class':'WorkBenchProcess',
+         'spawnargs':{'proc-name':'wb1'}
+            },
+    ]
 
 
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        yield self.setup_services()
+        yield self.setup_array_structure()
+        yield self.setup_data_listener()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def setup_services(self):
+
+        self.sup = yield self._spawn_processes(self.services)
+
+
+        child_ds1 = yield self.sup.get_child_id('ds1')
+        log.debug('Process ID:' + str(child_ds1))
+        self.ds1 = self._get_procinstance(child_ds1)
+
+
+        child_proc1 = yield self.sup.get_child_id('workbench_test1')
+        log.info('Process ID:' + str(child_proc1))
+        workbench_process1 = self._get_procinstance(child_proc1)
+        self.wb1 = workbench_process1
+
+    @defer.inlineCallbacks
+    def setup_array_structure(self):
+
+        # create two arraystructures and push them to the datastore (via putblobs)
+        # one is 3d, as a single bounded array
+        # the other is 4d as multiple ba's
+
+        repo = self.wb1.workbench.create_repository(CDM_ARRAY_STRUC_TYPE)
+
+        # Create the array structure
+        content = repo.root_object
+        ba1 = yield repo.create_object(CDM_BOUNDED_ARRAY_TYPE)
+        arr1 = yield repo.create_object(CDM_F64_ARRAY_TYPE)
+
+        ba1.bounds.add()
+        ba1.bounds[0].origin = 0
+        ba1.bounds[0].size = 15
+
+        ba1.bounds.add()
+        ba1.bounds[1].origin = 0
+        ba1.bounds[1].size = 40
+
+        ba1.bounds.add()
+        ba1.bounds[2].origin = 0
+        ba1.bounds[2].size = 200
+
+        arr1.value.extend((float(val) for val in xrange(0, 200*40*15)))
+
+        # assemble this array struc
+        ba1.ndarray = arr1
+        ref = content.bounded_arrays.add(); ref.SetLink(ba1)
+
+        repo.commit()
+
+        self.first_struct_repo_key = repo.repository_key
+        self.first_struct_as_key = content.MyId
+
+        # create second array structure
+        repo = self.wb1.workbench.create_repository(CDM_ARRAY_STRUC_TYPE)
+
+        # Create the array structure
+        content = repo.root_object
+
+        bas = []
+        arrs = []
+        totalintopdim = 20 ** 3
+        for x in xrange(4):
+            ba = yield repo.create_object(CDM_BOUNDED_ARRAY_TYPE)
+            bas.append(ba)
+
+            ba.bounds.add()
+            ba.bounds[0].origin = x
+            ba.bounds[0].size = 1
+
+            for y in xrange(1, 4):
+                ba.bounds.add()
+                ba.bounds[y].origin = 0
+                ba.bounds[y].size = 20
+
+            arr = yield repo.create_object(CDM_F64_ARRAY_TYPE)
+            arrs.append(arr)
+
+            arr.value.extend((float(val) for val in xrange(x * totalintopdim, (x+1)*totalintopdim)))
+
+            ba.ndarray = arr
+
+            ref = content.bounded_arrays.add()
+            ref.SetLink(ba)
+
+        repo.commit()
+        
+        self.second_struct_repo_key = repo.repository_key
+        self.second_struct_as_key = content.MyId
+
+        # send the array structs to the datastore (as putblobs)
+
+        msg = yield self.wb1.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        for repokey in [self.first_struct_repo_key, self.second_struct_repo_key]:
+            for key,val in self.wb1.workbench.get_repository(repokey).index_hash.iteritems():
+                link = msg.blob_elements.add()
+                obj = msg.Repository._wrap_message_object(val._element)
+                link.SetLink(obj)
+
+        dsc = DataStoreClient()
+        yield dsc.put_blobs(msg)
+
+    @defer.inlineCallbacks
+    def setup_data_listener(self):
+
+        p = Process()
+        yield p.spawn()
+
+        self._recv_data = []
+        self._def_done = defer.Deferred()   # this is called back in the handler when the "done" message comes through
+
+        @defer.inlineCallbacks
+        def datahandler(data, msg):
+            self._recv_data.append({'ndarray': data['content'].ndarray.value[:],
+                                    'start_index':data['content'].start_index,
+                                    'seq_number':data['content'].seq_number,
+                                    'seq_max':data['content'].seq_max})
+
+            #print "DataStoreExtractDataTest: received data", data['content'].seq_number, '/', data['content'].seq_max
+            if data['content'].done:
+                self._def_done.callback(True)
+            yield msg.ack()
+
+        consumer_config = { 'exchange' : 'magnet.topic',
+                'exchange_type' : 'topic',
+                'durable': False,
+                'auto_delete': True,
+                'mandatory': True,
+                'immediate': False,
+                'warn_if_exists': False,
+                'routing_key' : 'data_listener',      # may be None, if so, no binding is made to the queue (routing_key is incorrectly named in the dict used by Receiver)
+                'queue' : None,              # may be None, if so, the queue is made anonymously (and stored in receiver's consumer.queue attr)
+              }
+
+        datarec = WorkerReceiver('data_listener', process=p, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
+        yield datarec.attach()
+
+        self.dsc = DataStoreClient(proc=p)
+
+    @defer.inlineCallbacks
+    def test_full_one_ba(self):
+
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.first_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 15
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 40
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 200
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)       # unable to predict exact as we may change chunk size
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 200*40*15)
+
+        # should be contiguous too
+        counter = 0
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+            for data in ndarray:
+                self.failUnlessEqual(int(data), counter)
+                counter += 1
+        
+    @defer.inlineCallbacks
+    def test_partial_one_ba(self):
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.first_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 2
+        bounds.size = 1
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 10
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 50
+        bounds.size = 100
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 100 * 10 * 1)
+
+        # spot check values - to do this we must assemble all the ndarrays into one
+        bigndarray = []
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+           bigndarray.extend(ndarray)
+
+        self.failIfEquals(int(bigndarray[0]), 0)    # it's not 0 here, we started much further in
+
+        self.failIfEquals(int(bigndarray[100]) - int(bigndarray[99]), 1)    # this is a slice boundary of returned data - the value there
+                                                                            # is the actual index in the big array and should differ quite a bit
+
+    @defer.inlineCallbacks
+    def test_stride_one_ba(self):
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.first_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 1
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 10
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 50
+        bounds.size = 100
+        bounds.stride = 10
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 10 * 10 * 1) # 50-150 stride 10 is 10
+
+        # we strode the last dimension, each value should be 10 up from the previous
+        last = None
+
+        # assemble all the ndarrays into one
+        bigndarray = []
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+           bigndarray.extend(ndarray)
+
+        for x in xrange(10):
+            if last is not None:
+                self.failUnlessEqual(int(bigndarray[x]), last+10)
+
+            last = int(bigndarray[x])
+
+
+    @defer.inlineCallbacks
+    def test_full_multi_ba(self):
+        
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.second_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 4
+
+        for x in range(3):
+            bounds = msg.request_bounds.add()
+            bounds.origin = 0
+            bounds.size = 20
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 4 * (20 ** 3))
+
+        # should be contiguous too
+        counter = 0
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+            for data in ndarray:
+                self.failUnlessEqual(int(data), counter)
+                counter += 1
+
+    @defer.inlineCallbacks
+    def test_partial_one_ba_multi_ba(self):
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.second_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 1     # just request one, this keeps it all in one ba
+
+        for x in range(3):
+            bounds = msg.request_bounds.add()
+            bounds.origin = 0
+            bounds.size = 20
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 1 * (20 ** 3))
+
+        # should be contiguous too
+        counter = 0
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+            for data in ndarray:
+                self.failUnlessEqual(int(data), counter)
+                counter += 1
+
+    @defer.inlineCallbacks
+    def test_partial_crossing_bas_multi_ba(self):
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.second_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 1
+        bounds.size = 2
+
+        for x in range(3):
+            bounds = msg.request_bounds.add()
+            bounds.origin = 10
+            bounds.size = 5
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 2 * (5 ** 3))
+
+        # build the big array so we can spot check
+        bigndarray = []
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+           bigndarray.extend(ndarray)
+
+        self.failIfEquals(int(bigndarray[0]), 0)    # we requested further in from there
+
+        zerothval = (20**3)*1 + (20**2)*10 + 20 * 10 + 10
+        self.failUnlessEquals(int(bigndarray[0]), zerothval)
+
+        # check that the topmost dimension's 2nd entry is exactly 20**3 more than zerothval
+        self.failUnlessEquals(int(bigndarray[5**3]), zerothval + 20**3)
+
+    @defer.inlineCallbacks
+    def test_stride_higherdim_multi_ba(self):
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.second_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 2
+        bounds.size = 1
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 20
+        bounds.stride = 5
+
+        for x in range(2):
+            bounds = msg.request_bounds.add()
+            bounds.origin = 10
+            bounds.size = 10
+
+        msg.data_routing_key = "data_listener"
+
+        resp = yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 1 * 4 * (10**2))  # 0-20 stride 5 gives 4 values (0, 5, 10, 15)
+
+        # build the big array so we can spot check
+        bigndarray = []
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+           bigndarray.extend(ndarray)
+
+        zerothval = (20**3) * 2 + 20 * 10 + 10
+        self.failUnlessEquals(int(bigndarray[0]), zerothval)
+
+        # calculate next strided value in the 2nd dimension
+        nextval = (20**3) * 2 + (20**2) * 5 + 20 * 10 + 10
+
+        # now the next index in our returned array
+        nextidx = 10 * 10
+        self.failUnlessEquals(int(bigndarray[nextidx]), nextval)
