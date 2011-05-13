@@ -350,7 +350,9 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
 
     else:
         start_time = 1280102520
+        # 2010-07-26T00:02:00Z
         end_time = 1280106120
+        # 2010-07-26T01:02:00Z
 
     log.info("start_time %s end_time %s " % (start_time, end_time))
 
@@ -499,9 +501,8 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     gmtuple = time.gmtime(end_time)
     etime = time.strftime("%Y-%m-%dT%H:%M:%SZ", gmtuple)
 
-    print 'START TIME:', stime
-    print 'END TIME:', stime
-
+    log.info('ion_time_coverage_start: %s' % stime)
+    log.info('ion_time_coverage_end: %s' % etime)
 
     attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', [stime,])
     attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', [etime,])

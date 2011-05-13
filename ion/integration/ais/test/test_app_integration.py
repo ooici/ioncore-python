@@ -390,8 +390,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2008-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-01-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:04:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -418,8 +418,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2007-01-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-24T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:04:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
