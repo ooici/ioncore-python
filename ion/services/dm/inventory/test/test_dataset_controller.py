@@ -90,7 +90,7 @@ class DatasetControllerTest(IonTestCase):
         # You can send the root of the object or any linked composite part of it.
         create_response_msg = yield dscc.create_dataset_resource(create_request_msg)
 
-        yield asleep(2.0)
+        yield asleep(10.0)
 
     @defer.inlineCallbacks
     def test_hello_dataset(self):
@@ -106,7 +106,7 @@ class DatasetControllerTest(IonTestCase):
 
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
-        yield asleep(2.0)
+        yield asleep(10.0)
 
     @defer.inlineCallbacks
     def test_find_dataset(self):

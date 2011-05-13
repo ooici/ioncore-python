@@ -16,7 +16,8 @@ file_template = """
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
-from os import path, environ, chmod, unlink
+from os import path, environ, chmod, unlink, listdir
+import fnmatch
 
 from twisted.internet import reactor, defer, error
 from twisted.internet.protocol import ProcessProtocol
@@ -73,7 +74,31 @@ def create_ncml(id_ref, filepath=""):
 
     return file_template % id_ref
 
+def check_for_ncml_files(local_filepath):
+    """
+    Check for ncml files on disk.
+    
+    Returns True if any ncml files in the given directory, False if no files
+        or an error is raised.
+    """
+    log.debug('checking for ncml files in %s' % local_filepath)
 
+    try:
+        allfiles = listdir(local_filepath)
+        ncml_files = []
+        for file in allfiles:
+            if fnmatch.fnmatch(file, '*.ncml'):
+                ncml_files.append(file)
+    except IOError:
+        log.exception('Error searching %s for ncml files' % local_filepath)
+        return False
+
+    if len(ncml_files) > 0:
+        return True
+
+    return False
+
+    
 def rsync_ncml(local_filepath, server_url):
     """
     @brief Method to perform a bidirectional sync with a remote server,
@@ -87,7 +112,9 @@ def rsync_ncml(local_filepath, server_url):
     rpp = AsyncProcessWithCallbackProto(d)
     args = [RSYNC_CMD, '', '-r', '--include', '"*.ncml"',
             '-v', '--stats', '--delete', local_filepath + '/', server_url]
-    log.debug('Command is "%s %s"'% (RSYNC_CMD, args))
+    log.debug('Command is "%s"'% ' '.join(args))
+
+    #log.debug(environ.data)
 
     # Adding environ.data uses the parent environment, otherwise empty
     reactor.spawnProcess(rpp, RSYNC_CMD, args, env=environ.data)

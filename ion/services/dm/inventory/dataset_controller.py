@@ -6,12 +6,13 @@
 @brief An example service definition that can be used as template for resource management.
 """
 import uuid
+from os import getcwd, chdir
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync
+from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync, check_for_ncml_files
 from ion.core import ioninit
 
 from ion.core.process.process import ProcessFactory
@@ -206,13 +207,18 @@ class DatasetController(ServiceProcess):
         @brief On receipt of scheduler message, do rsync with server, moving
         any new ncml files over.
         """
-        # @todo fstat the ncml directory to check for new files
         log.debug('rsync scheduled beginning now')
+        if check_for_ncml_files(self.ncml_path):
+            log.debug('NcML files found, invoking rsync')
+            self.cwd = getcwd()
+            chdir(self.ncml_path)
+            yield do_complete_rsync(self.ncml_path, self.server_url,
+                                    self.private_key, self.public_key)
 
-        yield do_complete_rsync(self.ncml_path, self.server_url,
-                                self.private_key, self.public_key)
-
-        log.debug('rsync complete')
+            chdir(self.cwd)
+            log.debug('rsync complete')
+        else:
+            log.debug('No ncml found, doing nothing')
         
     #noinspection PyUnusedLocal
     @defer.inlineCallbacks
