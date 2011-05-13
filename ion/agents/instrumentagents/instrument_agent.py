@@ -2278,6 +2278,10 @@ class InstrumentAgent(Process):
         # If data received, coordinate buffering and publishing.
         if type == DriverAnnouncement.DATA_RECEIVED:
             
+            # Remember the transducer in case we need to transmit at a time
+            # other than these events.
+            self._prev_data_transducer = transducer
+
             # Get the driver observatory state.
             key = (DriverChannel.INSTRUMENT,DriverStatus.OBSERVATORY_STATE)
             reply = yield self._driver_client.get_status([key])
@@ -2299,10 +2303,9 @@ class InstrumentAgent(Process):
                 strval = self._get_data_string(value)
 
             if len(strval)>0:
-                self._prev_data_transducer = transducer
                 origin = "%s.%s" % (transducer,self.event_publisher_origin)
                 yield self._data_publisher.create_and_publish_event(\
-                    origin=origin,description=strval)
+                    origin=origin,data_block=strval)
 
         # Driver configuration changed, publish config.                
         elif type == DriverAnnouncement.CONFIG_CHANGE:
@@ -2327,7 +2330,7 @@ class InstrumentAgent(Process):
             if len(strval) > 0:    
                 origin = "%s.%s" % (self._prev_data_transducer,
                                     self.event_publisher_origin)
-                yield self._data_publisher.create_and_publish_event(\
+                yield self._log_publisher.create_and_publish_event(\
                     origin=origin,description=strval)
         
         elif type == DriverAnnouncement.EVENT_OCCURRED:
