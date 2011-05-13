@@ -46,24 +46,37 @@ DNLD_DIR_PATH = '/dodsC/ooiciData/'
 DNLD_FILE_TYPE = '.ncml.html'
 
 
-class DataResourceUpdateSubscriber(object):
-    def subscribe(self):
-        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
-        log.info('AIS DataResourceUpdateSubscriber')
-        self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
-        yield self.sub.register()
-        yield self.sub.initialize()
-        yield self.sub.activate()
-        log.info('DataResourceUpdateSubscriber.subscribe complete')
-        
-    @defer.inlineCallbacks
-    def handle_update_event(self, content):
-            log.info('DataResourceUpdateSubscriber.handle_update_event notification event received')
-            #Check that the item is in the store
-            log.info('DataResourceUpdateSubscriber.handle_update_event content   : %s', content)
+class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
+    def __init__(self, *args, **kwargs):
+        self.msgs = []
+        DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
+                
+    def ondata(self, data):
+        log.error("QuickEventSubscriber received a message:\n" + \
+                  "\tname = %s\n" + \
+                  "\tdatasource_id = %s\n" + \
+                  "\tdataset_id = %s\n" + \
+                  "\ttitle = %s\n" + \
+                  "\turl = %s\n" + \
+                  "\tstart_datetime_millis = %s\n" + \
+                  "\tend_datetime_millis = %s\n" + \
+                  "\tnumber_of_timesteps = %s\n",
+                  data['content'].name,
+                  data['content'].additional_data.datasource_id,
+                  data['content'].additional_data.dataset_id,
+                  data['content'].additional_data.title,
+                  data['content'].additional_data.url,
+                  data['content'].additional_data.start_datetime_millis,
+                  data['content'].additional_data.end_datetime_millis,
+                  data['content'].additional_data.number_of_timesteps
+                  )
 
-            msg = content['content'];
+        content = data['content']
 
+        #if hasattr(content, 'Repository'):
+        #    content.Repository.persistent = True
+
+        self.msgs.append(data)
 
     
 class FindDataResources(object):
