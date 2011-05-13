@@ -656,23 +656,7 @@ class DataStoreWorkbench(WorkBench):
         """
         Flush any repositories in the backend to the the workbench backend storage
         """
-
-        # Put any blobs from the workbench
-        #@TODO - only put the blobs - not the commits or the heads...
-        def_list = []
-        for key, element in self._workbench_cache.items():
-
-            def_list.append(self._blob_store.put(key, element.serialize()))
-        yield defer.DeferredList(def_list)
-        # @TODO - check the results - for what?
-
-
-        # This is simpler than a push - all of these are guaranteed to be new objects!
-        # now put any new commits that are not at the head
-        def_list = []
-        
-        
-
+        def_list=[]
         for repo in self._repos.itervalues():
 
             def_list.append(self.flush_repo_to_backend(repo))
@@ -698,10 +682,12 @@ class DataStoreWorkbench(WorkBench):
         Flush any repositories in the backend to the the workbench backend storage
         """
 
-
         # This is simpler than a push - all of these are guaranteed to be new objects!
-        # now put any new commits that are not at the head
         def_list = []
+        for key, element in repo.index_hash.items():
+
+            def_list.append(self._blob_store.put(key, element.serialize()))
+
 
         # any objects in the data structure that were transmitted have already
         # been updated now it is time to set update the commits

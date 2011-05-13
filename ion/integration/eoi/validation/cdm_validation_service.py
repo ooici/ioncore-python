@@ -292,10 +292,11 @@ class CdmValidationService(ServiceProcess):
         #    present, cfchecks will return a negative exit code -- negative exit codes
         #    are considered invalid by shell -- ergo exitcode 255 means warnings ONLY
         #
-        # @todo: FIX THIS!
-        #    In the future we must find a solution which does not result in the loss of
-        #    warning codes.  Also, if there are 255 or more error codes the hack below
-        #    will regard those errors as a success.  THIS IS NOT ACCEPTABLE.
+        #    There was concern that cfchecks may produce a response of 255 when it
+        #    in fact has failed, and the CdmValidationService may incorrectly report
+        #    success.  This WILL NOT happen, however, because in this case, the analysis
+        #    of the cfchecks output will reveal the actual number of errors, allowing an
+        #    accurate pass/fail response
         #--------------------------------------------------------------------------------
         #
         if exitcode == 255: exitcode = 0
