@@ -9,6 +9,7 @@
 Caching mechanisms are now in place. Consider changing the cache size test to look at the size of the _workbench_cache
 but throw out repositories from the _repo_cache to clear it - that would be better!
 """
+import base64
 
 from twisted.internet import defer
 
@@ -102,6 +103,30 @@ class WorkBench(object):
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
+    def __str__(self):
+        '''
+        Debugging string method.
+        '''
+        retstr = "Workbench info (id:%s)\n" % id(self)
+        retstr += "\n"
+        retstr += "Workbench Cache, (len:%d)\n" % len(self._workbench_cache)
+        for k,v in self._workbench_cache.iteritems():
+            retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
+
+        retstr += "\n"
+        retstr += "Repos, (len:%d)\n" % len(self._repos)
+        for k, v in self._repos.iteritems():
+            retstr += "\t%s: ih %d, cached %s, persistent %s, conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
+
+        retstr += "\n"
+        retstr += "RepoCache, (len:%d)\n" % len(self._repo_cache.keys())
+        for k, v in self._repo_cache.iteritems():
+            retstr += "\t%s: ih %d, cached %s, persistent %s,conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
+
+
+        retstr += "/ ====\n\n"
+
+        return retstr
       
     def create_repository(self, root_type=None, nickname=None, repository_key=None, persistent=False):
         """
