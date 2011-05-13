@@ -268,7 +268,9 @@ class DatasetController(ServiceProcess):
 
         # pfh - create local ncml file as well. These accumulate and are
         # harvested by the scheduled rsync
-        create_ncml(response.key, self.ncml_path)
+        # Per DS, empty datasets will cause thredds problems
+        # @bug Test with thredds
+        #create_ncml(response.key, self.ncml_path)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
