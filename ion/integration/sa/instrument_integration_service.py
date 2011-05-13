@@ -17,12 +17,26 @@ from ion.core.process.process import ProcessFactory, ProcessDesc
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.resource_registry.association_client import AssociationClientError
+from ion.core.messaging.message_client import MessageClient
+
+from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, PREDICATE_REFERENCE_TYPE
+
 import ion.util.procutils as pu
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
 from ion.services.dm.distribution.events import DataEventSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.agents.instrumentagents.instrument_constants import AgentCommand
+from ion.agents.instrumentagents.instrument_constants import AgentEvent
+from ion.agents.instrumentagents.instrument_constants import AgentStatus
+from ion.agents.instrumentagents.instrument_constants import AgentState
+from ion.agents.instrumentagents.instrument_constants import DriverChannel
+from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import INSTRUMENT_RES_TYPE_ID, TYPE_OF_ID
 
 from ion.core.process.process import Process
 from ion.core.process.process import ProcessDesc
@@ -36,19 +50,19 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
 INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
-IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
+#IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 INSTRUMENTDATA_EVENT_ID = 5001
 
 
 
-
+"""
 class InstrumentDataEventSubscriber(DataEventSubscriber):
-    """
-    Event Notification Subscriber for Instrument Data.
 
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
-    """
+    #Event Notification Subscriber for Instrument Data.
+
+    #The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+
     event_id = INSTRUMENTDATA_EVENT_ID
 
  # Setup a subscriber to an event topic
@@ -65,7 +79,8 @@ class SBE37DataEventSubscriber(InstrumentDataEventSubscriber):
 
         self.msgs.append(data)
         #convert the incoming string into a dict
- 
+"""
+
 
 class InstrumentIntegrationService(ServiceProcess):
     """
@@ -83,77 +98,132 @@ class InstrumentIntegrationService(ServiceProcess):
     def slc_init(self):
         self.rc = ResourceClient(proc=self)
         self.ac    = AssociationClient(proc=self)
+        self.asc = AssociationServiceClient(proc=self)
+        self.mc = MessageClient(proc = self)
 
         
     @defer.inlineCallbacks
-    def op_prepInstrument(self):
+    def op_prepInstrument(self, instrument_agent_resource_id):
+
+        self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=instrument_agent_resource_id.process_id)
+        log.info("IIService op_prepInstrument ia_client retrieved")
+
         # Begin an explicit transaciton.
         reply = yield self.ia_client.start_transaction(0)
         success = reply['success']
-        tid = reply['transaction_id']
+        trans_id = reply['transaction_id']
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
 
         # Initialize the agent to bring up the driver and client.
         cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
-        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
 
         # Connect to the driver.
         cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
-        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
 
         # Enter observatory mode.
         cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
-        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
 
         # Check agent state.
         params = [AgentStatus.AGENT_STATE]
-        reply = yield self.ia_client.get_observatory_status(params,tid)
+        reply = yield self.ia_client.get_observatory_status(params,trans_id)
         #self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
         success = reply['success']
+        result = reply['result']
+        log.info("IIService prep_instrument state: %s", result)
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
+
+        defer.returnValue(trans_id)
         
     @defer.inlineCallbacks
-    def op_cleanupInstrument(self):
+    def op_cleanupInstrument(self, trans_id):
         # Reset the agent to disconnect and bring down the driver and client.
         cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
-        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
         result = reply['result']
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return
 
         # Check agent state.
         params = [AgentStatus.AGENT_STATE]
-        reply = yield self.ia_client.get_observatory_status(params,tid)
+        reply = yield self.ia_client.get_observatory_status(params,trans_id)
         success = reply['success']
         result = reply['result']
+        log.info("IIService op_cleanupInstrument state: %s", result)
         if not success:
-            yield self.reply_err(msg, "Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
             return     
 
         # End the transaction.
-        reply = yield self.ia_client.end_transaction(tid)
+        reply = yield self.ia_client.end_transaction(trans_id)
         success = reply['success']
-        self.assert_(InstErrorCode.is_ok(success))
+        if not success:
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(success, "Unable to transition instrument state")
+            return
 
-   
+    @defer.inlineCallbacks
+    def op_getInstrumentList(self, content, headers, msg):
+        """
+        Service operation: Returns all instrument resource ids in the resource registry.
+        """
+        log.info("IIService op_getInstrumentList enter")
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = INSTRUMENT_RES_TYPE_ID
+        pair.object = type_ref
+
+        log.info("IIService op_getInstrumentList call assoc service")
+
+        result = yield self.asc.get_subjects(request)
+
+        log.info("IIService op_getInstrumentList size: %s", str(len(result.idrefs)))
+
+        key_list = []
+        for idref in result.idrefs:
+            log.info("IIService op_getInstrumentList list: %s", idref)
+            key_list.append(idref.key)
+
+        res_value = {'result':key_list }
+        yield self.reply_ok(msg, res_value)
+        
 
     @defer.inlineCallbacks
     def op_createNewInstrument(self, content, headers, msg):
@@ -200,19 +270,38 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         Service operation: Execute a command on an instrument.
 
+        """
+        log.info("IIService op_startAutoSampling")
+        # Step 1: Extract the arguments from the UI generated message content
+        commandInput = content['instrument_id']
+
+        # get the agent resource for this instrument
+        agent_resource_id = yield self.getAgentForInstrument(commandInput)
+        log.info("IIService op_startAutoSampling agent resource: %s", agent_resource_id)
+
+        instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
+
+        # Put the instrument in a state to accept commands
+        transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
+
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.START_AUTO_SAMPLING]
-        reply = yield self.ia_client.execute_device(chans,cmd,tid)
+        reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         success = reply['success']
         result = reply['result']
+        if not success:
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
 
-        self.assert_(InstErrorCode.is_ok(success))
+       # Put the instrument back into passive mode
+        reply = yield self.op_cleanupInstrument(transaction_id)
 
+        res_value = {'result':result }
+        yield self.reply_ok(msg, res_value)
 
-        """
-
-        res_value = {'result':'success' }
+        res_value = {'result':result }
         yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
@@ -220,11 +309,26 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         Service operation: Execute a command on an instrument.
 
+        """
+        log.info("IIService op_startAutoSampling")
+        # Step 1: Extract the arguments from the UI generated message content
+        commandInput = content['instrument_id']
+
+        # get the agent resource for this instrument
+        agent_resource_id = yield self.getAgentForInstrument(commandInput)
+        log.info("IIService op_startAutoSampling agent resource: %s", agent_resource_id)
+
+        instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
+
+        # Put the instrument in a state to accept commands
+        transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
+
+
         # Stop autosampling.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
-            reply = yield self.ia_client.execute_device(chans,cmd,tid)
+            reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
             success = reply['success']
             result = reply['result']
 
@@ -236,54 +340,85 @@ class InstrumentIntegrationService(ServiceProcess):
                 pass
 
             else:
-                self.fail('Stop autosample failed with error: '+str(success))
+                log.info("IIService Unable to transition instrument state")
+                yield self.reply_err(msg, "Unable to transition instrument state")
+                return
+                
+       # Put the instrument back into passive mode
+        reply = yield self.op_cleanupInstrument(transaction_id)
 
-        """
-
-        res_value = {'result':'success' }
+        res_value = {'result':result }
         yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_getInstrumentState(self, content, headers, msg):
         """
-        Service operation: .
+        Service operation: Retrieve the state of the instrument
         """
+        log.info("IIService op_getInstrumentState")
         # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
+        commandInput = content['instrument_id']
+
+        # get the agent resource for this instrument
+        agent_resource_id = yield self.getAgentForInstrument(commandInput)
+        log.info("IIService op_getInstrumentState agent resource: %s", agent_resource_id)
+
+        instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
 
        # Put the instrument in a state to accept commands
-        reply = yield self.op_prepInstrument()
+        transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
+        #transaction_id = reply['tid']
 
         # Get driver parameters.
-        #params = [('all','all')]
-        #reply = yield self.ia_client.get_device(params,tid)
-        #success = reply['success']
-        #result = reply['result']
+        params = [('all','all')]
+        reply = yield self.ia_client.get_device(params, transaction_id)
+        success = reply['success']
+        result = reply['result']
+        log.info("IIService op_getInstrumentState state: %s", result)
+        if not success:
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
 
+       #  Put the instrument back into passive mode
+        reply = yield self.op_cleanupInstrument(transaction_id)
         
-        res_value = {'result':'success' }
+        res_value = {'result':result }
         yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
     def op_setInstrumentState(self, content, headers, msg):
         """
         Service operation:
-
-        reply = yield self.ia_client.set_device(params,tid)
-        success = reply['success']
-        result = reply['result']
-        setparams = params
-
-
         """
+        log.info("IIService op_setInstrumentState")
         # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['commandInput']
+        instrument_id = content['instrument_id']
+        parameters = content['parameters']
+        log.info("IIService op_setInstrumentState  inst id: %s   parameters: %s", instrument_id, parameters)
+
+        # get the agent resource for this instrument
+        agent_resource_id = yield self.getAgentForInstrument(instrument_id)
+        log.info("IIService op_setInstrumentState agent resource: %s", agent_resource_id)
+        instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
 
        # Put the instrument in a state to accept commands
-       #reply = yield self.op_prepInstrument()
+        transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
 
+        # Set driver parameters.
+        reply = yield self.ia_client.set_device(parameters,transaction_id)
+        success = reply['success']
+        result = reply['result']
+        log.info("IIService op_setInstrumentState state: %s", result)
+        if not success:
+            log.info("IIService Unable to transition instrument state")
+            yield self.reply_err(msg, "Unable to transition instrument state")
+            return
 
-        res_value = {'result':'success' }
+       #  Put the instrument back into passive mode
+        reply = yield self.op_cleanupInstrument(transaction_id)
+
+        res_value = {'result':result }
         yield self.reply_ok(msg, res_value)
 
 
@@ -295,10 +430,10 @@ class InstrumentIntegrationService(ServiceProcess):
         """
 
         log.info("IIService op_start_instrument_agent start")
-        if 'instrumentID' in content:
-            inst_id = str(content['instrumentID'])
+        if 'instrument_id' in content:
+            inst_id = str(content['instrument_id'])
         else:
-            raise ValueError("Input for instrumentID not present")
+            raise ValueError("Input for instrument_id not present")
 
         if 'instrumentResourceID' in content:
             inst_resource_id = str(content['instrumentResourceID'])
@@ -412,6 +547,7 @@ class InstrumentIntegrationService(ServiceProcess):
         #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/presentation/web_viz_consumer.py
         #https://github.com/ooici/ioncore-python/blob/r1lca/ion/services/dm/distribution/consumers/timeseries_consumer.py
 
+        """
         log.info("IIService op_start_instrument_agent spawn listerner")
         subproc = Process()
         yield subproc.spawn()
@@ -421,8 +557,10 @@ class InstrumentIntegrationService(ServiceProcess):
         yield dataEventSubscrbr.initialize()
         yield dataEventSubscrbr.activate()
         log.info('IIService op_start_instrument_agent DataEvent activation complete')
+        """
 
-        res_value = {'instrument_agent_id':inst_agnt_id }
+
+        res_value = {'instrument_agent_resource_id':inst_agnt_id, 'instrument_agent_process_id':str(self.svc_id)}
         yield self.reply_ok(msg, res_value)
 
     @defer.inlineCallbacks
@@ -449,7 +587,7 @@ class InstrumentIntegrationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def getAgentDescForInstrument(self, instrument_id):
-        log.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
+        log.info("get_agent_desc_for_instrument() instrument_id="+str(instrument_id))
         """
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
@@ -473,30 +611,21 @@ class InstrumentIntegrationService(ServiceProcess):
 
         except AssociationClientError:
             log.error('AssociationError')
+            log.info('IIService getAgentForInstrument error retrieving association')
             defer.returnValue(result)
 
+        if len(results)  != 1 :
+            log.error('IIService  Instrument Agent association not found')
+            defer.returnValue()
+
         for association in results:
-            log.info('Associated Source for Instrument: ' + \
+            log.info('IIService Associated Source for Instrument: ' + \
                       association.ObjectReference.key + \
                       ' is: ' + association.SubjectReference.key)
 
-        instrument_agent_resource = yield self.rc.get_instance(association.ObjectReference.key)
+        defer.returnValue(association.ObjectReference.key)
 
 
-        """
-        log.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
-        int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
-        agent_query = InstrumentAgentResourceInstance()
-        agent_query.instrument_ref = int_ref
-        # @todo Need to list the LC state here. WHY???
-        agent_query.lifecycle = LCStates.developed
-        agents = yield self.arc.find_registered_agent_instance_from_description(agent_query, regex=False)
-        log.info("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
-        agent_res = None
-        if len(agents) > 0:
-            agent_res = agents[0]
-        defer.returnValue(agent_res)
-        """
 
     @defer.inlineCallbacks
     def getAgentPidForInstrument(self, instrument_id):
@@ -528,9 +657,9 @@ class InstrumentIntegrationClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-    def startInstrumentAgent(self, instrumentID, instrumentResourceID, model):
+    def startInstrumentAgent(self, instrument_id, instrumentResourceID, model):
         reqcont = {}
-        reqcont['instrumentID'] = instrumentID
+        reqcont['instrument_id'] = instrument_id
         reqcont['instrumentResourceID'] = instrumentResourceID
         reqcont['model'] = model
         #result = yield self._base_command('start_instrument_agent', reqcont)
@@ -538,62 +667,50 @@ class InstrumentIntegrationClient(ServiceClient):
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def stopInstrumentAgent(self, instrumentID):
+    def stopInstrumentAgent(self, instrument_id):
         reqcont = {}
-        reqcont['instrumentID'] = instrumentID
+        reqcont['instrument_id'] = instrument_id
         result = yield self._base_command('stopInstrumentAgent', reqcont)
         defer.returnValue(result)
 
 
     @defer.inlineCallbacks
-    def getInstrumentState(self, instrumentID):
+    def getInstrumentState(self, instrument_id):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        reqcont['commandInput'] = commandInput
-
-        result = yield self._base_command('getInstrumentState', reqcont)
-        defer.returnValue(result)
+        reqcont['instrument_id'] = instrument_id
+        (cont, hdrs, msg)  = yield self.rpc_send('getInstrumentState', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def setInstrumentState(self, instrumentID):
+    def setInstrumentState(self, instrument_id, parameters):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        reqcont['commandInput'] = commandInput
+        reqcont['instrument_id'] = instrument_id
+        reqcont['parameters'] = parameters
 
         result = yield self._base_command('setInstrumentState', reqcont)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def getInstrumentList(self, instrumentID):
+    def getInstrumentList(self):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        reqcont['commandInput'] = commandInput
-
-        result = yield self._base_command('getInstrumentState', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('getInstrumentList', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def startAutoSampling(self, instrumentID, command, arglist):
+    def startAutoSampling(self, instrument_id):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        commandInput['command'] = command
+        reqcont['instrument_id'] = instrument_id
 
-        result = yield self._base_command('startAutoSampling', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('startAutoSampling', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def stopAutoSampling(self, instrumentID, command, arglist):
+    def stopAutoSampling(self, instrument_id):
         reqcont = {}
-        commandInput = {}
-        commandInput['instrumentID'] = instrumentID
-        commandInput['command'] = command
+        reqcont['instrument_id'] = instrument_id
 
-        result = yield self._base_command('startAutoSampling', reqcont)
-        defer.returnValue(result)
+        (cont, hdrs, msg)  = yield self.rpc_send('stopAutoSampling', reqcont)
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def _base_command(self, op, content):
