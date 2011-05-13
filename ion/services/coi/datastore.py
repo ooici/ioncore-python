@@ -967,7 +967,7 @@ class DataStoreWorkbench(WorkBench):
             log.debug("striding requested %s" % strides)
 
             # create ranges with strides
-            strideranges = [(0, x.size - x.origin, x.stride) for x in request.request_bounds]
+            strideranges = [(0, x.size, x.stride or 1) for x in request.request_bounds]
 
             # dimensions of new, strided array
             reduceddims = [int(math.ceil(float(x[1]) / x[2])) for x in strideranges]
