@@ -18,11 +18,11 @@ from ion.core.object import object_utils
 
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 
-
 class AssociaitonManagerError(ApplicationError):
     """
     Error class for the association manager
     """
+
 
 class AssociationManager(object):
     """
@@ -32,22 +32,22 @@ class AssociationManager(object):
     """
 
     def __init__(self, predicate_map=None):
-
-        self.predicate_sorted_associations={}
+        self.predicate_sorted_associations = {}
 
         if predicate_map is None:
             predicate_map = {}
 
-        if not isinstance(predicate_map,dict):
-            raise AssociaitonManagerError('Invalid argument to create association manger class: predicate_map must be a dictionary')
+        if not isinstance(predicate_map, dict):
+            raise AssociaitonManagerError(
+                'Invalid argument to create association manger class: predicate_map must be a dictionary')
 
         self.predicate_map = predicate_map
 
 
     def update_predicate_map(self, predicate_map):
-
         if not isinstance(predicate_map, dict):
-            raise AssociaitonManagerError('Invalid argument to update association manger predicate_map: predicate_map must be a dictionary')
+            raise AssociaitonManagerError(
+                'Invalid argument to update association manger predicate_map: predicate_map must be a dictionary')
 
         self.predicate_map.update(predicate_map)
 
@@ -68,23 +68,20 @@ class AssociationManager(object):
         return ret
 
     def update(self, other):
-
         if not isinstance(other, AssociationManager):
             raise AssociaitonManagerError('Invalid argument to update in association manager: %s' % str(other))
 
-        for k,v in other.iteritems():
-
+        for k, v in other.iteritems():
             associations = self.predicate_sorted_associations.get(k, None)
             if associations is None:
                 associations = set()
-                self.predicate_sorted_associations[k]=associations
+                self.predicate_sorted_associations[k] = associations
 
             associations.update(v)
 
         self.predicate_map.update(other.predicate_map)
 
     def add(self, association):
-
         if not isinstance(association, AssociationInstance):
             raise AssociaitonManagerError('Invalid argument to add in association manager: %s' % str(association))
 
@@ -97,18 +94,16 @@ class AssociationManager(object):
             value = predicate_repo.root_object.word
             self.predicate_map[predicate_repo.repository_key] = value
 
-
         associations = self.predicate_sorted_associations.get(predicate, None)
 
         if associations is None:
             associations = set()
-            self.predicate_sorted_associations[predicate]=associations
+            self.predicate_sorted_associations[predicate] = associations
 
         associations.add(association)
 
 
     def remove(self, association):
-
         if not isinstance(association, AssociationInstance):
             raise AssociaitonManagerError('Invalid argument to remove in association manager: %s' % str(association))
 
@@ -126,21 +121,20 @@ class AssociationManager(object):
             raise AssociaitonManagerError('Association not found in association manager. Can not remove it!')
 
 
-
     def get_associations_by_predicate(self, predicate):
         """
         Return the set of associations for a particular predicate
         @param predicate is the ID of the predicate in question
         """
 
-        return self.predicate_sorted_associations.get(predicate,set())
+        return self.predicate_sorted_associations.get(predicate, set())
 
     def get_associations(self):
         """
         Return the set of associations for a particular predicate
         """
         result = set()
-        for k,v in self.predicate_sorted_associations.iteritems():
+        for k, v in self.predicate_sorted_associations.iteritems():
             result.update(v)
 
         return result
@@ -160,6 +154,7 @@ class AssociationInstanceError(ApplicationError):
     """
     Exception class for Resource Instance Object
     """
+
 
 class AssociationInstance(object):
     """
@@ -182,11 +177,12 @@ class AssociationInstance(object):
         self._repository = association_repository.Repository
 
         if self.Repository.status == self.Repository.NOTINITIALIZED:
-            raise AssociationInstanceError('The association_repository is in an invalid state - the association must be checked out after a pull.')
-
+            raise AssociationInstanceError(
+                'The association_repository is in an invalid state - the association must be checked out after a pull.')
 
         if self._repository._workspace_root.ObjectType != ASSOCIATION_TYPE:
-            raise AssociationInstanceError('Can not create an association instance with an object that is not an association.')
+            raise AssociationInstanceError(
+                'Can not create an association instance with an object that is not an association.')
 
         # Hold onto a workbench here to get the latest state of any associated objects
         self._workbench = workbench
@@ -197,11 +193,24 @@ class AssociationInstance(object):
 
     def __str__(self):
         output = '============== Association ==============\n'
-        output += str(self.AssociationIdentity) + '\n'
+        output += 'Association Repository State:\n'
+        output += str(self.Repository) + '\n'
         output += '========================================\n'
-        output += 'Subject: ' + str(self.SubjectReference) + '\n'
-        output += 'Predicate: ' + str(self.PredicateReference) + '\n'
-        output += 'Object: ' + str(self.ObjectReference) + '\n'
+        try:
+            output += 'Subject: ' + str(self.SubjectReference) + '\n'
+        except AttributeError, ae:
+            output += 'Subject: Association object in an invalid state \n'
+
+        try:
+            output += 'Predicate: ' + str(self.PredicateReference) + '\n'
+        except AttributeError, ae:
+            output += 'Predicate: Association object in an invalid state \n'
+
+        try:
+            output += 'Object: ' + str(self.ObjectReference) + '\n'
+        except AttributeError, ae:
+            output += 'Object: Association object in an invalid state \n'
+
         output += '============ End Association ===========\n'
         return output
 
@@ -216,7 +225,6 @@ class AssociationInstance(object):
 
         if previous_object_repository is not None:
             previous_object_repository.associations_as_object.add(self)
-
 
         previous_subject = self._repository._workspace_root.subject
         previous_subject_repository = self._workbench.get_repository(previous_subject.key)
@@ -290,19 +298,19 @@ class AssociationInstance(object):
         """
 
         if not hasattr(new_object, 'Repository'):
-            raise AssociationInstanceError('Invalid argument to SetObjectReference. The new object must have or be a repository! (ResourceInstance, AssociationInstance or Repository)')
-
+            raise AssociationInstanceError(
+                'Invalid argument to SetObjectReference. The new object must have or be a repository! (ResourceInstance, AssociationInstance or Repository)')
 
         new_repo = new_object.Repository
 
         if new_repo.status == new_repo.NOTINITIALIZED:
-            raise AssociationInstanceError('Can not associate to an object repository which is not in a finite state - must checkout a commit first!')
+            raise AssociationInstanceError(
+                'Can not associate to an object repository which is not in a finite state - must checkout a commit first!')
 
         elif new_repo.status == new_repo.MODIFIED:
             # For now - do a commit automagically!
 
             new_repo.repo.commit('Automagical commit made during association instance method SetObjectReference')
-
 
         previous_object = self._repository._workspace_root.object
 
@@ -312,7 +320,6 @@ class AssociationInstance(object):
         new_repo.set_repository_reference(previous_object, current_state=True)
 
         self.Repository.commit('Updated association instance with new object reference')
-
 
         new_repo.associations_as_object.add(self)
 
@@ -337,78 +344,71 @@ class AssociationInstance(object):
         previous_predicate = self._repository._workspace_root.predicate
         previous_predicate_repository = self._workbench.get_repository(previous_predicate.key)
 
-        
         if previous_object_repository is not None:
             if previous_object_repository.status == previous_object_repository.NOTINITIALIZED:
-                raise AssociationInstanceError('Error in set_null: associated object repository is present but not in a finite state - must checkout a commit first!')
+                raise AssociationInstanceError(
+                    'Error in set_null: associated object repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_object_repository.status == previous_object_repository.MODIFIED:
                 # For now - do a commit automagically!
-                previous_object_repository.repo.commit('Automagical commit made during association instance method SetObjectReference')
-        
-                
+                previous_object_repository.repo.commit(
+                    'Automagical commit made during association instance method SetObjectReference')
+
             previous_object_repository.set_repository_reference(previous_object, current_state=True)
 
             try:
                 previous_object_repository.associations_as_object.remove(self)
             except AssociaitonManagerError, ame:
                 log.debug('Association not found in previous objects association manager')
-                
-                
+
         if previous_predicate_repository is not None:
             if previous_predicate_repository.status == previous_predicate_repository.NOTINITIALIZED:
-                raise AssociationInstanceError('Error in set_null: associated predicate repository is present but not in a finite state - must checkout a commit first!')
+                raise AssociationInstanceError(
+                    'Error in set_null: associated predicate repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_predicate_repository.status == previous_predicate_repository.MODIFIED:
                 # For now - do a commit automagically!
-                previous_predicate_repository.repo.commit('Automagical commit made during association instance method SetpredicateReference')
-        
-                
+                previous_predicate_repository.repo.commit(
+                    'Automagical commit made during association instance method SetpredicateReference')
+
             previous_predicate_repository.set_repository_reference(previous_predicate, current_state=True)
 
             try:
                 previous_predicate_repository.associations_as_predicate.remove(self)
             except AssociaitonManagerError, ame:
                 log.debug('Association not found in previous predicates association manager')
-            
-                
+
         if previous_subject_repository is not None:
             if previous_subject_repository.status == previous_subject_repository.NOTINITIALIZED:
-                raise AssociationInstanceError('Error in set_null: associated subject repository is present but not in a finite state - must checkout a commit first!')
+                raise AssociationInstanceError(
+                    'Error in set_null: associated subject repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_subject_repository.status == previous_subject_repository.MODIFIED:
                 # For now - do a commit automagically!
-                previous_subject_repository.repo.commit('Automagical commit made during association instance method SetsubjectReference')
-        
-                
+                previous_subject_repository.repo.commit(
+                    'Automagical commit made during association instance method SetsubjectReference')
+
             previous_subject_repository.set_repository_reference(previous_subject, current_state=True)
 
             try:
                 previous_subject_repository.associations_as_subject.remove(self)
             except AssociaitonManagerError, ame:
                 log.debug('Association not found in previous subjects association manager')
-                
+
         if self.Repository.status == self.Repository.MODIFIED:
             self.Repository.commit('Updated association instance with new object reference before setting null')
-        
-        
-        
+
         previous_object.key = self.NULL
         previous_object.branch = self.NULL
         previous_object.commit = self.NULL
-        
+
         previous_subject.key = self.NULL
         previous_subject.branch = self.NULL
         previous_subject.commit = self.NULL
-        
+
         previous_predicate.key = self.NULL
         previous_predicate.branch = self.NULL
         previous_predicate.commit = self.NULL
-
-
-        for item in self.Repository._workspace.values():
-            print "Is in repo:", item.Repository is self.Repository
-            print item.Debug()
 
 
         self.Repository.commit('Association set to null!')

@@ -294,7 +294,30 @@ class RepositoryTest(unittest.TestCase):
         person_2 = yield repo.checkout('master')
         
         self.assertEqual(object.__getattribute__(person,'Invalid'), True)
-        
+
+    def test_str(self):
+        '''
+        should raise no exceptions!
+        '''
+        repo = self.wb.create_repository(PERSON_TYPE)
+
+        s = str(repo)
+        #print s
+
+        repo.purge_workspace()
+        s = str(repo)
+        #print s
+
+        repo.purge_associations()
+        s = str(repo)
+        #print s
+
+        repo.clear()
+        s = str(repo)
+        #print s
+
+
+
     def test_wrapper_properties(self):
         """
         Test the basic state of a new wrapper object when it is created

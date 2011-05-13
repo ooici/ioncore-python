@@ -5,6 +5,8 @@
 @file ion/core/object/test/test_workbench
 @author David Stuebe
 @test The object management WorkBench test class
+
+@TODO Add better testing for excluded types and fetch_blobs/fetch_links
 """
 
 import ion.util.ionlog

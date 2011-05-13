@@ -413,9 +413,10 @@ class EventSubscriber(Subscriber):
 
         Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, *args, **kwargs)
 
+    @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         log.debug("Listening to events on %s" % self._binding_key)
-        Subscriber.on_activate(self, *args, **kwargs)
+        yield Subscriber.on_activate(self, *args, **kwargs)
 
 class ResourceLifecycleEventSubscriber(EventSubscriber):
     """

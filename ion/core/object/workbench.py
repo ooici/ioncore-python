@@ -828,11 +828,11 @@ class WorkBench(object):
 
         blobs_msg, headers, msg = yield self._process.rpc_send(address,'fetch_blobs', blobs_request)
 
-        elements = []
+        elements = {}
         for se in blobs_msg.blob_elements:
             # Put the new objects in the repository
             element = gpb_wrapper.StructureElement(se.GPBMessage)
-            elements.append(element)
+            elements[element.key] = element
 
         defer.returnValue(elements)
 

@@ -591,7 +591,7 @@ class WrapperType(type):
             @return: The attribute being created (as a convenience)
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not isinstance(name, str):
+            if not isinstance(name, (str, unicode)):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
             if not name:
                 raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
@@ -1050,7 +1050,7 @@ class WrapperType(type):
             Specialized method for CDM variables to retrieve the number of bounded arrays used in
             defining this variables content
             """
-            return len(self.shape)
+            return len(self.content.bounded_arrays)
             
 
         #------------------------------------------------------------------------#
@@ -1868,7 +1868,11 @@ class Wrapper(object):
         else:
             msg = '\n' +self._gpbMessage.__str__()
         '''
-        msg = '\n %s \n'  % str(self._gpbMessage)
+        if self._source is self:
+            msg = '\n %s \n'  % str(self._gpbMessage)
+        else:
+            msg = '\n %s \n'  % str(self._source._gpbMessage)
+
         return msg
 
     def Debug(self):
@@ -2075,14 +2079,17 @@ class Wrapper(object):
 
         for name, field in self._Properties.iteritems():
 
-            field_val = field.__get__(self)
-            if field_val is None:
-                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, field_val)
+            try:
+                field_val = field.__get__(self)
+            except KeyError, ke:
+                log.debug(ke)
+
+                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, 'KeyError - object not found in local workbench')
                 continue
 
             if isinstance(field, (WrappedMessageProperty)):
                 try:
-                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  '), offset)
+                    val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  '), offset)
                 except Exception, ex:
                     log.error(ex)
                     msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
@@ -2090,14 +2097,14 @@ class Wrapper(object):
                 
             elif isinstance(field, WrappedRepeatedCompositeProperty):
                 try:
-                    val = 'Field Value - \n%s \n%s' % (field.__get__(self).PPrint(offset=offset+'  ',name=name), offset)
+                    val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  ',name=name), offset)
                 except Exception, ex:
                     log.error(ex)
                     msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
                     continue
 
             elif isinstance(field, WrappedRepeatedScalarProperty):
-                scalars = field.__get__(self)
+                scalars = field_val
                 if len(scalars) > 20:
                     val = '# of Values - %i: Field Values - "%s"... truncated at 20 values!' % (len(scalars), str(scalars[:20]))
                 else:
@@ -2105,7 +2112,7 @@ class Wrapper(object):
 
             else:
 
-                item = field.__get__(self)
+                item = field_val
                 if field.field_type == 'TYPE_ENUM':
                     item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
 

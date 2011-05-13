@@ -726,7 +726,7 @@ class InstrumentAgent(Process):
         assert(isinstance(content,dict)), 'Expected a dict content.'
         acq_timeout = content.get('acq_timeout',None)
         exp_timeout = content.get('exp_timeout',None)
-        assert(acq_timeout==None or
+        assert(acq_timeout==None or 
                (isinstance(acq_timeout,int) and acq_timeout>=0)), \
             'Expected None or nonnegative int acquisition timeout'
         assert(exp_timeout==None or

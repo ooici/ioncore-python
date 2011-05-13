@@ -12,49 +12,62 @@ To test this with the Java CC!
 > scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
-import time
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher
+import time, calendar
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
 import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.python import reflect
 
-from ion.services.coi import datastore
-
-from ion.core.object import gpb_wrapper
-
-from net.ooici.services.coi import resource_framework_pb2
-from net.ooici.core.type import type_pb2
-
-from ion.core.process.process import ProcessFactory, Process
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry.resource_client import \
-    ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
+
+from ion.services.dm.ingestion import cdm_attribute_methods
 
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
-from net.ooici.play import addressbook_pb2
-from ion.services.dm.distribution.publisher_subscriber import Publisher
 from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
+from ion.services.coi import datastore
 
+from ion.core.exception import ReceivedApplicationError, ReceivedError, ReceivedContainerError
+
+from ion.core.object.gpb_wrapper import OOIObjectError
 
 from ion.core import ioninit
-CONF = ioninit.config(__name__)
-
 from ion.core.object import object_utils
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+CONF = ioninit.config(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
-PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
-CREATE_DATASET_TOPICS_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
-INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
+
+CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
+
+CDM_SINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10009, version=1)
+CDM_UINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10010, version=1)
+CDM_LSINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10011, version=1)
+CDM_LUINT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10012, version=1)
+
+CDM_FLOAT_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10013, version=1)
+CDM_DOUBLE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10014, version=1)
+
+CDM_STRING_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, version=1)
+CDM_OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
+
+CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+
+SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
+PERFORM_INGEST_MSG_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
+CREATE_DATASET_TOPICS_MSG_TYPE = object_utils.create_type_identifier(object_id=2003, version=1)
+INGESTION_READY_TYPE = object_utils.create_type_identifier(object_id=2004, version=1)
+DAQ_COMPLETE_MSG_TYPE = object_utils.create_type_identifier(object_id=2005, version=1)
+
+BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
+
 
 class IngestionError(ApplicationError):
     """
@@ -62,72 +75,78 @@ class IngestionError(ApplicationError):
     """
     pass
 
+
+# Declare a few strings:
+OK              = 'OK'
+UNAVAILABLE     = 'EXTERNAL_SERVER_UNAVAILABLE'
+SERVER_ERROR    = 'EXTERNAL_SERVER_ERROR'
+NO_NEW_DATA     = 'NO_NEW_DATA'
+AGENT_ERROR     = 'AGENT_ERROR'
+
+
+# Supplememt added event message dict:
+
+EM_DATA_SOURCE  = 'datasource_id'
+EM_DATASET      = 'dataset_id'
+EM_TITLE        = 'title'
+EM_URL          = 'url'
+EM_START_DATE   = 'start_datetime_millis'
+EM_END_DATE     = 'end_datetime_millis'
+EM_TIMESTEPS    = 'number_of_timesteps'
+
+EM_ERROR        = 'error_explanation'
+
+
+
+
 class IngestionService(ServiceProcess):
     """
-    Place holder to move data between EOI and the datastore
+    DM R1 Ingestion service.
     """
 
     # Declaration of service
     declare = ServiceProcess.service_declare(name='ingestion', version='0.1.0', dependencies=[])
 
-    #TypeClassType = gpb_wrapper.get_type_from_obj(type_pb2.ObjectType())
+    # Declare the excluded types for repository operations
+    excluded_data_array_types = (CDM_SINT_ARRAY_TYPE, CDM_UINT_ARRAY_TYPE, CDM_LSINT_ARRAY_TYPE, CDM_LUINT_ARRAY_TYPE,
+                                 CDM_DOUBLE_ARRAY_TYPE, CDM_FLOAT_ARRAY_TYPE, CDM_STRING_ARRAY_TYPE,
+                                 CDM_OPAQUE_ARRAY_TYPE)
+
+
+
+
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        
-        #assert isinstance(backend, store.IStore)
-        #self.backend = backend
+
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.push = self.workbench.push
-        self.pull = self.workbench.pull
-        self.fetch_blobs = self.workbench.fetch_blobs
+
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
 
+        self.rc = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
 
         self._pscclient = PubSubClient(proc=self)
-        self._notify_ingest_factory = PublisherFactory(publisher_type=DatasetSupplementAddedEventPublisher, process=self)
+
+        self.dsc = datastore.DataStoreClient(proc=self)
+
+        self.dataset = None
 
         log.info('IngestionService.__init__()')
 
     @defer.inlineCallbacks
-    def op_ingest(self, content, headers, msg):
-        """
-        Push this dataset to the datastore
-        """
-        log.debug('op_ingest recieved content:'+ str(content))
+    def slc_activate(self):
 
-       
-        msg_repo = content.Repository
-        
-        result = yield self.push('datastore', msg_repo)
-        
-        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
-        
-        yield self.reply(msg, content=msg_repo.repository_key)
-        
+        pub_factory = PublisherFactory(process=self)
+
+        self._notify_ingest_publisher = yield pub_factory.build(publisher_type=DatasetSupplementAddedEventPublisher)
+
+        self._notify_unavailable_publisher = yield pub_factory.build(publisher_type=DatasourceUnavailableEventPublisher)
 
 
-    @defer.inlineCallbacks
-    def op_retrieve(self, content, headers, msg):
-        """
-        Return the root group of the dataset
-        Content is the unique ID for a particular dataset
-        """
-        log.debug('op_retrieve: recieved content:'+ str(content))
-        result = yield self.pull('datastore', str(content))
-        
-        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
-        
-        repo = self.workbench.get_repository(content)
-        
-        head = yield repo.checkout('master')
-        
-        yield self.reply(msg, content=head)
-        
 
     @defer.inlineCallbacks
     def op_create_dataset_topics(self, content, headers, msg):
@@ -165,6 +184,7 @@ class IngestionService(ServiceProcess):
         Specially derived Subscriber that routes received messages into the ingest service's
         standard receive method, as if it is one of the process receivers.
         """
+
         @defer.inlineCallbacks
         def _receive_handler(self, content, msg):
             yield self._process.receive(content, msg)
@@ -180,13 +200,45 @@ class IngestionService(ServiceProcess):
         return True
 
     @defer.inlineCallbacks
-    def op_perform_ingest(self, content, headers, msg):
+    def _prepare_ingest(self, content):
         """
-        Start the ingestion process by setting up neccessary
-        @TODO NO MORE MAGNET.TOPIC
+        Factor out the preparation for ingestion so that we can unit test functionality
         """
-        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
-        log.debug("...Content:\t" + str(content))
+
+        # Get the current state of the dataset:
+        self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+
+        # Get the bounded arrays but not the ndarrays
+        ba_links = []
+        for var in self.dataset.root_group.variables:
+            var_links = var.content.bounded_arrays.GetLinks()
+            ba_links.extend(var_links)
+
+        self.dataset.Repository.fetch_links(ba_links)
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('title')
+            title = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            title = 'None Given'
+
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('references')
+            references = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            references = 'None Given'
+
+
+
+        data_details = {EM_TITLE:title,
+                       EM_URL:references,
+                       EM_DATA_SOURCE:content.datasource_id,
+                       EM_DATASET:content.dataset_id,
+                       }
+
 
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
@@ -202,15 +254,40 @@ class IngestionService(ServiceProcess):
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
+
+
+        defer.returnValue(data_details)
+
+
+    @defer.inlineCallbacks
+    def op_ingest(self, content, headers, msg):
+        """
+        Start the ingestion process by setting up necessary
+        @TODO NO MORE MAGNET.TOPIC
+        """
+        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
+        log.debug("...Content:\t" + str(content))
+
+        if content.MessageType != PERFORM_INGEST_MSG_TYPE:
+            raise IngestionError('Expected message type PerfromIngestRequest, received %s'
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        data_details = yield self._prepare_ingest(content)
+
+
         def _timeout():
             # trigger execution to continue below with a False result
             log.info("Timed out in op_perform_ingest")
-            self._defer_ingest.callback(False)
+
+            result = {'status'      :'Internal Timeout',
+                      'status_body' :'Time out in communication between the JAW and the Ingestion service'}
+            self._defer_ingest.callback(result)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
-        log.info('Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
+        log.info(
+            'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
         irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
         irmsg.xp_name = "magnet.topic"
         irmsg.publish_topic = ingest_data_topic
@@ -221,6 +298,9 @@ class IngestionService(ServiceProcess):
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
         # common cleanup
+
+        # we succeeded, cancel the timeout
+        timeoutcb.cancel()
 
         # reset ingestion deferred so we can use it again
         self._defer_ingest = defer.Deferred()
@@ -233,135 +313,500 @@ class IngestionService(ServiceProcess):
         if ingest_res:
             log.debug("Ingest succeeded, respond to original request")
 
-            # we succeeded, cancel the timeout
-            timeoutcb.cancel()
+            ingest_res.update(data_details)
+
+            self.rc.put_instance(self.dataset)
 
             # send notification we performed an ingest
-            yield self._notify_ingest(content)
+            yield self._notify_ingest(ingest_res)
+
 
             # now reply ok to the original message
-            yield self.reply_ok(msg, content={})
+            yield self.reply_ok(msg)
         else:
             log.debug("Ingest failed, error back to original request")
             raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
 
     @defer.inlineCallbacks
-    def _notify_ingest(self, content):
+    def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
         """
-        pub = yield self._notify_ingest_factory.build()
 
-        # creates the event notification for us and sends it
-        # @TODO: fields below
-        yield pub.create_and_publish_event(origin=content.dataset_id,
-                                           dataset_id=content.dataset_id,
-                                           datasource_id="TODO",
-                                           title="TODO",
-                                           url="TODO")
+        if ingest_res.has_key(EM_ERROR):
+            # Report an error with the data source
+            datasource_id = ingest_res[EM_DATA_SOURCE]
+            yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
+        else:
+            # Report a successful update to the dataset
+            dataset_id = ingest_res[EM_DATASET]
+            yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):
         log.info("op_recv_dataset(%s)" % type(content))
         # this is NOT rpc
+
+        if content.MessageType != CDM_DATASET_TYPE:
+            raise IngestionError('Expected message type CDM Dataset Type, received %s'
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        if self.dataset is None:
+            raise IngestionError('Calling recv_dataset in an invalid state. No Dataset checked out to ingest.')
+
+        if self.dataset.Repository.status is not self.dataset.Repository.UPTODATE:
+            raise IngestionError('Calling recv_dataset in an invalid state. Dataset is already modified.')
+
+        self.dataset.CreateUpdateBranch(content.MessageObject)
+
+        group = self.dataset.root_group
+
+        # Clear any bounded arrays which are empty. Create content field if it is not present
+        for var in group.variables:
+            if var.IsFieldSet('content'):
+                content = var.content
+
+                if len(content.bounded_arrays) > 0:
+                    i = 0
+                    while i < len(content.bounded_arrays):
+                        ba = content.bounded_arrays[i]
+
+                        if not ba.IsFieldSet('ndarray'):
+                            del content.bounded_arrays[i]
+
+                            continue
+                        else:
+                            i += 1
+            else:
+                var.content = resource_instance.CreateObject(array_structure_type)
+
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_chunk(self, content, headers, msg):
         log.info("op_recv_chunk(%s)" % type(content))
         # this is NOT rpc
+        if content.MessageType != SUPPLEMENT_MSG_TYPE:
+            raise IngestionError('Expected message type SupplementMessageType, received %s'
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+            
+        if self.dataset is None:
+            raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
+
+        if self.dataset.ResourceLifeCycleState is not self.dataset.UPDATE:
+            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch!')
+
+        if content.dataset_id != self.dataset.ResourceIdentity:
+            raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
+
+
+        # Get the group out of the datset
+        group = self.dataset.root_group
+
+        # get the bounded array out of the message
+        ba = content.bounded_array
+
+
+        # Create a blobs message to send to the datastore with the ndarray
+        blobs_msg = yield self.mc.create_instance(BLOBS_MESSAGE_TYPE)
+        ndarray_element = content.Repository.index_hash.get(ba.ndarray.MyId)
+        obj = content.Repository._wrap_message_object(ndarray_element._element)
+
+        link = blobs_msg.blob_elements.add()
+        link.SetLink(obj)
+
+        # Put it to the datastore
+        try:
+            yield self.dsc.put_blobs(blobs_msg)
+        except ReceivedError, re:
+            log.error(re)
+            raise IngestionError('Could not put blob in received chunk to the datastore.')
+
+        # Now add the bounded array, but not the ndarray to the dataset in the ingestion service
+        log.debug('Adding content to variable name: %s' % content.variable_name)
+        try:
+            var = group.FindVariableByName(content.variable_name)
+        except gpb_wrapper.OOIObjectError, oe:
+            log.error(str(oe))
+            raise IngestionError('Expected variable name %s not found in the dataset' % (content.variable_name))
+
+        ba_link = var.content.bounded_arrays.add()
+        my_ba = ba_link.Repository.copy_object(ba, deep_copy=False)
+        ba_link.SetLink(my_ba)
+
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
+        """
+        @TODO deal with FMRC datasets and supplements
+        """
         log.info("op_recv_done(%s)" % type(content))
+        if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
+            raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
+                                 % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        if content.status != content.StatusCode.OK:
+            result = {}
+
+            st = content.status
+            if st == 1:
+                status = UNAVAILABLE
+            elif st == 2:
+                status = SERVER_ERROR
+            elif st == 3:
+                status = NO_NEW_DATA
+            elif st == 4:
+                status = AGENT_ERROR
+            else:
+                raise IngestionError('Unexpected StatusCode Enum value in Data Acquisition Complete Message')
+
+            result[EM_ERROR] = '%s: %s' % (status, content.status_body)
+
+            self._defer_ingest.callback(result)
+
+        else:
+
+            #@TODO ask dave for help here - how can I chain these callbacks?
+            yield self._merge_supplement()
+
+
         # this is NOT rpc
         yield msg.ack()
 
+        defer.returnValue(None)
+        
+
+    @defer.inlineCallbacks
+    def _merge_supplement(self):
+
+        # A little sanity check on entering recv_done...
+        if len(self.dataset.Repository.branches) != 2:
+            raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
+
+        # Commit the current state of the supplement - ingest of new content is complete
+        self.dataset.Repository.commit('Ingest received complete notification.')
+
+        # The current branch on entering recv done is the supplement branch
+        merge_branch = self.dataset.Repository.current_branch_key()
+        # Merge it with the current state of the dataset in the datastore
+        yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
+
+        #Remove the head for the supplement - there is only one current state once the merge is complete!
+        self.dataset.Repository.remove_branch(merge_branch)
+
+
+        # Get the root group of the current state of the dataset
+        root = self.dataset.root_group
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+
+        #print root.PPrint()
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
+
+
+        # Get the root group of the supplement we are merging
+        merge_root = self.dataset.Merge[0].root_group
+
+        # Determine the inner most dimension on which we are aggregating
+        dimension_order = []
+        for merge_var in merge_root.variables:
+
+            # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
+            for merge_dim in reversed(merge_var.shape):
+
+                if merge_dim not in dimension_order:
+                    dimension_order.insert(0, merge_dim)
+
+        #print 'FINAL DIMENSION ORDER:'
+        #print [ dim.name for dim in dimension_order]
+
+        # This is the inner most!
+        merge_agg_dim = dimension_order[0]
+
+        supplement_length = merge_agg_dim.length
+
+        agg_offset = 0
+        try:
+            agg_dim = root.FindDimensionByName(merge_agg_dim.name)
+            agg_offset = agg_dim.length
+            log.info('Aggregation offset from current dataset: %d' % agg_offset)
+
+        except OOIObjectError, oe:
+            log.debug('No Dimension found in current dataset:' + str(oe))
+
+        # Get the start time of the supplement
+        try:
+            string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
+            supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+            string_time = merge_root.FindAttributeByName('ion_time_coverage_end')
+            supplement_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+        except OOIObjectError, oe:
+            log.debug('No start time attribute found in dataset supplement!' + str(oe))
+            raise IngestionError('No start time attribute found in dataset supplement!')
+
+
+        # Get the end time of the current dataset
+        try:
+            string_time = root.FindAttributeByName('ion_time_coverage_end')
+            current_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+            if current_etime == supplement_stime:
+                agg_offset -= 1
+                log.info('Aggregation offset decremented by one - supplement overlaps: %d' % agg_offset)
+
+            elif current_etime > supplement_stime:
+
+                raise IngestionError('Can not aggregate dataset supplements which overlap by more than one timestep.')
+
+            else:
+                log.info('Aggregation offset unchanged - supplement does not overlap.')
+
+        except OOIObjectError, oe:
+            log.debug(oe)
+            log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
+
+
+
+        ###
+        ### Add the dimensions from the supplement to the current state if they are not already there
+        ###
+        merge_dims = {}
+        for merge_dim in merge_root.dimensions:
+            merge_dims[merge_dim.name] = merge_dim
+
+        dims = {}
+        for dim in root.dimensions:
+            dims[dim.name] = dim
+
+        if merge_dims.keys() != dims.keys():
+            if len(dims) != 0:
+                raise IngestionError('Can not ingest supplement with different dimensions than the dataset')
+            else:
+                for merge_dim in merge_root.dimensions:
+                    dim_link = root.dimensions.add()
+                    dim_link.SetLink(merge_dim)
+
+        else:
+            # We are appending an existing dataset - adjust the length of the aggregation dimension
+            agg_dim = dims[merge_agg_dim.name]
+            agg_dim.length += agg_offset
+
+
+
+
+        for merge_var in merge_root.variables:
+            var_name = merge_var.name
+
+            try:
+                var = root.FindVariableByName(var_name)
+            except OOIObjectError, oe:
+                log.debug(oe)
+                log.info('Variable %s does not yet exist in the dataset!' % var_name)
+
+                v_link = root.variables.add()
+                v_link.SetLink(merge_var)
+
+                log.info('Copied Variable %s into the dataset!' % var_name)
+                continue # Go to next variable...
+
+
+            if merge_agg_dim not in merge_var.shape:
+                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
+                continue # Ignore this variable...
+
+
+            # @TODO check attributes for variables which are not aggregated....
+
+
+
+            #print 'MERGEING VAR %s' % var_name
+            #print var.content.PPrint()
+
+            for merge_ba in merge_var.content.bounded_arrays:
+                ba = var.Repository.copy_object(merge_ba, deep_copy=False)
+
+                ba.bounds[0].origin += agg_offset
+
+                ba_link = var.content.bounded_arrays.add()
+                ba_link.SetLink(ba)
+
+            log.info('Merged Variable %s into the dataset!' % var_name)
+
+            #print 'MERGED VAR....'
+            #print var.content.PPrint()
+            #print 'MERGEING Complete %s' % var_name
+
+            merge_att_ids = set()
+            for merge_att in merge_var.attributes:
+                merge_att_ids.add(merge_att.MyId)
+
+            att_ids = set()
+            for att in var.attributes:
+                att_ids.add(att.MyId)
+
+            if att_ids != merge_att_ids:
+                raise ImportError('Variable %s attributes are not the same in the supplement!' % var_name)
+
+
+        # @TODO Get the vertical positive 'direction!' Deal with attributes accordingly.
+
+
+
+        try:
+            merge_att = merge_root.FindAttributeByName('ion_geospatial_vertical_positive')
+            merge_vertical_positive = merge_att.GetValue()
+        except OOIObjectError, oe:
+            log.debug(oe)
+            merge_vertical_positive = None
+
+        try:
+            att = root.FindAttributeByName('ion_geospatial_vertical_positive')
+            vertical_positive = att.GetValue()
+        except OOIObjectError, oe:
+            log.debug(oe)
+            vertical_positive = None
+
+        if merge_vertical_positive is not None and vertical_positive is not None:
+            if merge_vertical_positive != vertical_positive:
+                raise IngestionError('Can not merge a data supplement that switches vertical positive!')
+
+        else:
+            # Take which ever one is not None
+            vertical_positive = vertical_positive or merge_vertical_positive
+
+
+        for merge_att in merge_root.attributes:
+
+            att_name = merge_att.name
+
+            if att_name == 'ion_time_coverage_start':
+                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+            elif att_name == 'ion_time_coverage_end':
+                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lat_min':
+                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lat_max':
+                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lon_min':
+                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+            elif att_name == 'ion_geospatial_lon_max':
+                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+
+            elif att_name == 'ion_geospatial_vertical_min':
+
+                if vertical_positive == 'down':
+                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+                elif vertical_positive == 'up':
+                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+                else:
+                    raise OOIObjectError('Invalid value for Vertical Positive')
+
+
+            elif att_name == 'ion_geospatial_vertical_max':
+
+                if vertical_positive == 'down':
+                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+
+                elif vertical_positive == 'up':
+                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+
+                else:
+                    raise OOIObjectError('Invalid value for Vertical Positive')
+
+
+            elif att_name == 'history':
+                # @TODO is this the correct treatment for history?
+                cdm_attribute_methods.MergeAttDstOver(root, att_name, merge_root)
+
+            else:
+                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+
+
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+
+        #print root.PPrint()
+
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
+
+
+        result = {EM_START_DATE:supplement_stime*1000,
+                  EM_END_DATE:supplement_etime*1000,
+                  EM_TIMESTEPS:supplement_length}
+
+
         # trigger the op_perform_ingest to complete!
-        self._defer_ingest.callback(True)
+        self._defer_ingest.callback(result)
+
 
 class IngestionClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
     """
+
     def __init__(self, proc=None, **kwargs):
         # Step 1: Delegate initialization to parent "ServiceClient"
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "ingestion"
         ServiceClient.__init__(self, proc, **kwargs)
-        
+
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self.proc)
-#        self.rc = ResourceClient(proc=self.proc)
+
+    #        self.rc = ResourceClient(proc=self.proc)
+
 
     @defer.inlineCallbacks
-    def ingest(self):
-        """
-        No argument needed - just send a simple object....
-        """
-        yield self._check_init()
-        
-        repo, ab = self.proc.workbench.init_repository(addresslink_type)
-        
-        ab.person.add()
-
-        p = repo.create_object(person_type)
-        p.name = 'david'
-        p.id = 59
-        p.email = 'stringgggg'
-        ab.person[0] = p
-        
-        #print 'AdressBook!',ab
-        
-        (content, headers, msg) = yield self.rpc_send('ingest', ab)
-        
-        defer.returnValue(content)
-        
-        
-
-    @defer.inlineCallbacks
-    def retrieve(self,dataset_id):
-        """
-        @brief Client method to Register a Resource Instance
-        This method is used to generate a new resource instance of type
-        Resource Type
-        @param resource_type
-        """
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('retrieve', dataset_id)
-        
-        
-        log.info('EOI Ingestion Service; Retrieve replied: '+str(content))
-        # Return value should be a resource identity
-        defer.returnValue(content)
-        
-        
-        
-    @defer.inlineCallbacks
-    def perform_ingest(self, dataset_id, reply_to, ingest_service_timeout):
+    def ingest(self, msg):
         """
         Start the ingest process by passing the Service a topic to communicate on, a
         routing key for intermediate replies (signaling that the ingest is ready), and
         a custom timeout for the ingest service (since it may take much longer than the
         default timeout to complete an ingest)
+        @param msg, GPB 2002/1, a PerformIngestMessage
+        @retval Result is an empty ION Message, reply_ok
+        @GPB{Input,2002,1}
         """
         log.debug('-[]- Entered IngestionClient.perform_ingest()')
         # Ensure a Process instance exists to send messages FROM...
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
-        
-        # Create the PerformIngestMessage
-        begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
-        begin_msg.dataset_id                = dataset_id
-        begin_msg.reply_to                  = reply_to
-        begin_msg.ingest_service_timeout    = ingest_service_timeout
+
+        ingest_service_timeout = msg.ingest_service_timeout
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'perform_ingest' RPC message to ingestion service")
-        content = ""
-        (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
-        
+        (content, headers, msg) = yield self.rpc_send('ingest', msg, timeout=ingest_service_timeout + 30)
 
         defer.returnValue(content)
 
@@ -370,40 +815,25 @@ class IngestionClient(ServiceClient):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('create_dataset_topics', msg)
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
-    def demo(self, ds_ingest_topic):
-        """
-        This is a temporary method used for testing.
-        """
-        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
+    def send_dataset(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_dataset', content=msg)
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
+    @defer.inlineCallbacks
+    def send_chunk(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_chunk', content=msg)
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='demo_done')
+    @defer.inlineCallbacks
+    def send_done(self, topic, msg):
+        ''' For testing the service...'''
+        yield self._check_init()
+        yield self.proc.send(topic, operation='recv_done', content=msg)
+
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IngestionService)
-
-
-
-'''
-
-#----------------------------#
-# Application Startup
-#----------------------------#
-:: bash ::
-bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
-
-
-#----------------------------#
-# Begin_Ingest Testing
-#----------------------------#
-from ion.services.dm.ingestion.ingestion import IngestionClient
-client = IngestionClient()
-spawn('ingestion')
-
-client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
-
-'''

@@ -613,6 +613,14 @@ class Repository(ObjectContainer):
 
         output += 'Number of current workspace objects: %d \n' % len(self._workspace)
         output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Current context identifier for repository: %s \n' % self.convid_context
+
+        if self.merge is not None:
+            output += 'Repository is currently merging %d state(s)! \n' % len(self.merge)
+
+        else:
+            output += 'Not currently merging state in this repository. \n'
+
         output += 'Excluded types:\n'
         try:
             for type in self.excluded_types:
@@ -624,7 +632,17 @@ class Repository(ObjectContainer):
         output += str(self._dotgit) + '\n'
         output += '============== Root Object ==============\n'
         output += str(self._workspace_root) + '\n'
-        output += '============ End Resource ============\n'
+
+        if self.merge is not None:
+            for root in self.merge:
+
+                output += '============== Merge Root Object ==============\n'
+                output += str(root) + '\n'
+
+
+        output += '============ End Repository! ============\n'
+
+
         return output
 
     @property
@@ -1114,7 +1132,7 @@ class Repository(ObjectContainer):
         if self.status == self.MODIFIED:
 
             #@TODO consider changing this to a warning rather than an exception
-            raise RepositoryError('Can not purge repository in a modified state! Data will be lost')
+            log.warn('Called purge repository in a modified state! The current workspace is being lost!')
 
         # Do some clean up!
         for item in self._workspace.itervalues():
@@ -1366,6 +1384,31 @@ class Repository(ObjectContainer):
         self._object_counter += 1
         return str(self._object_counter)
 
+
+    @defer.inlineCallbacks
+    def fetch_links(self, links):
+
+        if hasattr(self._process, 'fetch_links'):
+            # Get the method from the process if it overrides workbench
+            fetch_links = self._process.fetch_links
+        elif hasattr(self._process, 'workbench'):
+            fetch_links = self._process.workbench.fetch_links
+
+        else:
+            raise RepositoryError('The repository object has no process to send a message with. It can not get the linked objects!')
+
+        #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
+        elements = yield fetch_links(self.upstream, links)
+
+        self.index_hash.update(elements)
+
+        # Load the content by the link!
+        for link in links:
+            self.get_linked_object(link)
+
+
+
+    '''
     @defer.inlineCallbacks
     def get_remote_linked_object(self, link):
             
@@ -1394,10 +1437,9 @@ class Repository(ObjectContainer):
             fetch_links = self._process.workbench.fetch_links
 
         #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
-        elements = yield fetch_links(self.upstream['process'], links)
+        elements = yield fetch_links(self.upstream, links)
 
-        for element in elements:
-            self.index_hash[element.key] = element
+        self.index_hash.update(elements)
 
     @defer.inlineCallbacks
     def load_remote_links(self, items):
@@ -1429,7 +1471,8 @@ class Repository(ObjectContainer):
             res = True
 
         defer.returnValue(res)
-        
+    '''
+    
     def copy_object(self, value, deep_copy=True):
         """
         Copy an object. This method will serialize the current state of the value.
