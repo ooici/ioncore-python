@@ -409,7 +409,7 @@ class SchedulerService(ServiceProcess):
 
             msg.additional_data.payload = payload
         except TypeError:
-            log.warn('No payload found')
+            log.info('No payload found')
 
         yield self.pub.publish_event(msg, origin=tdef['desired_origin'])
 

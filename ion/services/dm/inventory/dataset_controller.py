@@ -160,6 +160,10 @@ class DatasetController(ServiceProcess):
                                             CONF.getValue('task_id',
                                                           default=str(uuid.uuid4())))
 
+        self.walrus = self.spawn_args.get('do-init',
+                                            CONF.getValue('do-init',
+                                            default=False))
+
         log.debug('Update interval: %f' % self.update_interval)
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
         log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
@@ -171,14 +175,12 @@ class DatasetController(ServiceProcess):
                                 process=self)
         yield self.sesc.initialize()
         yield self.sesc.activate()
-        
-        # Check for singleton
-        if self.spawn_args.get('do-init', False):
+
+        if self.walrus:
             log.debug('I am the walrus.')
-            self.walrus = True
             yield self._create_scheduled_event()
         else:
-            self.walrus = False
+            log.debug('I am not Odobenus rosmarus')
 
         log.info('SLC_INIT Dataset Controller')
 

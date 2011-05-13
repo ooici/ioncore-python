@@ -104,9 +104,6 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
     @note Raises IOError if necessary
     """
 
-    assert private_key
-    assert public_key
-    
     ssh_dir = path.join(path.expanduser('~'), '.ssh')
     rsa_filename = path.join(ssh_dir, 'rsync_ncml.rsa')
     pubkey_filename = path.join(ssh_dir, 'rsync_ncml.pub')
