@@ -18,8 +18,9 @@ from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-from ion.services.dm.distribution.events import ScheduleEventPublisher
 
+from ion.services.dm.distribution.events import ScheduleEventPublisher
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber
 
 from ion.util.iontime import IonTime
 
@@ -65,14 +66,16 @@ class ManageDataResource(object):
 
     def __init__(self, ais):
         log.debug('ManageDataResource.__init__()')
+        self._proc = ais
         self.mc    = ais.mc
         self.rc    = ais.rc
         self.dscc  = DatasetControllerClient(proc=ais)
         self.ac    = AssociationClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
+        
+        #necessary to receive events i think
         self.pub   = ScheduleEventPublisher(process=ais)
-
 
     @defer.inlineCallbacks
     def update(self, msg_wrapped):
@@ -157,10 +160,6 @@ class ManageDataResource(object):
             if msg.IsFieldSet("max_ingest_millis"):
                 datasrc_resource.max_ingest_millis = msg.max_ingest_millis
 
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
-            dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
-
-            #FIXME: this needs to be on a delay
             if msg.IsFieldSet("is_public"):
                 if not msg.is_public:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
@@ -196,7 +195,24 @@ class ManageDataResource(object):
 
     @defer.inlineCallbacks
     def _onFirstIngestEvent(self, msgcontent):
-        # do stuff here
+
+        datasrc_id = msgcontent.additional_data.datasource_id
+        dataset_id = msgcontent.additional_data.dataset_id
+
+        #look up resources
+        log.info("_onFirstIngestEvent getting instance of data source resource")
+        datasrc_resource = yield self.rc.get_instance(datasrc_id)
+        log.info("_onFirstIngestEvent getting instance of data set resource")
+        datasrc_resource = yield self.rc.get_instance(dataset_id)
+
+        if not datasrc_resource.is_public:
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
+            dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
+        else:
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
+            dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+
+        yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
         # all done, cleanup
         yield self._subscriber.terminate()
@@ -404,13 +420,23 @@ class ManageDataResource(object):
                 resource_transaction.append(sched_task_rsrc)
 
 
-            #mark lifecycle states, public by default
-            if (msg.IsFieldSet("is_public") and not msg.is_public):
-                datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-                dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
-            else:
-                datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+            #these start new, and get set on the first ingest event
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
+            dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
+
+
+
+            #event to subscribe to
+            log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
+            self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
+
+            #what to do when 
+            self._subscriber.ondata = self._onFirstIngestEvent
+
+            yield self._subscriber.register()
+            yield self._subscriber.initialize()
+            yield self._subscriber.activate()
+
 
 
             yield self.rc.put_resource_transaction(resource_transaction)
@@ -538,8 +564,14 @@ class ManageDataResource(object):
         datasrc_resource.ion_description               = msg.ion_description
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
+        datasrc_resource.is_public                     = msg.is_public
+
+        #casrefs... hopefully this is right
+        #datasrc_resource.authentication                = msg.authentication
+        #datasrc_resource.search_pattern                = msg.search_pattern
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
+
 
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
@@ -603,7 +635,7 @@ class ManageDataResource(object):
                       "ion_institution_id",
                       #"update_interval_seconds",
                       #"update_start_datetime_millis",
-                      #is_public,
+                      "is_public",
                       ]
 
 

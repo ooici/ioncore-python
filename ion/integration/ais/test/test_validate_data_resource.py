@@ -40,7 +40,6 @@ class AISValidateDataResourceTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         raise unittest.SkipTest("Buildbot doesn't seem to have netCDF validator installed properly")
-        
         yield self._start_container()
 
         self.dispatcher_id = None

@@ -298,8 +298,9 @@ class AISManageDataResourceTest(IonTestCase):
         result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
 
         log.info("Analyzing results of updateDataResource call")
-        self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
-                             "updateDataResource had an internal failure")
+        if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
+            self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
+                                 "updateDataResource had an internal failure: " + result_wrapped.error_str)
         self.failUnlessEqual(200, result_wrapped.result, "deleteDataResource didn't return 200 OK")
         self.failUnlessEqual(1, len(result_wrapped.message_parameters_reference),
                              "updateDataResource returned a GPB with wrong number of 'message_parameters_reference's")
@@ -382,8 +383,9 @@ class AISManageDataResourceTest(IonTestCase):
 
         result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg)
 
-        self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
-                             "deleteDataResource had an internal failure")
+        if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
+            self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
+                                 "deleteDataResource had an internal failure: " + result_wrapped.error_str)
 
         self.failUnlessEqual(200, result_wrapped.result, "deleteDataResource didn't return 200 OK")
         self.failUnlessEqual(1, len(result_wrapped.message_parameters_reference),
@@ -434,21 +436,27 @@ class AISManageDataResourceTest(IonTestCase):
         create_req_msg.update_start_datetime_millis  = 30000
         create_req_msg.ion_title                     = "some lame title"
         create_req_msg.update_interval_seconds       = 3600
+        create_req_msg.is_public                     = False
+        log.info("testing with the full set of fields but no URLs")
         yield self._checkCreateFieldAcceptance(ais_req_msg)
 
         #test too many URLs
         create_req_msg.base_url     = "FIXME"
         create_req_msg.dataset_url  = "http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day"
+        log.info("testing with too many URLs")
         yield self._checkCreateFieldAcceptance(ais_req_msg)
 
         create_req_msg.ClearField("base_url")
 
 
         #should be ready for actual call that we expect to succeed
+        log.info("testing with the call that we expect to succeed")
+
         result_wrapped = yield self.aisc.createDataResource(ais_req_msg)
 
-        self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
-                             "createDataResource had an internal failure")
+        if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
+            self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
+                                 "createDataResource had an internal failure: " + result_wrapped.error_str)
         self.failUnlessEqual(200, result_wrapped.result, "deleteDataResource didn't return 200 OK")
         self.failUnlessEqual(1, len(result_wrapped.message_parameters_reference),
                              "createDataResource returned a GPB with too many 'message_parameters_reference's")
@@ -471,12 +479,14 @@ class AISManageDataResourceTest(IonTestCase):
         log.info("comparing resource with fields from original request")
         self.failUnlessEqual(cm.source_type,                   dr.source_type)
         self.failUnlessEqual(cm.request_type,                  dr.request_type)
+        self.failUnlessEqual(cm.dataset_url,                   dr.dataset_url)
+        self.failUnlessEqual(cm.ion_title,                     dr.ion_title)
         self.failUnlessEqual(cm.ion_description,               dr.ion_description)
         self.failUnlessEqual(cm.ion_institution_id,            dr.ion_institution_id)
         self.failUnlessEqual(cm.update_interval_seconds,       dr.update_interval_seconds)
         self.failUnlessEqual(cm.update_start_datetime_millis,  dr.update_start_datetime_millis)
-        self.failUnlessEqual(cm.ion_title,                     dr.ion_title)
-        self.failUnlessEqual(cm.dataset_url,                   dr.dataset_url)
+        self.failUnlessEqual(cm.is_public,                     dr.is_public)
+
 
         #test default value for max ingest millis, 1 second less than update interval
         self.failUnlessEqual((cm.update_interval_seconds - 1) * 1000, dr.max_ingest_millis)
