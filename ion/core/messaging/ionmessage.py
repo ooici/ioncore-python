@@ -16,8 +16,6 @@ from ion.core import ioninit
 from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
 
-f = open('/tmp/workfile', 'w')
-
 
 class IONMessageInterceptor(EnvelopeInterceptor):
     """
@@ -71,10 +69,6 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         msg[ic.IONMSG_HDR_ACTION] = message.get('operation')
         # The actual content
         msg['content'] = message.get('content')
-        msgs = str(message.get('content'))
-        if str.find(msgs,"============ End Message ============") == -1 and str.find(msgs,"transaction_id") == -1 and len(msgs) > 3:
-            f.write("\n-----\n" + msg['sender'] + "\n")
-            f.write(str(message.get('content')))
 
         invocation.message = msg
         return invocation

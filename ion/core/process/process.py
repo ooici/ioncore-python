@@ -38,7 +38,7 @@ from ion.core.object import workbench
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
 from ion.core.ioninit import request
-
+import pprint
 
 CONF = ioninit.config(__name__)
 CF_fail_fast = CONF['fail_fast']
@@ -652,7 +652,18 @@ class Process(BasicLifecycleObject):
 
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
-            log.exception("*****Application error in message processing*****")
+            log.exception("*****Non Conversation Application error in message processing*****")
+            log.error('*** Message payload received:')
+            log.error(pprint.pprint(payload))
+
+            if log.getEffectiveLevel() <= logging.INFO:
+                log.error('*** Message Content: \n \n')
+                log.error(str(payload.get('content', '## No Content! ##')))
+
+            log.error("*****End Non Conversation Application error in message processing*****")
+
+
+
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
             if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
@@ -660,7 +671,18 @@ class Process(BasicLifecycleObject):
 
         except Exception, ex:
             # *** PROBLEM. Here the conversation is in ERROR state
-            log.exception("*****Container error in message processing*****")
+
+            log.exception("*****Non Conversation Container error in message processing*****")
+            log.error('*** Message payload received:')
+            log.error(pprint.pprint(payload))
+
+            if log.getEffectiveLevel() <= logging.WARN:
+                log.error('*** Message Content: \n \n')
+                log.error(str(payload.get('content', '## No Content! ##')))
+
+            log.error("*****End Non Conversation Container error in message processing*****")
+
+
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
             if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
