@@ -198,8 +198,10 @@ class ValidateDataResource(object):
                        }[cdm_result.response_type]
 
 
-                errtext = "ValidateDataResource.validate(): INVALID: %s." % why
+                errtext = "ValidateDataResource.validate(): INVALID: %s " % why
+                more_out  = " :: cf_output: %s :: cdm_output: %s :: err_msg: %s " % (content.cf_output, content.cdm_output, content.err_msg)
 
+                errtext = errtext + more_out
 
                 log.info(errtext)
                 Response.error_num =  Response.ResponseCodes.INTERNAL_SERVER_ERROR
@@ -266,6 +268,7 @@ class ValidateDataResource(object):
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(VALIDATE_DATASOURCE_RSP)
         self._populateResult(Response.message_parameters_reference[0].dataResourceSummary, parsed_das)
+        Response.message_parameters_reference[0].cdmResponse = cdm_result
         defer.returnValue(Response)
 
 
