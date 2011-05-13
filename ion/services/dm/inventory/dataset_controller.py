@@ -6,12 +6,13 @@
 @brief An example service definition that can be used as template for resource management.
 """
 import uuid
+from os import getcwd, chdir
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync
+from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync, check_for_ncml_files
 from ion.core import ioninit
 
 from ion.core.process.process import ProcessFactory
@@ -83,6 +84,7 @@ message QueryResult{
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
+RMTASK_REQ_TYPE      = object_utils.create_type_identifier(object_id=2603, version=1)
 
 
 CONF = ioninit.config(__name__)
@@ -104,7 +106,7 @@ class RsyncHandler(ScheduleEventSubscriber):
 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug('Got a scheduled message, task id: %s' % data.task_id)
+        log.debug('Got a rsync update message from the scheduler')
         yield self.hook_fn()
 
 class DatasetController(ServiceProcess):
@@ -117,6 +119,16 @@ class DatasetController(ServiceProcess):
     declare = ServiceProcess.service_declare(name='dataset_controller',
                                              version='0.1.0',
                                              dependencies=['scheduler'])
+
+    @defer.inlineCallbacks
+    def slc_deactivate(self):
+        if not self.walrus:
+            defer.returnValue(None)
+
+        log.debug('Removing scheduled task')
+        msg = yield self.message_client.create_instance(RMTASK_REQ_TYPE)
+        msg.task_id = self.sched_task_id
+        yield self.ssc.rm_task(msg)
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -149,7 +161,11 @@ class DatasetController(ServiceProcess):
                                             CONF.getValue('task_id',
                                                           default=str(uuid.uuid4())))
 
-        log.debug('Public key: %s Interval: %f' % (self.public_key, self.update_interval))
+        self.walrus = self.spawn_args.get('do-init',
+                                            CONF.getValue('do-init',
+                                            default=False))
+
+        log.debug('Update interval: %f' % self.update_interval)
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
         log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
 
@@ -158,11 +174,14 @@ class DatasetController(ServiceProcess):
                                 queue_name=self.queue_name,
                                 origin=SCHEDULE_TYPE_DSC_RSYNC,
                                 process=self)
+        yield self.sesc.initialize()
+        yield self.sesc.activate()
 
-        # Check for singleton
-        if self.spawn_args.get('do-init', False):
+        if self.walrus:
             log.debug('I am the walrus.')
             yield self._create_scheduled_event()
+        else:
+            log.debug('I am not Odobenus rosmarus')
 
         log.info('SLC_INIT Dataset Controller')
 
@@ -173,9 +192,12 @@ class DatasetController(ServiceProcess):
         msg = yield self.message_client.create_instance(SCHEDULER_ADD_REQ_TYPE)
         msg.interval_seconds = int(self.update_interval)
         msg.task_id = self.task_id
+        msg.desired_origin = SCHEDULE_TYPE_DSC_RSYNC
 
         log.debug('Sending request to scheduler')
-        yield self.ssc.add_task(msg)
+        resp = yield self.ssc.add_task(msg)
+        self.sched_task_id = resp.task_id
+        
         log.debug('got scheduler response OK')
 
     #noinspection PyUnusedLocal
@@ -185,14 +207,18 @@ class DatasetController(ServiceProcess):
         @brief On receipt of scheduler message, do rsync with server, moving
         any new ncml files over.
         """
-
-        # @todo fstat the ncml directory to check for new files
         log.debug('rsync scheduled beginning now')
+        if check_for_ncml_files(self.ncml_path):
+            log.debug('NcML files found, invoking rsync')
+            self.cwd = getcwd()
+            chdir(self.ncml_path)
+            yield do_complete_rsync(self.ncml_path, self.server_url,
+                                    self.private_key, self.public_key)
 
-        yield do_complete_rsync(self.ncml_path, self.server_url,
-                                self.private_key, self.public_key)
-
-        log.debug('rsync complete')
+            chdir(self.cwd)
+            log.debug('rsync complete')
+        else:
+            log.debug('No ncml found, doing nothing')
         
     #noinspection PyUnusedLocal
     @defer.inlineCallbacks
@@ -242,7 +268,9 @@ class DatasetController(ServiceProcess):
 
         # pfh - create local ncml file as well. These accumulate and are
         # harvested by the scheduled rsync
-        create_ncml(response.key, self.ncml_path)
+        # Per DS, empty datasets will cause thredds problems
+        # @bug Test with thredds
+        #create_ncml(response.key, self.ncml_path)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)

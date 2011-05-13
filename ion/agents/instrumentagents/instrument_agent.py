@@ -306,7 +306,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.POWERED_DOWN)
             pass
@@ -334,7 +334,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.UNINITIALIZED)
             pass
@@ -381,7 +381,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.INACTIVE)
             pass
@@ -441,7 +441,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.STOPPED)
             pass
@@ -513,7 +513,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agents.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.IDLE)
             pass
@@ -580,7 +580,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agents.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.OBSERVATORY_MODE)
             pass
@@ -653,7 +653,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = '%s.%s' % ('',self.event_publisher_origin)
+            origin = 'agents.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.DIRECT_ACCESS_MODE)
             pass

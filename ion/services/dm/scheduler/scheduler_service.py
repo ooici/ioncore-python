@@ -402,11 +402,15 @@ class SchedulerService(ServiceProcess):
                                           task_id=tdef['task_id'],
                                           user_id=tdef['user_id'])
 
-        se = StructureElement.parse_structure_element(tdef['payload'])
-        payload = msg.Repository._load_element(se)
-        msg.Repository.index_hash[payload.MyId]=se
+        try:
+            se = StructureElement.parse_structure_element(tdef['payload'])
+            payload = msg.Repository._load_element(se)
+            msg.Repository.index_hash[payload.MyId]=se
 
-        msg.additional_data.payload = payload
+            msg.additional_data.payload = payload
+        except TypeError:
+            log.info('No payload found')
+
         yield self.pub.publish_event(msg, origin=tdef['desired_origin'])
 
         log.debug('Send completed, rescheduling %s' % task_id)

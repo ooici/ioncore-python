@@ -796,9 +796,13 @@ class DataStoreWorkbench(WorkBench):
         if not hasattr(request, 'MessageType') or request.MessageType != DATA_REQUEST_MESSAGE_TYPE:
             raise DataStoreWorkBenchError('Invalid extract_data request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
+        # verify there are no 0 strides in the request
+        if 0 in [x.stride for x in request.request_bounds if x.IsFieldSet('stride')]:   # the if makes it so that unset strides don't even get in the list
+            raise DataStoreWorkBenchError('Stride of 0 specified in request_bounds!')
+
         response = yield self._process.message_client.create_instance(DATA_REPLY_MESSAGE_TYPE)
 
-        log.debug("Extract data request bounds: %s", ["%d+%d" % (x.origin, x.size) for x in request.request_bounds])
+        log.debug("Extract data request bounds: %s", ["%d+%d,%d" % (x.origin, x.size, x.stride) for x in request.request_bounds])
 
         # create an anonymous repo to load things into
         repo = self.create_repository(root_type=ARRAY_STRUCTURE_TYPE)
@@ -940,6 +944,83 @@ class DataStoreWorkbench(WorkBench):
                     targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
 
             log.debug("END DATA COPY")
+
+        # IF STRIDING SET TO ANYTHING BUT 1 IN ALL DIMENSIONS, need to transform targetarray into a smaller version
+        strides = [x.stride or 1 for x in request.request_bounds]
+
+        # if we have anything but 1s in all dimensions
+        if strides != [1] * len(request.request_bounds):
+            log.debug("striding requested %s" % strides)
+
+            # create ranges with strides
+            strideranges = [(0, x.size, x.stride or 1) for x in request.request_bounds]
+
+            # dimensions of new, strided array
+            reduceddims = [int(math.ceil(float(x[1]) / x[2])) for x in strideranges]
+
+            # calc new # of elems, create array to hold them @TODO: improve
+            newtotalelems = reduce(lambda x, y: x*y, reduceddims)
+            newtargetarray = [None] * newtotalelems
+
+            # calculate index offsets for each dimension in targetarray
+            targetidxextents = [None] * len(targetshape)
+            targetidxextents[-1] = 1
+
+            for x in range(len(targetidxextents)-2, -1, -1):
+                targetidxextents[x] = reduce(lambda x,y: x*y, targetshape[x+1:])
+
+            def copystrides(curstrideranges, counter=0, curidx=0, rc=0):
+                '''
+                Recursive method to copy ranges using striding between targetarray and newtargetarray.
+
+                @param curstrideranges  Remaining ranges to iterate over.
+                @param counter          Teh current counter into the new target array to copy to.
+                @param curidx           The current calculated offset index into the old targetarray.
+                @param rc               Recursion count.
+                @returns                The current counter, which is the index into the newtargetarray to start copying to.
+                '''
+                # check for end conditions:
+                #   curstride range is empty - last dimension had striding, can only copy one value at a time
+                #   curstrideranges only has strides of 1 remaining - can copy chunks!
+                if len(curstrideranges) == 0 or [x[2] for x in curstrideranges] == [1] * len(curstrideranges):
+
+                    # either condition was true, this means we can actually perform a copy at this point
+                    slicelen = 1
+
+                    if not len(curstrideranges) == 0:
+                        # can possibly do larger chunks - get the slicelen
+                        assert rc > 0
+                        slicelen = targetidxextents[rc - 1]
+
+                    #log.debug("copystrides: nta[%d:%d] = ta[%d:%d]" % (counter, counter+slicelen, curidx, curidx+slicelen))
+
+                    # perform copy
+                    newtargetarray[counter:counter+slicelen] = targetarray[curidx:curidx+slicelen]
+
+                    # increment counter
+                    return counter + slicelen
+
+                else:
+
+                    currange = curstrideranges[0]
+                    remranges = curstrideranges[1:]
+
+                    for i in range(currange[0], currange[1], currange[2]):
+                        counter = copystrides(remranges, counter, curidx + (i * targetidxextents[rc]), rc+1)
+
+                # always return a counter!
+                return counter
+
+            # actually perform copy
+            log.debug("Starting to copy strided array")
+            copystrides(strideranges)
+            log.debug("Finished copying strided array")
+
+            # swap out old for new
+            oldtargetarray = targetarray
+            targetarray = newtargetarray
+            oldtotalelems = totalelems
+            totalelems = newtotalelems
 
         # CREATE RESPONSE CHUNKS OUT OF BIG ORIGINAL RESPONSE MESSAGE
 

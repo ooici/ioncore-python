@@ -15,11 +15,15 @@ from ion.test.iontest import IonTestCase
 from ion.services.coi.resource_registry import resource_client
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+from ion.util.procutils import asleep
 
 # Message types
 from ion.services.dm.inventory.dataset_controller import FINDDATASETREQUEST_TYPE, \
     DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
 
+from ion.util.itv_decorator import itv
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 
 class DatasetControllerTest(IonTestCase):
@@ -73,6 +77,21 @@ class DatasetControllerTest(IonTestCase):
         yield self._stop_container()
 
 
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_create_and_rsync(self):
+
+        # Create a Dataset Controller client with an anonymous process
+        dscc = DatasetControllerClient(proc=self.proc)
+
+        # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
+        create_request_msg = yield self.mc.create_instance(None)
+
+        # You can send the root of the object or any linked composite part of it.
+        create_response_msg = yield dscc.create_dataset_resource(create_request_msg)
+
+        yield asleep(10.0)
+
     @defer.inlineCallbacks
     def test_hello_dataset(self):
 
@@ -87,7 +106,7 @@ class DatasetControllerTest(IonTestCase):
 
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
-
+        yield asleep(10.0)
 
     @defer.inlineCallbacks
     def test_find_dataset(self):
