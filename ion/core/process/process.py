@@ -13,6 +13,7 @@ from twisted.python import failure
 
 from zope.interface import implements, Interface
 
+import logging
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
