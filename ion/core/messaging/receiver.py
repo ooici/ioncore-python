@@ -262,6 +262,12 @@ class Receiver(BasicLifecycleObject):
                     # if it is not an rpc conversation - set the context
                     request.workbench_context = convid
 
+                #####################################################################################
+                ### this line never executes as for some reason it is never true (is performative not a string? wat?)
+                ### the intended behavior is elif performative == 'request':
+                ### but turning that on crashes a lot of tests currently.  @TODO'ing it for later.
+                ### df 13 may 2011
+                #####################################################################################
                 elif performative is 'request':
                     # if it is an rpc request - set the context
                     request.workbench_context = convid
@@ -315,6 +321,7 @@ class Receiver(BasicLifecycleObject):
                                 # Print a warning if someone else is using the persistence tricks...
                                 log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
 
+                        #print "WORKBENCH STATE", self.process.workbench
 
     @defer.inlineCallbacks
     def send(self, **kwargs):

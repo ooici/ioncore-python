@@ -186,20 +186,20 @@ class ValidateDataResource(object):
 
             cdm_result = yield self.vc.validate(msg.data_resource_url)
             
-            if not cdm_result.response_type == content.ResponseType.PASS:
+            if not cdm_result.response_type == cdm_result.ResponseType.PASS:
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 
                 cr = cdm_result.ResponseType
                 why = {cr.NONE: 'No response',
                        cr.PASS: 'Validation Passed!',
                        cr.CDM_FAILURE: 'CDM (time-axis) validation failed',
-                       cr.CF_FAILURE: 'CF compliance failed x%d' % content.cf_error_count,
-                       cr.ERROR: "'Other' error: %s" % content.err_msg,
+                       cr.CF_FAILURE: 'CF compliance failed x%d' % cdm_result.cf_error_count,
+                       cr.ERROR: "'Other' error: %s" % cdm_result.err_msg,
                        }[cdm_result.response_type]
 
 
                 errtext = "ValidateDataResource.validate(): INVALID: %s " % why
-                more_out  = " :: cf_output: %s :: cdm_output: %s :: err_msg: %s " % (content.cf_output, content.cdm_output, content.err_msg)
+                more_out  = " :: cf_output: %s :: cdm_output: %s :: err_msg: %s " % (cdm_result.cf_output, cdm_result.cdm_output, cdm_result.err_msg)
 
                 errtext = errtext + more_out
 

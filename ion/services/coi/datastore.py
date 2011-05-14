@@ -238,6 +238,7 @@ class DataStoreWorkbench(WorkBench):
             raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
         repo = yield self._resolve_repo_state(request.repository_key)
+        repo.cached = True
 
         ####
         # Back to boiler plate op_pull
@@ -1169,6 +1170,7 @@ class DataStoreWorkbench(WorkBench):
         key = request.object_id.key
         repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
         assert repo
+        repo.cached = True
 
         # @TODO: use first head for now
         comms = repo.current_heads()

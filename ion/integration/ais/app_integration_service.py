@@ -23,7 +23,7 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 # import working classes for AIS
 from ion.integration.ais.common.metadata_cache import  MetadataCache
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources, \
-                                                    DataResourceUpdateSubscriber
+    DataResourceUpdateEventSubscriber
 from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetDataResourceDetail
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
@@ -55,14 +55,18 @@ class AppIntegrationService(ServiceProcess):
     
         log.debug('AppIntegrationService.__init__()')
 
+
     @defer.inlineCallbacks
     def slc_init(self):
         self.metadataCache = MetadataCache(self)
         log.debug('Instantiated AIS Metadata Cache Object')
         yield self.metadataCache.loadDataSets()
         yield self.metadataCache.loadDataSources()
-        self.subscriber = DataResourceUpdateSubscriber()
-        self.subscriber.subscribe()
+
+        log.debug('instantiating DataResourceUpdateEventSubscriber')
+        subscriber = DataResourceUpdateEventSubscriber(process = self)
+        yield subscriber.initialize()
+        yield subscriber.activate()
         
         
     def getMetadataCache(self):
