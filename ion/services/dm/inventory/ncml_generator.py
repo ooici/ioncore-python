@@ -197,7 +197,7 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     """
 
     if not private_key or not public_key:
-        log.error('Missing required key')
+        log.error('Missing required RSA key for NCML RSYNC in Dataset Controller!')
         defer.returnValue(None)
         
     # Generate a private key, add to ssh agent

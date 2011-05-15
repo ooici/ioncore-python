@@ -121,7 +121,7 @@ class DatasetController(ServiceProcess):
                                              dependencies=['scheduler'])
 
     @defer.inlineCallbacks
-    def slc_deactivate(self):
+    def slc_terminate(self):
         if not self.walrus:
             defer.returnValue(None)
 
@@ -130,13 +130,13 @@ class DatasetController(ServiceProcess):
         msg.task_id = self.sched_task_id
         yield self.ssc.rm_task(msg)
 
-    @defer.inlineCallbacks
-    def slc_init(self):
-        """
-        Service life cycle state. Initialize service here. Can use yields.
 
-        Can be called in __init__ or in slc_init... no yield required
-        """
+
+    def __init__(self, *args, **kwargs):
+        # Service class initializer. Basic config, but no yields allowed.
+
+        ServiceProcess.__init__(self, *args, **kwargs)
+
         self.resource_client = ResourceClient(proc=self)
         self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
@@ -169,13 +169,27 @@ class DatasetController(ServiceProcess):
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
         log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
 
+
+
+        log.info('INIT complete for Dataset Controller Service.')
+
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        """
+        Service life cycle state. Initialize service here. Can use yields.
+
+        Can be called in __init__ or in slc_init... no yield required
+        """
+
         log.debug('Creating new message receiver for scheduler')
         self.sesc = RsyncHandler(self.do_ncml_sync,
                                 queue_name=self.queue_name,
                                 origin=SCHEDULE_TYPE_DSC_RSYNC,
                                 process=self)
-        yield self.sesc.initialize()
-        yield self.sesc.activate()
+        # Add the receiver as a registered life cycle object
+        yield self.register_life_cycle_object(self.sesc)
+
 
         if self.walrus:
             log.debug('I am the walrus.')
