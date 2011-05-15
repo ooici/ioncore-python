@@ -533,6 +533,11 @@ class JavaAgentWrapper(ServiceProcess):
             log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
             end_time_seconds = calendar.timegm(datetime.datetime.utcnow())
 
+        stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
+        log.info('Getting Data Start time: %s' % stime)
+        etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
+        log.info('Getting Data Start time: %s' % etime)
+
         msg.start_datetime_millis = start_time_seconds * 1000
 
         msg.end_datetime_millis = end_time_seconds * 1000
