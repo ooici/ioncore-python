@@ -488,6 +488,10 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_done - Start')
 
+
+        log.info(type(content))
+        log.info(str(content.Message))
+
         if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
@@ -865,6 +869,7 @@ class IngestionClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('create_dataset_topics', msg)
         defer.returnValue(content)
 
+    """
     @defer.inlineCallbacks
     def send_dataset(self, topic, msg):
         ''' For testing the service...'''
@@ -882,7 +887,7 @@ class IngestionClient(ServiceClient):
         ''' For testing the service...'''
         yield self._check_init()
         yield self.proc.send(topic, operation='recv_done', content=msg)
-
+    """
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IngestionService)

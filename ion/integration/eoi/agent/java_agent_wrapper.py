@@ -427,16 +427,18 @@ class JavaAgentWrapper(ServiceProcess):
         log.debug("..." + str(context))
         (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
 
+        # @TODO check the result from the dataset agent!
 
         log.info('Dataset Agent Reply Content: %s' % str(content))
         log.info('Dataset Agent Reply Headers: %s' % str(headers))
 
-        # @todo: change reply based on response of the RPC send
-        # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
-#        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
         yield perform_ingest_deferred
+
+        log.debug('Ingestion is complete on the ingestion services side...')
+
+
         res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
         #yield msg.ack()
         log.info('**** Ingestion COMPLETE! ****')
