@@ -17,9 +17,14 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 from ion.util.procutils import asleep
 
+from ion.services.dm.distribution.events import ScheduleEventPublisher
+
 # Message types
 from ion.services.dm.inventory.dataset_controller import FINDDATASETREQUEST_TYPE, \
-    DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
+    DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE, SCHEDULE_TYPE_DSC_RSYNC
+
+from ion.services.dm.inventory.ncml_generator import clear_ncml_files, check_for_ncml_files, rsync_ncml
+
 
 from ion.util.itv_decorator import itv
 from ion.core import ioninit
@@ -57,12 +62,12 @@ class DatasetControllerTest(IonTestCase):
             {'name':'dataset_controller',
              'module':'ion.services.dm.inventory.dataset_controller',
              'class':'DataSetController',
-             'spawnargs': {'do-init' : True}},
+             'spawnargs': {'do-init' : False}},
         ]
 
 
         sup = yield self._spawn_processes(services)
-
+        self.sup = sup
         # Creat an anonymous process for the tests
         self.proc = process.Process()
         yield self.proc.spawn()
@@ -79,18 +84,40 @@ class DatasetControllerTest(IonTestCase):
 
     @itv(CONF)
     @defer.inlineCallbacks
-    def test_create_and_rsync(self):
+    def test_create_and_rsync_manually(self):
 
-        # Create a Dataset Controller client with an anonymous process
-        dscc = DatasetControllerClient(proc=self.proc)
+        dataset_controller_id = yield self.sup.get_child_id('dataset_controller')
+        log.debug('Process ID:' + str(dataset_controller_id))
+        dataset_controller= self._get_procinstance(dataset_controller_id)
 
-        # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
-        create_request_msg = yield self.mc.create_instance(None)
+        clear_ncml_files(dataset_controller.ncml_path)
+        self.failIf(check_for_ncml_files(dataset_controller.ncml_path))
 
-        # You can send the root of the object or any linked composite part of it.
-        create_response_msg = yield dscc.create_dataset_resource(create_request_msg)
+        yield dataset_controller.do_ncml_sync()
 
-        yield asleep(10.0)
+        self.failUnless(check_for_ncml_files(dataset_controller.ncml_path))
+
+
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_create_and_rsync_fire_message(self):
+
+        dataset_controller_id = yield self.sup.get_child_id('dataset_controller')
+        log.debug('Process ID:' + str(dataset_controller_id))
+        dataset_controller= self._get_procinstance(dataset_controller_id)
+
+        clear_ncml_files(dataset_controller.ncml_path)
+        self.failIf(check_for_ncml_files(dataset_controller.ncml_path))
+
+        pub = ScheduleEventPublisher(process=self.proc)
+        yield pub.create_and_publish_event(origin=SCHEDULE_TYPE_DSC_RSYNC,
+                                          task_id=dataset_controller.task_id)
+
+        yield asleep(5)
+
+        self.failUnless(check_for_ncml_files(dataset_controller.ncml_path))
+
+
 
     @defer.inlineCallbacks
     def test_hello_dataset(self):
