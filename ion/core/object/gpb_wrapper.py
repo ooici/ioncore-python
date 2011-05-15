@@ -47,60 +47,6 @@ class OOIObjectError(Exception):
     An exception class for errors that occur in the Object Wrapper class
     """
 
-'''
-class GPBSource(object):
-    """
-    @Brief Decorator class for gpb wrapper methods to get the SOURCE object
-    """
-    def __init__(self, func):
-        self.func = func
-        self.func_name = func.__name__
-
-    def __call__(self, *args, **kwargs):
-
-        print 'GPB SOURCE'
-        print 'func name', self.func_name, self.func
-        print 'args', args
-        print 'kwargs', kwargs
-
-        source = args[0]._source
-        if source._invalid:
-            log.error(source.Debug())
-            raise OOIObjectError('Can not access Invalidated Object in function "%s"' % self.func_name)
-        myargs = (source,) +args[1:]
-
-        return self.func(*myargs, **kwargs)
-
-class GPBSourceRoot(object):
-    """
-    @Brief Decorator class for gpb wrapper methods to get the SOURCE ROOT object
-    """
-    def __init__(self, func):
-        self.func = func
-        self.func_name = func.__name__
-
-    def __call__(self, *args, **kwargs):
-
-        print 'GPB SOURCE ROOT'
-
-        print 'func name', self.func_name, self.func
-        print 'args', args
-        print 'kwargs', kwargs
-
-        source = args[0]._source
-        if source._invalid:
-            log.error(source.Debug())
-            raise OOIObjectError('Can not access Invalidated Object in function "%s"' % self.func_name)
-        
-        source_root = source._root
-
-        myargs = (source_root,) +args[1:]
-
-        return self.func(*myargs, **kwargs)
-'''
-
-
-
 class WrappedEnum(object):
     """ Data descriptor (like a property) for passing through GPB enums from the Wrapper. """
 
