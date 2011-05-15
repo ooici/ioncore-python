@@ -26,7 +26,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
-from ion.services.dm.ingestion import cdm_attribute_methods
+from ion.core.object.cdm_methods import attribute_merge
 
 from ion.core.exception import ApplicationError
 
@@ -740,33 +740,33 @@ class IngestionService(ServiceProcess):
             att_name = merge_att.name
 
             if att_name == 'ion_time_coverage_start':
-                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                root.MergeAttLesser(att_name, merge_root)
 
             elif att_name == 'ion_time_coverage_end':
-                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                root.MergeAttGreater(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lat_min':
-                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                root.MergeAttLesser(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lat_max':
-                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                root.MergeAttGreater(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lon_min':
                 # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lon_max':
                 # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
 
             elif att_name == 'ion_geospatial_vertical_min':
 
                 if vertical_positive == 'down':
-                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                    root.MergeAttLesser(att_name, merge_root)
 
                 elif vertical_positive == 'up':
-                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                    root.MergeAttGreater(att_name, merge_root)
 
                 else:
                     raise OOIObjectError('Invalid value for Vertical Positive')
@@ -775,10 +775,10 @@ class IngestionService(ServiceProcess):
             elif att_name == 'ion_geospatial_vertical_max':
 
                 if vertical_positive == 'down':
-                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                    root.MergeAttGreater(att_name, merge_root)
 
                 elif vertical_positive == 'up':
-                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                    root.MergeAttLesser(att_name, merge_root)
 
                 else:
                     raise OOIObjectError('Invalid value for Vertical Positive')
@@ -786,10 +786,10 @@ class IngestionService(ServiceProcess):
 
             elif att_name == 'history':
                 # @TODO is this the correct treatment for history?
-                cdm_attribute_methods.MergeAttDstOver(root, att_name, merge_root)
+                root.MergeAttDstOver(att_name, merge_root)
 
             else:
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
 
 

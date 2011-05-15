@@ -11,19 +11,15 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from net.ooici.core.type import type_pb2
-from net.ooici.play import addressbook_pb2
-from ion.core.object import gpb_wrapper
 
 from ion.test.iontest import IonTestCase
 from ion.core.object.object_utils import *
-from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 
 CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 
-from ion.services.dm.ingestion.cdm_attribute_methods import *
+from ion.core.object.cdm_methods.attribute_merge import *
 
 class CdmAttributeTest(IonTestCase):
     """

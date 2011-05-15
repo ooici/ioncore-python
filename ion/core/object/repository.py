@@ -11,9 +11,8 @@ TODO
 Refactor Merge to use a proxy repository for the readonly objects - they must live in a seperate workspace.
 
 """
+from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 import weakref
 from twisted.internet import threads, reactor, defer
@@ -27,6 +26,9 @@ from ion.core.exception import ApplicationError, ReceivedApplicationError, Recei
 
 from ion.util import procutils as pu
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
 BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
@@ -35,7 +37,6 @@ LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 REQUEST_COMMIT_BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=48, version=1)
 
 
-ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
 from ion.core.object import object_utils
 

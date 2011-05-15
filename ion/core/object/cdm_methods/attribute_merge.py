@@ -9,13 +9,16 @@
 Loosely based on Porter-Duff Image Compositing rules
 """
 
+# Get the object decorator used on wrapper methods!
+from ion.core.object.object_utils import _gpb_source
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 import time, calendar
 from ion.core.object.gpb_wrapper import OOIObjectError
 
-
+@_gpb_source
 def MergeAttSrc(self, attname, src):
     """
     The Source overwrites the destination
@@ -59,7 +62,7 @@ def MergeAttSrc(self, attname, src):
 
     return None
 
-
+@_gpb_source
 def MergeAttDst(self, attname, src):
     """
     The Destination is unchanged - ignore the source - a NoOp!
@@ -72,6 +75,7 @@ def MergeAttDst(self, attname, src):
     # NO-OP
     return None
 
+@_gpb_source
 def MergeAttGreater(self, attname, src):
     """
     Keep the greater of the two attribute values
@@ -100,8 +104,8 @@ def MergeAttGreater(self, attname, src):
     # @todo: Ensure the length of the attribute list is exactly ONE
     
     
-    src_val = _GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
-    dst_val = _GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
+    src_val = self._GetNumericValue(src_att.GetDataType(), src_att.GetValue())
+    dst_val = self._GetNumericValue(dst_att.GetDataType(), dst_att.GetValue())
     if src_val > dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val > src_val:
@@ -112,7 +116,7 @@ def MergeAttGreater(self, attname, src):
 
     return None
 
-
+@_gpb_source
 def MergeAttLesser(self, attname, src):
     """
     Keep the lesser of the two attribute values
@@ -141,8 +145,8 @@ def MergeAttLesser(self, attname, src):
     # @todo: Ensure the length of the attribute list is exactly ONE
     
     
-    src_val = _GetNumericValue(self, src_att.GetDataType(), src_att.GetValue())
-    dst_val = _GetNumericValue(self, dst_att.GetDataType(), dst_att.GetValue())
+    src_val = self._GetNumericValue(src_att.GetDataType(), src_att.GetValue())
+    dst_val = self._GetNumericValue(dst_att.GetDataType(), dst_att.GetValue())
     if src_val < dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val < src_val:
@@ -153,6 +157,7 @@ def MergeAttLesser(self, attname, src):
 
     return None
 
+@_gpb_source
 def MergeAttDstOver(self, attname, src):
     """
     Merge the Destination over the Source. Use case: Global Att - history
@@ -187,6 +192,7 @@ def _get_attribs(src, dst, attname):
     
     return (src_att, dst_att)
 
+@_gpb_source
 def _GetNumericValue(self, data_type, value):
     
     def _norm_string(val):

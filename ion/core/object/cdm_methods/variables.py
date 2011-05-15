@@ -1,15 +1,72 @@
 #!/usr/bin/env python
-
 """
-@file ion/services/dm/ingestion/cdm_variable_methods.py
+@file ion/core/object/cdm_methods/variables.py
+@brief Wrapper methods for the cdm variable object
 @author David Stuebe
-
-@Brief Methods for merging and access to CDM Dataset variables
-
-Based on Porter - Duff Alpha Composite rules
+@author Tim LaRocque
+TODO: Implement get_intersecting...
 """
 
+# Get the object decorator used on wrapper methods!
+from ion.core.object.object_utils import _gpb_source
 
+
+from ion.core.object.object_utils import OOIObjectError
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
+from ion.core.object.cdm_methods import group
+
+#--------------------------------------#
+# Wrapper_Variable Specialized Methods #
+#--------------------------------------#
+
+@_gpb_source
+def _get_var_units(self):
+    """
+    Specialized method for CDM Objects to retrieve the value of a variable object's 'units' attribute
+    """
+    result = None
+    units = group._find_attribute_by_name(self, 'units')
+    if units is not None and len(units.array.value) > 0:
+        result = units.array.value[0]
+
+    # @attention: Sometimes (string) attribute values come back as unicode values..  we can provide
+    #             a trap here to convert them, but this may not be necessary.  Lets discuss [TPL]
+    return result
+
+@_gpb_source
+def _get_var_std_name(self):
+    """
+    Specialized method for CDM Objects to retrieve the value of a variable object's 'standard_name' attribute
+    """
+    result = None
+    name = group._find_attribute_by_name(self, 'standard_name')
+    if name is not None and len(name.array.value) > 0:
+        result = name.array.value[0]
+
+    # @attention: Sometimes (string) attribute values come back as unicode values..  we can provide
+    #             a trap here to convert them, but this may not be necessary.  Lets discuss [TPL]
+    return result
+
+@_gpb_source
+def _get_var_num_dims(self):
+    """
+    Specialized method for CDM variables to retrieve its dimensionality
+    """
+    return len(self.shape)
+
+@_gpb_source
+def _get_var_num_ba(self):
+    """
+    Specialized method for CDM variables to retrieve the number of bounded arrays used in
+    defining this variables content
+    """
+    return len(self.content.bounded_arrays)
+
+
+
+@_gpb_source
 def GetValue(self, *args):
     """
     @Brief Get a value from an array structure by its indices
@@ -55,7 +112,7 @@ def GetValue(self, *args):
     return value
 
 
-
+@_gpb_source
 def GetIntersectingBoundedArrays(self, bounded_array):
     """
     @brief get the SHA1 id of the bounded arrays which intersect the give coverage.
@@ -110,7 +167,7 @@ flow = root.FindVariableByName('streamflow')
 
 --------------------------------------------------------------------
 
-from ion.services.dm.ingestion.cdm_variable_methods import GetValue
+from ion.core.object.cdm_methods.variables import GetValue
 for i in range(flow.content.bounded_arrays[0].bounds[0].size):
     print GetValue(flow, i)
 
@@ -135,7 +192,7 @@ for dim in ssh.shape:
 
 #--------------------------------------------------------------------
 
-from ion.services.dm.ingestion.cdm_variable_methods import GetValue
+from ion.core.object.cdm_methods.variables import GetValue
 count = 1
 for bounds in ssh.content.bounded_arrays[0].bounds:
     count *= bounds.size 
