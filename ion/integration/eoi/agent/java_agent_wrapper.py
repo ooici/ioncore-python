@@ -26,6 +26,8 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 
+from ion.core.exception import ApplicationError
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -47,6 +49,12 @@ IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 DATA_SOURCE_TYPE = object_utils.create_type_identifier(object_id=4503, version=1)
 DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
+class JavaAgentWrapperException(ApplicationError):
+    """
+    An exception calss for the Java Agent Wrapper
+
+    Be careful using this - there is no process to notify of the error on ingest!
+    """
 
 class JavaAgentWrapper(ServiceProcess):
     """
@@ -404,7 +412,7 @@ class JavaAgentWrapper(ServiceProcess):
         begin_msg.reply_to                  = reply_to
         begin_msg.ingest_service_timeout    = ingest_timeout
 
-        perform_ingest_deferred = self.__ingest_client.ingest(msg)
+        perform_ingest_deferred = self.__ingest_client.ingest(begin_msg)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
@@ -419,7 +427,10 @@ class JavaAgentWrapper(ServiceProcess):
         log.debug("..." + str(context))
         (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
 
-        
+
+        log.info('Dataset Agent Reply Content: %s' % str(content))
+        log.info('Dataset Agent Reply Headers: %s' % str(headers))
+
         # @todo: change reply based on response of the RPC send
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
 #        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
@@ -476,9 +487,11 @@ class JavaAgentWrapper(ServiceProcess):
         # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
         if datasetID and not dataSourceID:
             dataSourceID = yield self._get_associated_data_source_id(datasetID)
-        if dataSourceID and not datasetID:
+        elif dataSourceID and not datasetID:
             datasetID = yield self._get_associated_dataset_id(dataSourceID)
-        
+        elif not datasetID and not dataSourceID:
+            raise JavaAgentWrapperException('Must provide data source or dataset ID!')
+
         
         log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
