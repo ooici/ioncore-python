@@ -16,7 +16,7 @@ file_template = """
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
-from os import path, environ, chmod, unlink, listdir
+from os import path, environ, chmod, unlink, listdir, remove
 import fnmatch
 
 from twisted.internet import reactor, defer, error
@@ -98,7 +98,32 @@ def check_for_ncml_files(local_filepath):
 
     return False
 
-    
+
+def clear_ncml_files(local_filepath):
+    """
+    Clear ncml files on disk.
+    """
+    log.debug('clearing ncml files in %s' % local_filepath)
+
+    try:
+        allfiles = listdir(local_filepath)
+        ncml_files = []
+        for file in allfiles:
+            if fnmatch.fnmatch(file, '*.ncml'):
+                fpath = path.join(local_filepath, file)
+                log.debug('Removing file: %s' % fpath)
+                remove(fpath)
+    except IOError:
+        log.exception('Error searching %s for ncml files' % local_filepath)
+        return False
+
+    if len(ncml_files) > 0:
+        return True
+
+    return False
+
+
+
 def rsync_ncml(local_filepath, server_url):
     """
     @brief Method to perform a bidirectional sync with a remote server,
@@ -210,6 +235,7 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     # Remove the key from the agent and then delete the keys for good measure.
     yield ssh_add(pkey, remove=True)
 
+    # Delete the keys from the file system
     unlink(skey)
     unlink(pkey)
 
