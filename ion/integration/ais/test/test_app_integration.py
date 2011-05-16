@@ -314,6 +314,7 @@ class AppIntegrationTest(IonTestCase):
     def test_findDataResourcesByUser(self):
 
         log.debug('Testing findDataResourcesByUser.')
+        raise unittest.SkipTest('findDataResourcesByUser Skipped.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
@@ -355,7 +356,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2008-08-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -567,16 +568,7 @@ class AppIntegrationTest(IonTestCase):
                 if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_vertical_positive'):
                     self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
 
-                log.debug('Minimum Metadata Variables:\n')
-                for var in rspMsg.message_parameters_reference[0].variable:
-                    log.debug('  Variable:\n')
-                    log.debug('    standard_name: ' + var.standard_name + '\n')
-                    log.debug('    long_name: ' + var.long_name + '\n')
-                    log.debug('    units: ' + var.units + '\n')
-                    for attrib in var.other_attributes:
-                        log.debug('    Other Attributes:\n')
-                        log.debug('      ' + str(attrib) + str('\n'))
-
+                #self.__printMetadataVariables(rspMsg)
 
         
     @defer.inlineCallbacks
@@ -1620,6 +1612,19 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             if not datasetMetadata.IsFieldSet('download_url'):
                 self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
             i = i + 1                
+
+
+    def __printMetadataVariables(self, rspMsg):
+        log.debug('Minimum Metadata Variables:\n')
+        for var in rspMsg.message_parameters_reference[0].variable:
+            log.debug('  Variable:\n')
+            log.debug('    standard_name: ' + var.standard_name + '\n')
+            log.debug('    long_name: ' + var.long_name + '\n')
+            log.debug('    units: ' + var.units + '\n')
+            for attrib in var.other_attributes:
+                log.debug('    Other Attributes:\n')
+                log.debug('      ' + str(attrib) + str('\n'))
+
 
 
     @defer.inlineCallbacks
