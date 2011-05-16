@@ -185,15 +185,13 @@ class RpcParticipant(ConversationRole):
             defer.returnValue(res)
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
-            log.exception("*****RPC Request Application error in message processing*****")
-            log.error('*** Message payload received:')
-            log.error(pprint.pprint(headers))
-
-            if log.getEffectiveLevel() <= logging.INFO:
+            if log.getEffectiveLevel() <= logging.INFO:    # only output all this stuff when debugging
+                log.exception("*****RPC Request Application error in message processing*****")
+                log.error('*** Message payload received:')
+                log.error(pprint.pprint(headers))
                 log.error('*** Message Content: \n')
                 log.error(str(headers.get('content', '## No Content! ##')))
-
-            log.error("*****End RPC Request Application error in message processing*****")
+                log.error("*****End RPC Request Application error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
             if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':

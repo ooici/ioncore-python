@@ -1,15 +1,15 @@
 {
     "type":"application",
-    "name":"dataset_controller",
-    "description": "Dataset Controller",
+    "name":"identity_registry",
+    "description": "Identity Registry Service",
     "version": "0.1",
     "mod": ("ion.core.pack.processapp", [
-        'dataset_controller',
-        'ion.services.dm.inventory.dataset_controller',
-        'DatasetController'], {}
+        'identity_registry',
+        'ion.services.coi.identity_registry',
+        'IdentityRegistryService'], {}
     ),
     "registered": [
-       "dataset_controller"
+       "identity_registry"
     ],
     "applications": [
         "ioncore","ccagent"

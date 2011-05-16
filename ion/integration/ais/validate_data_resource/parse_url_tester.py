@@ -14,7 +14,6 @@ import urllib
 from ply.lex import lex
 from ply.yacc import yacc
 
-
 from data_resource_parser import Lexer, Parser, ParseException
 
 def validate(data_resource_url):
@@ -57,6 +56,7 @@ def validate(data_resource_url):
         print
 
     print "\n"
+
 
 if __name__ == "__main__":
     validate(sys.argv[1])

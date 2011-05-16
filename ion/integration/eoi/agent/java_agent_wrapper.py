@@ -425,7 +425,7 @@ class JavaAgentWrapper(ServiceProcess):
 #        yield  self.__ingest_client.demo(ingest_topic)
         log.info("@@@--->>> Sending update request to Dataset Agent with context...")
         log.debug("..." + str(context))
-        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
+        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=60) # @attention: where should this timeout come from?
 
         # @TODO check the result from the dataset agent!
 
@@ -706,7 +706,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.4.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.5.jar')
 
         if not os.path.exists(jar_pathname):
             log.error("JAR for dataset agent (%s) not found" % jar_pathname)

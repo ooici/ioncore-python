@@ -18,6 +18,9 @@ import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
 
+import base64
+import pprint
+
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
@@ -339,7 +342,7 @@ class IngestionService(ServiceProcess):
 
             ingest_res.update(data_details)
 
-            self.rc.put_instance(self.dataset)
+            yield self.rc.put_instance(self.dataset)
 
             # send notification we performed an ingest
             yield self._notify_ingest(ingest_res)
@@ -378,10 +381,10 @@ class IngestionService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):
-        log.info("op_recv_dataset(%s)" % type(content))
-        # this is NOT rpc
 
         log.info('op_recv_dataset - Start')
+
+        log.info(headers)
 
         if content.MessageType != CDM_DATASET_TYPE:
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
@@ -488,6 +491,9 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_done - Start')
 
+        log.info(headers)
+        
+
 
         log.info(type(content))
         log.info(str(content.Message))
@@ -496,9 +502,12 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        if content.status != content.StatusCode.OK:
-            result = {}
 
+
+        if content.status != content.StatusCode.OK:
+
+            result = {}
+            
             st = content.status
             if st == 1:
                 status = UNAVAILABLE
@@ -513,16 +522,18 @@ class IngestionService(ServiceProcess):
 
             result[EM_ERROR] = '%s: %s' % (status, content.status_body)
 
-            self._defer_ingest.callback(result)
-
         else:
 
             #@TODO ask dave for help here - how can I chain these callbacks?
-            yield self._merge_supplement()
+            result = yield self._merge_supplement()
 
 
         # this is NOT rpc
         yield msg.ack()
+
+
+        # trigger the op_perform_ingest to complete!
+        self._defer_ingest.callback(result)
 
         log.info('op_recv_done - Complete')
 
@@ -551,20 +562,6 @@ class IngestionService(ServiceProcess):
 
         # Get the root group of the current state of the dataset
         root = self.dataset.root_group
-
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-
-        #print root.PPrint()
-
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM'
-
 
         # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
@@ -654,12 +651,19 @@ class IngestionService(ServiceProcess):
             # We are appending an existing dataset - adjust the length of the aggregation dimension
             agg_dim = dims[merge_agg_dim.name]
             agg_dim.length += agg_offset
+            log.info('Setting the aggregation dimension %s to %d' % (agg_dim.name, agg_dim.length))
 
+
+        for var in root.variables:
+            log.info('Root Var Name: %s' % var.name)
 
 
 
         for merge_var in merge_root.variables:
             var_name = merge_var.name
+
+            log.info('Merge Var Name: %s' % merge_var.name)
+
 
             try:
                 var = root.FindVariableByName(var_name)
@@ -682,10 +686,6 @@ class IngestionService(ServiceProcess):
             # @TODO check attributes for variables which are not aggregated....
 
 
-
-            #print 'MERGEING VAR %s' % var_name
-            #print var.content.PPrint()
-
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
 
@@ -696,10 +696,7 @@ class IngestionService(ServiceProcess):
 
             log.info('Merged Variable %s into the dataset!' % var_name)
 
-            #print 'MERGED VAR....'
-            #print var.content.PPrint()
-            #print 'MERGEING Complete %s' % var_name
-
+            
             merge_att_ids = set()
             for merge_att in merge_var.attributes:
                 merge_att_ids.add(merge_att.MyId)
@@ -709,7 +706,15 @@ class IngestionService(ServiceProcess):
                 att_ids.add(att.MyId)
 
             if att_ids != merge_att_ids:
-                raise ImportError('Variable %s attributes are not the same in the supplement!' % var_name)
+
+                for merge_att in merge_var.attributes:
+                    log.error('Merge Att: %s, %s, %s' % (merge_att.name, str(merge_att.GetValue()), base64.encodestring(merge_att.MyId)[0:-1]))
+
+                for att in var.attributes:
+                    log.error('Att: %s, %s, %s' % (att.name, str(att.GetValue()), base64.encodestring(att.MyId)[0:-1]))
+
+                #@TODO turn this error detection back on!
+                #raise ImportError('Variable %s attributes are not the same in the supplement!' % var_name)
 
 
         # @TODO Get the vertical positive 'direction!' Deal with attributes accordingly.
@@ -742,6 +747,8 @@ class IngestionService(ServiceProcess):
         for merge_att in merge_root.attributes:
 
             att_name = merge_att.name
+
+            log.info('Merging Attribute: %s' % att_name)
 
             if att_name == 'ion_time_coverage_start':
                 root.MergeAttLesser(att_name, merge_root)
@@ -818,8 +825,7 @@ class IngestionService(ServiceProcess):
 
         log.debug('_merge_supplement - Complete')
 
-        # trigger the op_perform_ingest to complete!
-        self._defer_ingest.callback(result)
+        defer.returnValue(result)
 
 
 class IngestionClient(ServiceClient):
