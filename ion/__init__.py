@@ -15,7 +15,7 @@ test cases. The scope of the services is the full functionality of the
 OOI CI deliverable of release 1 transcending any subsystem prototypes.
 Initially, all services start out as stubs with their message sending and
 receiving interface only and have the potential to grow into a fully functional
-operational architecture prototype as required for LCA.
+operational architecture prototype as required for LCA. 
 
 
 @see http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
