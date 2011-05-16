@@ -314,6 +314,7 @@ class AppIntegrationTest(IonTestCase):
     def test_findDataResourcesByUser(self):
 
         log.debug('Testing findDataResourcesByUser.')
+        raise unittest.SkipTest('findDataResourcesByUser Skipped.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
@@ -355,7 +356,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2008-08-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
