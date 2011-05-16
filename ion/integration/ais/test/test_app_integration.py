@@ -354,8 +354,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2008-08-1T10:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -383,8 +383,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2009-08-1T00:02:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -411,8 +411,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:04:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2008-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-01-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -439,8 +439,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-24T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:04:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2007-01-1T10:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -1333,7 +1333,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
-       # first create a subscription to be updated
+        # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1362,6 +1362,29 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling updateDataResourceSubscription.')
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+
+        # now update the subscription updated above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1428,7 +1451,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1451,15 +1474,21 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
         log.debug('Calling deleteDataResourceSubscriptions.')
         rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to deleteDataResourceSubscription: '+str(rspMsg.error_str))
         else:
-            log.debug('POSITIVE rspMsg to deleteDataResourceSubscription')
+            log.info('POSITIVE rspMsg to deleteDataResourceSubscription')
+
+        # now delete the subscription deleted above again
+        log.debug('Calling deleteDataResourceSubscriptions a second time.')
+        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            log.info('correct ERROR rspMsg to deleteDataResourceSubscription')
+        else:
+            self.fail('rspMsg to deleteDataResourceSubscription was not an error')
 
 
     @defer.inlineCallbacks
@@ -1590,8 +1619,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
                 self.fail('dataset: ' +  dsResourceID + ' has no ion_geospatial_vertical_positive field')
             if not datasetMetadata.IsFieldSet('download_url'):
                 self.fail('dataset: ' +  dsResourceID + ' has no download_url field')
-            else:
-                log.debug('Download URL: ' + datasetMetadata.download_url)
             i = i + 1                
 
 
