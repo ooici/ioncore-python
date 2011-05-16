@@ -32,20 +32,8 @@ from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.instrument_constants import BaseEnum
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.exception import ApplicationError
-from ion.core.object import object_utils
-
-# GPB messaging imports
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
-
 
 log = ion.util.ionlog.getLogger(__name__)
-
-# References to protobuf message/object definitions
-SBE37_EVENT_TYPE = object_utils.create_type_identifier(object_id=4304, version=1)
-
 
 DEBUG_PRINT = (True,False)[0]
 IO_LOG = (True,False)[1]
@@ -727,26 +715,12 @@ class SBE37Driver(InstrumentDriver):
         self._fsm = InstrumentFSM(SBE37State,SBE37Event,self._state_handlers,
                                  SBE37Event.ENTER,SBE37Event.EXIT)
 
-        # Google Protocol Buffer messaging support
-        self._rc = ResourceClient(proc=self)
-        self._mc = MessageClient(proc=self)
 
     ###########################################################################
     # State handling method.
     ###########################################################################
 
-    @defer.inlineCallbacks
-    def _send_state(self, type, transducer, value): 
-            msg = yield self._mc.create_instance(SBE37_EVENT_TYPE)
-            msg.type = type
-            msg.transducer = transducer
-            msg.state = value
-            content = {'type': type,
-                       'transducer': transducer,
-                       'value': value}
-            yield self.send(self.proc_supid,'driver_event_occurred', msg)
          
-    @defer.inlineCallbacks
     def state_handler_unconfigured(self,event,params):
         """
         Event handler for STATE_UNCONFIGURED.
@@ -763,9 +737,10 @@ class SBE37Driver(InstrumentDriver):
         self._debug_print(event)
         if event == SBE37Event.ENTER:
             # Announce the state change to agent.                        
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.UNCONFIGURED)
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.UNCONFIGURED}
+            self.send(self.proc_supid,'driver_event_occurred',content)
             self._initialize()
 
         elif event == SBE37Event.EXIT:
@@ -780,11 +755,9 @@ class SBE37Driver(InstrumentDriver):
         
         else:
             success = InstErrorCode.INCORRECT_STATE
-        defer.returnValue((success,next_state))
-
+        return (success,next_state)
         
     
-    @defer.inlineCallbacks
     def state_handler_disconnected(self,event,params):
         """
         Event handler for STATE_DISCONNECTED.
@@ -802,9 +775,10 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.DISCONNECTED)
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.DISCONNECTED}
+            self.send(self.proc_supid,'driver_event_occurred',content)
             
             # If we enter a disconnect state with the connection complete
             # defered defined, then we are entering from a previous connection
@@ -828,10 +802,9 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
             
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_connecting(self,event,params):
         """
         Event handler for STATE_CONNECTING.
@@ -848,9 +821,10 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.CONNECTING)
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.CONNECTING}
+            self.send(self.proc_supid,'driver_event_occurred',content)
 
             self.getConnected()
             
@@ -867,9 +841,9 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
-    @defer.inlineCallbacks
+
     def state_handler_disconnecting(self,event,params):
         """
         Event handler for STATE_DISCONNECTING.
@@ -886,9 +860,11 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.DISCONNECTING)
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.DISCONNECTED}
+            self.send(self.proc_supid,'driver_event_occurred',content)            
+            
             self.getDisconnected()
             
         elif event == SBE37Event.EXIT:
@@ -900,9 +876,9 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
-    @defer.inlineCallbacks
+
     def state_handler_connected(self,event,params):
         """
         Event handler for STATE_CONNECTED.
@@ -922,10 +898,11 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.CONNECTED)
-                        
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.CONNECTED}
+            self.send(self.proc_supid,'driver_event_occurred',content)            
+            
             # If we enter connected with the connection complete deferred
             # defined we are establishing the initial connection in response
             # to a connect command. Send the reply to indicate successful
@@ -966,10 +943,9 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
         
-    @defer.inlineCallbacks
     def state_handler_acquire_sample(self,event,params):
         """
         Event handler for STATE_ACQUIRE_SAMPLE.
@@ -987,11 +963,12 @@ class SBE37Driver(InstrumentDriver):
 
         if event == SBE37Event.ENTER:
                         
-            # Announce the state change to agent.  
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.ACQUIRE_SAMPLE)
-                      
+            # Announce the state change to agent.            
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.ACQUIRE_SAMPLE}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
+                        
             # Initialize data buffer and copy device command buffer over
             # from the acquire command spec.
             command_spec = self._driver_command_buffer[0]
@@ -1062,17 +1039,16 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]                
                 self._debug_print('received samples',samples)
-                yield self._send_state(type = DriverAnnouncement.DATA_RECEIVED,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = samples)
-                                                          
+                content = {'type':DriverAnnouncement.DATA_RECEIVED,
+                           'transducer':SBE37Channel.INSTRUMENT,'value':samples}
+                self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
         else:
             success = InstErrorCode.INCORRECT_STATE
         
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
-    @defer.inlineCallbacks
+
     def state_handler_autosample(self,event,params):
         """
         Event handler for STATE_AUTOSAMPLE.
@@ -1093,10 +1069,11 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
 
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.AUTOSAMPLE)
-            
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.AUTOSAMPLE}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
+
             # Clear the data buffer and copy the device command buffer
             # from the autosample command spec.
             command_spec = self._driver_command_buffer[0]
@@ -1196,18 +1173,17 @@ class SBE37Driver(InstrumentDriver):
                 if len(samples)==1:
                     samples = samples[0]
                 self._debug_print('received samples',samples)
-                yield self._send_state(type = DriverAnnouncement.DATA_RECEIVED,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = samples)
+                content = {'type':DriverAnnouncement.DATA_RECEIVED,
+                           'transducer':SBE37Channel.INSTRUMENT,'value':samples}
+                self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
         else:
             
             success = InstErrorCode.INCORRECT_STATE
         
-        defer.returnValue((success,next_state))           
+        return (success,next_state)           
 
 
-    @defer.inlineCallbacks
     def state_handler_update_params(self,event,params):
         """
         Event handler for STATE_UPDATE_PARAMS.
@@ -1226,9 +1202,10 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.UPDATE_PARAMS)
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.UPDATE_PARAMS}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
               
             # Clear data buffer and populate device command buffer directly.
             self._data_lines = []
@@ -1262,9 +1239,10 @@ class SBE37Driver(InstrumentDriver):
             # Announce the config change to agent. This assumes
             # that param updates occur one-to-one with config changes.
             paramdict = self.get_parameter_dict()
-            yield self._send_state(type = DriverAnnouncement.CONFIG_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = paramdict)
+            content = {'type':DriverAnnouncement.CONFIG_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':paramdict}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                                
                     
         elif event == SBE37Event.PROMPTED:
             
@@ -1299,10 +1277,9 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_set(self,event,params):
         """
         Event handler for STATE_SET.
@@ -1322,10 +1299,11 @@ class SBE37Driver(InstrumentDriver):
         if event == SBE37Event.ENTER:
             
             # Announce the state change to agent.            
-            yield self._send_state(type = DriverAnnouncement.STATE_CHANGE,
-                       transducer = SBE37Channel.INSTRUMENT,
-                       value = SBE37State.SET)
-                        
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.SET}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                                
+            
             # Clear the data buffer and copy the device command buffer over
             # from the command spec.
             command_spec = self._driver_command_buffer[0]
@@ -1380,7 +1358,7 @@ class SBE37Driver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
             
-        defer.returnValue((success,next_state))
+        return (success,next_state)
 
 
     ###########################################################################
@@ -2793,5 +2771,4 @@ class SBE37DriverClient(InstrumentDriverClient):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(SBE37Driver)
-
 

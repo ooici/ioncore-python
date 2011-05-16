@@ -133,7 +133,7 @@ class InstrumentAgent(Process):
         self._driver_client = None
         
         """
-	The PubSub origin for the event publisher that this instrument agent uses to
+    The PubSub origin for the event publisher that this instrument agent uses to
         distribute messages related to generic events that it handles. One queue
         sends all messages, each tagged with an event ID number and the "agent"
         keyword or channel name if applicable (delimited by "."). If "agent"
@@ -306,7 +306,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agent.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.POWERED_DOWN)
             pass
@@ -334,7 +334,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Low level agent initialization beyond construction and plc.
-            origin = 'agent.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.UNINITIALIZED)
             pass
@@ -381,7 +381,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Agent initialization beyond driver spawn.
-            origin = 'agent.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.INACTIVE)
             pass
@@ -441,7 +441,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Save agent and driver running state.
-            origin = 'agent.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.STOPPED)
             pass
@@ -513,7 +513,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.IDLE)
             pass
@@ -580,7 +580,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.OBSERVATORY_MODE)
             pass
@@ -653,7 +653,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(),event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = '%s.%s' % ('',self.event_publisher_origin)
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.DIRECT_ACCESS_MODE)
             pass
@@ -726,7 +726,7 @@ class InstrumentAgent(Process):
         assert(isinstance(content,dict)), 'Expected a dict content.'
         acq_timeout = content.get('acq_timeout',None)
         exp_timeout = content.get('exp_timeout',None)
-        assert(acq_timeout==None or 
+        assert(acq_timeout==None or
                (isinstance(acq_timeout,int) and acq_timeout>=0)), \
             'Expected None or nonnegative int acquisition timeout'
         assert(exp_timeout==None or
@@ -884,7 +884,7 @@ class InstrumentAgent(Process):
 
         result = self._end_transaction(content)
             
-	# Publish an end transaction message...mainly as a test for now
+    # Publish an end transaction message...mainly as a test for now
         yield self._log_publisher.create_and_publish_event(name="Transaction ended!")
 
         # Publish any errors.
