@@ -113,18 +113,24 @@ class GetDataResourceDetail(object):
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
 
-        if not (dSourceResID is None):
-            log.debug('Associated datasourceID: ' + dSourceResID)
-
-            if self.bUseMetadataCache:
-                dSource = self.metadataCache.getDSource(dSourceResID)
-            else:
-                dSource = yield self.rc.get_instance(dSourceResID)
-        else:            
+        if (dSourceResID is None):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
             Response.error_str = "No Associated Data Source Found"
+            defer.returnValue(Response)
+
+        log.debug('Associated datasourceID: ' + dSourceResID)
+        if self.bUseMetadataCache:
+            dSource = self.metadataCache.getDSource(dSourceResID)
+        else:
+            dSource = yield self.rc.get_instance(dSourceResID)
+
+        if (dSource is None):
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS getDataResourceDetail error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "Data Source Found for ID: " + dSourceResID
             defer.returnValue(Response)
 
         self.__printSourceMetadata(dSource)
