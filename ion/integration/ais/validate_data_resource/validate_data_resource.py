@@ -7,9 +7,10 @@
 """
 
 
+from ply.lex import lex
+from ply.yacc import yacc
 
-
-from data_resource_parser import Lexer, Parser, ParseException
+from ion.integration.ais.validate_data_resource.data_resource_parser import Lexer, Parser, ParseException
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -102,22 +103,9 @@ class ValidateDataResource(object):
 
 
 
+            #get metadata!
+            parsed_das = self._parseDas(msg.data_resource_url)
 
-
-
-
-            #prepare to parse!
-            lexer = lex(module=Lexer())
-            parser = yacc(module=Parser(), write_tables=0, debug=False)
-
-            #fetch file
-            fullurl = msg.data_resource_url + ".das"
-            webfile = urllib.urlopen(fullurl)
-            dasfile = webfile.read()
-            webfile.close()
-
-            #crunch it!
-            parsed_das = parser.parse(dasfile)
 
 
         #url doesn't exist
@@ -195,3 +183,17 @@ class ValidateDataResource(object):
             if g.has_key("easternmost_longitude"):
                 out_msg.ion_geospatial_lon_max = g["easternmost_longitude"]["VALUE"]
 
+
+    def _parseDas(self, url):
+        #prepare to parse!
+        lexer = lex(module=Lexer())
+        parser = yacc(module=Parser(), write_tables=0, debug=False)
+
+        #fetch file
+        fullurl = url + ".das"
+        webfile = urllib.urlopen(fullurl)
+        dasfile = webfile.read()
+        webfile.close()
+        
+        #crunch it!
+        return parser.parse(dasfile)
