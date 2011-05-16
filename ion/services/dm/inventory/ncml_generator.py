@@ -122,7 +122,8 @@ def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
     """
     @brief Another hack. Take an RSA key, save it as an ssh-formatted file into
     the .ssh directory for use by rsync.
-    @param rsa_key RSA private key, as returned from 'ssh-keygen -t rsa'
+    @param private_key RSA private key, as returned from 'ssh-keygen -t rsa'
+    @param public_key Public half of same, used for ssh-add -d
     @retval Tuple of filenames - private and public key
     @note Raises IOError if necessary
     """
