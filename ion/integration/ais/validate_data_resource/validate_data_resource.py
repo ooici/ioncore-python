@@ -6,6 +6,7 @@
 @brief The worker class that implements data source URL validation
 """
 
+import urllib
 
 from ply.lex import lex
 from ply.yacc import yacc
@@ -148,7 +149,13 @@ class ValidateDataResource(object):
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(VALIDATE_DATASOURCE_RSP)
         self._populateResult(Response.message_parameters_reference[0].dataResourceSummary, parsed_das)
-        Response.message_parameters_reference[0].cdmResponse = cdm_result
+        Response.message_parameters_reference[0].cdmResponse.response_type = cdm_result.response_type
+        Response.message_parameters_reference[0].cdmResponse.cf_output = cdm_result.cf_output
+        Response.message_parameters_reference[0].cdmResponse.cdm_output = cdm_result.cdm_output
+        Response.message_parameters_reference[0].cdmResponse.cf_error_count = cdm_result.cf_error_count
+        Response.message_parameters_reference[0].cdmResponse.cf_warning_count = cdm_result.cf_warning_count
+        Response.message_parameters_reference[0].cdmResponse.cf_info_count = cdm_result.cf_info_count
+        Response.message_parameters_reference[0].cdmResponse.err_msg = cdm_result.err_msg
         defer.returnValue(Response)
 
 
@@ -161,27 +168,20 @@ class ValidateDataResource(object):
             if g.has_key("institution"):  out_msg.institution = g["institution"]["VALUE"]
             if g.has_key("source_data"):  out_msg.source = g["source_data"]["VALUE"]
             if g.has_key("references"):   out_msg.references = g["references"]["VALUE"]
+            if g.has_key("conventions"):   out_msg.conventions = g["Conventions"]["VALUE"]
+            if g.has_key("summary"):      out_msg.summary  = g["summary"]["VALUE"]
             if g.has_key("comment"):      out_msg.comment  = g["comment"]["VALUE"]
-
-            if g.has_key("start_date") and g.has_key("start_time"):
-                tmp = g["start_date"]["VALUE"] + " " + g["start_time"]["VALUE"]
-                out_msg.ion_time_coverage_start = tmp
-
-            if g.has_key("stop_date") and g.has_key("stop_time"):
-                tmp = g["stop_date"]["VALUE"] + " " + g["stop_time"]["VALUE"]
-                out_msg.ion_time_coverage_end = tmp
-
-            if g.has_key("southernmost_latitude"):
-                out_msg.ion_geospatial_lat_min = g["southernmost_latitude"]["VALUE"]
-
-            if g.has_key("northernmost_latitude"):
-                out_msg.ion_geospatial_lat_max = g["northernmost_latitude"]["VALUE"]
-
-            if g.has_key("westernmost_longitude"):
-                out_msg.ion_geospatial_lon_min = g["westernmost_longitude"]["VALUE"]
-
-            if g.has_key("easternmost_longitude"):
-                out_msg.ion_geospatial_lon_max = g["easternmost_longitude"]["VALUE"]
+            if g.has_key("time_coverage_start"):      out_msg.ion_time_coverage_start  = g["time_coverage_start"]["VALUE"]
+            if g.has_key("time_coverage_end"):      out_msg.ion_time_coverage_end  = g["time_coverage_end"]["VALUE"]
+            if g.has_key("geospatial_lat_min"):      out_msg.ion_geospatial_lat_min  = float(g["geospatial_lat_min"]["VALUE"])
+            if g.has_key("geospatial_lat_max"):      out_msg.ion_geospatial_lat_max  = float(g["geospatial_lat_max"]["VALUE"])
+            if g.has_key("geospatial_lon_min"):      out_msg.ion_geospatial_lon_min  = float(g["geospatial_lon_min"]["VALUE"])
+            if g.has_key("geospatial_lon_max"):      out_msg.ion_geospatial_lon_max  = float(g["geospatial_lon_max"]["VALUE"])
+            if g.has_key("geospatial_vertical_min"):      out_msg.ion_geospatial_vertical_min  = float(g["geospatial_vertical_min"]["VALUE"])
+            if g.has_key("geospatial_vertical_max"):      out_msg.ion_geospatial_vertical_max  = float(g["geospatial_vertical_max"]["VALUE"])
+            # TODO add algorithm to determine vertical positive value
+            out_msg.ion_geospatial_vertical_positive  = 'True'
+            # TODO add download URL?
 
 
     def _parseDas(self, url):
