@@ -57,7 +57,6 @@ class GetDataResourceDetail(object):
 
         if self.bUseMetadataCache:            
             ds = self.metadataCache.getDSet(dSetResID)
-            dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
             if ds is None:
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -66,6 +65,9 @@ class GetDataResourceDetail(object):
                 Response.error_str = "No Data Set Found for Dataset ID: " + dSetResID
                 defer.returnValue(Response)
 
+            dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
+            dSourceResID = dSetMetadata['DSourceID']
+            ownerID = dSetMetadata['OwnerID']
 
         else:            
             try:        
@@ -96,19 +98,17 @@ class GetDataResourceDetail(object):
                 RspMsg.error_str = ex.msg_content.MessageResponseBody
                 defer.returnValue(RspMsg)
 
-        #
-        # Find the datasource associated with this dataset, and then find the
-        # owner associated with the dataset; for now, instantiate
-        # a FindDataResources worker object. The getAssociatedSource should be
-        # moved into a common worker class; it's currently in the FindDataResources
-        # class, which doesn't use it.
-        #
-        log.debug('getDataResourceDetail getting datasource resource instance')
-        worker = FindDataResources(self.ais)
-        dSourceResID = dSetMetadata['DSourceID']
-        ownerID = dSetMetadata['OwnerID']
-        #dSourceResID = yield worker.getAssociatedSource(dSetResID)
-        #ownerID = yield worker.getAssociatedOwner(dSetResID)
+            #
+            # Find the datasource associated with this dataset, and then find the
+            # owner associated with the dataset; for now, instantiate
+            # a FindDataResources worker object. The getAssociatedSource should be
+            # moved into a common worker class; it's currently in the FindDataResources
+            # class, which doesn't use it.
+            #
+            log.debug('getDataResourceDetail getting datasource resource instance')
+            worker = FindDataResources(self.ais)
+            dSourceResID = yield worker.getAssociatedSource(dSetResID)
+            ownerID = yield worker.getAssociatedOwner(dSetResID)
         
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
