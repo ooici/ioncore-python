@@ -97,8 +97,10 @@
 # Bootlevel 9 #
 #-------------#
 
-        # Add Ingestion Service
-        # Add Notification Email Service
+        {'name':'ingestion',    'version':'0.1',
+
+        },
+
         {'name':'notification_alert', 'version':'0.1',
                                       'processapp':('notification_alert_service', 'ion.integration.ais.notification_alert_service', 'NotificationAlertService'),
         },

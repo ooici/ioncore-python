@@ -8,9 +8,10 @@
 """
 
 # Imports:
-import os
+import os, time, calendar
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
+from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.core.process.process import Process, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.resource_client import \
@@ -24,6 +25,8 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
+
+from ion.core.exception import ApplicationError
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -46,6 +49,12 @@ IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 DATA_SOURCE_TYPE = object_utils.create_type_identifier(object_id=4503, version=1)
 DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 
+class JavaAgentWrapperException(ApplicationError):
+    """
+    An exception calss for the Java Agent Wrapper
+
+    Be careful using this - there is no process to notify of the error on ingest!
+    """
 
 class JavaAgentWrapper(ServiceProcess):
     """
@@ -191,7 +200,7 @@ class JavaAgentWrapper(ServiceProcess):
         log.debug(" -[]- Entered slc_activate(); state=%s" % (str(self._get_state())))
         # Step 1: Delegate initialization to parent class
         # slc_activate is only for over ride in subclasses - no need to callit!
-        #yield defer.maybeDeferred(ServiceProcess.slc_activate, self)
+        yield defer.maybeDeferred(ServiceProcess.slc_activate, self)
         
         # Step 2: Suspend execution until receipt of the external child process's binding key
         def _recieve_binding_key(self):
@@ -389,7 +398,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
         log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
         if self.__ingest_client is None:
-            self.__ingest_client = IngestionClient()
+            self.__ingest_client = IngestionClient(proc=self)
         
         reply_to        = self.receiver.name
         ingest_timeout  = context.max_ingest_millis
@@ -399,11 +408,11 @@ class JavaAgentWrapper(ServiceProcess):
         # Create the PerformIngestMessage
         begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
         begin_msg.dataset_id                = content.dataset_id
-        begin_msg.data_source_id            = content.data_source_id
+        begin_msg.datasource_id             = content.data_source_id
         begin_msg.reply_to                  = reply_to
-        begin_msg.ingest_timeout            = ingest_timeout
+        begin_msg.ingest_service_timeout    = ingest_timeout
 
-        perform_ingest_deferred = self.__ingest_client.ingest(msg)
+        perform_ingest_deferred = self.__ingest_client.ingest(begin_msg)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
@@ -418,7 +427,10 @@ class JavaAgentWrapper(ServiceProcess):
         log.debug("..." + str(context))
         (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
 
-        
+
+        log.info('Dataset Agent Reply Content: %s' % str(content))
+        log.info('Dataset Agent Reply Headers: %s' % str(headers))
+
         # @todo: change reply based on response of the RPC send
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
 #        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
@@ -475,9 +487,11 @@ class JavaAgentWrapper(ServiceProcess):
         # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
         if datasetID and not dataSourceID:
             dataSourceID = yield self._get_associated_data_source_id(datasetID)
-        if dataSourceID and not datasetID:
+        elif dataSourceID and not datasetID:
             datasetID = yield self._get_associated_dataset_id(dataSourceID)
-        
+        elif not datasetID and not dataSourceID:
+            raise JavaAgentWrapperException('Must provide data source or dataset ID!')
+
         
         log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
@@ -499,16 +513,34 @@ class JavaAgentWrapper(ServiceProcess):
         if str(datasetID).startswith(TESTING_SIGNIFIER):
             testing = True
         msg.source_type = datasource.source_type
-        msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+
+        try:
+            string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
+            # Get the time since epoch in seconds.
+            start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+
+        except OOIObjectError, oe:
+            log.debug('No start time attribute found in dataset!' + str(oe))
+
+            start_time_seconds = calendar.timegm(datetime.datetime.utcnow()) - datasource.update_interval_seconds
+
+
         if testing:
             log.debug('\n\n\n\nTESTING\n\n\n\n')
-            startTime = datetime.datetime.strptime(msg.start_time, '%Y-%m-%dT%H:%M:%SZ')
-            deltaTime = datetime.timedelta(days=3)
-            endTime = startTime + deltaTime
+            deltaTime = 3*86400 # 3 days in seconds
+            end_time_seconds = start_time_seconds + deltaTime
         else:
             log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
-            endTime = datetime.datetime.utcnow()
-        msg.end_time = endTime.strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_time_seconds = calendar.timegm(datetime.datetime.utcnow())
+
+        stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
+        log.info('Getting Data Start time: %s' % stime)
+        etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
+        log.info('Getting Data Start time: %s' % etime)
+
+        msg.start_datetime_millis = start_time_seconds * 1000
+
+        msg.end_datetime_millis = end_time_seconds * 1000
 
         msg.property.extend(datasource.property)
         msg.station_id.extend(datasource.station_id)
@@ -523,10 +555,10 @@ class JavaAgentWrapper(ServiceProcess):
         msg.ncml_mask = datasource.ncml_mask
         msg.max_ingest_millis = datasource.max_ingest_millis
 
-        if datasource.FieldIsSet('authentication'):
+        if datasource.IsFieldSet('authentication'):
             msg.authentication = datasource.authentication
 
-        if datasource.FieldIsSet('search_pattern'):
+        if datasource.IsFieldSet('search_pattern'):
             msg.search_pattern = datasource.search_pattern
         
         defer.returnValue(msg)
@@ -672,7 +704,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'res/apps/eoi_ds_agent/DatasetAgent.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.4.jar')
 
         if not os.path.exists(jar_pathname):
             log.error("JAR for dataset agent (%s) not found" % jar_pathname)

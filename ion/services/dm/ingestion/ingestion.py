@@ -26,7 +26,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
-from ion.services.dm.ingestion import cdm_attribute_methods
+from ion.core.object.cdm_methods import attribute_merge
 
 from ion.core.exception import ApplicationError
 
@@ -140,12 +140,15 @@ class IngestionService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_activate(self):
 
+        log.info('Activation - Start')
+
         pub_factory = PublisherFactory(process=self)
 
         self._notify_ingest_publisher = yield pub_factory.build(publisher_type=DatasetSupplementAddedEventPublisher)
 
         self._notify_unavailable_publisher = yield pub_factory.build(publisher_type=DatasourceUnavailableEventPublisher)
 
+        log.info('Activation - Complete')
 
 
     @defer.inlineCallbacks
@@ -154,6 +157,8 @@ class IngestionService(ServiceProcess):
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
         """
+
+        log.info('op_create_dataset_topics - Start')
 
         # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
         msg = yield self.mc.create_instance(XS_TYPE)
@@ -178,6 +183,10 @@ class IngestionService(ServiceProcess):
         rc = yield self._pscclient.declare_topic(msg)
 
         yield self.reply_ok(msg)
+
+        log.info('op_create_dataset_topics - Complete')
+
+
 
     class IngestSubscriber(Subscriber):
         """
@@ -205,7 +214,7 @@ class IngestionService(ServiceProcess):
         Factor out the preparation for ingestion so that we can unit test functionality
         """
 
-        log.info('Prepare ingest: Start')
+        log.debug('_prepare_ingest - Start')
 
         # Get the current state of the dataset:
         self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
@@ -218,7 +227,7 @@ class IngestionService(ServiceProcess):
             var_links = var.content.bounded_arrays.GetLinks()
             ba_links.extend(var_links)
 
-        self.dataset.Repository.fetch_links(ba_links)
+        yield self.dataset.Repository.fetch_links(ba_links)
 
         try:
             att = self.dataset.root_group.FindAttributeByName('title')
@@ -243,7 +252,14 @@ class IngestionService(ServiceProcess):
                        EM_DATASET:content.dataset_id,
                        }
 
-        log.info('Created dataset details, Now setup subscriber...')
+        log.debug('_prepare_ingest - Complete')
+
+        defer.returnValue(data_details)
+
+    @defer.inlineCallbacks
+    def _setup_ingestion_topic(self, content):
+
+        log.debug('_setup_ingestion_topic - Start')
 
         # TODO: replace this from the msg itself with just dataset id
         ingest_data_topic = content.dataset_id
@@ -259,10 +275,9 @@ class IngestionService(ServiceProcess):
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
-        log.info('Prepare ingest: complete!')
+        log.debug('_setup_ingestion_topic - Complete')
 
-
-        defer.returnValue(data_details)
+        defer.returnValue(ingest_data_topic)
 
 
     @defer.inlineCallbacks
@@ -271,14 +286,17 @@ class IngestionService(ServiceProcess):
         Start the ingestion process by setting up necessary
         @TODO NO MORE MAGNET.TOPIC
         """
-        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
-        log.debug("...Content:\t" + str(content))
+        log.info('op_ingest - Start')
 
         if content.MessageType != PERFORM_INGEST_MSG_TYPE:
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
         data_details = yield self._prepare_ingest(content)
+
+        log.info('Created dataset details, Now setup subscriber...')
+
+        ingest_data_topic = yield self._setup_ingestion_topic(content)
 
 
         def _timeout():
@@ -333,11 +351,18 @@ class IngestionService(ServiceProcess):
             log.debug("Ingest failed, error back to original request")
             raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
 
+        log.info('op_ingest - Complete')
+
+
+
     @defer.inlineCallbacks
     def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
         """
+
+        log.debug('_notify_ingest - Start')
+
 
         if ingest_res.has_key(EM_ERROR):
             # Report an error with the data source
@@ -348,12 +373,15 @@ class IngestionService(ServiceProcess):
             dataset_id = ingest_res[EM_DATASET]
             yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
 
+        log.debug('_notify_ingest - Complete')
 
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):
         log.info("op_recv_dataset(%s)" % type(content))
         # this is NOT rpc
+
+        log.info('op_recv_dataset - Start')
 
         if content.MessageType != CDM_DATASET_TYPE:
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
@@ -390,9 +418,14 @@ class IngestionService(ServiceProcess):
 
         yield msg.ack()
 
+        log.info('op_recv_dataset - Complete')
+
+
     @defer.inlineCallbacks
     def op_recv_chunk(self, content, headers, msg):
-        log.info("op_recv_chunk(%s)" % type(content))
+
+        log.info('op_recv_chunk - Start')
+
         # this is NOT rpc
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
@@ -444,12 +477,17 @@ class IngestionService(ServiceProcess):
 
         yield msg.ack()
 
+        log.info('op_recv_chunk - Complete')
+
+
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
         """
         @TODO deal with FMRC datasets and supplements
         """
-        log.info("op_recv_done(%s)" % type(content))
+
+        log.info('op_recv_done - Start')
+
         if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
@@ -482,11 +520,14 @@ class IngestionService(ServiceProcess):
         # this is NOT rpc
         yield msg.ack()
 
-        defer.returnValue(None)
-        
+        log.info('op_recv_done - Complete')
+
 
     @defer.inlineCallbacks
     def _merge_supplement(self):
+
+
+        log.debug('_merge_supplement - Start')
 
         # A little sanity check on entering recv_done...
         if len(self.dataset.Repository.branches) != 2:
@@ -699,33 +740,33 @@ class IngestionService(ServiceProcess):
             att_name = merge_att.name
 
             if att_name == 'ion_time_coverage_start':
-                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                root.MergeAttLesser(att_name, merge_root)
 
             elif att_name == 'ion_time_coverage_end':
-                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                root.MergeAttGreater(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lat_min':
-                cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                root.MergeAttLesser(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lat_max':
-                cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                root.MergeAttGreater(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lon_min':
                 # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
             elif att_name == 'ion_geospatial_lon_max':
                 # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
 
             elif att_name == 'ion_geospatial_vertical_min':
 
                 if vertical_positive == 'down':
-                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                    root.MergeAttLesser(att_name, merge_root)
 
                 elif vertical_positive == 'up':
-                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                    root.MergeAttGreater(att_name, merge_root)
 
                 else:
                     raise OOIObjectError('Invalid value for Vertical Positive')
@@ -734,10 +775,10 @@ class IngestionService(ServiceProcess):
             elif att_name == 'ion_geospatial_vertical_max':
 
                 if vertical_positive == 'down':
-                    cdm_attribute_methods.MergeAttGreater(root, att_name, merge_root)
+                    root.MergeAttGreater(att_name, merge_root)
 
                 elif vertical_positive == 'up':
-                    cdm_attribute_methods.MergeAttLesser(root, att_name, merge_root)
+                    root.MergeAttLesser(att_name, merge_root)
 
                 else:
                     raise OOIObjectError('Invalid value for Vertical Positive')
@@ -745,10 +786,10 @@ class IngestionService(ServiceProcess):
 
             elif att_name == 'history':
                 # @TODO is this the correct treatment for history?
-                cdm_attribute_methods.MergeAttDstOver(root, att_name, merge_root)
+                root.MergeAttDstOver(att_name, merge_root)
 
             else:
-                cdm_attribute_methods.MergeAttSrc(root, att_name, merge_root)
+                root.MergeAttSrc(att_name, merge_root)
 
 
 
@@ -770,6 +811,8 @@ class IngestionService(ServiceProcess):
                   EM_END_DATE:supplement_etime*1000,
                   EM_TIMESTEPS:supplement_length}
 
+
+        log.debug('_merge_supplement - Complete')
 
         # trigger the op_perform_ingest to complete!
         self._defer_ingest.callback(result)

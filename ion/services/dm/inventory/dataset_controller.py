@@ -121,7 +121,7 @@ class DatasetController(ServiceProcess):
                                              dependencies=['scheduler'])
 
     @defer.inlineCallbacks
-    def slc_deactivate(self):
+    def slc_terminate(self):
         if not self.walrus:
             defer.returnValue(None)
 
@@ -130,13 +130,13 @@ class DatasetController(ServiceProcess):
         msg.task_id = self.sched_task_id
         yield self.ssc.rm_task(msg)
 
-    @defer.inlineCallbacks
-    def slc_init(self):
-        """
-        Service life cycle state. Initialize service here. Can use yields.
 
-        Can be called in __init__ or in slc_init... no yield required
-        """
+
+    def __init__(self, *args, **kwargs):
+        # Service class initializer. Basic config, but no yields allowed.
+
+        ServiceProcess.__init__(self, *args, **kwargs)
+
         self.resource_client = ResourceClient(proc=self)
         self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
@@ -169,13 +169,27 @@ class DatasetController(ServiceProcess):
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))
         log.debug('Scheduler queue name: %s Task ID: %s' % (self.queue_name, self.task_id))
 
+
+
+        log.info('INIT complete for Dataset Controller Service.')
+
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        """
+        Service life cycle state. Initialize service here. Can use yields.
+
+        Can be called in __init__ or in slc_init... no yield required
+        """
+
         log.debug('Creating new message receiver for scheduler')
         self.sesc = RsyncHandler(self.do_ncml_sync,
                                 queue_name=self.queue_name,
                                 origin=SCHEDULE_TYPE_DSC_RSYNC,
                                 process=self)
-        yield self.sesc.initialize()
-        yield self.sesc.activate()
+        # Add the receiver as a registered life cycle object
+        yield self.register_life_cycle_object(self.sesc)
+
 
         if self.walrus:
             log.debug('I am the walrus.')
@@ -208,17 +222,26 @@ class DatasetController(ServiceProcess):
         any new ncml files over.
         """
         log.debug('rsync scheduled beginning now')
-        if check_for_ncml_files(self.ncml_path):
-            log.debug('NcML files found, invoking rsync')
-            self.cwd = getcwd()
-            chdir(self.ncml_path)
-            yield do_complete_rsync(self.ncml_path, self.server_url,
+        #if check_for_ncml_files(self.ncml_path):
+
+        query_result = yield self._get_active_dataset_resources()
+
+        for id_ref in query_result.idrefs:
+            create_ncml(id_ref.key, self.ncml_path)
+
+        log.debug('NcML files found, invoking rsync')
+        self.cwd = getcwd()
+        chdir(self.ncml_path)
+        yield do_complete_rsync(self.ncml_path, self.server_url,
                                     self.private_key, self.public_key)
 
-            chdir(self.cwd)
-            log.debug('rsync complete')
-        else:
-            log.debug('No ncml found, doing nothing')
+        chdir(self.cwd)
+        log.debug('rsync complete')
+
+        defer.returnValue(None)
+
+        #else:
+        #    log.debug('No ncml found, doing nothing')
         
     #noinspection PyUnusedLocal
     @defer.inlineCallbacks
@@ -359,6 +382,55 @@ class DatasetController(ServiceProcess):
         # The result is the same type
         self.reply_ok(msg, result)
 
+
+    @defer.inlineCallbacks
+    def _get_active_dataset_resources(self):
+        """
+        get the dataset ids to create the tds ncml
+        """
+
+
+        log.info('_get_active_dataset_resources: ')
+
+
+        query = yield self.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = query.pairs.add()
+
+        # Set the predicate search term
+        pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = query.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
+
+
+        #### Add a life cycle state request
+        pair = query.pairs.add()
+
+        # Set the predicate search term
+        pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+
+        # Set the Object search term
+        state_ref = query.CreateObject(LCS_REFERENCE_TYPE)
+        # @TODO What state should we use?
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
+        result = yield self.asc.get_subjects(query)
+
+        # The result is the same type
+        defer.returnValue(result)
 
 
 class DatasetControllerClient(ServiceClient):

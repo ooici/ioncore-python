@@ -5,7 +5,6 @@
 @author David Stuebe
 """
 
-from ion.util import procutils as pu
 from ion.util.cache import memoize
 
 from net.ooici.core.type import type_pb2
@@ -16,12 +15,21 @@ import os
 from google.protobuf import message
 from google.protobuf.internal import containers
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 # Globals
 gpb_id_to_class = {}
 
 class ObjectUtilException(Exception):
     """ Exceptions specific to Object Utilities. """
     pass
+
+class OOIObjectError(Exception):
+    """
+    An exception class for errors that occur in the Object Wrapper class
+    """
+
 
 def __eq__gpbtype(self, other):
     ''' Improve performance on GPBType comparisons enormously. '''
@@ -257,5 +265,71 @@ def open_proto(typeid):
         py_path = os.path.join(py_dir, proto_dir, py_file)
         launch(py_path)
 
+
+
+def _gpb_source(func):
+
+    def call_func(self, *args, **kwargs):
+
+        func_name = func.__name__
+        '''
+        print 'GPB SOURCE'
+        print 'func name', func_name, func
+        print 'args', args
+        print 'kwargs', kwargs
+        '''
+        source = self._source
+        if source._invalid:
+            log.error(source.Debug())
+            raise OOIObjectError('Can not access Invalidated Object in function "%s"' % func_name)
+
+        return func(source, *args, **kwargs)
+
+    return call_func
+
+def _gpb_source_root(func):
+
+        def call_func(self, *args, **kwargs):
+
+            func_name = func.__name__
+
+            '''
+            print 'GPB SOURCE ROOT'
+
+            print 'func name', func_name, func
+            print 'args', args
+            print 'kwargs', kwargs
+            '''
+            source = self._source
+            if source._invalid:
+                log.error(source.Debug())
+                raise OOIObjectError('Can not access Invalidated Object in function "%s"' % func_name)
+
+            source_root = source._root
+
+            return func(source_root, *args, **kwargs)
+
+
+        return call_func
+
+
+
+
 # Build the lookup table on first import
 build_gpb_lookup('net')
+
+# Build the CDM TYPES for import 
+CDM_GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
+CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
+CDM_VARIABLE_TYPE = create_type_identifier(object_id=10024, version=1)
+CDM_DIMENSION_TYPE = create_type_identifier(object_id=10018, version=1)
+CDM_ATTRIBUTE_TYPE = create_type_identifier(object_id=10017, version=1)
+ARRAY_STRUCTURE_TYPE = create_type_identifier(object_id=10025, version=1)
+CDM_ARRAY_INT32_TYPE = create_type_identifier(object_id=10009, version=1)
+CDM_ARRAY_UINT32_TYPE = create_type_identifier(object_id=10010, version=1)
+CDM_ARRAY_INT64_TYPE = create_type_identifier(object_id=10011, version=1)
+CDM_ARRAY_UINT64_TYPE = create_type_identifier(object_id=10012, version=1)
+CDM_ARRAY_FLOAT32_TYPE = create_type_identifier(object_id=10013, version=1)
+CDM_ARRAY_FLOAT64_TYPE = create_type_identifier(object_id=10014, version=1)
+CDM_ARRAY_STRING_TYPE = create_type_identifier(object_id=10015, version=1)
+CDM_ARRAY_OPAQUE_TYPE = create_type_identifier(object_id=10016, version=1)

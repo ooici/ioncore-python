@@ -189,6 +189,9 @@ class ManageResources(object):
 
    def __LoadIdentityColumnHeadrers(self, To):
       To.column_names.append('OoiId')
+      To.column_names.append('Name')
+      To.column_names.append('Email')
+      To.column_names.append('Institution')
       To.column_names.append('Subject')
 
 
@@ -214,6 +217,9 @@ class ManageResources(object):
    def __LoadIdentityColumnData(self, To, From, Id):
       try:
          To.attribute.append(Id)
+         To.attribute.append(From.name)
+         To.attribute.append(From.email)
+         To.attribute.append(From.institution)
          To.attribute.append(From.subject)
       
       except:

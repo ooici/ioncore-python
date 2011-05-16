@@ -10,9 +10,11 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import ion.util.procutils as pu
 
 from twisted.internet import defer
 
+from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
@@ -25,6 +27,8 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, \
+    DatasetSupplementAddedEventSubscriber
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
@@ -75,6 +79,22 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
 DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 
+class TestDataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
+    def __init__(self, *args, **kwargs):
+        self.msgs = []
+        DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
+                
+    def ondata(self, data):
+        log.error("DatasetSupplementAddedEventSubscriber received a message with name: %s",
+                  data['content'].name)
+        content = data['content']
+
+        if hasattr(content, 'Repository'):
+            content.Repository.persistent = True
+
+        self.msgs.append(data)
+                
+
 
 class AppIntegrationTest(IonTestCase):
    
@@ -119,7 +139,7 @@ class AppIntegrationTest(IonTestCase):
                 'spawnargs':
                     {
                         'datastore_service':'datastore'}
-                    },
+            },
             {
                 'name':'exchange_management',
                 'module':'ion.services.coi.exchange.exchange_management',
@@ -172,6 +192,7 @@ class AppIntegrationTest(IonTestCase):
         self.aisc = AppIntegrationServiceClient(proc=sup)
         self.rc = ResourceClient(proc=sup)
         self.ac  = AssociationClient(proc=sup)
+        self._proc = Process()
 
         # Step 1: Get this dispatcher's ID from the local dispatcher.id file
         f = None
@@ -1468,6 +1489,45 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.info('correct ERROR rspMsg to deleteDataResourceSubscription')
         else:
             self.fail('rspMsg to deleteDataResourceSubscription was not an error')
+
+
+    @defer.inlineCallbacks
+    def test_cacheUpdate(self):
+        """
+        Test to see if wildcards match for subscribers
+        """
+        subproc = Process()
+        yield subproc.spawn()
+        #test_origin = "%s.%s" % ("chan1", str(subproc.id))
+        #testsub = TestDataResourceUpdateEventSubscriber(origin=test_origin,
+        #                              process=subproc)
+        testsub = TestDataResourceUpdateEventSubscriber(process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+        
+        # Setup the publisher
+        pub1 = DatasetSupplementAddedEventPublisher(process=self._proc)
+        yield pub1.initialize()
+        yield pub1.activate()
+        
+        yield pu.asleep(1.0)
+        
+        yield pub1.create_and_publish_event(
+            name = "TestUpdateEvent",
+            origin = "DATASET RESOURCE ID",
+            dataset_id = "dataresrc123",
+            datasource_id = "dataresrc123",
+            title = "TODO",
+            url = "TODO",
+            start_datetime_millis = 10000,
+            end_datetime_millis = 11000,
+            number_of_timesteps = 7
+            )
+
+        # Pause to make sure we catch the message
+        yield pu.asleep(1.0)
+        
+        self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
 
 
     def __validateDatasetByOwnerMetadata(self, metadata):

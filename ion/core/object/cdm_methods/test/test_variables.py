@@ -11,13 +11,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from net.ooici.core.type import type_pb2
-from net.ooici.play import addressbook_pb2
-from ion.core.object import gpb_wrapper
 
 from ion.test.iontest import IonTestCase
 from ion.core.object.object_utils import *
-from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 
@@ -26,7 +22,7 @@ CDM_ARRAY_STRUC_TYPE = create_type_identifier(object_id=10025, version=1)
 CDM_BOUNDED_ARRAY_TYPE = create_type_identifier(object_id=10021, version=1)
 CDM_F64_ARRAY_TYPE = create_type_identifier(object_id=10014, version=1)
 
-from ion.services.dm.ingestion.cdm_variable_methods import _flatten_index
+from ion.core.object.cdm_methods.variables import _flatten_index
 
 class CdmVariableTest(IonTestCase):
     """

@@ -10,8 +10,7 @@ there but resource types are not...
 
 """
 import math
-from ion.core.object.gpb_wrapper import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE
-from ion.core.object.repository import ARRAY_STRUCTURE_TYPE
+from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -238,6 +237,7 @@ class DataStoreWorkbench(WorkBench):
             raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
         repo = yield self._resolve_repo_state(request.repository_key)
+        repo.cached = True
 
         ####
         # Back to boiler plate op_pull
@@ -1169,6 +1169,7 @@ class DataStoreWorkbench(WorkBench):
         key = request.object_id.key
         repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
         assert repo
+        repo.cached = True
 
         # @TODO: use first head for now
         comms = repo.current_heads()

@@ -6,10 +6,10 @@
 @author Matt Rodriguez
 """
 import base64
+from twisted.trial import unittest
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
-from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE
 from ion.core.process.process import Process
-from ion.services.dm.ingestion.test.test_cdm_variable_methods import CDM_ARRAY_STRUC_TYPE, CDM_F64_ARRAY_TYPE
+from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -41,7 +41,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DA
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
 
 from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE
-from ion.core.object.gpb_wrapper import CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE, StructureElement
+from ion.core.object.gpb_wrapper import StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -685,6 +685,10 @@ class CassandraBackedDataStoreTest(DataStoreTest):
         yield DataStoreTest.tearDown(self)
 
 
+    def test_put_blobs(self):
+        raise unittest.SkipTest("This test does not work with the cassandra backend.")
+
+
 class DataStoreExtractDataTest(IonTestCase):
     services = [
         {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
@@ -732,12 +736,12 @@ class DataStoreExtractDataTest(IonTestCase):
         # one is 3d, as a single bounded array
         # the other is 4d as multiple ba's
 
-        repo = self.wb1.workbench.create_repository(CDM_ARRAY_STRUC_TYPE)
+        repo = self.wb1.workbench.create_repository(ARRAY_STRUCTURE_TYPE)
 
         # Create the array structure
         content = repo.root_object
         ba1 = yield repo.create_object(CDM_BOUNDED_ARRAY_TYPE)
-        arr1 = yield repo.create_object(CDM_F64_ARRAY_TYPE)
+        arr1 = yield repo.create_object(CDM_ARRAY_FLOAT64_TYPE)
 
         ba1.bounds.add()
         ba1.bounds[0].origin = 0
@@ -763,7 +767,7 @@ class DataStoreExtractDataTest(IonTestCase):
         self.first_struct_as_key = content.MyId
 
         # create second array structure
-        repo = self.wb1.workbench.create_repository(CDM_ARRAY_STRUC_TYPE)
+        repo = self.wb1.workbench.create_repository(ARRAY_STRUCTURE_TYPE)
 
         # Create the array structure
         content = repo.root_object
@@ -784,7 +788,7 @@ class DataStoreExtractDataTest(IonTestCase):
                 ba.bounds[y].origin = 0
                 ba.bounds[y].size = 20
 
-            arr = yield repo.create_object(CDM_F64_ARRAY_TYPE)
+            arr = yield repo.create_object(CDM_ARRAY_FLOAT64_TYPE)
             arrs.append(arr)
 
             arr.value.extend((float(val) for val in xrange(x * totalintopdim, (x+1)*totalintopdim)))

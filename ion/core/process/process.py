@@ -13,6 +13,9 @@ from twisted.python import failure
 
 from zope.interface import implements, Interface
 
+import StringIO
+
+import logging
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -800,6 +803,16 @@ class Process(BasicLifecycleObject):
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf():
             log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,conv.conv_id))
+            p_headers = StringIO.StringIO()
+            pprint.pprint(headers, stream=p_headers)
+            p_content = StringIO.StringIO()
+            pprint.pprint(content, stream=p_content)
+
+            log.info('Timedout Message Receive: %s' % recv)
+            log.info('Timedout Message Headers: %s' % p_headers.getvalue())
+            log.info('Timedout Message Operation: %s' % operation)
+            log.info('Timedout Message Content: %s' % p_content.getvalue())
+
             # Remove RPC. Delayed result will go to catch operation
             conv.timeout = str(pu.currenttime_ms())
             conv.blocking_deferred.errback(defer.TimeoutError())

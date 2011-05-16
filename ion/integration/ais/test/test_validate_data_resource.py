@@ -21,6 +21,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+from ion.integration.ais.validate_data_resource.validate_data_resource import ValidateDataResource
 
 from ion.core.messaging.message_client import MessageClient
 
@@ -125,6 +126,15 @@ class AISValidateDataResourceTest(IonTestCase):
         self.failUnlessEqual(res.ion_geospatial_lat_max, 89.956055)
         self.failUnlessEqual(res.ion_geospatial_lon_min, -179.95605)
         self.failUnlessEqual(res.ion_geospatial_lon_max, 179.95605)
+
+
+    @defer.inlineCallbacks
+    def test_parserOnlyPositive(self):
+        raise unittest.SkipTest("Not sure how to create proper process for this test.  Use parse_url_tester.py instead.")
+        v = ValidateDataResource()
+        parsed_result = v._parseDas("http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc")
+
+        res = parsed_result
 
 
     @defer.inlineCallbacks
