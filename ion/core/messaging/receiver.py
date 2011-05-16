@@ -246,20 +246,28 @@ class Receiver(BasicLifecycleObject):
                 convid = data.get('conv-id', None)
                 protocol = data.get('protocol', None)
                 performative = data.get('performative', None)
+                op = data.get('op', None)
+
 
                 request.convid = convid
                 request.protocol = protocol
                 request.performative = performative
 
-                """
+
                 print 'BEFORE YIELD'
+                print 'OP "%s"' % op
                 print 'CONVID "%s"' %  convid
                 print 'PERFORMATIVE "%s"' % performative
                 print 'PROTOCOL "%s"' % protocol
-                """
+                print 'Workbench Context "%s"' % request.workbench_context
+
+                print "WORKBENCH STATE", self.process.workbench
+                
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
+
+                    log.warn('Setting non rpc workbench_context: %s ' % convid)
                     request.workbench_context = convid
 
                 #####################################################################################
@@ -268,8 +276,10 @@ class Receiver(BasicLifecycleObject):
                 ### but turning that on crashes a lot of tests currently.  @TODO'ing it for later.
                 ### df 13 may 2011
                 #####################################################################################
-                elif performative is 'request':
+                elif performative == 'request':
                     # if it is an rpc request - set the context
+                    log.warn('Setting request workbench_context: %s ' % convid)
+
                     request.workbench_context = convid
 
                 encoding = data.get('encoding', None)
@@ -303,13 +313,13 @@ class Receiver(BasicLifecycleObject):
                         #performative = request.get('performative', None)
                         #protocol = request.get('protocol', None)
 
-                        """
+
                         print 'AFTER YIELD'
                         print 'CONVID', convid
                         print 'PERFORMATIVE',performative
                         print 'WORKBENCH CONTXT',workbench_context
                         print 'PROTOCOL "%s"' % protocol
-                        """
+
 
                         if convid == workbench_context:
 
@@ -321,7 +331,7 @@ class Receiver(BasicLifecycleObject):
                                 # Print a warning if someone else is using the persistence tricks...
                                 log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
 
-                        #print "WORKBENCH STATE", self.process.workbench
+                        print "WORKBENCH STATE", self.process.workbench
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
