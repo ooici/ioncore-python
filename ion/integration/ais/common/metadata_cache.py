@@ -225,6 +225,8 @@ class MetadataCache(object):
             log.error('Metadata not found for datasetID: ' + dSourceID)
             return None
         
+        if DSOURCE in metadata.keys():
+            log.debug('dsourceID from cached datasource object: ' + metadata[DSOURCE].ResourceIdentity)
         return metadata[DSOURCE]
 
     
