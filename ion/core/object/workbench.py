@@ -107,24 +107,21 @@ class WorkBench(object):
         '''
         Debugging string method.
         '''
-        retstr = "Workbench info (id:%s)\n" % id(self)
-        retstr += "\n"
-        retstr += "Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
+        retstr = "/ ==== Workbench info (id:%s) ==========\n" % id(self)
+        retstr += "++ Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
         for k,v in self._workbench_cache.iteritems():
             retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
 
-        retstr += "\n"
-        retstr += "Persistent Repositories, (len:%d)\n" % len(self._repos)
+        retstr += "++ Persistent Repositories, (len:%d)\n" % len(self._repos)
         for k, v in self._repos.iteritems():
             retstr += "\t%s: ih %d, cached %s, persistent %s, conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
 
-        retstr += "\n"
-        retstr += "LRU RepoCache, (len:%d)\n" % len(self._repo_cache.keys())
+        retstr += "++ LRU RepoCache, (len:%d)\n" % len(self._repo_cache.keys())
         for k, v in self._repo_cache.iteritems():
             retstr += "\t%s: ih %d, cached %s, persistent %s,conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
 
 
-        retstr += "/ ====\n\n"
+        retstr += "/ ==== End  Workbench info ===========\n"
 
         return retstr
       

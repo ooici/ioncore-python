@@ -208,6 +208,9 @@ class Receiver(BasicLifecycleObject):
         @note is called from carrot as normal method; no return expected
         @param msg instance of carrot.backends.txamqp.Message
         """
+        log.info('Start Receiver.Receive on proc: %s' % str(self.process))
+
+
         if self.rec_shutoff:
             log.warn("MESSAGE RECEIVED AFTER SHUTOFF - DROPPED")
             log.warn("Dropped message: "+str(msg.payload))
@@ -243,26 +246,28 @@ class Receiver(BasicLifecycleObject):
                     del self.rec_messages[id(msg)]
             else:
 
+
+                # Extract message headers
                 convid = data.get('conv-id', None)
                 protocol = data.get('protocol', None)
                 performative = data.get('performative', None)
                 op = data.get('op', None)
 
 
+                # Set the stack local context for known entries
                 request.convid = convid
                 request.protocol = protocol
                 request.performative = performative
 
 
-                print 'BEFORE YIELD'
-                print 'OP "%s"' % op
-                print 'CONVID "%s"' %  convid
-                print 'PERFORMATIVE "%s"' % performative
-                print 'PROTOCOL "%s"' % protocol
-                print 'Workbench Context "%s"' % request.workbench_context
+                log.debug( 'BEFORE YIELD to Message Handler')
+                log.debug('OP "%s"' % op)
+                log.debug('CONVID "%s"' %  convid)
+                log.debug('PERFORMATIVE "%s"' % performative)
+                log.debug('PROTOCOL "%s"' % protocol)
+                log.debug('Workbench Context "%s"' % request.get('workbench_context', None))
 
-                print "WORKBENCH STATE", self.process.workbench
-                
+                log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(self.process.workbench))
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
@@ -281,12 +286,18 @@ class Receiver(BasicLifecycleObject):
                     log.warn('Setting request workbench_context: %s ' % convid)
 
                     request.workbench_context = convid
+                # if it is an RPC result message - do not set the context!
 
+
+                # If this is a GPB message add it to the process workbench
                 encoding = data.get('encoding', None)
                 if hasattr(self.process, 'workbench') and encoding == ION_R1_GPB:
                     # The Codec does not attach the repository to the process. That is done here.
                     content = data.get('content')
                     self.process.workbench.put_repository(content.Repository)
+
+                    log.debug("WORKBENCH STATE after incoming message is added:\n%s" % str(self.process.workbench))
+
 
                 # Make the calls into the application code (e.g. process receive)
                 try:
@@ -314,16 +325,20 @@ class Receiver(BasicLifecycleObject):
                         #protocol = request.get('protocol', None)
 
 
-                        print 'AFTER YIELD'
-                        print 'CONVID', convid
-                        print 'PERFORMATIVE',performative
-                        print 'WORKBENCH CONTXT',workbench_context
-                        print 'PROTOCOL "%s"' % protocol
+                        log.debug('AFTER YIELD to message handler')
+                        log.debug('CONVID: %s' % convid)
+                        #log.debug('PERFORMATIVE',performative)
+                        log.debug('WORKBENCH CONTXT: %s' % workbench_context)
+                        #log.debug('PROTOCOL "%s"' % protocol)
+
 
 
                         if convid == workbench_context:
 
                             log.info('Receiver Process: Calling workbench clear:')
+
+                            log.debug("WORKBENCH STATE Before Clear:\n%s" % str(self.process.workbench))
+
                             self.process.workbench.manage_workbench_cache(workbench_context)
 
                             nrepos = len(self.process.workbench._repos)
@@ -331,7 +346,9 @@ class Receiver(BasicLifecycleObject):
                                 # Print a warning if someone else is using the persistence tricks...
                                 log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
 
-                        print "WORKBENCH STATE", self.process.workbench
+                            log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
+
+        log.info( 'End Receiver.Receive on proc: %s' % str(self.process))
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
