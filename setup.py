@@ -55,7 +55,7 @@ setup( name = 'ioncore',
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ply==3.4',
            'pysnmp==4.1.16a',
-           'ionproto>=0.3.21',
+           'ionproto>=0.3.22',
                           ],
        entry_points = {
                         'console_scripts': [
