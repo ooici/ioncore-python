@@ -375,12 +375,11 @@ class FindDataResources(object):
                     # problem).
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+
                     #
-                    # Need to get the notifications associated with this dataset.
+                    # Set the notificationSet flag; this is not efficient at all
                     #
-                    yield self.__getSubscriptionList(userID)
-                    
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = yield self.__isNotificationSet(userID, dSetResID)
                     #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, dSetMetadata, ownerID, dSetResID)
@@ -678,9 +677,9 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __getSubscriptionList(self, userID):        
+    def __isNotificationSet(self, userID, dSetID):        
         
-        log.debug('__getSubscriptionList()')
+        log.debug('__isNotificationSet()')
         
         #
         # Now call AIS to find the subscriptions
@@ -689,12 +688,14 @@ class FindDataResources(object):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = userID
 
-        log.debug('__getSubscriptionList(): Calling notification service getSubscriptionList()')
         reply = yield self.nac.getSubscriptionList(reqMsg)
         numSubsReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
-        log.error('getSubscriptionList returned: ' + str(numSubsReturned) + ' subscriptions.')
         
-        
+        for result in reply.message_parameters_reference[0].subscriptionListResults:
+            if dSetID == result.subscriptionInfo.data_src_id:
+                defer.returnValue(True)
+            
+        defer.returnValue(False)
         
         
 
