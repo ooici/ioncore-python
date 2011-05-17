@@ -3,6 +3,7 @@
 """
 @file ion/interact/int_observer.py
 @author Michael Meisinger
+@author Dave Foster <dfoster@asascience.com>
 @brief A process that observes interactions in the Exchange
 """
 import string
@@ -64,6 +65,8 @@ class InteractionObserver(Process):
         msg.ack()
 
 
+
+
     def log_message(self, hdrs):
         # Tuple of Timestamp (MS), type, message
         mhdrs = hdrs.copy()
@@ -71,6 +74,8 @@ class InteractionObserver(Process):
             del mhdrs['content']
         msg_rec = (pu.currenttime_ms(), mhdrs)
         self.msg_log.append(msg_rec)
+
+        #log.debug(hdrs)
 
         hstr = "MSG %d: %s(%s) -> %s %s:%s:%s-%s; uid=%s, status=%s" % (msg_rec[0],
                 mhdrs.get('sender',None),
@@ -86,69 +91,108 @@ class InteractionObserver(Process):
             self.msg_log = self.msg_log[100:]
 
     def writeout_msc(self):
-        msglog = []
-        msglog.extend(self.msg_log)
+        msglog = self.msg_log[:]
         procs = []
         senders = []
-        proc_alias = {}
+        proc_alias = {}     # maps receivers -> process names
+        open_rpcs = {}      # maps convid -> unknown receiver names
+
         for msgtup in msglog:
             msg = msgtup[1]
             sid = msg.get('sender', '??')
-            if sid.endswith('b'):
-                sid = sid[:len(sid)-1]
-            sid = string.replace(sid, ".", "_")
-            sid = string.replace(sid, "-", "_")
-
             rec = msg.get('receiver')
-            if rec.endswith('b'):
-                rec = rec[:len(rec)-1]
-            rec = string.replace(rec, ".", "_")
-            rec = string.replace(rec, "-", "_")
+            sname = msg.get('sender-name', sid)
 
-            sname = msg.get('sender-name', None)
-            sname = string.replace(sname, ".", "_")
-            sname = string.replace(sname, "-", "_")
-            sender = sname or sid
-
-            if not sender in senders:
+            # map sender to process name
+            if not sid in proc_alias:
                 proc_alias[sid] = sname
 
-            if not sid in procs:
-                procs.append(sid)
+            # is this rpc?
+            if msg.get('protocol', None) == 'rpc':
 
+                # if this is a request, do we know who it is addressed to?
+                performative = msg.get('performative', None)
+                convid = msg.get('conv-id', None)
+
+                if convid is None or performative is None:
+                    log.warn('Intercepted message with no performative or convid, but says it is rpc')
+                elif performative == 'request':
+                    torec = msg.get('receiver', None)
+                    if torec is not None and torec not in proc_alias:
+                        # add to open rpc conversation maps
+                        open_rpcs[convid] = torec
+                        log.debug("Adding receiver %s to open conversations to resolve (conv id %s)" % (torec, convid))
+
+                elif performative != 'timeout':     # all other items are responses, so we should be able to get info
+
+                    # have we seen this conversation before and need to resolve a receiver name?
+                    if convid in open_rpcs:
+                        oldrecname = open_rpcs.pop(convid)
+                        proc_alias[oldrecname] = msg.get('sender-name', oldrecname)
+
+                        log.debug("Mapping receiver %s to proc name %s" % (oldrecname, proc_alias[oldrecname]))
+                else:
+                    # @TODO: timeout? we never see it
+                    pass
+
+            # catch any non-rpc leftover destinations
             if not rec in procs:
                 procs.append(rec)
 
-        senders = []
-        for proc in procs:
-            senders.append(proc_alias.get(proc, proc))
+
+        # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
+        senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
+        senders.extend(open_rpcs.itervalues())
+
+        # add leftover non-rpc destinations
+        for rec in procs:
+            if not (rec in proc_alias or rec in open_rpcs.values()):
+                senders.append(rec)
+
+        def sanitize(input):
+            return string.replace(string.replace(input, ".", "_"), "-", "_")
 
         msc = "msc {\n"
-        sstr = ",".join(senders)
+        sstr = sanitize(",".join(senders))
         msc += " %s;\n" % sstr
 
         for msgtup in msglog:
             msg = msgtup[1]
+
             sid = msg.get('sender', '??')
-            if sid.endswith('b'):
-                sid = sid[:len(sid)-1]
-            sid = string.replace(sid, ".", "_")
-            sid = string.replace(sid, "-", "_")
-            sname = msg.get('sender-name', None)
-            sname = string.replace(sname, ".", "_")
-            sname = string.replace(sname, "-", "_")
-            sname = sname or sid
+            sname = proc_alias.get(sid, sid)
+            sname = sanitize(sname)
+
             rec = msg.get('receiver')
-            if rec.endswith('b'):
-                rec = rec[:len(rec)-1]
-            rec = string.replace(rec, ".", "_")
-            rec = string.replace(rec, "-", "_")
+
             rname = proc_alias.get(rec, rec)
+            rname = sanitize(rname)
+
             mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
                 msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
             # @todo Clean up sender and receiver names - remove host and PID
             #re.sub('.+:','',sname)
-            msc += ' %s -> %s [ label="%s" ];\n' % (sname, rname, mlabel)
+
+            # default attributes only a label
+            attrs = ['label="%s"' % mlabel]
+
+            # determine arrow type used based on message type
+            arrow = '->'
+            if msg.get('protocol', None) == 'rpc':
+
+                arrow = ">>"    # default response, covers a few cases here
+
+                performative = msg.get('performative', None)
+                if performative == 'request':
+                    arrow = '=>'
+                elif performative == 'timeout':
+                    arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
+
+                if performative == 'failure' or performative == 'error':
+                    attrs.append('textbgcolor="red"')
+                    attrs.append('linecolor="red"')
+
+            msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(attrs))
         msc += "}\n"
 
         return msc
