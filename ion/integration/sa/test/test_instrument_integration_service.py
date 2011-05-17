@@ -19,7 +19,7 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient, R
 from ion.services.dm.distribution.events import DataEventPublisher
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
-from ion.services.dm.distribution.events import DataEventSubscriber
+from ion.services.dm.distribution.events import DataEventSubscriber, DataBlockEventSubscriber
 
 import ion.util.procutils as pu
 
@@ -109,7 +109,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def XXtest_createAndSetInstrument(self):
+    def test_createAndSetInstrument(self):
         """
         Create an instrument, create associated instrument agent then get and set the status
         """
@@ -136,12 +136,11 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 1: %s ",resultDict[(DriverChannel.INSTRUMENT,'INTERVAL')] )
 
 
-
         # Set a few parameters. This will test the device set functions
         # and set up the driver for sampling commands.
         params = {}
         params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 3
+        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 4
 
         result = yield self.iic.setInstrumentState(instrument_id, params)
         log.info("IIServiceTest test_createAndSetInstrument  instrument state: %s ", result['result'] )
@@ -151,25 +150,30 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         result = yield self.iic.getInstrumentState(instrument_id)
         #log.info("IIServiceTest test_createInstrument  instrument state: %s ", result['result'] )
         resultDict = result['result']
-        log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 2: %s ",resultDict[(DriverChannel.INSTRUMENT,'INTERVAL')] )
+        intervalReturned = resultDict[(DriverChannel.INSTRUMENT,'INTERVAL')][1]
+        log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 2: %s ",intervalReturned)
 
+        if intervalReturned != 4:
+            self.fail('InstrumentIntegrationServiceTest: test_createAndSetInstrument returned incorrect interval after set operation.')
 
         origparams = {}
-        params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 4
+        origparams[(DriverChannel.INSTRUMENT,'NAVG')] = 1
+        origparams[(DriverChannel.INSTRUMENT,'INTERVAL')] = 5
 
         result = yield self.iic.setInstrumentState(instrument_id, origparams)
-        #log.info("IIServiceTest test_createAndSetInstrument  instrument state: %s ", result['result'] )
 
         # Verify the set changes were made.
         result = yield self.iic.getInstrumentState(instrument_id)
-        #log.info("IIServiceTest test_createAndSetInstrument  instrument state: %s ", result['result'] )
         resultDictFinal = result['result']
-        log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 3: %s ",resultDictFinal[(DriverChannel.INSTRUMENT,'INTERVAL')] )
+        intervalReturned = resultDictFinal[(DriverChannel.INSTRUMENT,'INTERVAL')][1]
+        log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 3: %s ", intervalReturned)
+
+        if intervalReturned != 5:
+            self.fail('InstrumentIntegrationServiceTest: test_createAndSetInstrument returned incorrect interval after set operation.')
 
 
     @defer.inlineCallbacks
-    def XXtest_createInstrumentStartSampling(self):
+    def XXXtest_createInstrumentStartSampling(self):
         """
         Create an instrument, create associated instrument agent, start sampling and catch the events
         """
@@ -189,7 +193,8 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         instrument_agent_resource_id = result['instrument_agent_resource_id']
         log.info("IIServiceTest test_createInstrumentStartSampling  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
 
-        self.sub = DataEventSubscriber(process=self.sup, origin=instrument_agent_process_id)
+        #self.sub = DataEventSubscriber(process=self.sup, origin=instrument_agent_process_id)  DataBlockEventSubscriber
+        self.sub = DataBlockEventSubscriber(process=self.sup, origin=instrument_agent_process_id)
         log.info('IIServiceTest test_createInstrumentStartSampling  set handler for DataEventSubscriber')
         self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
         #yield self.sub.register()
@@ -203,7 +208,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         resultDict = result['result']
 
         # Wait for a few samples to arrive.
-        yield pu.asleep(30)
+        yield pu.asleep(20)
 
         # Stop autosampling.
         result = yield self.iic.stopAutoSampling(instrument_id)
