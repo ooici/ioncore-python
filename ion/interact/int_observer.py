@@ -70,12 +70,22 @@ class InteractionObserver(Process):
     def log_message(self, hdrs):
         # Tuple of Timestamp (MS), type, message
         mhdrs = hdrs.copy()
-        if 'content' in mhdrs:
-            del mhdrs['content']
+
+        if isinstance(mhdrs['content'], ion.core.messaging.message_client.MessageInstance):
+            mclass = str(mhdrs['content'].__class__).split('MessageInstance_')[-1][:-2] # chop last '>, @TODO better plz
+            if 'Wrapper_' in mclass:
+                mclass = string.replace(mclass, "Wrapper_", "")
+        else:
+            mclass = str(mhdrs['content'].__class__)[7:][:-2]   # trim out the <type ''> nonsense @TODO: better
+
+        # lose the content, we don't want to hold it, but store its type name
+        mhdrs.pop('content', None)
+        mhdrs['_content_type'] = mclass
+
         msg_rec = (pu.currenttime_ms(), mhdrs)
         self.msg_log.append(msg_rec)
 
-        #log.debug(hdrs)
+        #log.debug(mhdrs)
 
         hstr = "MSG %d: %s(%s) -> %s %s:%s:%s-%s; uid=%s, status=%s" % (msg_rec[0],
                 mhdrs.get('sender',None),
@@ -153,6 +163,7 @@ class InteractionObserver(Process):
             return string.replace(string.replace(input, ".", "_"), "-", "_")
 
         msc = "msc {\n"
+        msc += ' wordwraparcs="1";\n'
         sstr = sanitize(",".join(senders))
         msc += " %s;\n" % sstr
 
@@ -168,17 +179,23 @@ class InteractionObserver(Process):
             rname = proc_alias.get(rec, rec)
             rname = sanitize(rname)
 
-            mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
-                msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
+            #mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
+            #    msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
             # @todo Clean up sender and receiver names - remove host and PID
             #re.sub('.+:','',sname)
 
-            # default attributes only a label
-            attrs = ['label="%s"' % mlabel]
+            mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+
+            # default attributes: only a label
+            attrs = {'label': mlabel}
 
             # determine arrow type used based on message type
             arrow = '->'
             if msg.get('protocol', None) == 'rpc':
+
+                # we know its rpc based on arrow type and color, so we change the label to be more friendly
+                #rpclabel = "%s (%s->%s) <%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+                #attrs['label'] = rpclabel
 
                 arrow = ">>"    # default response, covers a few cases here
 
@@ -189,10 +206,17 @@ class InteractionObserver(Process):
                     arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
 
                 if performative == 'failure' or performative == 'error':
-                    attrs.append('textbgcolor="red"')
-                    attrs.append('linecolor="red"')
+                    attrs['textbgcolor'] = 'red'
+                    attrs['linecolor'] = 'red'
+                else:
+                    attrs['textcolor'] = 'navy'
+                    attrs['linecolor'] = 'navy'
+            else:
+                # non rpc -> perhaps a data message for ingest/exgest?
+                #msglabel = "%s (%s->%s) <%s>"
+                pass
 
-            msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(attrs))
+            msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(('%s="%s"' % (k, v) for k,v in attrs.iteritems())))
         msc += "}\n"
 
         return msc
