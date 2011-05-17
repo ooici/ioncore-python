@@ -1727,6 +1727,7 @@ class SBE37Driver(InstrumentDriver):
         params = content.get('params',None)
         assert(isinstance(params,(list,tuple))),'Expected list or tuple params.'
 
+
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
         if timeout != None:

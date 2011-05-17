@@ -8,6 +8,7 @@
 USE. From the CC shell, import asa commands and constants.
 
 bin/twistd -n cc -h amoeba.ucsd.edu
+
 import ion.agents.instrumentagents.agent_shell_api as asa
 from ion.agents.instrumentagents.instrument_constants import *
 
@@ -124,7 +125,7 @@ def reset():
     
 @defer.inlineCallbacks
 def get_device():
-    return IAC.get_device([('all','all')])
+    result = yield IAC.get_device([('all','all')])
     defer.returnValue(result)
     
 @defer.inlineCallbacks

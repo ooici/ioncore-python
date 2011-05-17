@@ -1903,12 +1903,14 @@ class InstrumentAgent(Process):
         success = None
         result = None
         
+        
         try:
             
             dvr_result = yield self._driver_client.get(params)
             success = dvr_result.get('success',None)
             result = dvr_result.get('result',None)                
-        
+            #pass
+            
         # Unkonwn error.
         except:
             success = InstErrorCode.UNKNOWN_ERROR
@@ -1918,6 +1920,8 @@ class InstrumentAgent(Process):
         else:
             reply['success'] = success
             reply['result'] = result
+            #reply['success'] = InstErrorCode.OK
+            #reply['result'] = {'parameter':(InstErrorCode.OK,'value')}
             
         # Publish errors, clean up transaction.
         finally:
@@ -1934,7 +1938,7 @@ class InstrumentAgent(Process):
             self._in_protected_function = False
                     
         yield self.reply_ok(msg,reply)
-
+        
 
     @defer.inlineCallbacks
     def op_set_device(self, content, headers, msg):
@@ -2912,6 +2916,7 @@ class InstrumentAgentClient(ProcessClient):
             ...,(chan_arg,param_arg):(success,val)},
             'transaction_id':transaction_id}
         """
+
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
@@ -2922,7 +2927,6 @@ class InstrumentAgentClient(ProcessClient):
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
-
 
     @defer.inlineCallbacks
     def set_device(self,params,transaction_id='none'):
