@@ -11,8 +11,7 @@ exit with a deferred.
 
 # File template. The filename and 'location' are just the GUID.
 # Note the %s for string substitution.
-file_template = """<?xml version="1.0" encoding="UTF-8"?>
-<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
+file_template = """<?xml version="1.0" encoding="UTF-8"?><netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
 from os import path, environ, chmod, unlink, listdir, remove
