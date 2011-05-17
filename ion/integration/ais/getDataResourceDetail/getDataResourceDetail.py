@@ -146,7 +146,7 @@ class GetDataResourceDetail(object):
         
         i = 0
         for var in ds.root_group.variables:
-            print 'Working on variable: %s' % str(var.name)
+            log.debug('Working on variable: ' + str(var.name))
             rspMsg.message_parameters_reference[0].variable.add()
             self.__loadGPBVariable(rspMsg.message_parameters_reference[0].variable[i], ds, var)
             i = i + 1
