@@ -88,6 +88,9 @@ class LazyEye(InteractionObserver):
                 handler=self.receive,
                 error_handler=self.receive_error)
         self.add_receiver(self.main_receiver)
+
+        if not os.path.exists(BINARY_NAME):
+            raise Exception('LazyEye cannot find mscgen binary (configuration said it was %s)' % BINARY_NAME)
         
 
     def _reset_receiver(self):
@@ -183,8 +186,7 @@ class LazyEye(InteractionObserver):
 
         self.mpp = MscProcessProtocol(self._mscgen_callback, msg)
         log.debug('Spawing mscgen to render the graph, %d edges or so...' % len(self.msg_log))
-        # @bug spawnProcess drops the first element in the tuple, so pad with blank
-        args = ['', '-T', 'png', '-i', self.filename, '-o', self.imagename]
+        args = [BINARY_NAME, '-T', 'png', '-i', self.filename, '-o', self.imagename]
         log.debug(args)
         yield reactor.spawnProcess(self.mpp, BINARY_NAME, args)
         log.debug('%s started' % BINARY_NAME)

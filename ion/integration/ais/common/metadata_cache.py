@@ -23,18 +23,22 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient, R
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, \
+    SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
-            DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, HAS_A_ID
+    DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, HAS_A_ID, OWNED_BY_ID
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
 #
 # Data Set Metadata Constants
 #
+DSET         = 'dset'
+DSOURCE      = 'dsource'
 KEY          = 'key'
 RESOURCE_ID  = 'ResourceIdentity'
 DSOURCE_ID   = 'DSourceID'
+OWNER_ID     = 'OwnerID'
 TITLE        = 'title'
 INSTITUTION  = 'institution'
 SOURCE       = 'source'
@@ -138,6 +142,25 @@ class MetadataCache(object):
         defer.returnValue(True)
 
 
+    def getDSet(self, dSetID):
+        """
+        Get the dictionary entry containing the metadata from the data set
+        represented by the given ResourceID (dSetID); return the dataset
+        object instead of the metadata.
+        """
+        
+        log.debug('getDSet')
+                    
+        try:
+            metadata = self.__metadata[dSetID]
+            log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
+        except KeyError:
+            log.error('Metadata not found for datasetID: ' + dSetID)
+            return None
+        
+        return metadata[DSET]
+
+
     def getDSetMetadata(self, dSetID):
         """
         Get the dictionary entry containing the metadata from the data set
@@ -185,6 +208,27 @@ class MetadataCache(object):
             log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
             return False
                     
+    
+    def getDSource(self, dSourceID):
+        """
+        Get the dictionary entry containing the metadata from the data source
+        represented by the given ResourceID (dSourceID); return the datasource
+        object instead of the metadata
+        """
+        
+        log.debug('getDSource')
+                    
+        try:
+            metadata = self.__metadata[dSourceID]
+            log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
+        except KeyError:
+            log.error('Metadata not found for datasetID: ' + dSourceID)
+            return None
+        
+        if DSOURCE in metadata.keys():
+            log.debug('dsourceID from cached datasource object: ' + metadata[DSOURCE].ResourceIdentity)
+        return metadata[DSOURCE]
+
     
     def getDSourceMetadata(self, dSourceID):
         """
@@ -250,8 +294,13 @@ class MetadataCache(object):
         if ((dSet.ResourceLifeCycleState == dSet.ACTIVE) or 
             (dSet.ResourceLifeCycleState == dSet.COMMISSIONED)):
             dSetMetadata = {}
+            #
+            # Store the entire dataset now; should be doing only that anyway
+            #
+            dSetMetadata[DSET] = dSet
             dSetMetadata[DSOURCE_ID] = yield self.__getAssociatedSource(dSet)
             dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
+            dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
             for attrib in dSet.root_group.attributes:
                 #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
                 if attrib.name == TITLE:
@@ -315,6 +364,10 @@ class MetadataCache(object):
         if ((dSource.ResourceLifeCycleState == dSource.ACTIVE) or 
             (dSource.ResourceLifeCycleState == dSource.COMMISSIONED)):
             dSourceMetadata = {}
+            #
+            # Store the entire datasource now; should be doing only that anyway
+            #
+            dSourceMetadata[DSOURCE] = dSource
             for property in dSource.property:
                 dSourceMetadata[PROPERTY] = property
     
@@ -402,6 +455,56 @@ class MetadataCache(object):
         log.debug('__getAssociatedSource() exit')
 
         defer.returnValue(association.SubjectReference.key)
+
+
+    @defer.inlineCallbacks
+    def __getAssociatedOwner(self, dsID):
+        """
+        Worker class method to find the owner associated with a data set.
+        This is a public method because it can be called from the
+        findDataResourceDetail worker class.
+        """
+        log.debug('getAssociatedOwner() entry')
+
+        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        #
+        # Set up an owned_by_id search term using:
+        # - OWNED_BY_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # ..(subject)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = dsID
+        
+        pair.subject = type_ref
+
+        log.info('Calling get_objects with dsID: ' + dsID)
+
+        try:
+            result = yield self.asc.get_objects(request)
+        
+        except AssociationServiceError:
+            log.error('getAssociatedOwner: association error!')
+            defer.returnValue(None)
+
+        if len(result.idrefs) == 0:
+            log.error('Owner not found!')
+            defer.returnValue('OWNER NOT FOUND!')
+        elif len(result.idrefs) == 1:
+            log.debug('getAssociatedOwner() exit')
+            defer.returnValue(result.idrefs[0].key)
+        else:
+            log.error('More than 1 owner found!')
+            defer.returnValue('MULTIPLE OWNERS!')
 
 
     def __printMetadata(self, res):
