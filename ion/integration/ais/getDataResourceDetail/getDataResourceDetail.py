@@ -39,7 +39,7 @@ class GetDataResourceDetail(object):
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
         self.metadataCache = ais.getMetadataCache()
-        self.bUseMetadataCache = False
+        self.bUseMetadataCache = True
 
         
     @defer.inlineCallbacks
@@ -133,7 +133,7 @@ class GetDataResourceDetail(object):
             Response.error_str = "Data Source Found for ID: " + dSourceResID
             defer.returnValue(Response)
 
-        self.__printSourceMetadata(dSource)
+        #self.__printSourceMetadata(dSource)
         
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
