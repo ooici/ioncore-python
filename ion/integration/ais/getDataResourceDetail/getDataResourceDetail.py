@@ -39,7 +39,7 @@ class GetDataResourceDetail(object):
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
         self.metadataCache = ais.getMetadataCache()
-        self.bUseMetadataCache = True
+        self.bUseMetadataCache = False
 
         
     @defer.inlineCallbacks
