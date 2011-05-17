@@ -1,0 +1,202 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <title>OOICI UX Template</title>
+
+  <link rel="stylesheet" type="text/css" href="http://localhost:8080/css/ciux-default.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/cupertino/jquery-ui-1.8.9.custom.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-page.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-table-jui.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/colorbox.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ooici_ux-main.css"/>
+  
+  <style type="text/css">
+  	html, body { min-height: 100%; }
+  	#layoutContainer {
+		min-width: 100%; min-height: 100%;
+	}
+	.ui-layout-center {
+		padding: 1.5em;
+	}
+  	
+  </style>
+
+  <script src="http://localhost:8080/js/jquery-1.4.4.min.js" type="text/javascript"></script>
+  <script src="http://localhost:8080/js/jquery.layout.min.js" type="text/javascript"></script>
+  <script src="http://localhost:8080/js/jquery.colorbox.min.js" type="text/javascript"></script>
+  <script src="http://localhost:8080/js/jquery.tmpl.min.js" type="text/javascript"></script>
+  <script src="http://localhost:8080/js/json2.js" type="text/javascript"></script>
+  <script type="text/javascript">
+  $(function() {
+	  var selector = '#layoutContainer', $el = $(selector);
+      var layout_main = $el.layout({
+          resizerClass: 'ui-state-default',
+          north__resizable: false,
+          north__closable: false,
+          north__size: 60,
+          //west__size: 350,
+          //east__size: 350
+      });
+      $el.css('position', 'static');
+  });
+  </script>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+        google.load('visualization', '1', {'packages': ['corechart']});
+    </script>
+    <script type="text/javascript">
+        function initInstrumentDataCharts() {
+
+            // Create the data tables
+            this.conductivity_data = new google.visualization.DataTable();
+            this.conductivity_data.addColumn('string', 'x');
+            this.conductivity_data.addColumn('number', 'Instrument 1');
+
+            this.pressure_data = new google.visualization.DataTable();
+            this.pressure_data.addColumn('string', 'x');
+            this.pressure_data.addColumn('number', 'Instrument 1');
+
+            this.salinity_data = new google.visualization.DataTable();
+            this.salinity_data.addColumn('string', 'x');
+            this.salinity_data.addColumn('number', 'Instrument 1');
+
+            this.sound_velocity_data = new google.visualization.DataTable();
+            this.sound_velocity_data.addColumn('string', 'x');
+            this.sound_velocity_data.addColumn('number', 'Instrument 1');
+
+            this.temperature_data = new google.visualization.DataTable();
+            this.temperature_data.addColumn('string', 'x');
+            this.temperature_data.addColumn('number', 'Instrument 1');
+       
+            // Create the visualizations
+            this.conductivity_lineChart = new google.visualization.LineChart(document.getElementById('conductivity_visualization'));
+            this.pressure_lineChart = new google.visualization.LineChart(document.getElementById('pressure_visualization'));
+            this.salinity_lineChart = new google.visualization.LineChart(document.getElementById('salinity_visualization'));
+            this.sound_velocity_lineChart = new google.visualization.LineChart(document.getElementById('sound_velocity_visualization'));
+            this.temperature_lineChart = new google.visualization.LineChart(document.getElementById('temperature_visualization'));
+        }
+        
+        google.setOnLoadCallback(initInstrumentDataCharts);
+    </script>
+
+    <script type="text/javascript">
+        var intervalID;
+        var gllasttime = '0';
+        $(document).ready(function() { 
+
+            function dowork(lasttime, callback)
+            {
+                req = "/data/" + lasttime;
+
+                $.getJSON(req, function(data) {
+                    gllasttime = data.lasttime;
+                    intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
+                    callback(data);
+                });
+            }
+
+            function handledata(data)
+            {
+               for (var i = 0; i < data.data.length; i++)
+               {
+                  var curdata = data.data[i]; 
+                    
+                  var subscription_desc = curdata.subscription_desc;
+                    
+                  // Determine if instrument sample data event subscription
+                  if ((subscription_desc == "5001.#") && (curdata.events.length > 0))
+                  {
+                     for (var j = 0; j < curdata.events.length; j++)
+                     {
+                        var conductivity = 0.0;
+                        var pressure = 0.0;
+                        var salinity = 0.0;
+                        var sound_velocity = 0.0;
+                        var temperature = 0.0;
+                        var time = "0";
+
+                        for (var k = 0; k < curdata.events[j].length; k++)
+                        {
+                           var cchild = curdata.events[j][k];
+                           if (cchild.id == "conductivity")
+                           {
+                              conductivity = parseFloat(cchild.content);
+                           }
+                           else if (cchild.id == "pressure")
+                           {
+                              pressure = parseFloat(cchild.content);
+                           }
+                           else if (cchild.id == "salinity")
+                           {
+                              salinity = parseFloat(cchild.content);
+                           }
+                           else if (cchild.id == "sound_velocity")
+                           {
+                              sound_velocity = parseFloat(cchild.content);
+                           }
+                           else if (cchild.id == "temperature")
+                           {
+                              temperature = parseFloat(cchild.content);
+                           }
+                           else if (cchild.id == "time")
+                           {
+                              time = cchild.content;
+                           }
+                        }
+
+                        // Update the data tables
+                        this.conductivity_data.addRow([time,conductivity]);
+                        this.pressure_data.addRow([time,pressure]);
+                        this.salinity_data.addRow([time,salinity]);
+                        this.sound_velocity_data.addRow([time,sound_velocity]);
+                        this.temperature_data.addRow([time,temperature]);
+                     }
+       
+                     // Draw the visualizations
+                     this.conductivity_lineChart.draw(this.conductivity_data, {curveType: "function", width: 1000, height: 150, vAxis: {maxValue: 10}});
+                     this.pressure_lineChart.draw(this.pressure_data, {curveType: "function", width: 1000, height: 150, vAxis: {maxValue: 10}});
+                     this.salinity_lineChart.draw(this.salinity_data, {curveType: "function", width: 1000, height: 150, vAxis: {maxValue: 10}});
+                     this.sound_velocity_lineChart.draw(this.sound_velocity_data, {curveType: "function", width: 1000, height: 150, vAxis: {maxValue: 10}});
+                     this.temperature_lineChart.draw(this.temperature_data, {curveType: "function", width: 1000, height: 150, vAxis: {maxValue: 10}});
+                  }
+               }
+            }
+
+            // Subscribe to instrument sample data events
+            $.getJSON('/ctl/sub/5001', function(data) {
+//                console.log(data);
+            });
+
+            dowork(gllasttime, handledata);
+
+        });
+    </script>
+</head>
+<body id="body">
+<div id="loading_message"><span class="msg">Loading...</span></div>
+
+<div id="layoutContainer">
+
+  <div id="top" class="ui-layout-north">
+    <div id="branding">
+    </div>
+  </div><!-- end .ui-layout-north -->
+
+  <div class="ui-layout-center">
+        <h2>Conductivity</h2>
+        <div id="conductivity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
+        <h2>Pressure</h2>
+        <div id="pressure_visualization" style="align: center; width: 1000px; height: 150px;"></div>
+        <h2>Salinity</h2>
+        <div id="salinity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
+        <h2>Sound Velocity</h2>
+        <div id="sound_velocity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
+        <h2>Temperature</h2>
+        <div id="temperature_visualization" style="align: center; width: 1000px; height: 150px;"></div>
+  </div><!-- end .ui-layout-center -->
+
+</div>
+</body>
+
+</html>
