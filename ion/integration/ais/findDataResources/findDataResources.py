@@ -14,6 +14,7 @@ from twisted.internet import defer
 
 from decimal import Decimal
 
+from ion.core.object import object_utils
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationInstance, AssociationManager
 from ion.services.coi.resource_registry.association_client import AssociationClientError
@@ -29,17 +30,21 @@ from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubsc
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
 
+from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
-from ion.core.object import object_utils
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE, \
-                                                       FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE, \
+                                                       FIND_DATA_RESOURCES_RSP_MSG_TYPE, \
+                                                       FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE, \
+                                                       FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
+                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE
+
 
 DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
 DNLD_DIR_PATH = '/dodsC/ooiciData/'
@@ -80,6 +85,8 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
 
     
 class FindDataResources(object):
+
+    ALL = 0
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
@@ -88,6 +95,8 @@ class FindDataResources(object):
         self.mc = ais.mc
         self.asc = AssociationServiceClient()
         self.ac = AssociationClient(proc=ais)
+        self.nac = NotificationAlertServiceClient(proc=ais)
+
         self.metadataCache = ais.getMetadataCache()
         self.bUseMetadataCache = True
 
@@ -100,11 +109,6 @@ class FindDataResources(object):
         """
 
         log.debug('findDataResources Worker Class Method')
-
-        #
-        # I don't think this is needed, but leaving it in for now
-        #
-        userID = msg.message_parameters_reference.user_ooi_id
 
         self.downloadURL       = 'Uninitialized'
         
@@ -128,7 +132,7 @@ class FindDataResources(object):
             
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg)
+        yield self.__getDataResources(msg, dSetResults, rspMsg, typeFlag = self.ALL)
 
         defer.returnValue(rspMsg)
 
@@ -174,7 +178,7 @@ class FindDataResources(object):
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg, userID)
+        yield self.__getDataResources(msg, dSetResults, rspMsg)
         
         defer.returnValue(rspMsg)
 
@@ -263,7 +267,7 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __getDataResources(self, msg, dSetResults, rspMsg, userID = None):
+    def __getDataResources(self, msg, dSetResults, rspMsg, typeFlag = ALL):
         """
         Given the list of datasetIDs, determine in the data represented by
         the dataset is within the given spatial and temporal bounds, and
@@ -278,6 +282,7 @@ class FindDataResources(object):
         #
         bounds = SpatialTemporalBounds()
         bounds.loadBounds(msg.message_parameters_reference)
+        userID = msg.message_parameters_reference.user_ooi_id
         
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
@@ -318,6 +323,7 @@ class FindDataResources(object):
     
                 dSetMetadata = {}
                 self.__loadMinMetaData(dSet, dSetMetadata)
+
 
             #
             # If the dataset's data is within the given criteria, include it
@@ -362,7 +368,7 @@ class FindDataResources(object):
                 #ownerID = yield self.getAssociatedOwner(dSetResID)
                 ownerID = 'Is this used?'
 
-                if userID is None:
+                if typeFlag is self.ALL:
                     #
                     # This was a findDataResources request; the list should only
                     # include datasets that public (so "registered" is not a
@@ -372,6 +378,8 @@ class FindDataResources(object):
                     #
                     # Need to get the notifications associated with this dataset.
                     #
+                    yield self.__getSubscriptionList(userID)
+                    
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
                     #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
@@ -667,5 +675,26 @@ class FindDataResources(object):
         rspPayload.activation_state = dSource['lcs']
         #rspPayload.update_interval_seconds = dSource.update_interval_seconds
         rspPayload.update_interval_seconds = dSource['update_interval_seconds']
+
+
+    @defer.inlineCallbacks
+    def __getSubscriptionList(self, userID):        
+        
+        log.debug('__getSubscriptionList()')
+        
+        #
+        # Now call AIS to find the subscriptions
+        #
+        reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = userID
+
+        log.debug('__getSubscriptionList(): Calling notification service getSubscriptionList()')
+        reply = yield self.nac.getSubscriptionList(reqMsg)
+        numSubsReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
+        log.error('getSubscriptionList returned: ' + str(numSubsReturned) + ' subscriptions.')
+        
+        
+        
         
 
