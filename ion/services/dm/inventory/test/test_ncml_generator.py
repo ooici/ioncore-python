@@ -83,7 +83,7 @@ class PSAT(IonTestCase):
         os.unlink(pkf)
         os.unlink(pubkf)
 
-
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_ssh_add(self):
         pubkey = self._get_public_key()
@@ -98,6 +98,7 @@ class PSAT(IonTestCase):
         os.unlink(pkf)
         os.unlink(pubkf)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_complete(self):
         # Switch to a no-op command

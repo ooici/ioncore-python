@@ -403,6 +403,7 @@ message SubscriptionCreateReqMsg {
     }
     
     optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+    optional net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasetMetadataType datasetMetadata = 2;
 }
 """
 
@@ -477,6 +478,7 @@ message SubscriptionUpdateReqMsg {
     }
 
     optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+    optional net.ooici.integration.ais.common.aisDataResourceMetadata.AisDatasetMetadataType datasetMetadata = 2;
 }
 """
 

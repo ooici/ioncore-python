@@ -369,6 +369,9 @@ class FindDataResources(object):
                     # problem).
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+                    #
+                    # Need to get the notifications associated with this dataset.
+                    #
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
                     #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']

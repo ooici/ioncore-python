@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python 
 """
 @file ion/integration/ais/RegisterUser/RegisterUser.py
 @author Bill Bollenbcher
@@ -13,10 +12,14 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.core.intercept.policy import user_has_admin_role, \
-                                      user_is_early_adopter, \
-                                      user_has_marine_operator_role, \
-                                      user_has_data_provider_role
+from ion.core.intercept.policy import subject_has_admin_role, \
+                                      subject_is_early_adopter, \
+                                      subject_has_marine_operator_role, \
+                                      subject_has_data_provider_role, \
+                                      map_ooi_id_to_subject_admin_role, \
+                                      map_ooi_id_to_subject_is_early_adopter, \
+                                      map_ooi_id_to_subject_marine_operator_role, \
+                                      map_ooi_id_to_subject_data_provider_role
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -24,6 +27,7 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        GET_USER_PROFILE_RESPONSE_TYPE
 from ion.core.object import object_utils
+from ion.core.security.authentication import Authentication
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
@@ -284,16 +288,41 @@ class RegisterUser(object):
                Response.error_str = 'Error calling register_user (AIS): '+ex.msg_content.MessageResponseBody
                defer.returnValue(Response)
 
+      # Get subject from certificate to allow lookup of user roles/attributes
+      authentication = Authentication()
+      cert_info = authentication.decode_certificate(str(Request.configuration.certificate))
+      subject = cert_info['subject']
+
       # build AIS response with user's ooi_id
+      ooi_id = result.resource_reference.ooi_id
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(REGISTER_USER_RESPONSE_TYPE)
-      Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
+      Response.message_parameters_reference[0].ooi_id = ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
-      Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_is_early_adopter = user_is_early_adopter(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_is_data_provider = user_has_marine_operator_role(result.resource_reference.ooi_id)
-      Response.message_parameters_reference[0].user_is_marine_operator = user_has_data_provider_role(result.resource_reference.ooi_id)
+
+      # Obtain extra user roles/attributes. Also call mapping methods to add ooi_id to role lookup
+      # for use by policy management interceptor
+      if subject_has_admin_role(subject):
+          Response.message_parameters_reference[0].user_is_admin = True
+          map_ooi_id_to_subject_admin_role(subject, ooi_id)
+      else:
+          Response.message_parameters_reference[0].user_is_admin = False
+      if subject_is_early_adopter(subject):
+          Response.message_parameters_reference[0].user_is_early_adopter = True
+          map_ooi_id_to_subject_is_early_adopter(subject, ooi_id)
+      else:
+          Response.message_parameters_reference[0].user_is_early_adopter = False
+      if subject_has_data_provider_role(subject):
+          Response.message_parameters_reference[0].user_is_data_provider = True
+          map_ooi_id_to_subject_data_provider_role(subject, ooi_id)
+      else:
+          Response.message_parameters_reference[0].user_is_data_provider = False
+      if subject_has_marine_operator_role(subject):
+          Response.message_parameters_reference[0].user_is_marine_operator = True
+          map_ooi_id_to_subject_marine_operator_role(subject, ooi_id)
+      else:
+          Response.message_parameters_reference[0].user_is_marine_operator = False
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 

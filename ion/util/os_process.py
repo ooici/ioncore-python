@@ -49,7 +49,7 @@ class OSProcess(protocol.ProcessProtocol):
       for graceful shutdown.
 
     """
-    def __init__(self, binary=None, spawnargs=None, startdir=None, **kwargs):
+    def __init__(self, binary=None, spawnargs=None, startdir=None, env=None, **kwargs):
         """
         @param  binary      The binary to run.
         @param  spawnargs   Arguments to give the binary. Does not need to have the binary as the first argument,
@@ -66,6 +66,7 @@ class OSProcess(protocol.ProcessProtocol):
         self.used               = False             # do not allow anyone to use again
         self.close_timeout      = None
         self.startdir           = startdir
+        self.env                = env   # Environment variables, if any
 
     def spawn(self, binary=None, args=None):
         """
@@ -97,7 +98,7 @@ class OSProcess(protocol.ProcessProtocol):
             theargs.extend(args)
 
         log.debug("OSProcess::spawn %s %s" % (str(binary), " ".join(theargs)))
-        reactor.spawnProcess(self, binary, theargs, path=self.startdir, env=None)
+        reactor.spawnProcess(self, binary, theargs, path=self.startdir, env=self.env)
         self.used = True
 
         return self.deferred_exited
