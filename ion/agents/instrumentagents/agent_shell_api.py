@@ -26,7 +26,6 @@ asa.stop()
 asa.reset()
 """
 
-
 from twisted.internet import defer
 
 from ion.core import ioninit
@@ -156,7 +155,7 @@ def start_agent():
         if item.proc_module == AGENT_MODULE:
             IAC = ia.InstrumentAgentClient(target=item.proc_id)
             yield IAC.set_observatory(params_driver,'create')
-        
+            print 'Created client!'
 
 
 

@@ -9,6 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+from twisted.trial import unittest
 
 INSTRUMENTDATA_EVENT_ID = 5001
 
@@ -87,6 +88,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent and get the list of instruments
         """
+        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
 
         log.info("IIServiceTest test_createInstrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
@@ -113,6 +115,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent then get and set the status
         """
+        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
 
         log.info("IIServiceTest test_createAndSetInstrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
@@ -177,7 +180,8 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent, start sampling and catch the events
         """
-
+        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
+        
         log.info("IIServiceTest test_createInstrumentStartSampling Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
                  'model' : "unknown model",
