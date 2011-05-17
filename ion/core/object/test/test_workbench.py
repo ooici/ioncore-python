@@ -163,7 +163,10 @@ class WorkBenchTest(unittest.TestCase):
 
         self.assertIn(key, self.wb._repos)
 
-        self.wb.manage_workbench_cache()
+        log.info('Workbench state:\n' + str(self.wb))
+
+        context = self.repo.convid_context
+        self.wb.manage_workbench_cache(convid_context=context)
 
         # make sure it is gone!
         self.assertNotIn(key, self.wb._repos)
@@ -181,7 +184,8 @@ class WorkBenchTest(unittest.TestCase):
 
         self.repo.persistent = True
 
-        self.wb.manage_workbench_cache()
+        context = self.repo.convid_context
+        self.wb.manage_workbench_cache(convid_context=context)
 
         self.assertIn(key, self.wb._repos)
 
@@ -203,7 +207,8 @@ class WorkBenchTest(unittest.TestCase):
         self.assertNotIn(key, self.wb._repo_cache)
 
         # Move it to the cache
-        self.wb.manage_workbench_cache()
+        context = self.repo.convid_context
+        self.wb.manage_workbench_cache(convid_context=context)
 
         # Make sure it is in the right place
         self.assertNotIn(key, self.wb._repos)

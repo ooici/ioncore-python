@@ -23,9 +23,18 @@ from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
 from ion.core.object.codec import ION_R1_GPB
 
+from ion.core.exception import IonError
+
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
 from ion.core.ioninit import request
+
+
+class ReceiverError(IonError):
+    """
+    An exception class for errors thrown in the receiver.
+    """
+
 
 
 class IReceiver(Interface):
@@ -253,11 +262,18 @@ class Receiver(BasicLifecycleObject):
                 performative = data.get('performative', None)
                 op = data.get('op', None)
 
+                if hasattr(self.process, 'workbench'):
+                    workbench = self.process.workbench
+                else:
+                    workbench = None
+
+
+                current_context = request.get('workbench_context', [])
 
                 # Set the stack local context for known entries
-                request.convid = convid
-                request.protocol = protocol
-                request.performative = performative
+                #request.convid = convid
+                #request.protocol = protocol
+                #request.performative = performative
 
 
                 log.debug( 'BEFORE YIELD to Message Handler')
@@ -265,38 +281,39 @@ class Receiver(BasicLifecycleObject):
                 log.debug('CONVID "%s"' %  convid)
                 log.debug('PERFORMATIVE "%s"' % performative)
                 log.debug('PROTOCOL "%s"' % protocol)
-                log.debug('Workbench Context "%s"' % request.get('workbench_context', None))
+                log.debug('Current Context "%s"' % str(current_context))
 
-                log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(self.process.workbench))
+                log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(workbench))
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
 
-                    log.warn('Setting non rpc workbench_context: %s ' % convid)
-                    request.workbench_context = convid
+                    log.info('Setting NON RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
+                    current_context.append( convid)
+                    request.workbench_context = current_context
 
-                #####################################################################################
-                ### this line never executes as for some reason it is never true (is performative not a string? wat?)
-                ### the intended behavior is elif performative == 'request':
-                ### but turning that on crashes a lot of tests currently.  @TODO'ing it for later.
-                ### df 13 may 2011
-                #####################################################################################
                 elif performative == 'request':
                     # if it is an rpc request - set the context
-                    log.warn('Setting request workbench_context: %s ' % convid)
+                    log.info('Setting RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
 
-                    request.workbench_context = convid
+                    current_context.append( convid)
+                    request.workbench_context = current_context
+
                 # if it is an RPC result message - do not set the context!
 
 
                 # If this is a GPB message add it to the process workbench
                 encoding = data.get('encoding', None)
-                if hasattr(self.process, 'workbench') and encoding == ION_R1_GPB:
+                if encoding == ION_R1_GPB:
+
+                    if workbench is None:
+                        raise ReceiverError('Can not receive a GPB message in a process which does not have a workbench!')
+
                     # The Codec does not attach the repository to the process. That is done here.
                     content = data.get('content')
-                    self.process.workbench.put_repository(content.Repository)
+                    workbench.put_repository(content.Repository)
 
-                    log.debug("WORKBENCH STATE after incoming message is added:\n%s" % str(self.process.workbench))
+                    log.debug("WORKBENCH STATE after incoming message is added:\n%s" % str(workbench))
 
 
                 # Make the calls into the application code (e.g. process receive)
@@ -317,19 +334,36 @@ class Receiver(BasicLifecycleObject):
 
                     # Cleanup the workbench after an op...
 
+                    if protocol != 'rpc':
+                        # if it is not an rpc conversation - set the context
+                        workbench_context = current_context.pop()
+                        log.info('Popping Non RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
+
+                    elif performative == 'request':
+                        # if it is an rpc request - set the context
+
+                        workbench_context = current_context.pop()
+                        log.info('Popping RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
+
+                        # if it is an RPC result message - do not set the context!
+
+                    else:
+                        # @TODO - SHOULD THIS BE HERE?
+                        workbench_context = pu.get_last_or_default(current_context, 'No Context Set!')
+                        log.info('Using last workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
+                        #print 'CONVID:', convid
+                        #print 'CONTEXT:', workbench_context
+
+
                     if hasattr(self.process, 'workbench'):
-
-                        workbench_context = request.get('workbench_context', None)
-                        convid = request.get('convid', None)
-                        #performative = request.get('performative', None)
-                        #protocol = request.get('protocol', None)
-
 
                         log.debug('AFTER YIELD to message handler')
                         log.debug('CONVID: %s' % convid)
-                        #log.debug('PERFORMATIVE',performative)
+                        log.debug('PERFORMATIVE: %s',performative)
                         log.debug('WORKBENCH CONTXT: %s' % workbench_context)
-                        #log.debug('PROTOCOL "%s"' % protocol)
+                        log.debug('Current CONTXT: %s' % current_context)
+
+                        log.debug('PROTOCOL "%s"' % protocol)
 
 
 
@@ -343,8 +377,18 @@ class Receiver(BasicLifecycleObject):
 
                             nrepos = len(self.process.workbench._repos)
                             if  nrepos > 0:
-                                # Print a warning if someone else is using the persistence tricks...
-                                log.warn('Holding persistent state in the workbench: # of repos %d' % nrepos)
+
+                                pname = self.process.proc_name
+
+                                count = 0
+                                for repo in self.process.workbench._repos.itervalues():
+                                    if repo.convid_context != 'Test runner context!' or repo.persistent is True:
+                                        count +=1
+
+                                if count > 0:
+
+                                    # Print a warning if someone else is using the persistence tricks...
+                                    log.warn('The "%s" process is holding persistent state in %d repository objects!' % (pname, count))
 
                             log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
 

@@ -20,6 +20,7 @@ from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 from ion.core.object import association_manager
+from ion.util import procutils as pu
 
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
@@ -346,7 +347,9 @@ class WorkBench(object):
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
 
-        repo.convid_context = request.get('workbench_context',None)
+        wc = request.get('workbench_context',[])
+
+        repo.convid_context = pu.get_last_or_default(wc, 'Default Context')
 
        
     def reference_repository(self, repo_key, current_state=False):
@@ -531,8 +534,6 @@ class WorkBench(object):
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
 
 
-        print 'DKSMSKLNDSLKDSFN LKSNLKSDN'
-
         # Add any new content to the repository:
         for se in result.commit_elements:
 
@@ -560,9 +561,6 @@ class WorkBench(object):
         repo.upstream = targetname
 
         log.info('pull - complete')
-
-
-        log.info('MKSMSKSMNKSNMS' + str(self))
 
         defer.returnValue(result)
 

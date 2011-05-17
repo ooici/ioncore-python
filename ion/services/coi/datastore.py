@@ -1186,6 +1186,7 @@ class DataStoreWorkbench(WorkBench):
         # get blobs, update into response repository so we don't have to copy
         blobs = yield self._get_blobs(response.Repository, [link.key], filtermethod)
         response.Repository.index_hash.update(blobs)
+        repo.index_hash.update(blobs)
 
         # load root object + links
         element = response.Repository.index_hash[link.key]
