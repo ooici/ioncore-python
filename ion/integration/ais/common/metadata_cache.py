@@ -513,6 +513,3 @@ class MetadataCache(object):
             log.debug('key: ' + key)
         for value in self.__metadata[res.ResourceIdentity].values():
             log.debug('value: ' + str(value))
-
-        
-    

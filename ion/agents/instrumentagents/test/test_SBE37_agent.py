@@ -371,9 +371,6 @@ class TestSBE37Agent(IonTestCase):
         result = reply['result']
         setparams = params
         
-        #print 'set device reply:'
-        #print reply
-
         self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the set changes were made.
