@@ -38,6 +38,8 @@ class GetDataResourceDetail(object):
         self.rc = ResourceClient(proc=ais)
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
+        self.metadataCache = ais.getMetadataCache()
+        self.bUseMetadataCache = False
 
         
     @defer.inlineCallbacks
@@ -45,64 +47,90 @@ class GetDataResourceDetail(object):
         log.debug('getDataResourceDetail Worker Class got GPB: \n' + str(msg))
 
         if msg.message_parameters_reference.IsFieldSet('data_resource_id'):
-            resID = msg.message_parameters_reference.data_resource_id
+            dSetResID = msg.message_parameters_reference.data_resource_id
         else:
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [data_resource_id] not found in message"
             defer.returnValue(Response)
-            
-        try:        
-            log.debug('getDataResourceDetail getting dataset resource instance: ' + resID)
-            ds = yield self.rc.get_instance(resID)
 
-            """
-            for atrib in ds.root_group.attributes:
-                log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
+        if self.bUseMetadataCache:            
+            ds = self.metadataCache.getDSet(dSetResID)
+            if ds is None:
+                # build AIS error response
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                      MessageName='AIS getDataResourceDetail error response')
+                Response.error_num = Response.ResponseCodes.NOT_FOUND
+                Response.error_str = "No Data Set Found for Dataset ID: " + dSetResID
+                defer.returnValue(Response)
+
+            dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
+            dSourceResID = dSetMetadata['DSourceID']
+            ownerID = dSetMetadata['OwnerID']
+
+        else:            
+            try:        
+                log.debug('getDataResourceDetail getting dataset resource instance: ' + dSetResID)
+                #
+                # Get this out of the cache
+                #
+                ds = yield self.rc.get_instance(dSetResID)
     
-            for var in ds.root_group.variables:
-                log.debug('Root Variable: %s' % str(var.name))
-                for atrib in var.attributes:
-                    log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
-                log.debug("....Dimensions:")
-                for dim in var.shape:
-                    log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
-            """                                    
-
-        except ReceivedApplicationError, ex:
-            # build AIS error response
-            RspMsg = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                MessageName='AIS getDataResourceDetail error response')
-            RspMsg.error_num = ex.msg_content.MessageResponseCode
-            RspMsg.error_str = ex.msg_content.MessageResponseBody
-            defer.returnValue(RspMsg)
-
-        #
-        # Find the datasource associated with this dataset, and then find the
-        # owner associated with the dataset; for now, instantiate
-        # a FindDataResources worker object. The getAssociatedSource should be
-        # moved into a common worker class; it's currently in the FindDataResources
-        # class, which doesn't use it.
-        #
-        log.debug('getDataResourceDetail getting datasource resource instance')
-        worker = FindDataResources(self.ais)
-        dSourceResID = None
-        dSourceResID = yield worker.getAssociatedSource(resID)
-        ownerID = yield worker.getAssociatedOwner(resID)
+                """
+                for atrib in ds.root_group.attributes:
+                    log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
         
-        log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + resID)
+                for var in ds.root_group.variables:
+                    log.debug('Root Variable: %s' % str(var.name))
+                    for atrib in var.attributes:
+                        log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
+                    log.debug("....Dimensions:")
+                    for dim in var.shape:
+                        log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+                """                                    
+    
+            except ReceivedApplicationError, ex:
+                # build AIS error response
+                RspMsg = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                    MessageName='AIS getDataResourceDetail error response')
+                RspMsg.error_num = ex.msg_content.MessageResponseCode
+                RspMsg.error_str = ex.msg_content.MessageResponseBody
+                defer.returnValue(RspMsg)
+
+            #
+            # Find the datasource associated with this dataset, and then find the
+            # owner associated with the dataset; for now, instantiate
+            # a FindDataResources worker object. The getAssociatedSource should be
+            # moved into a common worker class; it's currently in the FindDataResources
+            # class, which doesn't use it.
+            #
+            log.debug('getDataResourceDetail getting datasource resource instance')
+            worker = FindDataResources(self.ais)
+            dSourceResID = yield worker.getAssociatedSource(dSetResID)
+            ownerID = yield worker.getAssociatedOwner(dSetResID)
+        
+        log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
 
-        if not (dSourceResID is None):
-            log.debug('Associated datasourceID: ' + dSourceResID)
-            
-            dSource = yield self.rc.get_instance(dSourceResID)
-        else:            
+        if (dSourceResID is None):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
             Response.error_str = "No Associated Data Source Found"
+            defer.returnValue(Response)
+
+        log.debug('Associated datasourceID: ' + dSourceResID)
+        if self.bUseMetadataCache:
+            dSource = self.metadataCache.getDSource(dSourceResID)
+        else:
+            dSource = yield self.rc.get_instance(dSourceResID)
+
+        if (dSource is None):
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS getDataResourceDetail error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "Data Source Found for ID: " + dSourceResID
             defer.returnValue(Response)
 
         self.__printSourceMetadata(dSource)
@@ -111,7 +139,7 @@ class GetDataResourceDetail(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE)
 
-        rspMsg.message_parameters_reference[0].data_resource_id = resID
+        rspMsg.message_parameters_reference[0].data_resource_id = dSetResID
 
         self.__loadGPBMinMetaData(rspMsg.message_parameters_reference[0].dataResourceSummary, ds)
         self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource, userProfile)

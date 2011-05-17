@@ -531,5 +531,3 @@ class ManageResources(object):
          defer.returnValue(Response)
   
       defer.returnValue(None)
-
-      
