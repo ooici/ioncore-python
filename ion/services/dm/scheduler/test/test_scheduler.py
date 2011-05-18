@@ -64,7 +64,7 @@ class SchedulerTest(IonTestCase):
         yield self._setup_store()
         sup = yield self._spawn_processes(services)
 
-        self.proc = Process()
+        self.proc = Process(spawnargs={'proc-name':'SchedulerTestProcess'})
         yield self.proc.spawn()
 
         # setup subscriber for trigger event
