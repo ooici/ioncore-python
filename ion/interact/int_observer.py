@@ -17,6 +17,7 @@ from ion.core.messaging.receiver import FanoutReceiver
 from ion.core.process.process import Process, ProcessFactory
 import ion.util.procutils as pu
 import re
+from ion.services.dm.distribution.events import EventSubscriber
 
 class InteractionObserver(Process):
     """
@@ -43,46 +44,50 @@ class InteractionObserver(Process):
                 handler=self.msg_receive)
         self.add_receiver(self.msg_receiver)
 
-    @defer.inlineCallbacks
-    def plc_init(self):
-        yield self.msg_receiver.initialize()
+        self.ev_sub = EventSubscriber(process=self)
+        self.ev_sub.ondata = self.ev_receive
 
-    @defer.inlineCallbacks
-    def plc_activate(self):
-        yield self.msg_receiver.activate()
+        self.add_life_cycle_object(self.msg_receiver)
+        self.add_life_cycle_object(self.ev_sub)
 
     @defer.inlineCallbacks
     def plc_terminate(self):
-        yield self.msg_receiver.deactivate()
-        yield self.msg_receiver.terminate()
+        #yield self.msg_receiver.deactivate()
+        #yield self.msg_receiver.terminate()
         if self.write_on_term:
             f = open('msc.txt', 'w')
             f.write(self.writeout_msc())
             f.close()
 
+    @defer.inlineCallbacks
     def msg_receive(self, payload, msg):
         self.log_message(payload)
-        msg.ack()
+        yield msg.ack()
+
+    def ev_receive(self, evmsg):
+        self.log_message(evmsg, True)
 
 
 
-
-    def log_message(self, hdrs):
-        # Tuple of Timestamp (MS), type, message
+    def log_message(self, hdrs, evmsg=False):
+        """
+        @param evmsg    This message is an event, render it as such!
+        """
         mhdrs = hdrs.copy()
 
         if isinstance(mhdrs['content'], ion.core.messaging.message_client.MessageInstance):
-            mclass = str(mhdrs['content'].__class__).split('MessageInstance_')[-1][:-2] # chop last '>, @TODO better plz
+            mclass = mhdrs['content'].__class__.__name__.split('MessageInstance_')[-1]
             if 'Wrapper_' in mclass:
                 mclass = string.replace(mclass, "Wrapper_", "")
         else:
-            mclass = str(mhdrs['content'].__class__)[7:][:-2]   # trim out the <type ''> nonsense @TODO: better
+            mclass = mhdrs['content'].__class__.__name__
 
         # lose the content, we don't want to hold it, but store its type name
         mhdrs.pop('content', None)
         mhdrs['_content_type'] = mclass
 
-        msg_rec = (pu.currenttime_ms(), mhdrs)
+        # TUPLE: timestamp (MS), type, boolean if its an event
+        msg_rec = (pu.currenttime_ms(), mhdrs, evmsg)
         self.msg_log.append(msg_rec)
 
         #log.debug(mhdrs)
@@ -145,8 +150,9 @@ class InteractionObserver(Process):
                     # @TODO: timeout? we never see it
                     pass
 
-            # catch any non-rpc leftover destinations
-            if not rec in procs:
+            # catch any non-rpc leftover destinations, make sure they are not events, we do not want their destinations
+            # as a line in the msc!
+            if not rec in procs and not msgtup[2]:
                 procs.append(rec)
 
 
@@ -179,44 +185,52 @@ class InteractionObserver(Process):
             rname = proc_alias.get(rec, rec)
             rname = sanitize(rname)
 
-            #mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
-            #    msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
-            # @todo Clean up sender and receiver names - remove host and PID
-            #re.sub('.+:','',sname)
+            if msgtup[2]:
+                # this is an EVENT, show it as a box!
+                evlabel = "%s" % (rname)
 
-            mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
-
-            # default attributes: only a label
-            attrs = {'label': mlabel}
-
-            # determine arrow type used based on message type
-            arrow = '->'
-            if msg.get('protocol', None) == 'rpc':
-
-                # we know its rpc based on arrow type and color, so we change the label to be more friendly
-                #rpclabel = "%s (%s->%s) <%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
-                #attrs['label'] = rpclabel
-
-                arrow = ">>"    # default response, covers a few cases here
-
-                performative = msg.get('performative', None)
-                if performative == 'request':
-                    arrow = '=>'
-                elif performative == 'timeout':
-                    arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
-
-                if performative == 'failure' or performative == 'error':
-                    attrs['textbgcolor'] = 'red'
-                    attrs['linecolor'] = 'red'
-                else:
-                    attrs['textcolor'] = 'navy'
-                    attrs['linecolor'] = 'navy'
+                msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, evlabel)
             else:
-                # non rpc -> perhaps a data message for ingest/exgest?
-                #msglabel = "%s (%s->%s) <%s>"
-                pass
 
-            msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(('%s="%s"' % (k, v) for k,v in attrs.iteritems())))
+                #mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
+                #    msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
+                # @todo Clean up sender and receiver names - remove host and PID
+                #re.sub('.+:','',sname)
+
+                mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+
+                # default attributes: only a label
+                attrs = {'label': mlabel}
+
+                # determine arrow type used based on message type
+                arrow = '->'
+                if msg.get('protocol', None) == 'rpc':
+
+                    # we know its rpc based on arrow type and color, so we change the label to be more friendly
+                    #rpclabel = "%s (%s->%s) <%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+                    #attrs['label'] = rpclabel
+
+                    arrow = ">>"    # default response, covers a few cases here
+
+                    performative = msg.get('performative', None)
+                    if performative == 'request':
+                        arrow = '=>'
+                    elif performative == 'timeout':
+                        arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
+
+                    if performative == 'failure' or performative == 'error':
+                        attrs['textbgcolor'] = 'red'
+                        attrs['linecolor'] = 'red'
+                    else:
+                        attrs['textcolor'] = 'navy'
+                        attrs['linecolor'] = 'navy'
+                else:
+                    # non rpc -> perhaps a data message for ingest/exgest?
+                    #msglabel = "%s (%s->%s) <%s>"
+                    pass
+
+                msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(('%s="%s"' % (k, v) for k,v in attrs.iteritems())))
+
         msc += "}\n"
 
         return msc
