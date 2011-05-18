@@ -110,8 +110,8 @@ class WorkBench(object):
         '''
         retstr = "/ ==== Workbench info (id:%s) ==========\n" % id(self)
         retstr += "++ Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
-        for k,v in self._workbench_cache.iteritems():
-            retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
+        #for k,v in self._workbench_cache.iteritems():
+        #    retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
 
         retstr += "++ Persistent Repositories, (len:%d)\n" % len(self._repos)
         for k, v in self._repos.iteritems():

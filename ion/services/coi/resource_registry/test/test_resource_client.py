@@ -234,8 +234,7 @@ class ResourceClientTest(IonTestCase):
 
         res_ref.branch = 'foobar!'
         # Fails
-        self.failUnlessFailure(my_rc.get_instance(res_ref),ResourceClientError)
-
+        yield self.failUnlessFailure(my_rc.get_instance(res_ref),ResourceClientError)
 
 
 

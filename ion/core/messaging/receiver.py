@@ -358,12 +358,13 @@ class Receiver(BasicLifecycleObject):
                     if hasattr(self.process, 'workbench'):
 
                         log.debug('AFTER YIELD to message handler')
+                        log.debug('OP "%s"' % op)
                         log.debug('CONVID: %s' % convid)
                         log.debug('PERFORMATIVE: %s',performative)
-                        log.debug('WORKBENCH CONTXT: %s' % workbench_context)
-                        log.debug('Current CONTXT: %s' % current_context)
-
                         log.debug('PROTOCOL "%s"' % protocol)
+                        log.debug('Current CONTXT: %s' % current_context)
+                        log.debug('WORKBENCH CONTXT: %s' % workbench_context)
+
 
 
 
@@ -382,7 +383,8 @@ class Receiver(BasicLifecycleObject):
 
                                 count = 0
                                 for repo in self.process.workbench._repos.itervalues():
-                                    if repo.convid_context != 'Test runner context!' or repo.persistent is True:
+                                    #if repo.convid_context != 'Test runner context!' or repo.persistent is True:
+                                    if repo.persistent is True:
                                         count +=1
 
                                 if count > 0:
@@ -391,6 +393,9 @@ class Receiver(BasicLifecycleObject):
                                     log.warn('The "%s" process is holding persistent state in %d repository objects!' % (pname, count))
 
                             log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
+
+                        else:
+                            log.debug('Workbench context does not match the Convid - Do not clear anything from the workbench!')
 
         log.info( 'End Receiver.Receive on proc: %s' % str(self.process))
 
