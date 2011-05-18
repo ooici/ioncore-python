@@ -996,7 +996,7 @@ class WorkBench(object):
             # if we are doing a clone - pulling a new repository
             repo._dotgit = head
             if len(repo.branches)>1:
-                log.warn('Do not assume branch order in unchanged - setting master to branch 0 anyways!')
+                log.warn('Do not assume branch order is unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
             return
         
