@@ -89,8 +89,9 @@ class CapabilityContainer(service.Service):
         self.defer_started = defer.Deferred()
 
         self.lockfile = None
-        if 'lockfile' in self.config:
-            self.lockfile = open(self.config['lockfile'], 'w')
+        lockfilepath = self.config.get('lockfile', None)
+        if not lockfilepath is None:
+            self.lockfile = open(lockfilepath, 'w')
             result = fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
             #assert(result == 0)
 
