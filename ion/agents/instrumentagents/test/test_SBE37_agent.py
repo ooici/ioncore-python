@@ -20,6 +20,7 @@ import ion.util.procutils as pu
 from ion.core.exception import ReceivedError
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
+from ion.agents.instrumentagents.instrument_constants import AgentParameter
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import AgentState
@@ -27,6 +28,14 @@ from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
+from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
+from ion.agents.instrumentagents.instrument_constants import MetadataParameter
+from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
+from ion.agents.instrumentagents.SBE37_driver import SBE37Command
+from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
+from ion.agents.instrumentagents.SBE37_driver import SBE37MetadataParameter
+from ion.agents.instrumentagents.SBE37_driver import SBE37Status
+
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -56,6 +65,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 SKIP_TESTS = [
     'test_execute_instrument',
     'test_state_transitions',
+    'test_get_capabilities',
     'dummy'
 ]    
 
@@ -410,11 +420,11 @@ class TestSBE37Agent(IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
-        self.assertIsInstance(result.get('sound velocity',None),float)
+        self.assertIsInstance(result.get('sound_velocity',None),float)
         self.assertIsInstance(result.get('pressure',None),float)
         self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('time',None),tuple)
-        self.assertIsInstance(result.get('date',None),tuple)
+        self.assertIsInstance(result.get('time',None),str)
+        self.assertIsInstance(result.get('date',None),str)
         
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
@@ -456,10 +466,10 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('temperature'),float)
             self.assertIsInstance(sample.get('salinity'),float)
             self.assertIsInstance(sample.get('pressure',None),float)
-            self.assertIsInstance(sample.get('sound velocity',None),float)
+            self.assertIsInstance(sample.get('sound_velocity',None),float)
             self.assertIsInstance(sample.get('conductivity',None),float)
-            self.assertIsInstance(sample.get('time',None),tuple)
-            self.assertIsInstance(sample.get('date',None),tuple)
+            self.assertIsInstance(sample.get('time',None),str)
+            self.assertIsInstance(sample.get('date',None),str)
         
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,tid)
@@ -485,6 +495,102 @@ class TestSBE37Agent(IonTestCase):
             else:
                 self.assertEqual(val,final_config[key])
                 
+        # Reset the agent to disconnect and bring down the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory(cmd,tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)        
+
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(tid)
+        success = reply['success']
+        self.assert_(InstErrorCode.is_ok(success))
+
+
+
+    @defer.inlineCallbacks
+    def test_get_capabilities(self):
+        """
+        Test cases for querying the device and observatory capabilities.
+        """
+        if not RUN_TESTS:
+            raise unittest.SkipTest("Do not run this test automatically.")
+        
+        if 'test_get_capabilities' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+
+        # Check agent state upon creation. No transaction needed for
+        # get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
+
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        tid = reply['transaction_id']
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(type(tid),str)
+        self.assertEqual(len(tid),36)
+        
+        # Initialize the agent to bring up the driver and client.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
+        reply = yield self.ia_client.execute_observatory(cmd,tid) 
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status(params,tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok(success))        
+        self.assert_(agent_state == AgentState.INACTIVE)
+
+        #
+        params = [InstrumentCapability.ALL]
+        reply = yield self.ia_client.get_capabilities(params,tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok(success))
+        
+        self.assertEqual(list(result[InstrumentCapability.\
+            DEVICE_CHANNELS][1]).sort(),SBE37Channel.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            DEVICE_COMMANDS][1]).sort(),SBE37Command.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            DEVICE_METADATA][1]).sort(),SBE37MetadataParameter.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            DEVICE_PARAMS][1]).sort(),SBE37Parameter.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            DEVICE_STATUSES][1]).sort(),SBE37Status.list().sort())
+        
+        self.assertEqual(list(result[InstrumentCapability.\
+            OBSERVATORY_COMMANDS][1]).sort(),AgentCommand.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            OBSERVATORY_METADATA][1]).sort(),MetadataParameter.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            OBSERVATORY_PARAMS][1]).sort(),AgentParameter.list().sort())
+        self.assertEqual(list(result[InstrumentCapability.\
+            OBSERVATORY_STATUSES][1]).sort(),AgentStatus.list().sort())
+
         # Reset the agent to disconnect and bring down the driver and client.
         cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
         reply = yield self.ia_client.execute_observatory(cmd,tid)
