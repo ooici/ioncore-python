@@ -346,11 +346,11 @@ class ConnectionMethod(BaseEnum):
     Common connection method enum.
     """
     NOT_SPECIFIED = 'CONNECTION_METHOD_NOT_SPECIFIED'
-    OFFLINE = 'CONNECTION_METHOD_OFFLINE' # Device offline.
-    CABLED_OBSERVATORY = 'CONNECTION_METHOD_CABLED_OBSERVATORY' # Accessible through cabled observatory, available full time.
-    SHORE_NETWORK = 'CONNECTION_METHOD_SHORE_NETWORK' # Connected through full time shore connection.
-    PART_TIME_SCHEDULED = 'CONNECTION_METHOD_PART_TIME_SCHEDULED' # Comes online on scheduled basis. Outages normal.
-    PART_TIME_RANDOM = 'CONNECTION_METHOD_PART_TIME_RANDOM' # Comes online as needed. Outages normal.    
+    OFFLINE = 'CONNECTION_METHOD_OFFLINE' 
+    CABLED_OBSERVATORY = 'CONNECTION_METHOD_CABLED_OBSERVATORY' 
+    SHORE_NETWORK = 'CONNECTION_METHOD_SHORE_NETWORK' 
+    PART_TIME_SCHEDULED = 'CONNECTION_METHOD_PART_TIME_SCHEDULED' 
+    PART_TIME_RANDOM = 'CONNECTION_METHOD_PART_TIME_RANDOM'    
     
 
 """
@@ -360,10 +360,11 @@ class AlarmType(BaseEnum):
     """
     Common agent alarm enum.
     """
-    CANNOT_PUBLISH = ('ALARM_CANNOT_PUBLISH','Attempted to publish but cannot.'),
-    INSTRUMENT_UNREACHABLE = ('ALARM_INSTRUMENT_UNREACHABLE','Instrument cannot be contacted when it should be.'),
-    MESSAGING_ERROR = ('ALARM_MESSAGING_ERROR','Error when sending messages.'),
-    HARDWARE_ERROR = ('ALARM_HARDWARE_ERROR','Hardware problem detected.'),
+    CANNOT_PUBLISH = ('ALARM_CANNOT_PUBLISH','Attempted to publish but cannot.')
+    INSTRUMENT_UNREACHABLE = ('ALARM_INSTRUMENT_UNREACHABLE',
+                'Instrument cannot be contacted when it should be.')
+    MESSAGING_ERROR = ('ALARM_MESSAGING_ERROR','Error when sending messages.')
+    HARDWARE_ERROR = ('ALARM_HARDWARE_ERROR','Hardware problem detected.')
     UNKNOWN_ERROR = ('ALARM_UNKNOWN_ERROR','An unknown error has occurred.')       
    
     
@@ -374,20 +375,21 @@ class ObservatoryCapability(BaseEnum):
     """
     Common agent observatory capabilies enum.
     """
-    OBSERVATORY_COMMANDS = 'CAP_OBSERVATORY_COMMANDS' # Common and specific observatory command names.
-    OBSERVATORY_PARAMS = 'CAP_OBSERVATORY_PARAMS' # Common and specific observatory parameter names.
-    OBSERVATORY_STATUSES = 'CAP_OBSERVATORY_STATUSES' # Common and specific observatory status names.
-    OBSERVATORY_METADATA = 'CAP_OBSERVATORY_METADATA' # Common and specific metadata names.
+    OBSERVATORY_COMMANDS = 'CAP_OBSERVATORY_COMMANDS' 
+    OBSERVATORY_PARAMS = 'CAP_OBSERVATORY_PARAMS' 
+    OBSERVATORY_STATUSES = 'CAP_OBSERVATORY_STATUSES' 
+    OBSERVATORY_METADATA = 'CAP_OBSERVATORY_METADATA' 
     OBSERVATORY_ALL = 'CAP_OBSERVATORY_ALL'
     
 class DriverCapability(BaseEnum):
     """
     Common device capabilities enum.
     """
-    DEVICE_METADATA = 'CAP_DEVICE_METADATA' # Common and specific metadata names.
-    DEVICE_COMMANDS = 'CAP_DEVICE_COMMANDS' # Common and specific device command names.
-    DEVICE_PARAMS = 'CAP_DEVICE_PARAMS' # Common and specific device parameter names.
-    DEVICE_STATUSES = 'CAP_DEVICE_STATUSES' # Common and specific device status names.    
+    DEVICE_METADATA = 'CAP_DEVICE_METADATA' 
+    DEVICE_COMMANDS = 'CAP_DEVICE_COMMANDS' 
+    DEVICE_PARAMS = 'CAP_DEVICE_PARAMS' 
+    DEVICE_STATUSES = 'CAP_DEVICE_STATUSES' 
+    DEVICE_CHANNELS = 'CAP_DEVICE_CHANNELS' 
     DEVICE_ALL = 'CAP_DEVICE_ALL'
     
 class InstrumentCapability(ObservatoryCapability,DriverCapability):

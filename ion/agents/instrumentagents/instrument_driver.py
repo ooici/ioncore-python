@@ -364,7 +364,7 @@ class InstrumentDriverClient(ProcessClient):
             {'success':success,'result':{cap_arg:(success,val),
                 ...,cap_arg:(success,val)}}.
        """
-        
+
         assert(isinstance(params, (list, tuple))), 'Expected a params list or tuple.'        
         if timeout != None:
             assert(isinstance(timeout, int)), 'Expected a timeout int.'

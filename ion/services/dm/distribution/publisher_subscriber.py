@@ -86,11 +86,13 @@ class Publisher(BasicLifecycleObject):
         """
         routing_key = routing_key or self._routing_key
 
+        # set up the sender/sender-name to make it look as if the owning process is doing the sending, which at some level it
+        # technically is.
         kwargs = { 'recipient' : routing_key,
                    'content'   : data,
-                   'headers'   : {},
-                   'operation' : None } #,
-                   #'sender'    : self.xname }
+                   'headers'   : {'sender-name' : self._process.proc_name },
+                   'operation' : None,
+                   'sender'    : self._process.id.full }
 
         return self._recv.send(**kwargs)
 

@@ -84,6 +84,13 @@ def get_obs(params=None):
         params = [AgentParameter.ALL]
     result = yield IAC.get_observatory(params)
     defer.returnValue(result)
+
+@defer.inlineCallbacks
+def get_cap(params=None):
+    if not params:
+        params = [InstrumentCapability.ALL]
+    result = yield IAC.get_capabilities(params)
+    defer.returnValue(result)
     
 @defer.inlineCallbacks
 def set_obs_driver():

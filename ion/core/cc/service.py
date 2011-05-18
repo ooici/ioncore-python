@@ -92,8 +92,7 @@ class CapabilityContainer(service.Service):
         lockfilepath = self.config.get('lockfile', None)
         if not lockfilepath is None:
             self.lockfile = open(lockfilepath, 'w')
-            result = fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
-            #assert(result == 0)
+            fcntl.lockf(self.lockfile, fcntl.LOCK_EX)
 
     @defer.inlineCallbacks
     def startService(self):
@@ -122,11 +121,29 @@ class CapabilityContainer(service.Service):
 
         # signal successful container start
         if self.lockfile:
-            fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
+            fcntl.lockf(self.lockfile, fcntl.LOCK_UN)
             self.lockfile.close()
             # The spawning process must cleanup the lockfile to avoid race conditions
 
         self.defer_started.callback(True)
+
+        # event notify that the startup is good to go!
+
+        # must do imports here or we get cyclical import problems
+        from ion.services.dm.distribution.events import ContainerStartupEventPublisher
+        from ion.core.process.process import Process
+        p = Process(spawnargs={'proc-name':'ContainerStartupPubProcess'})
+        yield p.spawn()
+        pub = ContainerStartupEventPublisher(process=p)
+        yield pub.initialize()
+        yield pub.activate()
+
+        evmsg = yield pub.create_event(origin=self.container.id)
+        evmsg.additional_data.startup_names.extend(self.config['scripts'])
+        yield pub.publish_event(evmsg, origin=self.container.id)
+
+        yield pub.terminate()
+        yield p.terminate()
 
     @defer.inlineCallbacks
     def stopService(self):

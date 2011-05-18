@@ -12,7 +12,11 @@ import time
 from uuid import uuid4
 
 from twisted.internet import defer, reactor
-
+try:
+    import json
+except:
+    import simplejson as json
+    
 import ion.util.procutils as pu
 import ion.util.ionlog
 from ion.core.process.process import Process
@@ -251,6 +255,13 @@ class InstrumentAgent(Process):
         self._data_buffer_limit = 0
     
         """
+        A dict of device capabilities that is read from the driver upon
+        driver construction. The dict persists whether we are connected to
+        the driver or not.
+        """
+        self._device_capabilities = {}
+    
+        """
         List of current alarm conditions. Tuple of (ID,description).
         """
         self._alarms = []
@@ -384,7 +395,22 @@ class InstrumentAgent(Process):
             origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.INACTIVE)
-            pass
+
+            # Read the device capabilities.
+            try:
+                self._device_capabilities = {}
+                reply = yield self._driver_client.get_capabilities(\
+                                                [DriverCapability.DEVICE_ALL])
+            except:
+                pass
+            
+            else:
+                result = reply['result']
+                for (key,val) in result.iteritems():
+                    success_val = val[0]
+                    val_val = val[1]
+                    if InstErrorCode.is_ok(success_val):
+                        self._device_capabilities[key] = val
 
         elif event == AgentEvent.EXIT:
             pass
@@ -516,8 +542,7 @@ class InstrumentAgent(Process):
             origin = 'agents.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.IDLE)
-            pass
-
+                                
         elif event == AgentEvent.EXIT:
             pass
         
@@ -722,7 +747,7 @@ class InstrumentAgent(Process):
         @retval A dict with 'success' success/fail string and
             'transaction_id' transaction ID UUID string.
         """
-        
+
         assert(isinstance(content,dict)), 'Expected a dict content.'
         acq_timeout = content.get('acq_timeout',None)
         exp_timeout = content.get('exp_timeout',None)
@@ -735,7 +760,8 @@ class InstrumentAgent(Process):
         
         result = {'success':None,'transaction_id':None}
         
-        (success,tid) = yield self._request_transaction(acq_timeout,exp_timeout)
+        (success,tid) = yield self._request_transaction(acq_timeout,
+                                        exp_timeout,headers['sender'])
         result['success'] = success
         result['transaction_id'] = tid
             
@@ -803,12 +829,13 @@ class InstrumentAgent(Process):
             return (InstErrorCode.LOCKED_RESOURCE,None)
 
 
-    def _request_transaction(self,acq_timeout,exp_timeout):
+    def _request_transaction(self,acq_timeout,exp_timeout,requester):
         """
         @param acq_timeout An integer in seconds to wait to acquire a new
             transaction.
         @param exp_timeout An integer in seconds to allow the new transaction
             to remain open.
+        @param requester A process ID for requester.
         @retval A deferred that will fire when the a new transaction has
             been constructed or timeout occurs. The deferred value is a
             tuple (success/fail,transaction_id).
@@ -869,7 +896,8 @@ class InstrumentAgent(Process):
             
             acq_timeout_call = reactor.callLater(acq_timeout,acquisition_timeout)
             
-            self._pending_transactions.append((d,acq_timeout_call,exp_timeout))
+            self._pending_transactions.append((d,acq_timeout_call,exp_timeout,
+                                               requester))
             
             return d
         
@@ -927,7 +955,8 @@ class InstrumentAgent(Process):
             # If there is a pending transaction, issue a new transaction
             # and cancel the acquisition timeout.
             if len(self._pending_transactions) > 0:
-                (d,call,exp_timeout) = self._pending_transactions.pop(0)
+                (d,call,exp_timeout,requester) = \
+                    self._pending_transactions.pop(0)
                 call.cancel()
                 (success,tid) = self._start_transaction(exp_timeout)
                 d.callback((success,tid))
@@ -1444,8 +1473,9 @@ class InstrumentAgent(Process):
                 origin="agent.%s" % self.event_publisher_origin
                 config = self._get_parameters()
                 strval = self._get_data_string(config)
+                json_val = json.dumps(config)
                 yield self._log_publisher.create_and_publish_event(origin=origin,
-                        description=strval)
+                        description=json_val)
             
             if (tid == 'create') or (self._transaction_timed_out == True):
                 self._end_transaction(self.transaction_id)
@@ -1604,8 +1634,10 @@ class InstrumentAgent(Process):
                     
                 # Pending transactions.
                 if arg == AgentStatus.PENDING_TRANSACTIONS or arg == AgentStatus.ALL:
+                    pending_transaction_pids = \
+                        [item[3] for item in self._pending_transactions]
                     result[AgentStatus.PENDING_TRANSACTIONS] = \
-                        (InstErrorCode.OK,self._pending_transactions)                
+                        (InstErrorCode.OK,pending_transaction_pids)                
 
         # Unknown error.
         except:
@@ -1677,9 +1709,8 @@ class InstrumentAgent(Process):
 
         reply['transaction_id'] = self.transaction_id
         get_errors = False
-        result = {}
-        
-        
+        result = {} 
+              
         try:
             
             # Do the work here.
@@ -1690,74 +1721,98 @@ class InstrumentAgent(Process):
                     get_errors = True
                     continue
                 
-                if arg == InstrumentCapability.OBSERVATORY_COMMANDS or \
-                        arg == InstrumentCapability.OBSERVATORY_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    result[InstrumentCapability.OBSERVATORY_COMMANDS] = \
-                        (InstErrorCode.OK,AgentCommand.list())
+                if ObservatoryCapability.has(arg) or arg == InstrumentCapability.ALL:
                     
-                if arg == InstrumentCapability.OBSERVATORY_PARAMS or \
-                        arg == InstrumentCapability.OBSERVATORY_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    result[InstrumentCapability.OBSERVATORY_PARAMS] = \
-                        (InstErrorCode.OK,AgentParameter.list())
+                    if arg == InstrumentCapability.OBSERVATORY_COMMANDS or \
+                            arg == InstrumentCapability.OBSERVATORY_ALL or \
+                            arg == InstrumentCapability.ALL:
+                        result[InstrumentCapability.OBSERVATORY_COMMANDS] = \
+                            (InstErrorCode.OK,AgentCommand.list())
+                        
+                    if arg == InstrumentCapability.OBSERVATORY_PARAMS or \
+                            arg == InstrumentCapability.OBSERVATORY_ALL or \
+                            arg == InstrumentCapability.ALL:
+                        result[InstrumentCapability.OBSERVATORY_PARAMS] = \
+                            (InstErrorCode.OK,AgentParameter.list())
+                        
+                    if arg == InstrumentCapability.OBSERVATORY_STATUSES or \
+                            arg == InstrumentCapability.OBSERVATORY_ALL or \
+                            arg == InstrumentCapability.ALL:
+                        result[InstrumentCapability.OBSERVATORY_STATUSES] = \
+                            (InstErrorCode.OK,AgentStatus.list())
+                        
+                    if arg == InstrumentCapability.OBSERVATORY_METADATA or \
+                            arg == InstrumentCapability.OBSERVATORY_ALL or \
+                            arg == InstrumentCapability.ALL:
+                        result[InstrumentCapability.OBSERVATORY_METADATA] = \
+                            (InstErrorCode.OK,MetadataParameter.list())
                     
-                if arg == InstrumentCapability.OBSERVATORY_STATUSES or \
-                        arg == InstrumentCapability.OBSERVATORY_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    result[InstrumentCapability.OBSERVATORY_STATUSES] = \
-                        (InstErrorCode.OK,AgentStatus.list())
-                    
-                if arg == InstrumentCapability.OBSERVATORY_METADATA or \
-                        arg == InstrumentCapability.OBSERVATORY_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    result[InstrumentCapability.OBSERVATORY_METADATA] = \
-                        (InstErrorCode.OK,MetadataParameter.list())
-                    
-                if arg == InstrumentCapability.DEVICE_COMMANDS or \
-                        arg == InstrumentCapability.DEVICE_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,
-                               ['device_command_1','device_command_2'])
-                    result[InstrumentCapability.DEVICE_COMMANDS] = dvr_val
+                if DriverCapability.has(arg) or arg == InstrumentCapability.ALL:
 
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
-                    
-                if arg == InstrumentCapability.DEVICE_PARAMS or \
-                        arg == InstrumentCapability.DEVICE_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    #TDOD driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_param_1',
-                        'device_param_2','device_param_3'])
-                    result[InstrumentCapability.DEVICE_PARAMS] = dvr_val
+                    if arg==InstrumentCapability.DEVICE_CHANNELS or \
+                           arg==InstrumentCapability.DEVICE_ALL or \
+                           arg==InstrumentCapability.ALL:
+                        val = self._device_capabilities.\
+                              get(InstrumentCapability.DEVICE_CHANNELS,None)
+                        if val != None:
+                            result[InstrumentCapability.DEVICE_CHANNELS] = \
+                                (InstErrorCode.OK,val)
+                        else:
+                            result[InstrumentCapability.DEVICE_CHANNELS] = \
+                                (InstErrorCode.INVALID_CAPABILITY,None)
+                            get_errors = True
 
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
-                    
-                if arg == InstrumentCapability.DEVICE_STATUSES or \
-                        arg == InstrumentCapability.DEVICE_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    #TODO driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_status_1',
-                        'device_status_2','device_status_3'])
-                    result[InstrumentCapability.DEVICE_STATUSES] = dvr_val
+                    if arg==InstrumentCapability.DEVICE_COMMANDS or \
+                           arg==InstrumentCapability.DEVICE_ALL or \
+                           arg==InstrumentCapability.ALL:
+                        val = self._device_capabilities.\
+                              get(InstrumentCapability.DEVICE_COMMANDS,None)
+                        if val != None:
+                            result[InstrumentCapability.DEVICE_COMMANDS] = \
+                                (InstErrorCode.OK,val)
+                        else:
+                            result[InstrumentCapability.DEVICE_COMMANDS] = \
+                                (InstErrorCode.INVALID_CAPABILITY,None)
+                            get_errors = True
 
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
+                    if arg==InstrumentCapability.DEVICE_METADATA or \
+                           arg==InstrumentCapability.DEVICE_ALL or \
+                           arg==InstrumentCapability.ALL:
+                        val = self._device_capabilities.\
+                              get(InstrumentCapability.DEVICE_METADATA,None)
+                        if val != None:
+                            result[InstrumentCapability.DEVICE_METADATA] = \
+                                (InstErrorCode.OK,val)
+                        else:
+                            result[InstrumentCapability.DEVICE_METADATA] = \
+                                (InstErrorCode.INVALID_CAPABILITY,None)
+                            get_errors = True
 
-                if arg == InstrumentCapability.DEVICE_METADATA or \
-                        arg == InstrumentCapability.DEVICE_ALL or \
-                        arg == InstrumentCapability.ALL:
-                    #TODO driver integration.
-                    dvr_val = (InstErrorCode.OK,['device_metadata_1',
-                        'device_metadata_2','device_metadata_3'])
-                    result[InstrumentCapability.DEVICE_METADATA] = dvr_val
+                    if arg==InstrumentCapability.DEVICE_PARAMS or \
+                           arg==InstrumentCapability.DEVICE_ALL or \
+                           arg==InstrumentCapability.ALL:
+                        val = self._device_capabilities.\
+                              get(InstrumentCapability.DEVICE_PARAMS,None)
+                        if val != None:
+                            result[InstrumentCapability.DEVICE_PARAMS] = \
+                                (InstErrorCode.OK,val)
+                        else:
+                            result[InstrumentCapability.DEVICE_PARAMS] = \
+                                (InstErrorCode.INVALID_CAPABILITY,None)
+                            get_errors = True
 
-                    if InstErrorCode.is_error(dvr_val[0]):
-                        get_errors = True
-
+                    if arg==InstrumentCapability.DEVICE_STATUSES or \
+                           arg==InstrumentCapability.DEVICE_ALL or \
+                           arg==InstrumentCapability.ALL:
+                        val = self._device_capabilities.\
+                              get(InstrumentCapability.DEVICE_STATUSES,None)
+                        if val != None:
+                            result[InstrumentCapability.DEVICE_STATUSES] = \
+                                (InstErrorCode.OK,val)
+                        else:
+                            result[InstrumentCapability.DEVICE_STATUSES] = \
+                                (InstErrorCode.INVALID_CAPABILITY,None)
+                            get_errors = True
         
         # Unkonwn error.
         except:
@@ -2326,51 +2381,64 @@ class InstrumentAgent(Process):
             result = reply['result']
             obs_status = result.get(key,None)
             strval = ''
+            json_val = None
             
             # If in streaming mode, buffer data and publish at intervals.
             if InstErrorCode.is_ok(success) and obs_status != None:
                 if obs_status[1] == ObservatoryState.STREAMING:
                     self._data_buffer.append(value)
                     if len(self._data_buffer) > self._data_buffer_limit:
-                        strval = self._get_data_string(self._data_buffer)
+                        # strval = self._get_data_string(self._data_buffer)
+                        json_val = json.dumps(self._data_buffer)                        
                         self._data_buffer = []
             
             # If not in streaming mode, always publish data upon receipt.   
             else:
-                strval = self._get_data_string(value)
-
-            if len(strval)>0:
+                #strval = self._get_data_string(value)
+                json_val = json.dumps([value])
+                
+            #if len(strval)>0:
+            if json_val != None:
                 origin = "%s.%s" % (transducer,self.event_publisher_origin)
                 yield self._data_publisher.create_and_publish_event(\
-                    origin=origin,data_block=strval)
+                    origin=origin,data_block=json_val)
 
         # Driver configuration changed, publish config.                
         elif type == DriverAnnouncement.CONFIG_CHANGE:
             
-            #
+            
             reply = yield self._driver_client.get([(DriverChannel.ALL,
                                                     DriverParameter.ALL)])
             success = reply['success']
             result = reply['result']
             if InstErrorCode.is_ok(success) and len(result)>0:
-                strval = self._get_data_string(result)
+                str_key_dict = {}
+                for (key,val) in result.iteritems():
+                    str_key = '%s__%s' % (key[0],key[1])
+                    str_key_dict[str_key] = val
+                #strval = self._get_data_string(result)
+                json_val = json.dumps(str_key_dict)
                 origin="%s.%s" % (transducer, self.event_publisher_origin)            
                 yield self._log_publisher.create_and_publish_event(origin=origin,
-                    description=strval)
+                    description=json_val)
         
         elif type == DriverAnnouncement.ERROR:
             pass
         
         # If the driver state changed, publish any buffered data remaining.
         elif type == DriverAnnouncement.STATE_CHANGE:
-
-            strval = self._get_data_string(self._data_buffer)
-            if len(strval) > 0:    
-                origin = "%s.%s" % (self._prev_data_transducer,
-                                    self.event_publisher_origin)
-                yield self._log_publisher.create_and_publish_event(\
-                    origin=origin,description=strval)
-        
+            json_val = None
+            if len(self._data_buffer)>0:
+                #strval = self._get_data_string(self._data_buffer)
+                json_val = json.dumps(self._data_buffer)
+                #if len(strval) > 0:
+                if json_val != None:
+                    origin = "%s.%s" % (self._prev_data_transducer,
+                                        self.event_publisher_origin)
+                    yield self._log_publisher.create_and_publish_event(\
+                        origin=origin,description=json_val)
+            
+            
         elif type == DriverAnnouncement.EVENT_OCCURRED:
             pass
             

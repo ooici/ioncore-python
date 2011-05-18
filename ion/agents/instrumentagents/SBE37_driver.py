@@ -1919,7 +1919,7 @@ class SBE37Driver(InstrumentDriver):
         assert(isinstance(content,dict)), 'Expected dict content.'
         params = content.get('params',None)
         assert(isinstance(params,(list,tuple))), 'Expected list or tuple params.'
-        
+
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
         if timeout != None:
@@ -2044,13 +2044,6 @@ class SBE37Driver(InstrumentDriver):
         # Create the connection complete deferred and fire EVENT_DISCONNECT.
         reply = yield self._process_disconnect()
         yield self.reply_ok(msg,reply)
-
-
-    @defer.inlineCallbacks
-    def publish(self, topic, transducer, data):
-        """
-        """
-        yield
 
 
     ###########################################################################
@@ -2325,6 +2318,7 @@ class SBE37Driver(InstrumentDriver):
         @param params a list of capability arguments.
         @retval reply message with the requested capability results.
         """
+
         # Set up the reply message.
         reply = {'success':None,'result':None}
         result = {}
@@ -2353,6 +2347,11 @@ class SBE37Driver(InstrumentDriver):
                     result[SBE37Capability.DEVICE_STATUSES] = \
                         (InstErrorCode.OK,SBE37Status.list())
             
+                if arg == SBE37Capability.DEVICE_CHANNELS or \
+                        arg == SBE37Capability.DEVICE_ALL:
+                    result[SBE37Capability.DEVICE_CHANNELS] = \
+                        (InstErrorCode.OK,SBE37Channel.list())
+
             else:
                 result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
                 get_errors = True
@@ -2604,12 +2603,12 @@ class SBE37Driver(InstrumentDriver):
         # Extract sound velocity and salinity if present.
         if match.group(5) and match.group(7):
             sample_data['salinity'] = float(match.group(5))
-            sample_data['sound velocity'] = float(match.group(7))
+            sample_data['sound_velocity'] = float(match.group(7))
         elif match.group(5):
             if self.parameters.get(SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSAL)['value']:
                 sample_data['salinity'] = float(match.group(5))
             elif self.parameters.get(SBE37Channel.INSTRUMENT,SBE37Parameter.OUTPUTSV)['value']:
-                sample_data['sound velocity'] = match.group(5)
+                sample_data['sound_velocity'] = match.group(5)
         
         # Extract date and time if present.
         sample_time = None
@@ -2620,8 +2619,10 @@ class SBE37Driver(InstrumentDriver):
             sample_time = time.strptime(match.group(15),', %m-%d-%Y, %H:%M:%S')
         
         if sample_time:
-            sample_data['date'] = (sample_time[2],sample_time[1],sample_time[0])
-            sample_data['time'] = (sample_time[3],sample_time[4],sample_time[5])            
+            #sample_data['date'] = (sample_time[2],sample_time[1],sample_time[0])
+            #sample_data['time'] = (sample_time[3],sample_time[4],sample_time[5])            
+            sample_data['date'] = '%i-%i-%i' % (sample_time[1],sample_time[2],sample_time[0])
+            sample_data['time'] = '%i:%i:%i' % (sample_time[3],sample_time[4],sample_time[5]) 
         
         return sample_data
     
