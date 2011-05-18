@@ -275,11 +275,6 @@ class AppIntegrationTest(IonTestCase):
         #
         # Send a message with bounds
         #
-        
-        # Create a message client
-        mc = MessageClient(proc=self.test_sup)
-        
-        # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.minLatitude  = 30
@@ -293,7 +288,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
 
         
-        log.debug('Calling findDataResources to get list of resources.')
+        log.debug('Calling findDataResources to get list of resources with temporal/spatial bounds.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
@@ -304,27 +299,36 @@ class AppIntegrationTest(IonTestCase):
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         #
-        # Send a message with bounds
+        # Send a message with only depth
         #
-        
-        # Create a message client
-        mc = MessageClient(proc=self.test_sup)
-        
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.minLatitude  = -50
-        #reqMsg.message_parameters_reference.maxLatitude  = 45
-        reqMsg.message_parameters_reference.minLongitude = -70
-        #reqMsg.message_parameters_reference.maxLongitude = -70
         reqMsg.message_parameters_reference.minVertical  = 10
-        #reqMsg.message_parameters_reference.maxVertical  = 30
+        reqMsg.message_parameters_reference.maxVertical  = 20
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2008-08-01T00:50:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2008-08-01T15:50:00Z'
-
         
-        log.debug('Calling findDataResources to get list of resources.')
+        log.debug('Calling findDataResources to get list of resources bounded by depth only.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        #
+        # Send a message with only altitude
+        #
+        # Use the message client to create a message object
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.minVertical  = 10
+        reqMsg.message_parameters_reference.maxVertical  = 20
+        reqMsg.message_parameters_reference.posVertical  = 'up'
+        
+        log.debug('Calling findDataResources to get list of resources bounded by altitude only.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
@@ -379,9 +383,9 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxLongitude = 30
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
-        reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:20:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:05Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:15Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -408,7 +412,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxLongitude = 30
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
-        reqMsg.message_parameters_reference.posVertical  = 'down'
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:00:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T02:00:00Z'
 
@@ -436,7 +440,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxLongitude = 30
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
-        reqMsg.message_parameters_reference.posVertical  = 'down'
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:20:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2011-01-1T11:00:00Z'
 
@@ -464,7 +468,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxLongitude = 30
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
-        reqMsg.message_parameters_reference.posVertical  = 'down'
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2009-07-26T00:00:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T01:00:00Z'
 
