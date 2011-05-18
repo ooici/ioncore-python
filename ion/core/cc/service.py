@@ -92,8 +92,7 @@ class CapabilityContainer(service.Service):
         lockfilepath = self.config.get('lockfile', None)
         if not lockfilepath is None:
             self.lockfile = open(lockfilepath, 'w')
-            result = fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
-            #assert(result == 0)
+            fcntl.lockf(self.lockfile, fcntl.LOCK_EX)
 
     @defer.inlineCallbacks
     def startService(self):
@@ -122,7 +121,7 @@ class CapabilityContainer(service.Service):
 
         # signal successful container start
         if self.lockfile:
-            fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
+            fcntl.lockf(self.lockfile, fcntl.LOCK_UN)
             self.lockfile.close()
             # The spawning process must cleanup the lockfile to avoid race conditions
 
