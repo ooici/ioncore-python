@@ -61,6 +61,7 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['broker_credfile'] = CONF.getValue('broker_credfile', None)
+        mopt['lockfile'] = CONF.getValue('lockfile', None)
         mopt['no_shell'] = True
         # This is where dependent apps can be included
         if start_apps and type(start_apps) in (tuple, list):
