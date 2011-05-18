@@ -10,15 +10,14 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-import ion.util.procutils as pu
 
 from twisted.internet import defer
 
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
+#from ion.core.object import object_utils
+
+from ion.core.data.storage_configuration_utility import COMMIT_CACHE
+#from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
+#from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
 
 
 from ion.core.data import store
@@ -33,9 +32,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
-                                                                    TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
-                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
                                                                     DATARESOURCE_SCHEDULE_TYPE_ID
 
 
@@ -43,22 +40,16 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
-                                                       CREATE_DATA_RESOURCE_RSP_TYPE, \
                                                        UPDATE_DATA_RESOURCE_REQ_TYPE, \
-                                                       UPDATE_DATA_RESOURCE_RSP_TYPE, \
-                                                       DELETE_DATA_RESOURCE_REQ_TYPE, \
-                                                       DELETE_DATA_RESOURCE_RSP_TYPE, \
-                                                       DATA_RESOURCE_SCHEDULED_TASK_TYPE
+                                                       DELETE_DATA_RESOURCE_REQ_TYPE
 
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, \
-                                                                    SAMPLE_PROFILE_DATA_SOURCE_ID, \
-                                                                    SAMPLE_STATION_DATA_SOURCE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATA_SOURCE_ID
 
 
 
-from ion.integration.ais.manage_data_resource.manage_data_resource import DEFAULT_MAX_INGEST_MILLIS
+#from ion.integration.ais.manage_data_resource.manage_data_resource import DEFAULT_MAX_INGEST_MILLIS
 
 
 class AISManageDataResourceTest(IonTestCase):
