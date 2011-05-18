@@ -54,7 +54,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 
-def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
+def bootstrap_byte_array_dataset(instance, *args, **kwargs):
     """
     Example file: ion/services/coi/SOS_Test.arr
     This method loads data from byte array files on disk - structure container GPB's or tgz of the same...
@@ -73,10 +73,10 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
 
     if filename.endswith('.tar.gz') or filename.endswith('.tgz'):
 
-        result = read_ooicdm_tar_file(resource_instance, filename)
+        result = read_ooicdm_tar_file(instance, filename)
 
     else:
-        result = read_ooicdm_file(resource_instance, filename)
+        result = read_ooicdm_file(instance, filename)
 
 
 
@@ -87,7 +87,7 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
 
     return result
 
-def read_ooicdm_file(resource_instance, filename):
+def read_ooicdm_file(instance, filename):
     f = None
     try:
 
@@ -102,11 +102,11 @@ def read_ooicdm_file(resource_instance, filename):
 
     if f is not None:
         head_elm, obj_dict = codec._unpack_container(f.read())
-        resource_instance.Repository.index_hash.update(obj_dict)
+        instance.Repository.index_hash.update(obj_dict)
 
-        root_obj = resource_instance.Repository._load_element(head_elm)
+        root_obj = instance.Repository._load_element(head_elm)
 
-        resource_instance.Repository.load_links(root_obj)
+        instance.Repository.load_links(root_obj)
 
 
         if root_obj.ObjectType == ION_MSG_TYPE:
@@ -114,15 +114,13 @@ def read_ooicdm_file(resource_instance, filename):
         else:
             dataset = root_obj
             
-        resource_instance.ResourceObject = dataset
-
-
+        instance.root_group = dataset.root_group
 
         f.close()
 
     return result
 
-def read_ooicdm_tar_file(resource_instance, filename):
+def read_ooicdm_tar_file(instance, filename):
     f = None
     tar = None
     result = False
@@ -158,11 +156,11 @@ def read_ooicdm_tar_file(resource_instance, filename):
             return False
 
         head_elm, obj_dict = codec._unpack_container(f.read())
-        resource_instance.Repository.index_hash.update(obj_dict)
+        instance.Repository.index_hash.update(obj_dict)
 
         f.close()
 
-        head_obj = resource_instance.Repository._load_element(head_elm)
+        head_obj = instance.Repository._load_element(head_elm)
 
         # Get rid of the ION Message object if present...
         if head_obj.ObjectType == ION_MSG_TYPE:
@@ -173,12 +171,13 @@ def read_ooicdm_tar_file(resource_instance, filename):
         else:
             vars.append(head_obj)
 
-    resource_instance.ResourceObject = root_obj
-
-    resource_instance.Repository.load_links(root_obj)
-
-
     group = root_obj.root_group
+
+    instance.root_group = group
+
+    instance.Repository.load_links(group)
+
+
 
     # Clear any bounded arrays which are empty. Create content field if it is not present
     for var in group.variables:
@@ -202,7 +201,7 @@ def read_ooicdm_tar_file(resource_instance, filename):
                         i += 1
 
         else:
-            var.content = resource_instance.CreateObject(ARRAY_STRUCTURE_TYPE)
+            var.content = instance.CreateObject(ARRAY_STRUCTURE_TYPE)
 
     # Now add any bounded arrays that we need....
     for var_container in vars:

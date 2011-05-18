@@ -57,7 +57,7 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
                 
     def ondata(self, data):
-        log.error("QuickEventSubscriber received a message:\n" + \
+        log.debug("QuickEventSubscriber received a message:\n" + \
                   "\tname = %s\n" + \
                   "\tdatasource_id = %s\n" + \
                   "\tdataset_id = %s\n" + \
