@@ -25,6 +25,7 @@ from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
+from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -345,7 +346,7 @@ class TestSBE37Agent(IonTestCase):
         self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
         
         # Get driver parameters.
-        params = [('all','all')]
+        params = [(DriverChannel.ALL,DriverParameter.ALL)]
         reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']
@@ -371,13 +372,10 @@ class TestSBE37Agent(IonTestCase):
         result = reply['result']
         setparams = params
         
-        #print 'set device reply:'
-        #print reply
-
         self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the set changes were made.
-        params = [('all','all')]
+        params = [(DriverChannel.ALL,DriverParameter.ALL)]
         reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']
@@ -471,7 +469,7 @@ class TestSBE37Agent(IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the original configuration was restored.    
-        params = [('all','all')]
+        params = [(DriverChannel.ALL,DriverParameter.ALL)]
         reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
         result = reply['result']

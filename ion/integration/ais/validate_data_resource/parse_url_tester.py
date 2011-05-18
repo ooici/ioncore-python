@@ -16,37 +16,47 @@ from ply.yacc import yacc
 
 from data_resource_parser import Lexer, Parser, ParseException
 
-def validate(data_resource_url):
+def parseUrl(das_resource_url):
     """
-    @brief update a data resource
+    @brief validate a data resource
     @retval big table
+    """
+
+    #prepare to parse!
+    lexer = lex(module=Lexer())
+    parser = yacc(module=Parser(), write_tables=0, debug=False)
+        
+
+    #fetch file
+    fullurl = das_resource_url
+    webfile = urllib.urlopen(fullurl)
+    dasfile = webfile.read()
+    webfile.close()
+    
+    #crunch it!
+    return parser.parse(dasfile, lexer=lexer)
+
+
+def validateUrl(data_resource_url):
+    """
+    @brief validate a data resource
+    @retval helpful output
     """
 
     try:
 
-        #prepare to parse!
-        lexer = lex(module=Lexer())
-        parser = yacc(module=Parser(), write_tables=0, debug=False)
-
-        #fetch file
-        fullurl = data_resource_url + ".das"
-        webfile = urllib.urlopen(fullurl)
-        dasfile = webfile.read()
-        webfile.close()
-
-        #crunch it!
-        parsed_das = parser.parse(dasfile)
+        parsed_das = parseUrl(data_resource_url)
 
 
     #url doesn't exist
-    except IOError, e1:
-        print ("Couldn't fetch '%s'" % fullurl)
+    except IOError:
+        print ("Couldn't fetch '%s'" % data_resource_url)
         
     #bad data
-    except ParseException, e2:
-        print ("Content of '%s' didn't parse" % fullurl)
+    except ParseException:
+        print ("Content of '%s' didn't parse" % data_resource_url)
 
-    print "\n\nResults of parsing this URL:\n%s" % fullurl
+    print "\n\nResults of parsing this URL:\n%s" % data_resource_url
     print "\n  Found these sections:"
     for k in parsed_das.keys():
         print "    %s" % k
@@ -59,4 +69,4 @@ def validate(data_resource_url):
 
 
 if __name__ == "__main__":
-    validate(sys.argv[1])
+    validateUrl(sys.argv[1])

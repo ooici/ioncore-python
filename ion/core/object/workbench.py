@@ -20,6 +20,7 @@ from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 from ion.core.object import association_manager
+from ion.util import procutils as pu
 
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
@@ -107,24 +108,21 @@ class WorkBench(object):
         '''
         Debugging string method.
         '''
-        retstr = "Workbench info (id:%s)\n" % id(self)
-        retstr += "\n"
-        retstr += "Workbench Cache, (len:%d)\n" % len(self._workbench_cache)
-        for k,v in self._workbench_cache.iteritems():
-            retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
+        retstr = "/ ==== Workbench info (id:%s) ==========\n" % id(self)
+        retstr += "++ Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
+        #for k,v in self._workbench_cache.iteritems():
+        #    retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
 
-        retstr += "\n"
-        retstr += "Repos, (len:%d)\n" % len(self._repos)
+        retstr += "++ Persistent Repositories, (len:%d)\n" % len(self._repos)
         for k, v in self._repos.iteritems():
             retstr += "\t%s: ih %d, cached %s, persistent %s, conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
 
-        retstr += "\n"
-        retstr += "RepoCache, (len:%d)\n" % len(self._repo_cache.keys())
+        retstr += "++ LRU RepoCache, (len:%d)\n" % len(self._repo_cache.keys())
         for k, v in self._repo_cache.iteritems():
             retstr += "\t%s: ih %d, cached %s, persistent %s,conv %s\n" %(k, len(v.index_hash), v.cached, v.persistent, v.convid_context)
 
 
-        retstr += "/ ====\n\n"
+        retstr += "/ ==== End  Workbench info ===========\n"
 
         return retstr
       
@@ -258,6 +256,8 @@ class WorkBench(object):
 
     def clear_repository(self, repo):
 
+        log.info('Clearing Repository: %s ' % repo.repository_key)
+
         key = repo.repository_key
         repo.clear()
 
@@ -271,6 +271,8 @@ class WorkBench(object):
 
 
     def cache_repository(self, repo):
+
+        log.info('Caching Repository: %s ' % repo.repository_key)
 
         key = repo.repository_key
         # Get rid of the nick name - this is a PITA
@@ -294,6 +296,9 @@ class WorkBench(object):
         @Brief Move repositories from the level 1 persistent cache to the level two LRU cache
         @param convid_context if not None, move only objects in a particular context
         """
+
+        log.info('Running Manage Workbench Cache...')
+
 
         # Can't use iter here - it is actually deleting keys in the dict object.
         for key, repo in self._repos.items():
@@ -342,7 +347,9 @@ class WorkBench(object):
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
 
-        repo.convid_context = request.get('workbench_context',None)
+        wc = request.get('workbench_context',[])
+
+        repo.convid_context = pu.get_last_or_default(wc, 'Default Context')
 
        
     def reference_repository(self, repo_key, current_state=False):
@@ -418,6 +425,8 @@ class WorkBench(object):
     @defer.inlineCallbacks
     def op_checkout(self, content, headers, msg):
 
+        log.info('op_checkout - start')
+
         if not hasattr(content, 'MessageType') or content.MessageType != REQUEST_COMMIT_BLOBS_MESSAGE_TYPE:
              raise WorkBenchError('Invalid checkout request. Bad Message Type!', content.ResponseCodes.BAD_REQUEST)
 
@@ -441,12 +450,17 @@ class WorkBench(object):
 
         yield self._process.reply_ok(msg, content=response)
 
+        log.info('op_checkout - complete')
+
 
     @defer.inlineCallbacks
     def pull(self, origin, repo_name, get_head_content=True, excluded_types=None):
         """
         Pull the current state of the repository
         """
+
+        log.info('pull - start')
+
         if excluded_types is not None and not hasattr(excluded_types, '__iter__'):
             raise WorkBenchError('Invalid excluded_types argument passed to checkout')
 
@@ -487,6 +501,11 @@ class WorkBench(object):
                 exobj.object_id = extype.object_id
                 exobj.version = extype.version
 
+
+        log.info('Before pull - requesting workbench status:')
+        log.info(str(self))
+
+
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)
         except ReceivedApplicationError, re:
@@ -517,6 +536,7 @@ class WorkBench(object):
 
         # Add any new content to the repository:
         for se in result.commit_elements:
+
             # Move over new commits
             element = gpb_wrapper.StructureElement(se.GPBMessage)
 
@@ -540,6 +560,8 @@ class WorkBench(object):
         # Where to get objects not yet transfered.
         repo.upstream = targetname
 
+        log.info('pull - complete')
+
         defer.returnValue(result)
 
 
@@ -553,7 +575,9 @@ class WorkBench(object):
         only the repository and its commits have been transferred. The content
         will be lazy fetched as needed!
         """
-        
+
+        log.info('op_pull - start')
+
 
         if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
             raise WorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
@@ -615,6 +639,7 @@ class WorkBench(object):
                 link.SetLink(obj)
 
         yield self._process.reply_ok(msg, content=response)
+        log.info('op_pull - complete')
 
 
     def serialize_mutable(self, mutable):
@@ -971,7 +996,7 @@ class WorkBench(object):
             # if we are doing a clone - pulling a new repository
             repo._dotgit = head
             if len(repo.branches)>1:
-                log.warn('Do not assume branch order in unchanged - setting master to branch 0 anyways!')
+                log.warn('Do not assume branch order is unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
             return
         

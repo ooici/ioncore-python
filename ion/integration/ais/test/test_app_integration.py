@@ -232,12 +232,37 @@ class AppIntegrationTest(IonTestCase):
         
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
-        
-        # Use the message client to create a message object
+
+        # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         
-        log.debug('Calling findDataResources to get list of resources.')
+        log.debug('Calling findDataResources to get list of resources with no bounds.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        if numResReturned > 0:
+            dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
+
+        #
+        # Now that we have a valid datasetID, create a subscription for it, and then
+        # test to see if the NotificationSet comes back.  We also need to create
+        # a userID to own the subscription
+        #
+        yield self.createUser()
+
+        log.debug('Calling __createSubscriptions')
+        yield self.__createSubscriptions(dsID)
+        
+        log.debug('Calling findDataResources to get list of resources with no bounds to test NotificationSet.')
+        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
@@ -314,7 +339,7 @@ class AppIntegrationTest(IonTestCase):
     def test_findDataResourcesByUser(self):
 
         log.debug('Testing findDataResourcesByUser.')
-        raise unittest.SkipTest('findDataResourcesByUser Skipped.')
+        #raise unittest.SkipTest('findDataResourcesByUser Skipped.')
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
@@ -340,7 +365,7 @@ class AppIntegrationTest(IonTestCase):
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing user_ooi_ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
-        
+
         #
         # Send a request with a temporal bounds covered by data time 
         #
@@ -355,8 +380,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2008-08-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:20:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -384,8 +409,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2007-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2009-08-1T00:02:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T02:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -412,8 +437,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2008-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2010-01-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:20:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2011-01-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -440,8 +465,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
         reqMsg.message_parameters_reference.posVertical  = 'down'
-        reqMsg.message_parameters_reference.minTime      = '2007-01-1T10:00:00Z'
-        reqMsg.message_parameters_reference.maxTime      = '2008-08-1T11:00:00Z'
+        reqMsg.message_parameters_reference.minTime      = '2009-07-26T00:00:00Z'
+        reqMsg.message_parameters_reference.maxTime      = '2010-07-26T01:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
         rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
@@ -1109,7 +1134,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
-       # Add a subscription for this user to this data resource
+        # Add a subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
@@ -1564,7 +1589,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
             if not dataResourceSummaries[i].IsFieldSet('notificationSet'):
                 self.fail('dataset: ' +  dsResourceID + ' has no notificationSet field')
-            log.info('notificationSet: ' + str(dataResourceSummaries[i].notificationSet))
             if not dataResourceSummaries[i].IsFieldSet('date_registered'):
                 self.fail('dataset: ' +  dsResourceID + ' has no date_registered field')
             log.info('date registered: ' + str(dataResourceSummaries[i].date_registered))
@@ -1716,4 +1740,108 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
+
+    @defer.inlineCallbacks
+    def __createSubscriptions(self, datasetID):
+        log.debug('__createSubscriptions().')
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+
+        #
+        # Create dispatchers and associations
+        #
+        log.info("Creating 2 dispatchers for testing")
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource1')
+        log.info('Created Dispatcher1 ID: ' + self.dispatcherRes.ResourceIdentity)
+        self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
+        self.dispatcherID = self.dispatcherRes.ResourceIdentity
+        log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+            
+        #
+        # Now make an association between the user and this dispatcher
+        #
+        try:
+            log.info('Getting user resource instance')
+            try:
+                self.userRes = yield self.rc.get_instance(self.user_id)
+            except ResourceClientError:
+                self.fail('Error getting instance of userID: ' + self.user_id)
+            log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+            association = yield self.ac.create_association(self.userRes, HAS_A_ID, self.dispatcherRes)
+            if association not in self.userRes.ResourceAssociationsAsSubject:
+                self.fail('Error: subject not in association!')
+            if association not in self.dispatcherRes.ResourceAssociationsAsObject:
+                self.fail('Error: object not in association')
+            
+            #
+            # Put the association in datastore
+            #
+            log.debug('Storing association: ' + str(association))
+            yield self.rc.put_instance(association)
+
+        except AssociationClientError, ex:
+            self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
+
+        #
+        # Add a couple of subscriptions to find later...
+        #
+        
+        #
+        # Add a subscription for this user to this data resource
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = datasetID
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = datasetID
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+
+        #
+        # Call AIS to create the subscription
+        #
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+
+        #
+        # Add another subscription for this user to this data resource
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+    
+        #
+        # Call AIS to create the subscription
+        #
+        log.debug('Calling createDataResourceSubscription.')
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to createDataResourceSubscription')
+        else:
+            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 

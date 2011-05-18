@@ -435,6 +435,8 @@ class EchoProcess(Process):
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
         yield self.reply_ok(msg, content=content)
+        log.info("Reply Sent")
+
 
     @defer.inlineCallbacks
     def op_echo_fail(self, content, headers, msg):

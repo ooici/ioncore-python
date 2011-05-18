@@ -425,8 +425,8 @@ class ManageDataResourceSubscription(object):
         except ApplicationError, ex:
             log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-            Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  ex.msg_content.MessageResponseBody
+            Response.error_num =  ex.response_code
+            Response.error_str =  str(ex)
             defer.returnValue(Response)
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)

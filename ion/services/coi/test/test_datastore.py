@@ -176,7 +176,7 @@ class DataStoreTest(IonTestCase):
 
     def test_pull_invalid(self):
 
-        self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
+        yield self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
 
     @defer.inlineCallbacks
     def test_put_blobs(self):

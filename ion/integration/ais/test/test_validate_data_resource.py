@@ -10,26 +10,22 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-import ion.util.procutils as pu
 
 from twisted.internet import defer
 
-from ion.core.object import object_utils
+#from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError
+
 
 from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
-from ion.integration.ais.validate_data_resource.validate_data_resource import ValidateDataResource
 
-from ion.core.messaging.message_client import MessageClient
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       VALIDATE_DATASOURCE_REQ, \
-                                                       VALIDATE_DATASOURCE_RSP
+                                                       VALIDATE_DATASOURCE_REQ
 
 
 class AISValidateDataResourceTest(IonTestCase):
@@ -126,15 +122,6 @@ class AISValidateDataResourceTest(IonTestCase):
         self.failUnlessEqual(res.ion_geospatial_lat_max, 89.956055)
         self.failUnlessEqual(res.ion_geospatial_lon_min, -179.95605)
         self.failUnlessEqual(res.ion_geospatial_lon_max, 179.95605)
-
-
-    @defer.inlineCallbacks
-    def test_parserOnlyPositive(self):
-        raise unittest.SkipTest("Not sure how to create proper process for this test.  Use parse_url_tester.py instead.")
-        v = ValidateDataResource()
-        parsed_result = v._parseDas("http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc")
-
-        res = parsed_result
 
 
     @defer.inlineCallbacks

@@ -216,7 +216,7 @@ class MetadataCache(object):
         object instead of the metadata
         """
         
-        log.debug('getDSource')
+        log.debug('getDSource for: ' + dSourceID)
                     
         try:
             metadata = self.__metadata[dSourceID]
@@ -225,8 +225,6 @@ class MetadataCache(object):
             log.error('Metadata not found for datasetID: ' + dSourceID)
             return None
         
-        if DSOURCE in metadata.keys():
-            log.debug('dsourceID from cached datasource object: ' + metadata[DSOURCE].ResourceIdentity)
         return metadata[DSOURCE]
 
     
@@ -295,8 +293,11 @@ class MetadataCache(object):
             (dSet.ResourceLifeCycleState == dSet.COMMISSIONED)):
             dSetMetadata = {}
             #
-            # Store the entire dataset now; should be doing only that anyway
+            # Store the entire dataset now; should be doing only that anyway.
+            # Set persisence to true.  NOTE: remember to set this to false
+            # on delete.
             #
+            dSet.Repository.persistent = True
             dSetMetadata[DSET] = dSet
             dSetMetadata[DSOURCE_ID] = yield self.__getAssociatedSource(dSet)
             dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
@@ -338,7 +339,7 @@ class MetadataCache(object):
             elif dSet.ResourceLifeCycleState == dSet.COMMISSIONED:
                 dSetMetadata[LCS] = self.PUBLIC
             
-            log.debug('keys: ' + str(dSetMetadata.keys()))
+            log.debug('dSetMetadata keys: ' + str(dSetMetadata.keys()))
             #
             # Store this dSetMetadata in the dictionary, indexed by the resourceID
             #
@@ -366,7 +367,10 @@ class MetadataCache(object):
             dSourceMetadata = {}
             #
             # Store the entire datasource now; should be doing only that anyway
+            # Set persisence to true.  NOTE: remember to set this to false
+            # on delete.
             #
+            dSource.Repository.persistent = True
             dSourceMetadata[DSOURCE] = dSource
             for property in dSource.property:
                 dSourceMetadata[PROPERTY] = property
@@ -385,7 +389,7 @@ class MetadataCache(object):
             elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
                 dSourceMetadata[LCS] = self.PUBLIC
             
-            log.debug('keys: ' + str(dSourceMetadata.keys()))
+            log.debug('dSourceMetadata keys: ' + str(dSourceMetadata.keys()))
             #
             # Store this dSourceMetadata in the dictionary, indexed by the resourceID
             #
@@ -514,5 +518,5 @@ class MetadataCache(object):
         for value in self.__metadata[res.ResourceIdentity].values():
             log.debug('value: ' + str(value))
 
-        
-    
+    def __printObject(self, object):
+        log.debug('Object: ' + str(object))
