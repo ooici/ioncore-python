@@ -38,7 +38,7 @@ def publish(proc):
     yield rep.activate()
     # TODO: register
 
-    yield rep.create_and_publish_event(origin="Tom", data_block = json.dumps([{'temperature': -0.88160000000000005, 'salinity': 20.105599999999999, 'sound_velocity': 1424.9690000000001, 'pressure': -3.3119999999999998, 'time': (10, 11, 21), 'date': (18, 5, 2011), 'conductivity': 1.70343}]))
+    yield rep.create_and_publish_event(origin="Tom", data_block = json.dumps([{'temperature': -0.88160000000000005, 'salinity': 20.105599999999999, 'sound_velocity': 1424.9690000000001, 'pressure': -3.3119999999999998, 'time': '2011-05-18T15:32:36', 'conductivity': 1.70343}]))
 
     global callbackid
     callbackid = reactor.callLater(5, publish, proc)
