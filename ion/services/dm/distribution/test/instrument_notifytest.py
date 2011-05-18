@@ -7,6 +7,11 @@
 """
 from twisted.internet import defer, reactor
 
+try:
+    import json
+except:
+    import simplejson as json
+
 from ion.core import ioninit
 from ion.core import bootstrap
 from ion.core.cc.shell import control
@@ -20,7 +25,7 @@ EVENTMONITOR_GETDATA_MESSAGE_TYPE       = object_utils.create_type_identifier(ob
 EVENTMONITOR_DATA_MESSAGE_TYPE          = object_utils.create_type_identifier(object_id=2339, version=1)
 
 from ion.services.dm.distribution.events import RESOURCE_LIFECYCLE_EVENT_ID, ResourceLifecycleEventPublisher, ResourceLifecycleEventSubscriber, \
-INSTRUMENT_SAMPLE_DATA_EVENT_ID,  InstrumentSampleDataEventPublisher, InstrumentSampleDataEventSubscriber
+DATABLOCK_EVENT_ID,  DataBlockEventPublisher, DataBlockEventSubscriber
 from ion.services.dm.distribution.eventmonitor import EventMonitorServiceClient
 
 callbackid = None
@@ -28,12 +33,12 @@ callbackid = None
 @defer.inlineCallbacks
 def publish(proc):
 
-    rep = InstrumentSampleDataEventPublisher(process=proc)
+    rep = DataBlockEventPublisher(process=proc)
     yield rep.initialize()
     yield rep.activate()
     # TODO: register
 
-    yield rep.create_and_publish_event(origin="Tom", conductivity=123.123, pressure=234.234, temperature=456.456,sound_velocity=567.567,salinity=678.678,time="123456",date="654321")
+    yield rep.create_and_publish_event(origin="Tom", data_block = json.dumps([{'temperature': -0.88160000000000005, 'salinity': 20.105599999999999, 'sound_velocity': 1424.9690000000001, 'pressure': -3.3119999999999998, 'time': (10, 11, 21), 'date': (18, 5, 2011), 'conductivity': 1.70343}]))
 
     global callbackid
     callbackid = reactor.callLater(5, publish, proc)
@@ -78,7 +83,7 @@ def start():
     msg = yield mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
 
     msg.session_id="dos"
-    msg.event_id=INSTRUMENT_SAMPLE_DATA_EVENT_ID
+    msg.event_id=DATABLOCK_EVENT_ID
     msg.origin = "*"
 
     ec = EventMonitorServiceClient()
