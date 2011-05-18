@@ -100,7 +100,7 @@ class SBE37Channel(BaseEnum):
     TEMPERATURE = DriverChannel.TEMPERATURE
     PRESSURE = DriverChannel.PRESSURE
     CONDUCTIVITY = DriverChannel.CONDUCTIVITY
-
+    ALL = DriverChannel.ALL
 
 # Device specific parameters.
 class SBE37Parameter(DriverParameter):
@@ -2254,29 +2254,28 @@ class SBE37Driver(InstrumentDriver):
         get_errors = False
 
         for (chan,arg) in params:
-            if (SBE37Channel.has(chan) or chan.lower() == 'all') and \
-                (SBE37Status.has(arg) or arg.lower() == 'all'):
+            if SBE37Channel.has(chan) and SBE37Status.has(arg):
                 # If instrument channel or all.
-                if chan == SBE37Channel.INSTRUMENT or chan.lower() == 'all':
-                    if arg == SBE37Status.DRIVER_STATE or arg.lower() == 'all':
+                if chan == SBE37Channel.INSTRUMENT or chan == SBE37Channel.ALL:
+                    if arg == SBE37Status.DRIVER_STATE or arg == SBE37Status.ALL:
                         result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_STATE)] = \
                             (InstErrorCode.OK,self._fsm.get_current_state())
                     
-                    if arg == SBE37Status.OBSERVATORY_STATE or arg.lower() == 'all':
+                    if arg == SBE37Status.OBSERVATORY_STATE or arg == SBE37Status.ALL:
                         result[(SBE37Channel.INSTRUMENT,SBE37Status.OBSERVATORY_STATE)] = \
                             (InstErrorCode.OK,self._get_observatory_state())
                     
-                    if arg == SBE37Status.DRIVER_ALARMS or arg.lower() == 'all':
+                    if arg == SBE37Status.DRIVER_ALARMS or arg == SBE37Status.ALL:
                         result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_ALARMS)] = \
                             (InstErrorCode.OK,self._alarms)
                     
-                    if arg == SBE37Status.DRIVER_VERSION or arg.lower() == 'all':
+                    if arg == SBE37Status.DRIVER_VERSION or arg == SBE37Status.ALL:
                         result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_VERSION)] = \
                             (InstErrorCode.OK,self.get_version())
     
                 # If conductivity channel or all.            
-                if chan == SBE37Channel.CONDUCTIVITY or chan.lower() == 'all':
-                    if arg == 'all':
+                if chan == SBE37Channel.CONDUCTIVITY or chan == SBE37Channel.ALL:
+                    if arg == SBE37Status.ALL:
                         pass
                         
                     # Conductivity channel does not support this status.
@@ -2284,8 +2283,8 @@ class SBE37Driver(InstrumentDriver):
                         result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
                         get_errors = True
                         
-                if chan == SBE37Channel.PRESSURE or chan.lower() == 'all':
-                    if arg == 'all':
+                if chan == SBE37Channel.PRESSURE or chan == SBE37Channel.ALL:
+                    if arg == SBE37Status.ALL:
                         pass
 
                     # Pressure channel does not support this status.                        
@@ -2294,8 +2293,8 @@ class SBE37Driver(InstrumentDriver):
                         get_errors = True
     
                 # If pressure channel or all.
-                if chan == SBE37Channel.TEMPERATURE or chan.lower() == 'all':
-                    if arg == 'all':
+                if chan == SBE37Channel.TEMPERATURE or chan == SBE37Channel.ALL:
+                    if arg == SBE37Status.ALL:
                         pass
                         
                     # Temp channel does not support this status.
@@ -2332,21 +2331,25 @@ class SBE37Driver(InstrumentDriver):
         get_errors = False
 
         for arg in params:
-            if SBE37Capability.has(arg) or arg.lower() == 'all':
+            if SBE37Capability.has(arg):
                 
-                if arg == SBE37Capability.DEVICE_COMMANDS or arg == 'all':
+                if arg == SBE37Capability.DEVICE_COMMANDS or \
+                        arg == SBE37Capability.DEVICE_ALL:
                     result[SBE37Capability.DEVICE_COMMANDS] = \
                         (InstErrorCode.OK,SBE37Command.list())
                 
-                if arg == SBE37Capability.DEVICE_METADATA or arg == 'all':
+                if arg == SBE37Capability.DEVICE_METADATA or \
+                        arg == SBE37Capability.DEVICE_ALL:
                     result[SBE37Capability.DEVICE_METADATA] = \
                         (InstErrorCode.OK,SBE37MetadataParameter.list())
                 
-                if arg == SBE37Capability.DEVICE_PARAMS or arg == 'all':
+                if arg == SBE37Capability.DEVICE_PARAMS or \
+                        arg == SBE37Capability.DEVICE_ALL:
                     result[SBE37Capability.DEVICE_PARAMS] = \
                         (InstErrorCode.OK,self.parameters.keys())
                 
-                if arg == SBE37Capability.DEVICE_STATUSES or arg == 'all':
+                if arg == SBE37Capability.DEVICE_STATUSES or \
+                        arg == SBE37Capability.DEVICE_ALL:
                     result[SBE37Capability.DEVICE_STATUSES] = \
                         (InstErrorCode.OK,SBE37Status.list())
             
@@ -2524,11 +2527,11 @@ class SBE37Driver(InstrumentDriver):
         for (chan,param) in params:
             
             # Retrieve all parameters.
-            if chan == 'all' and param == 'all':
+            if chan == SBE37Channel.ALL and param == SBE37Parameter.ALL:
                 for (key,val) in self.parameters.iteritems():
                     result[key] = (InstErrorCode.OK,val['value'])
 
-            elif chan == 'all':
+            elif chan == SBE37Channel.ALL:
 
                 # Invalid parameter name.
                 if param not in params_list:
@@ -2541,7 +2544,7 @@ class SBE37Driver(InstrumentDriver):
                         if key[1] == param:
                             result[key] = (InstErrorCode.OK,val['value'])
 
-            elif param == 'all':
+            elif param == SBE37Parameter.ALL:
 
                 # Invalid channel name.
                 if chan not in channels_list:

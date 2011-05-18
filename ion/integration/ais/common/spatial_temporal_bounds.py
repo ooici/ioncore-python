@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+"""
+@file ion/integration/ais/common/spatial_temporal_bounds.py
+@author David Everett
+@brief Class to determine whether a given set of metadata is within a given
+set of temporal/spatial bounds.
+"""
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -10,6 +17,17 @@ from decimal import Decimal
 
 class SpatialTemporalBounds(object):
 
+    #
+    # Constants for "vertical positive" parameter, which is either "up"
+    # or "down" and denotes depth or altitude:
+    # "down" means depth, and a positive number means below the surface,
+    # sealevel being 0, and a negative number means above the surface.
+    # "up" means altitude, and a positive number means above the surface,
+    # sealeve being 0, and a negative number means below the surface.
+    #
+    UP = 0
+    DOWN = 1
+    
     bounds = {}
     filterByLatitude  = True
     filterByLongitude = True
@@ -26,20 +44,17 @@ class SpatialTemporalBounds(object):
         parameters.
         """
         log.debug('__loadBounds')
-        
+
         #
-        # Determine if only one of the latitude bounds have been set; if so,
-        # use the other to determine whether which hemisphere.  If no latitude
-        # bounds have been given, set filterByLatitude to False.
+        # Set these flags; they're used for further tests
         #
-        
         self.bIsMinLatitudeSet =  bounds.IsFieldSet('minLatitude')
         self.bIsMaxLatitudeSet =  bounds.IsFieldSet('maxLatitude')
         self.bIsMinLongitudeSet =  bounds.IsFieldSet('minLongitude')
         self.bIsMaxLongitudeSet =  bounds.IsFieldSet('maxLongitude')
         self.bIsMinVerticalSet  =   bounds.IsFieldSet('minVertical')
         self.bIsMaxVerticalSet  =   bounds.IsFieldSet('maxVertical')
-        self.bIsVerticalPositiveSet =   bounds.IsFieldSet('posVertical')        
+        self.bIsVerticalPositiveSet = bounds.IsFieldSet('posVertical')        
 
         if self.bIsMinLatitudeSet:
             self.bounds['minLat'] = Decimal(str(bounds.minLatitude))
@@ -49,53 +64,38 @@ class SpatialTemporalBounds(object):
             self.bounds['minLon'] = Decimal(str(bounds.minLongitude))
         if self.bIsMaxLongitudeSet:
             self.bounds['maxLon'] = Decimal(str(bounds.maxLongitude))
-        if self.bIsMinVerticalSet:
-            self.bounds['minVert'] = Decimal(str(bounds.minVertical))
-        if self.bIsMaxVerticalSet:
-            self.bounds['maxVert'] = Decimal(str(bounds.maxVertical))
-
-
+        
         #
-        # If both minLat and maxLat are not set, we need to determine which
-        # hemisphere the other is in (if it's set), so that we can know how
-        # to default the one that isn't set.  If none are set we won't filter
-        # by area.  Same with minLon and maxLon.
+        # If both minLat and maxLat are NOT set, we need to set the default.
+        # If none are set we won't filter by area.
         #
         if not (self.bIsMinLatitudeSet and self.bIsMaxLatitudeSet): 
             if self.bIsMinLatitudeSet:
-                #
-                # Determine whether northern or southern hemisphere
-                #
-                # Don't have to check which hemisphere anymore; set to
+                # 
                 # maximum latitude possible
                 #
                 self.bounds['maxLat'] = Decimal('90')
             elif self.bIsMaxLatitudeSet:
-                #
-                # Determine whether northern or southern hemisphere
-                #
-                # Don't have to check which hemisphere anymore; set to
+                # 
                 # minimum latitude possible
                 #
                 self.bounds['minLat'] = Decimal('-90')
             else:
                 self.filterByLatitude = False
 
+        #
+        # If both minLon and maxLon are NOT set, we need to set the default.
+        # If none are set we won't filter by area.
+        #
         if not (self.bIsMinLongitudeSet and self.bIsMaxLongitudeSet): 
             if self.bIsMinLongitudeSet:
-                #
-                # Determine whether northern or southern hemisphere
-                #
-                # Don't have to check which hemisphere anymore; set to
+                # 
                 # maximum longitude possible
                 #
                 if self.bounds['minLon'] >= 0:
                     self.bounds['maxLon'] = Decimal('180')
             elif self.bIsMaxLongitudeSet:
-                #
-                # Determine whether northern or southern hemisphere
-                #
-                # Don't have to check which hemisphere anymore; set to
+                # 
                 # minimum longitude possible
                 #
                 if self.bounds['maxLon'] >= 0:
@@ -104,13 +104,27 @@ class SpatialTemporalBounds(object):
                 self.filterByLongitude = False
 
         #
-        # If posVertical has not been set, don't filter vertically
+        # All three of the vertical parameters must be set in order to filter
+        # by vertical
         #
-        if self.bIsVerticalPositiveSet:
-            self.bounds['vertPos'] = bounds.posVertical
+        if self.bIsVerticalPositiveSet and self.bIsMinVerticalSet and self.bIsMaxVerticalSet:
+            self.bounds['minVert'] = Decimal(str(bounds.minVertical))
+            self.bounds['maxVert'] = Decimal(str(bounds.maxVertical))
+            #
+            # If posVertical has not been set correctly, don't filter vertically
+            #
+            if "up" == bounds.posVertical:
+                self.bounds['posVert'] = self.UP
+            elif "down" == bounds.posVertical:
+                self.bounds['posVert'] = self.DOWN
+            else:
+                self.filterByVertical = False
         else:
             self.filterByVertical = False
 
+        #
+        # Load up the time bounds
+        #
         if bounds.IsFieldSet('minTime'):
             self.minTimeBound = bounds.minTime
             tmpTime = datetime.datetime.strptime(bounds.minTime, \
@@ -214,15 +228,31 @@ class SpatialTemporalBounds(object):
         #
         # This needs to adjust for the verical positive parameter
         #
-        if self.bIsMinVerticalSet:
-            if minMetaData['ion_geospatial_vertical_min'] > bounds['minVert']:
-                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['minVert']))
-                return False
-            
-        if self.bIsMaxVerticalSet:
-            if minMetaData['ion_geospatial_vertical_max'] > bounds['maxVert']:
-                log.debug('%s is > bounds %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['maxVert']))
-                return False
+        if self.DOWN == self.bounds['posVert']:
+            log.debug('testing bounds by depth')
+            #
+            # If the minDepth for the data is greater than the max of the bounds,
+            # return false
+            #
+            if self.bIsMinVerticalSet:
+                if minMetaData['ion_geospatial_vertical_min'] > bounds['maxVert']:
+                    log.debug('min depth for data: %s is > bounds max depth: %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['maxVert']))
+                    return False
+            #
+            # If the maxDepth for the data is less than the min of the bounds,
+            # return false
+            if self.bIsMaxVerticalSet:
+                if minMetaData['ion_geospatial_vertical_max'] < bounds['minVert']:
+                    log.debug('max depth for data: %s is < bounds min depth: %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['minVert']))
+                    return False
+                
+            #
+            # If the data covers the bounds (bounds depth is contained by the
+            # data depth)
+            #
+
+        elif self.UP == self.bounds['posVert']:
+            log.debug('testing bounds by altitude')
         
         return True
 

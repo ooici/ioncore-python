@@ -17,14 +17,13 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.core.messaging.message_client import MessageClient
-from ion.core.object import object_utils
+#from ion.core.messaging.message_client import MessageClient
+#from ion.core.object import object_utils
+from ion.core.exception import ReceivedApplicationError
 
 from ion.integration.eoi.validation.cdm_validation_service import CdmValidationClient
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        VALIDATE_DATASOURCE_REQ, \
                                                        VALIDATE_DATASOURCE_RSP
@@ -110,8 +109,8 @@ class ValidateDataResource(object):
 
 
         #url doesn't exist
-        except IOError, e1:
-            my_msg = "ValidateDataResource.validate(): couldn't fetch '%s'" % fullurl
+        except IOError:
+            my_msg = "ValidateDataResource.validate(): couldn't fetch DAS for '%s'" % msg.data_resource_url
             log.info(my_msg)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -121,8 +120,8 @@ class ValidateDataResource(object):
             defer.returnValue(Response)
 
         #bad data
-        except ParseException, e2:
-            my_msg = "ValidateDataResource.validate(): content of '%s' didn't parse" % fullurl
+        except ParseException:
+            my_msg = "ValidateDataResource.validate(): DAS content for '%s' didn't parse" % msg.data_resource_url
             log.info(my_msg)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -196,4 +195,4 @@ class ValidateDataResource(object):
         webfile.close()
         
         #crunch it!
-        return parser.parse(dasfile)
+        return parser.parse(dasfile, lexer=lexer)

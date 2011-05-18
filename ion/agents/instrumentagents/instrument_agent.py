@@ -1161,12 +1161,13 @@ class InstrumentAgent(Process):
                             
             # Add each observatory parameter given in params list.
             for arg in params:
-                if (not AgentParameter.has(arg)) and arg != 'all':
+                if not AgentParameter.has(arg):
                     result[arg] = (InstErrorCode.INVALID_PARAMETER, None)
                     get_errors = True                
                     continue
                 
-                if arg == AgentParameter.EVENT_PUBLISHER_ORIGIN or arg=='all':                            
+                if arg == AgentParameter.EVENT_PUBLISHER_ORIGIN or \
+                    arg == AgentParameter.ALL:
                     if self.event_publisher_origin == None:
                         result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
                             (InstErrorCode.OK,None)
@@ -1174,39 +1175,48 @@ class InstrumentAgent(Process):
                         result[AgentParameter.EVENT_PUBLISHER_ORIGIN] = \
                             (InstErrorCode.OK,self.event_publisher_origin)
                                 
-                if arg == AgentParameter.DRIVER_DESC or arg == 'all':
+                if arg == AgentParameter.DRIVER_DESC or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.DRIVER_DESC] = \
                         (InstErrorCode.OK,self._driver_desc)
                 
-                if arg == AgentParameter.DRIVER_CLIENT_DESC or arg == 'all':
+                if arg == AgentParameter.DRIVER_CLIENT_DESC or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.DRIVER_CLIENT_DESC] = \
                         (InstErrorCode.OK,self._client_desc)                
                 
-                if arg == AgentParameter.DRIVER_CONFIG or arg == 'all':
+                if arg == AgentParameter.DRIVER_CONFIG or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.DRIVER_CONFIG] = \
                         (InstErrorCode.OK,self._driver_config)                
 
-                if arg == AgentParameter.TIME_SOURCE or arg=='all':
+                if arg == AgentParameter.TIME_SOURCE or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.TIME_SOURCE] = \
                         (InstErrorCode.OK,self._time_source)
                     
-                if arg == AgentParameter.CONNECTION_METHOD or arg=='all':
+                if arg == AgentParameter.CONNECTION_METHOD or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.CONNECTION_METHOD] = \
                         (InstErrorCode.OK,self._connection_method)
                     
-                if arg == AgentParameter.MAX_ACQ_TIMEOUT or arg=='all':
+                if arg == AgentParameter.MAX_ACQ_TIMEOUT or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.MAX_ACQ_TIMEOUT] = \
                         (InstErrorCode.OK,self._max_acq_timeout)
                     
-                if arg == AgentParameter.DEFAULT_EXP_TIMEOUT or arg=='all':
+                if arg == AgentParameter.DEFAULT_EXP_TIMEOUT or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.DEFAULT_EXP_TIMEOUT] = \
                         (InstErrorCode.OK,self._default_exp_timeout)
 
-                if arg == AgentParameter.MAX_EXP_TIMEOUT or arg=='all':
+                if arg == AgentParameter.MAX_EXP_TIMEOUT or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.MAX_EXP_TIMEOUT] = \
                         (InstErrorCode.OK,self._max_exp_timeout)
                     
-                if arg == AgentParameter.BUFFER_SIZE or arg=='all':
+                if arg == AgentParameter.BUFFER_SIZE or \
+                    arg == AgentParameter.ALL:
                     result[AgentParameter.BUFFER_SIZE] = \
                         (InstErrorCode.OK,self._data_buffer_limit)
         
@@ -1557,43 +1567,43 @@ class InstrumentAgent(Process):
             for arg in params:
 
                 # If status key not recognized, report error.
-                if not AgentStatus.has(arg) and arg != 'all':
+                if not AgentStatus.has(arg):
                     result[arg] = (InstErrorCode.INVALID_STATUS,None)
                     get_errors = True
                     continue
                 
                 # Agent state.
-                if arg == AgentStatus.AGENT_STATE or arg == 'all':
+                if arg == AgentStatus.AGENT_STATE or arg == AgentStatus.ALL:
                     result[AgentStatus.AGENT_STATE] = \
                         (InstErrorCode.OK,self._fsm.get_current_state())
 
                 # Connection state.                        
-                if arg == AgentStatus.CONNECTION_STATE or arg == 'all':
+                if arg == AgentStatus.CONNECTION_STATE or arg == AgentStatus.ALL:
                     result[AgentStatus.CONNECTION_STATE] = \
                         (InstErrorCode.OK,self._get_connection_state())
                 
                 # Alarm conditions.
-                if arg == AgentStatus.ALARMS or arg == 'all':
+                if arg == AgentStatus.ALARMS or arg == AgentStatus.ALL:
                     result[AgentStatus.ALARMS] = \
                         (InstErrorCode.OK,self._alarms)
 
                 # Time status.
-                if arg == AgentStatus.TIME_STATUS or arg == 'all':
+                if arg == AgentStatus.TIME_STATUS or arg == AgentStatus.ALL:
                     result[AgentStatus.TIME_STATUS] = \
                         (InstErrorCode.OK,self._time_status)
 
                 # Data buffer size.
-                if arg == AgentStatus.BUFFER_SIZE or arg == 'all':
+                if arg == AgentStatus.BUFFER_SIZE or arg == AgentStatus.ALL:
                     result[AgentStatus.BUFFER_SIZE] = \
                         (InstErrorCode.OK,self._get_buffer_size())
 
                 # Agent software version.
-                if arg == AgentStatus.AGENT_VERSION or arg == 'all':
+                if arg == AgentStatus.AGENT_VERSION or arg == AgentStatus.ALL:
                     result[AgentStatus.AGENT_VERSION] = \
                         (InstErrorCode.OK,self.get_version())                
                     
                 # Pending transactions.
-                if arg == AgentStatus.PENDING_TRANSACTIONS or arg == 'all':
+                if arg == AgentStatus.PENDING_TRANSACTIONS or arg == AgentStatus.ALL:
                     result[AgentStatus.PENDING_TRANSACTIONS] = \
                         (InstErrorCode.OK,self._pending_transactions)                
 
@@ -1675,28 +1685,38 @@ class InstrumentAgent(Process):
             # Do the work here.
             # Set up the result message.
             for arg in params:
-                if not InstrumentCapability.has(arg) and arg != 'all':
+                if not InstrumentCapability.has(arg):
                     result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
                     get_errors = True
                     continue
                 
-                if arg == InstrumentCapability.OBSERVATORY_COMMANDS or arg == 'all':
+                if arg == InstrumentCapability.OBSERVATORY_COMMANDS or \
+                        arg == InstrumentCapability.OBSERVATORY_ALL or \
+                        arg == InstrumentCapability.ALL:
                     result[InstrumentCapability.OBSERVATORY_COMMANDS] = \
                         (InstErrorCode.OK,AgentCommand.list())
                     
-                if arg == InstrumentCapability.OBSERVATORY_PARAMS or arg == 'all':
+                if arg == InstrumentCapability.OBSERVATORY_PARAMS or \
+                        arg == InstrumentCapability.OBSERVATORY_ALL or \
+                        arg == InstrumentCapability.ALL:
                     result[InstrumentCapability.OBSERVATORY_PARAMS] = \
                         (InstErrorCode.OK,AgentParameter.list())
                     
-                if arg == InstrumentCapability.OBSERVATORY_STATUSES or arg == 'all':
+                if arg == InstrumentCapability.OBSERVATORY_STATUSES or \
+                        arg == InstrumentCapability.OBSERVATORY_ALL or \
+                        arg == InstrumentCapability.ALL:
                     result[InstrumentCapability.OBSERVATORY_STATUSES] = \
                         (InstErrorCode.OK,AgentStatus.list())
                     
-                if arg == InstrumentCapability.OBSERVATORY_METADATA or arg == 'all':
+                if arg == InstrumentCapability.OBSERVATORY_METADATA or \
+                        arg == InstrumentCapability.OBSERVATORY_ALL or \
+                        arg == InstrumentCapability.ALL:
                     result[InstrumentCapability.OBSERVATORY_METADATA] = \
                         (InstErrorCode.OK,MetadataParameter.list())
                     
-                if arg == InstrumentCapability.DEVICE_COMMANDS or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_COMMANDS or \
+                        arg == InstrumentCapability.DEVICE_ALL or \
+                        arg == InstrumentCapability.ALL:
                     #TDOD driver integration.
                     dvr_val = (InstErrorCode.OK,
                                ['device_command_1','device_command_2'])
@@ -1705,7 +1725,9 @@ class InstrumentAgent(Process):
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == InstrumentCapability.DEVICE_PARAMS or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_PARAMS or \
+                        arg == InstrumentCapability.DEVICE_ALL or \
+                        arg == InstrumentCapability.ALL:
                     #TDOD driver integration.
                     dvr_val = (InstErrorCode.OK,['device_param_1',
                         'device_param_2','device_param_3'])
@@ -1714,7 +1736,9 @@ class InstrumentAgent(Process):
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
                     
-                if arg == InstrumentCapability.DEVICE_STATUSES or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_STATUSES or \
+                        arg == InstrumentCapability.DEVICE_ALL or \
+                        arg == InstrumentCapability.ALL:
                     #TODO driver integration.
                     dvr_val = (InstErrorCode.OK,['device_status_1',
                         'device_status_2','device_status_3'])
@@ -1723,7 +1747,9 @@ class InstrumentAgent(Process):
                     if InstErrorCode.is_error(dvr_val[0]):
                         get_errors = True
 
-                if arg == InstrumentCapability.DEVICE_METADATA or arg == 'all':
+                if arg == InstrumentCapability.DEVICE_METADATA or \
+                        arg == InstrumentCapability.DEVICE_ALL or \
+                        arg == InstrumentCapability.ALL:
                     #TODO driver integration.
                     dvr_val = (InstErrorCode.OK,['device_metadata_1',
                         'device_metadata_2','device_metadata_3'])
@@ -2322,7 +2348,8 @@ class InstrumentAgent(Process):
         elif type == DriverAnnouncement.CONFIG_CHANGE:
             
             #
-            reply = yield self._driver_client.get([('all','all')])
+            reply = yield self._driver_client.get([(DriverChannel.ALL,
+                                                    DriverParameter.ALL)])
             success = reply['success']
             result = reply['result']
             if InstErrorCode.is_ok(success) and len(result)>0:

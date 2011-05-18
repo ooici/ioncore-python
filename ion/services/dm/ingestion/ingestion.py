@@ -354,6 +354,8 @@ class IngestionService(ServiceProcess):
             log.debug("Ingest failed, error back to original request")
             raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
 
+        self.dataset=None
+
         log.info('op_ingest - Complete')
 
 

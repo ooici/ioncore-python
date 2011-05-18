@@ -22,6 +22,8 @@ from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
 from ion.agents.instrumentagents.SBE37_driver import SBE37Status
 from ion.agents.instrumentagents.SBE37_driver import SBE37Capability
+from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
+from ion.agents.instrumentagents.SBE37_driver import SBE37MetadataParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 
@@ -267,7 +269,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Get all parameters and verify. Store the current config for later.
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
 
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
@@ -281,7 +283,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Get all pressure parameters and verify.        
-        params = [(SBE37Channel.PRESSURE,'all')]
+        params = [(SBE37Channel.PRESSURE,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
@@ -360,7 +362,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Get all parameters, verify the changes were made.        
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params)
         get_current_state = yield self.driver_client.get_state()
         success = reply['success']
@@ -390,7 +392,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Get parameters and make sure they match the original config.
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
@@ -472,7 +474,7 @@ class TestSBE37(IonTestCase):
 
         # Get all parameters, verify the valid ones were set,
         # and the invalid ones kept the old values.
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
@@ -560,10 +562,11 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Test get status. Currently not implemented.
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Status.ALL)]
         reply = yield self.driver_client.get_status(params)
         success = reply['success']
-        result = reply['result']        
+        result = reply['result']
+        print reply
         self.assert_(InstErrorCode.is_ok(success))
         
         dvr_state = result[(SBE37Channel.INSTRUMENT,
@@ -673,7 +676,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Test get capabilities. Currently not implemented.
-        params = ['all']
+        params = [SBE37Capability.DEVICE_ALL]
         reply = yield self.driver_client.get_capabilities(params)
         success = reply['success']
         result = reply['result']        
@@ -735,7 +738,8 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
         # Test get metadata. Currently not implemented.
-        params = [('all','all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL,
+                   SBE37MetadataParameter.ALL)]
         reply = yield self.driver_client.get_metadata(params)
         success = reply['success']
         result = reply['result']        
@@ -814,7 +818,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(current_state,SBE37State.CONNECTED)        
 
         # Get all the parameters and dump them to the screen if desired.
-        params = [('all','all')]
+        params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params)
         current_state = yield self.driver_client.get_state()
         success = reply['success']

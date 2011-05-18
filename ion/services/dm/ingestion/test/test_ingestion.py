@@ -11,6 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from ion.core import ioninit
 from ion.util import procutils as pu
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, TYPE_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, ID_CFG
 
@@ -21,13 +22,19 @@ from ion.core.process import process
 from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE
 from ion.test.iontest import IonTestCase
 
-from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE
+from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE, bootstrap_byte_array_dataset
 
 from ion.core.object.object_utils import create_type_identifier
+
+from ion.util.itv_decorator import itv
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 DATASOURCE_TYPE = create_type_identifier(object_id=4503, version=1)
 GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
+
+
+CONF = ioninit.config(__name__)
+
 
 class IngestionTest(IonTestCase):
     """
@@ -328,6 +335,102 @@ class IngestionTest(IonTestCase):
         yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
 
         log.info('Calling Receive Done: Complete!')
+
+
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_ingest_from_files(self):
+        """
+        This is a test method for ingesting multiple updates from a set of files - simulating what the JAW/DAC do...
+
+        'ion.services.dm.ingestion.test.test_ingestion':{
+        # Path to files relative to ioncore-python directory!
+        'ingest_files' :
+            [
+                '../../ion_data/NTAS_10_Real-time_Mooring_Data_System_1.ooicdm.tgz',
+                '../../ion_data/NTAS_10_Real-time_Mooring_Data_System_1_u1.ooicdm.tgz',
+                '../../ion_data/NTAS_10_Real-time_Mooring_Data_System_1_u2.ooicdm.tgz'
+            ],
+        },
+        """
+
+        flist = CONF.getValue('ingest_files', [])
+        if not flist:
+            raise RuntimeError('Expected config file entry not found: ingest_files is missing or empty!')
+
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+
+        def create_dataset(dataset, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            group = dataset.CreateObject(GROUP_TYPE)
+            dataset.root_group = group
+            return True
+
+        data_set_description = {ID_CFG:new_dataset_id,
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:'Blank dataset for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:create_dataset,
+                      }
+
+        self.datastore._create_resource(data_set_description)
+
+        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
+
+
+        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
+
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        # ============================================
+        # Don't need a real data source at this time!
+        # ============================================
+
+        log.info('Created Dataset Resource for test.')
+
+        # Receive a dataset to get setup...
+        content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id = new_dataset_id
+        content.datasource_id = new_datasource_id
+
+        # Now fake the receipt of the dataset message
+
+        @defer.inlineCallbacks
+        def do_file_update(file):
+
+            yield self.ingest._prepare_ingest(content)
+
+            cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
+            yield bootstrap_byte_array_dataset(cdm_dset_msg, self, filename=file)
+
+            log.info('Calling Receive Dataset')
+
+            # Call the op of the ingest process directly
+            yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+
+            log.info('Calling Receive Dataset: Complete')
+
+            complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
+
+            log.info('Calling Receive Done')
+
+            complete_msg.status = complete_msg.StatusCode.OK
+            yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+
+            yield self.ingest.rc.put_instance(self.ingest.dataset)
+
+            log.info('Calling Receive Done: Complete!')
+
+
+            self.ingest._defer_ingest = defer.Deferred()
+
+            self.ingest.dataset = None
+
+
+        for file in flist:
+            log.info('Loading data file to ingest: %s' % file)
+            yield do_file_update(file)
 
 
 

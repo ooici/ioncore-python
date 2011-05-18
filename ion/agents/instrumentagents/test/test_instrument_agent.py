@@ -324,7 +324,7 @@ class TestInstrumentAgent(IonTestCase):
     
         # Get current configuration using 'all' syntax. Verify all parameters were
         # attempted. Verify the results same as before. Verify no transaction is issued.
-        params_2 = ['all']
+        params_2 = [AgentParameter.ALL]
         reply_2 = yield self.ia_client.get_observatory(params_2,'none')
         success_2 = reply_2['success']
         result_2 = reply_2['result']
@@ -336,7 +336,7 @@ class TestInstrumentAgent(IonTestCase):
 
         # Get current configuration with implicit transaction. Verify all parameters
         # are attempted. Verify results same as before. Verify transaction ID issued.
-        params_3 = ['all']
+        params_3 = [AgentParameter.ALL]
         reply_3 = yield self.ia_client.get_observatory(params_3,'create')
         success_3 = reply_3['success']
         result_3 = reply_3['result']
@@ -349,7 +349,7 @@ class TestInstrumentAgent(IonTestCase):
         
         # Try to get parameters with previous implicit transaction ID, now expired.
         # This should fail.
-        params_4 = ['all']
+        params_4 = [AgentParameter.ALL]
         reply_4 = yield self.ia_client.get_observatory(params_4,transaction_id_3)        
         success_4 = reply_4['success']
         result_4 = reply_4['result']
@@ -451,7 +451,7 @@ class TestInstrumentAgent(IonTestCase):
         
         # Get full configuration. Verify it matches the original configuration. Verify the
         # transaction ID.
-        params_12 = ['all']
+        params_12 = [AgentParameter.ALL]
         reply_12 = yield self.ia_client.get_observatory(params_12,transaction_id_8)
         success_12 = reply_12['success']
         result_12 = reply_12['result']
@@ -509,7 +509,7 @@ class TestInstrumentAgent(IonTestCase):
         
         # Get the full configuration again. Verify it matches the original and none of
         # the bad sets made it through.
-        params_17 = ['all']
+        params_17 = [AgentParameter.ALL]
         reply_17 = yield self.ia_client.get_observatory(params_17,'none')
         success_17 = reply_17['success']
         result_17 = reply_17['result']
@@ -543,7 +543,7 @@ class TestInstrumentAgent(IonTestCase):
         #raise unittest.SkipTest("Temp skip.")
         
         # Get current metadata without a transacton using 'all' syntax.
-        params = [('all','all')]
+        params = [(AgentParameter.ALL,MetadataParameter.ALL)]
         reply = yield self.ia_client.get_observatory_metadata(params,'none')
         success = reply['success']
         result = reply['result']
@@ -561,7 +561,7 @@ class TestInstrumentAgent(IonTestCase):
         #raise unittest.SkipTest("Temp skip.")
         
         # Get all observatory status vals using 'all' syntax.
-        params_1 = ['all']
+        params_1 = [AgentStatus.ALL]
         reply_1 = yield self.ia_client.get_observatory_status(params_1,'none')
         success_1 = reply_1['success']
         result_1 = reply_1['result']
@@ -627,7 +627,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(len(transaction_id_4),36)
         
         # Try to get the status parameters with no transaction. This should fail.
-        params_5 = ['all']
+        params_5 = [AgentStatus.ALL]
         reply_5 = yield self.ia_client.get_observatory_status(params_5,'none')
         success_5 = reply_5['success']
         result_5 = reply_5['result']
@@ -638,7 +638,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(transaction_id_5,None)
 
         # Try to get the status parameters with implicit transaction. This should fail.
-        params_6 = ['all']
+        params_6 = [AgentStatus.ALL]
         reply_6 = yield self.ia_client.get_observatory_status(params_6,'create')
         success_6 = reply_6['success']
         result_6 = reply_6['result']
@@ -650,7 +650,7 @@ class TestInstrumentAgent(IonTestCase):
 
         # Try to get the status parameters with a bad transaction ID. This should fail.
         bad_tid = str(uuid.uuid4())
-        params_7 = ['all']
+        params_7 = [AgentStatus.ALL]
         reply_7 = yield self.ia_client.get_observatory_status(params_7,bad_tid)
         success_7 = reply_7['success']
         result_7 = reply_7['result']
@@ -661,7 +661,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(transaction_id_7,None)
 
         # Get status parameters with valid transaction ID.
-        params_8 = ['all']
+        params_8 = [AgentStatus.ALL]
         reply_8 = yield self.ia_client.get_observatory_status(params_8,transaction_id_4)
         success_8 = reply_8['success']
         result_8 = reply_8['result']
@@ -677,7 +677,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_ok(success_9))
 
         # Make sure the old transaction no longer works.
-        params_10 = ['all']
+        params_10 = [AgentStatus.ALL]
         reply_10 = yield self.ia_client.get_observatory_status(params_10,transaction_id_4)
         success_10 = reply_10['success']
         result_10 = reply_10['result']
@@ -688,7 +688,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(transaction_id_10,None)
 
         # An implicit transaction should now work.
-        params_11 = ['all']
+        params_11 = [AgentStatus.ALL]
         reply_11 = yield self.ia_client.get_observatory_status(params_11,'create')
         success_11 = reply_11['success']
         result_11 = reply_11['result']
@@ -707,7 +707,7 @@ class TestInstrumentAgent(IonTestCase):
         #raise unittest.SkipTest("Temp skip.")
 
         # Get all capabilities with the 'all' syntax.
-        params = ['all']
+        params = [InstrumentCapability.ALL]
         reply = yield self.ia_client.get_capabilities(params,'none')
         success = reply['success']
         result = reply['result']
@@ -779,7 +779,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(len(transaction_id),36)
 
         # Try to get capabilities without a transaction.
-        params = ['all']
+        params = [InstrumentCapability.ALL]
         reply = yield self.ia_client.get_capabilities(params,'none')
         success = reply['success']
         result = reply['result']
@@ -790,7 +790,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(transaction_id,None)
         
         # Try to get capabilities with implicit transaction.
-        params = ['all']
+        params = [InstrumentCapability.ALL]
         reply = yield self.ia_client.get_capabilities(params,'create')
         success = reply['success']
         result = reply['result']
@@ -802,7 +802,7 @@ class TestInstrumentAgent(IonTestCase):
                 
         # Try to get capabilities with bad transaction ID.
         bad_tid = str(uuid.uuid4())
-        params = ['all']
+        params = [InstrumentCapability.ALL]
         reply = yield self.ia_client.get_capabilities(params,bad_tid)
         success = reply['success']
         result = reply['result']
@@ -813,7 +813,7 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(transaction_id,None)
         
         # Get capabilities with correct transaction ID.
-        params = ['all']
+        params = [InstrumentCapability.ALL]
         reply = yield self.ia_client.get_capabilities(params,transaction_id_4)
         success = reply['success']
         result = reply['result']

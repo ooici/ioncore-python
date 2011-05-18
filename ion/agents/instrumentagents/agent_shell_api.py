@@ -81,7 +81,7 @@ params_acq = {
 @defer.inlineCallbacks
 def get_obs(params=None):
     if not params:
-        params = ['all']
+        params = [AgentParameter.ALL]
     result = yield IAC.get_observatory(params)
     defer.returnValue(result)
     
@@ -98,7 +98,7 @@ def set_obs_acq():
 @defer.inlineCallbacks
 def get_obs_status(params=None):
     if not params:
-        params = ['all']
+        params = [AgentStatus.ALL]
     result = yield IAC.get_observatory_status(params)
     defer.returnValue(result)
 
@@ -129,7 +129,7 @@ def reset():
 @defer.inlineCallbacks
 def get_device(params=None):
     if not params:
-        params = [('all','all')]
+        params = [(DriverChannel.ALL,DriverParameter.ALL)]
     result = yield IAC.get_device(params)
     defer.returnValue(result)
     

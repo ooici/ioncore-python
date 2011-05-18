@@ -48,8 +48,8 @@ class DriverChannel(BaseEnum):
     INSTRUMENT = 'CHANNEL_INSTRUMENT'
     TEMPERATURE = 'CHANNEL_TEMPERATURE'
     PRESSURE = 'CHANNEL_PRESSURE'
-    CONDUCTIVITY = 'CHANNEL_CONDUCTIVITY'
-    
+    CONDUCTIVITY = 'CHANNEL_CONDUCTIVITY'    
+    ALL = 'CHANNEL_ALL'
 
 """
 Common driver commands.
@@ -70,7 +70,6 @@ class DriverCommand(BaseEnum):
     GET_METADATA = 'DRIVER_CMD_GET_METADATA'
     UPDATE_PARAMS = 'DRIVER_CMD_UPDATE_PARAMS'
     TEST_ERRORS = 'DRIVER_CMD_TEST_ERRORS'    
-
 
 """
 Common driver states.
@@ -133,6 +132,7 @@ class DriverStatus(BaseEnum):
     DRIVER_STATE = 'DRIVER_STATUS_DRIVER_STATE'
     OBSERVATORY_STATE = 'DRIVER_STATUS_OBSERVATORY_STATE'
     DRIVER_ALARMS = 'DRIVER_STATUS_DRIVER_ALARMS'
+    ALL = 'DRIVER_STATUS_ALL'
 
 """
 Common driver parameters.
@@ -141,7 +141,7 @@ class DriverParameter(BaseEnum):
     """
     Common driver parameter enum.
     """
-    pass
+    ALL = 'DRIVER_PARAMETER_ALL'
 
     
 """
@@ -238,7 +238,7 @@ class AgentParameter(BaseEnum):
     DRIVER_CLIENT_DESC = 'AGENT_PARAM_DRIVER_CLIENT_DESC'
     DRIVER_CONFIG = 'AGENT_PARAM_DRIVER_CONFIG'
     BUFFER_SIZE = 'AGENT_PARAM_BUFFER_SIZE'
-
+    ALL = 'AGENT_PARAM_ALL'
 
 """
 List of observatory status names.
@@ -254,7 +254,7 @@ class AgentStatus(BaseEnum):
     BUFFER_SIZE = 'AGENT_STATUS_BUFFER_SIZE'
     AGENT_VERSION = 'AGENT_STATUS_AGENT_VERSION'
     PENDING_TRANSACTIONS = 'AGENT_STATUS_PENDING_TRANSACTIONS'
-
+    ALL = 'AGENT_STATUS_ALL'
 
 """
 Agent connection state.
@@ -378,7 +378,7 @@ class ObservatoryCapability(BaseEnum):
     OBSERVATORY_PARAMS = 'CAP_OBSERVATORY_PARAMS' # Common and specific observatory parameter names.
     OBSERVATORY_STATUSES = 'CAP_OBSERVATORY_STATUSES' # Common and specific observatory status names.
     OBSERVATORY_METADATA = 'CAP_OBSERVATORY_METADATA' # Common and specific metadata names.
-    
+    OBSERVATORY_ALL = 'CAP_OBSERVATORY_ALL'
     
 class DriverCapability(BaseEnum):
     """
@@ -388,13 +388,13 @@ class DriverCapability(BaseEnum):
     DEVICE_COMMANDS = 'CAP_DEVICE_COMMANDS' # Common and specific device command names.
     DEVICE_PARAMS = 'CAP_DEVICE_PARAMS' # Common and specific device parameter names.
     DEVICE_STATUSES = 'CAP_DEVICE_STATUSES' # Common and specific device status names.    
-    
+    DEVICE_ALL = 'CAP_DEVICE_ALL'
     
 class InstrumentCapability(ObservatoryCapability,DriverCapability):
     """
     Comination of agent and device capabilities enum.
     """
-    pass
+    ALL = 'CAP_ALL'
 
 
 """
@@ -415,6 +415,7 @@ class MetadataParameter(BaseEnum):
     VALID_VALUES = 'META_VALID_VALUES'
     FRIENDLY_NAME = 'META_FRIENDLY_NAME'
     DESCRIPTION = 'META_DESCRIPTION'
+    ALL = 'META_ALL'
 
 
 ###############################################################################
