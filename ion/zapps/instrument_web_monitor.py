@@ -21,7 +21,7 @@ from ion.core.cc.shell import control
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
     instrument_proc = [
-        {'name':'instrument_web_monitor_1',
+        {'name':'instrument_web_monitor',
          'module':'ion.services.dm.distribution.instrument_web_monitor',
          'class':'InstrumentWebMonitorService',
          'spawnargs':{}
