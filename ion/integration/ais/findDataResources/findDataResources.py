@@ -87,6 +87,7 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
 class FindDataResources(object):
 
     ALL = 0
+    USER = 1
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
@@ -178,7 +179,7 @@ class FindDataResources(object):
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg)
+        yield self.__getDataResources(msg, dSetResults, rspMsg, typeFlag = self.USER)
         
         defer.returnValue(rspMsg)
 
