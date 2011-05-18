@@ -19,7 +19,7 @@ from ion.util.itv_decorator import itv
 from ion.test.iontest import IonTestCase
 
 from ion.services.dm.inventory.ncml_generator import create_ncml, rsync_ncml, \
-    rsa_to_dot_ssh, ssh_add, do_complete_rsync
+    rsa_to_dot_ssh, ssh_add, do_complete_rsync, clear_ncml_files
 from ion.services.dm.inventory import ncml_generator
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -34,6 +34,8 @@ class PSAT(IonTestCase):
 
     def tearDown(self):
         ncml_generator.RSYNC_CMD = self.old_cmd
+        clear_ncml_files(self.filedir)
+
 
     def test_premade(self):
         # Borrowed this trick from David Foster. Reference datafile in test dir
