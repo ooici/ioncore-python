@@ -484,8 +484,8 @@ class NotificationAlertService(ServiceProcess):
     
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.data_resource_id = rows[key]['data_src_id']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.title = rows[key]['dispatcher_script_path']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.institution = rows[key]['title']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.title = rows[key]['title']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.institution = rows[key]['institution']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.source = rows[key]['source']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.references = rows[key]['references']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.summary = rows[key]['summary']
@@ -551,8 +551,8 @@ class NotificationAlertService(ServiceProcess):
 
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.data_resource_id = rows[key]['data_src_id']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.title = rows[key]['dispatcher_script_path']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.institution = rows[key]['title']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.title = rows[key]['title']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.institution = rows[key]['institution']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.source = rows[key]['source']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.references = rows[key]['references']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.summary = rows[key]['summary']

@@ -1003,6 +1003,13 @@ class InstrumentAgent(Process):
     #   Observatory Facing Interface
     ############################################################################
     
+    
+    @defer.inlineCallbacks
+    def op_hello(self, content, headers, msg):
+
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+    
 
     @defer.inlineCallbacks
     def op_execute_observatory(self, content, headers, msg):
@@ -1124,7 +1131,7 @@ class InstrumentAgent(Process):
             {'success':success,'result':{param_arg:(success,val),...,
             param_arg:(success,val)},'transaction_id':transaction_id)
         """
-
+        
         self._in_protected_function = True
 
         assert(isinstance(content,dict)), 'Expected a dict content.'
@@ -1877,7 +1884,7 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         # Set up the transaction
-        success = yield self._verify_transaction(tid,'execute')
+        success = yield self._verify_transaction(tid,'get')
         if InstErrorCode.is_error(success):
             reply['success'] = success
             yield self.reply_ok(msg,reply)
@@ -1896,12 +1903,14 @@ class InstrumentAgent(Process):
         success = None
         result = None
         
+        
         try:
             
             dvr_result = yield self._driver_client.get(params)
             success = dvr_result.get('success',None)
             result = dvr_result.get('result',None)                
-        
+            #pass
+            
         # Unkonwn error.
         except:
             success = InstErrorCode.UNKNOWN_ERROR
@@ -1911,6 +1920,8 @@ class InstrumentAgent(Process):
         else:
             reply['success'] = success
             reply['result'] = result
+            #reply['success'] = InstErrorCode.OK
+            #reply['result'] = {'parameter':(InstErrorCode.OK,'value')}
             
         # Publish errors, clean up transaction.
         finally:
@@ -1927,7 +1938,7 @@ class InstrumentAgent(Process):
             self._in_protected_function = False
                     
         yield self.reply_ok(msg,reply)
-
+        
 
     @defer.inlineCallbacks
     def op_set_device(self, content, headers, msg):
@@ -1955,7 +1966,7 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         # Set up the transaction
-        success = yield self._verify_transaction(tid,'execute')
+        success = yield self._verify_transaction(tid,'set')
         if InstErrorCode.is_error(success):
             reply['success'] = success
             yield self.reply_ok(msg,reply)
@@ -2110,7 +2121,7 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         # Set up the transaction
-        success = yield self._verify_transaction(tid,'execute')
+        success = yield self._verify_transaction(tid,'get')
         if InstErrorCode.is_error(success):
             reply['success'] = success
             yield self.reply_ok(msg,reply)
@@ -2191,7 +2202,7 @@ class InstrumentAgent(Process):
         reply = {'success':None,'result':None,'transaction_id':None}
 
         # Set up the transaction
-        success = yield self._verify_transaction(tid,'execute')
+        success = yield self._verify_transaction(tid,'get')
         if InstErrorCode.is_error(success):
             reply['success'] = success
             yield self.reply_ok(msg,reply)
@@ -2706,6 +2717,13 @@ class InstrumentAgentClient(ProcessClient):
     #   Observatory Facing Interface.
     ############################################################################
 
+    
+    @defer.inlineCallbacks
+    def hello(self, text='Hi there'):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('hello', text)
+        defer.returnValue(str(content))
+    
 
     @defer.inlineCallbacks
     def execute_observatory(self,command,transaction_id):
@@ -2722,6 +2740,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(command,list)), 'Expected a command list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
 
+        yield self._check_init()
         content = {'command':command,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('execute_observatory',content,
@@ -2745,11 +2764,12 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_observatory',content,
                           timeout=self.default_rpc_timeout)
-        
+
         assert(isinstance(content,dict))
         defer.returnValue(content)
         
@@ -2769,6 +2789,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('set_observatory',content,
@@ -2793,6 +2814,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_observatory_metadata',content,
@@ -2816,6 +2838,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_observatory_status',content,
@@ -2838,6 +2861,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_capabilities',content,
@@ -2870,6 +2894,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(command,list)), 'Expected a command list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'channels':channels,'command':command,
                    'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
@@ -2891,16 +2916,17 @@ class InstrumentAgentClient(ProcessClient):
             ...,(chan_arg,param_arg):(success,val)},
             'transaction_id':transaction_id}
         """
+
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_device',content,timeout=self.default_rpc_timeout)
         
         assert(isinstance(content,dict))
         defer.returnValue(content)
-
 
     @defer.inlineCallbacks
     def set_device(self,params,transaction_id='none'):
@@ -2917,6 +2943,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('set_device',content,timeout=self.default_rpc_timeout)
@@ -2939,6 +2966,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_device_metadata',content,
@@ -2962,6 +2990,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'params':params,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('get_device_status',content,
@@ -2984,6 +3013,7 @@ class InstrumentAgentClient(ProcessClient):
         assert(bytes), 'Expected command bytes.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
         
+        yield self._check_init()
         content = {'bytes':bytes,'transaction_id':transaction_id}
         (content,headers,messaage) = yield \
             self.rpc_send('execute_device_direct',content,

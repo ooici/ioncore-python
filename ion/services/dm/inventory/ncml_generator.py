@@ -11,16 +11,14 @@ exit with a deferred.
 
 # File template. The filename and 'location' are just the GUID.
 # Note the %s for string substitution.
-file_template = """
-<?xml version="1.0" encoding="UTF-8"?>
-<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
+file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
 from os import path, environ, chmod, unlink, listdir, remove
 import fnmatch
 
 from twisted.internet import reactor, defer, error
-from twisted.internet.protocol import ProcessProtocol
+from ion.util.os_process import OSProcess
 
 import ion.util.ionlog
 from ion.core import ioninit
@@ -30,29 +28,6 @@ log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 RSYNC_CMD = CONF['rsync']
 SSH_ADD_CMD = CONF['ssh-add']
-
-class AsyncProcessWithCallbackProto(ProcessProtocol):
-    """
-    Our wrapper class to run an external program, fires callback/errback when done.
-    """
-    def __init__(self, completion_deferred):
-        self.cbd = completion_deferred
-
-    def connectionMade(self):
-        log.debug('Program is running')
-
-    def processExited(self, reason):
-        # let the caller know we're done and how it went
-        if isinstance(reason, error.ProcessTerminated):
-            log.error('exec failed, %s' % reason.value)
-            self.cbd.errback(reason)
-        else:
-            log.debug('Return value from program, %s' % reason.value)
-            self.cbd.callback('Done')
-
-    def outReceived(self, data):
-        log.debug('Program says: "%s"' % data)
-
 
 def create_ncml(id_ref, filepath=""):
     """
@@ -133,25 +108,20 @@ def rsync_ncml(local_filepath, server_url):
     @param server_url rsync URL of the server
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    d = defer.Deferred()
-    rpp = AsyncProcessWithCallbackProto(d)
-    args = [RSYNC_CMD, '', '-r', '--include', '"*.ncml"',
+    args = ['-r', '--include', '"*.ncml"',
             '-v', '--stats', '--delete', local_filepath + '/', server_url]
+    rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
 
-    #log.debug(environ.data)
-
-    # Adding environ.data uses the parent environment, otherwise empty
-    reactor.spawnProcess(rpp, RSYNC_CMD, args, env=environ.data)
-
-    return d
-
+    return rp.spawn()
+    
 
 def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
     """
     @brief Another hack. Take an RSA key, save it as an ssh-formatted file into
     the .ssh directory for use by rsync.
-    @param rsa_key RSA private key, as returned from 'ssh-keygen -t rsa'
+    @param private_key RSA private key, as returned from 'ssh-keygen -t rsa'
+    @param public_key Public half of same, used for ssh-add -d
     @retval Tuple of filenames - private and public key
     @note Raises IOError if necessary
     """
@@ -199,19 +169,15 @@ def ssh_add(filename, remove=False):
     @note You need to have the public key present in the ssh directory for
     delete to work.
     """
-    d = defer.Deferred()
-    rpp = AsyncProcessWithCallbackProto(d)
-
     if remove:
-        second_arg = '-d'
+        args = ['-d', filename]
     else:
-        second_arg = ''
+        args = [filename]
 
-    args = [SSH_ADD_CMD, second_arg, filename]
     log.debug('Command is %s' % args)
 
-    reactor.spawnProcess(rpp, SSH_ADD_CMD, args, env=environ.data)
-    return d
+    sap = OSProcess(binary=SSH_ADD_CMD, spawnargs=args, env=environ.data)
+    return sap.spawn()
 
 
 @defer.inlineCallbacks

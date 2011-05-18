@@ -342,7 +342,7 @@ class DataStoreTest(IonTestCase):
     @defer.inlineCallbacks
     def test_get_object(self):
         from ion.core.process.process import Process
-        p = Process()
+        p = Process(proc_name='test_anon')
         yield p.spawn()
 
         msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
@@ -352,7 +352,7 @@ class DataStoreTest(IonTestCase):
 
         msg.object_id = idref
 
-        dsc = DataStoreClient()
+        dsc = DataStoreClient(proc=p)
         obj = yield dsc.get_object(msg)
 
         # test object, make sure it is what we expect
@@ -705,9 +705,14 @@ class DataStoreExtractDataTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
+
+        self.proc = Process(proc_name='ds_extract_proc')
+        yield self.proc.spawn()
+
         yield self.setup_services()
         yield self.setup_array_structure()
         yield self.setup_data_listener()
+
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -813,14 +818,11 @@ class DataStoreExtractDataTest(IonTestCase):
                 obj = msg.Repository._wrap_message_object(val._element)
                 link.SetLink(obj)
 
-        dsc = DataStoreClient()
+        dsc = DataStoreClient(proc=self.proc)
         yield dsc.put_blobs(msg)
 
     @defer.inlineCallbacks
     def setup_data_listener(self):
-
-        p = Process()
-        yield p.spawn()
 
         self._recv_data = []
         self._def_done = defer.Deferred()   # this is called back in the handler when the "done" message comes through
@@ -848,10 +850,10 @@ class DataStoreExtractDataTest(IonTestCase):
                 'queue' : None,              # may be None, if so, the queue is made anonymously (and stored in receiver's consumer.queue attr)
               }
 
-        datarec = WorkerReceiver('data_listener', process=p, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
+        datarec = WorkerReceiver('data_listener', process=self.proc, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
         yield datarec.attach()
 
-        self.dsc = DataStoreClient(proc=p)
+        self.dsc = DataStoreClient(proc=self.proc)
 
     @defer.inlineCallbacks
     def test_full_one_ba(self):
