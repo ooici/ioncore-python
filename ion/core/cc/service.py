@@ -114,6 +114,22 @@ class CapabilityContainer(service.Service):
         # signal successful container start
         self.defer_started.callback(True)
 
+        # event notify that the startup is good to go!
+
+        # must do imports here or we get cyclical import problems
+        from ion.services.dm.distribution.events import ContainerStartupEventPublisher
+        from ion.core.process.process import Process
+        p = Process(spawnargs={'proc-name':'ContainerStartupPubProcess'})
+        yield p.spawn()
+        pub = ContainerStartupEventPublisher(process=p)
+        yield pub.initialize()
+        yield pub.activate()
+
+        yield pub.create_and_publish_event(origin=self.container.id)
+
+        yield pub.terminate()
+        yield p.terminate()
+
     @defer.inlineCallbacks
     def stopService(self):
         yield self.container.terminate()
