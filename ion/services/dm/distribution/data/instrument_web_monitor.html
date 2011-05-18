@@ -109,33 +109,32 @@
                   {
                      for (var j = 0; j < curdata.events.length; j++)
                      {
-                        var conductivity = 0.0;
-                        var pressure = 0.0;
-                        var salinity = 0.0;
-                        var sound_velocity = 0.0;
-                        var temperature = 0.0;
-                        var time = "0";
-
                         for (var k = 0; k < curdata.events[j].length; k++)
                         {
                            var cchild = curdata.events[j][k];
                            if (cchild.id == "data_block")
                            {
                               var datapoints = JSON.parse(cchild.content);
-                              conductivity = datapoints.conductivity;
-                              pressure = datapoints.pressure;
-                              salinity = datapoints.salinity;
-                              sound_velocity = datapoints.sound_velocity;
-                              temperature = datapoints.temperature;
-                              time = datapoints.time;
-                           }
+                              for (var l = 0; l < datapoints.length; l++)
+                              {
+                                 var datapoint = datapoints[l];
+                                 var conductivity = datapoint.conductivity;
+                                 var pressure = datapoint.pressure;
+                                 var salinity = datapoint.salinity;
+//                                 var sound_velocity = datapoint.sound_velocity;
+                                 var sound_velocity = 123.00;
+                                 var temperature = datapoint.temperature;
+//                                 var time = datapoint.time;
+                                 var time = "timeval";
 
-                           // Update the data tables
-                           this.conductivity_data.addRow([time,conductivity]);
-                           this.pressure_data.addRow([time,pressure]);
-                           this.salinity_data.addRow([time,salinity]);
-                           this.sound_velocity_data.addRow([time,sound_velocity]);
-                           this.temperature_data.addRow([time,temperature]);
+                                 // Update the data tables
+                                 this.conductivity_data.addRow([time,conductivity]);
+                                 this.pressure_data.addRow([time,pressure]);
+                                 this.salinity_data.addRow([time,salinity]);
+                                 this.sound_velocity_data.addRow([time,sound_velocity]);
+                                 this.temperature_data.addRow([time,temperature]);
+                              }
+                           }
                         }
                      }
        
