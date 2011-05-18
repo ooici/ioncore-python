@@ -121,11 +121,9 @@
                                  var conductivity = datapoint.conductivity;
                                  var pressure = datapoint.pressure;
                                  var salinity = datapoint.salinity;
-//                                 var sound_velocity = datapoint.sound_velocity;
-                                 var sound_velocity = 123.00;
+                                 var sound_velocity = datapoint.sound_velocity;
                                  var temperature = datapoint.temperature;
-//                                 var time = datapoint.time;
-                                 var time = "timeval";
+                                 var time = datapoint.time;
 
                                  // Update the data tables
                                  this.conductivity_data.addRow([time,conductivity]);
