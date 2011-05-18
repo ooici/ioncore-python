@@ -346,8 +346,12 @@ class AssociationInstance(object):
 
         if previous_object_repository is not None:
             if previous_object_repository.status == previous_object_repository.NOTINITIALIZED:
-                raise AssociationInstanceError(
-                    'Error in set_null: associated object repository is present but not in a finite state - must checkout a commit first!')
+
+                log.warn('Not sure how to handle set_null for cached resource object')
+                previous_object_repository.checkout('master')
+
+                #raise AssociationInstanceError(
+                #    'Error in set_null: associated object repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_object_repository.status == previous_object_repository.MODIFIED:
                 # For now - do a commit automagically!
@@ -363,8 +367,12 @@ class AssociationInstance(object):
 
         if previous_predicate_repository is not None:
             if previous_predicate_repository.status == previous_predicate_repository.NOTINITIALIZED:
-                raise AssociationInstanceError(
-                    'Error in set_null: associated predicate repository is present but not in a finite state - must checkout a commit first!')
+
+                log.warn('Not sure how to handle set_null for cached resource object')
+                previous_predicate_repository.checkout('master')
+
+                #raise AssociationInstanceError(
+                #    'Error in set_null: associated predicate repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_predicate_repository.status == previous_predicate_repository.MODIFIED:
                 # For now - do a commit automagically!
@@ -380,8 +388,12 @@ class AssociationInstance(object):
 
         if previous_subject_repository is not None:
             if previous_subject_repository.status == previous_subject_repository.NOTINITIALIZED:
-                raise AssociationInstanceError(
-                    'Error in set_null: associated subject repository is present but not in a finite state - must checkout a commit first!')
+
+                log.warn('Not sure how to handle set_null for cached resource object')
+                previous_subject_repository.checkout('master')
+
+                #raise AssociationInstanceError(
+                #    'Error in set_null: associated subject repository is present but not in a finite state - must checkout a commit first!')
 
             elif previous_subject_repository.status == previous_subject_repository.MODIFIED:
                 # For now - do a commit automagically!

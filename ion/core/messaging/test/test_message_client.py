@@ -20,6 +20,10 @@ from ion.core.object import object_utils
 from ion.core.object import workbench
 from ion.core.messaging import message_client
 
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
+from ion.core.ioninit import request
+
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 ION_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
@@ -191,9 +195,13 @@ class MessageClientTest(IonTestCase):
             
         message = yield mc.create_instance(PERSON_TYPE, MessageName='person message')
         message.name ='David'
-        
+
+        log.info('StackLocal Request Before Send: workbench context: "%s"' % request.get('workbench_context'))
+
         (response, headers, msg) = yield self.test_sup.rpc_send(pid, 'echo', message)
-                
+
+        log.info('StackLocal Request After Send: workbench context: "%s"' % request.get('workbench_context'))
+
         self.assertIsInstance(response, message_client.MessageInstance)
         self.assertEqual(response.name, 'David')
         

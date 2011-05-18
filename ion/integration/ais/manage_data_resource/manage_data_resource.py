@@ -10,8 +10,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.core.messaging.message_client import MessageClient
+from ion.core.exception import ReceivedApplicationError
+#from ion.core.messaging.message_client import MessageClient
+#from ion.services.coi.resource_registry.resource_client import ResourceClient
+
 from ion.core.object import object_utils
 
 from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
@@ -26,19 +28,12 @@ from ion.util.iontime import IonTime
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
-                                                                    TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
-                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
                                                                     DATARESOURCE_SCHEDULE_TYPE_ID
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient, \
-                                                               ResourceInstance, \
-                                                               ResourceClientError, \
-                                                               ResourceInstanceError
 
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
@@ -145,7 +140,7 @@ class ManageDataResource(object):
                                                                     ResourceName="ScheduledTask resource")
 
                     sched_task_rsrc.task_id = sched_task.task_id
-                    association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
+                    yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                     sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                     yield self.rc.put_instance(sched_task_rsrc)
                     
@@ -203,7 +198,7 @@ class ManageDataResource(object):
         log.info("_onFirstIngestEvent getting instance of data source resource")
         datasrc_resource = yield self.rc.get_instance(datasrc_id)
         log.info("_onFirstIngestEvent getting instance of data set resource")
-        datasrc_resource = yield self.rc.get_instance(dataset_id)
+        dataset_resource = yield self.rc.get_instance(dataset_id)
 
         if not datasrc_resource.is_public:
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
@@ -304,7 +299,6 @@ class ManageDataResource(object):
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(DELETE_DATA_RESOURCE_RSP_TYPE)
         for d in deletions:
-            i = len(Response.message_parameters_reference[0].successfully_deleted_id)
             Response.message_parameters_reference[0].successfully_deleted_id.append(d)
 
         defer.returnValue(Response)
@@ -325,11 +319,9 @@ class ManageDataResource(object):
 
         my_datasrc_id      = None
         my_dataset_id      = None
-        my_association_id  = None
 
         datasrc_resource      = None
         dataset_resource      = None
-        association_resource  = None
 
         msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
         try:
@@ -389,7 +381,7 @@ class ManageDataResource(object):
             self.ing.create_dataset_topics(topics_msg)
 
             #make associations
-            association_u = yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
+            yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
             association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
             #build transaction
@@ -415,7 +407,7 @@ class ManageDataResource(object):
                                                                 ResourceName="ScheduledTask resource")
 
                 sched_task_rsrc.task_id = sched_task.task_id
-                association_s = yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
+                yield self.ac.create_association(datasrc_resource, HAS_A_ID, sched_task_rsrc)
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
@@ -529,6 +521,7 @@ class ManageDataResource(object):
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
             response = yield self.sc.rm_task(req_msg)
+            log.debug("not sure what to do with the response: %s" % str(type(response)))
             #fixme: anything to do with this response?  i don't know of anything...
             sched_task_rsrc.ResourceLifeCycleState = sched_task_rsrc.RETIRED
             yield self.rc.put_instance(sched_task_rsrc)

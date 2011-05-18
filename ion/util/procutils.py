@@ -232,3 +232,15 @@ def get_ion_path(filename):
     log.info('Found file on path: "%s"' % filename)
 
     return filename
+
+
+
+
+def get_last_or_default(alist, default=None):
+
+    try:
+        res = alist[-1]
+    except IndexError, ie:
+        log.debug('get_last_or_default: using default!')
+        res=default
+    return res

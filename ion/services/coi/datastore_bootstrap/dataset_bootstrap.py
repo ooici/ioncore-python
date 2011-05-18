@@ -114,7 +114,7 @@ def read_ooicdm_file(resource_instance, filename):
         else:
             dataset = root_obj
             
-        resource_instance.ResourceObject = root_obj
+        resource_instance.ResourceObject = dataset
 
 
 

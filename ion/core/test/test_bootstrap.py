@@ -47,4 +47,4 @@ class BootstrapTest2(IonTestCase):
     def test_2(self):
 
         yield pu.asleep(1)
-        self.assertEqual(request.workbench_context, 'Test runner context!')
+        self.assertEqual(request.workbench_context, ['Test runner context!'])
