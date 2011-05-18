@@ -22,6 +22,8 @@ def get_events_exchange_point():
 
 EVENT_MESSAGE_TYPE                          = object_utils.create_type_identifier(object_id=2322, version=1)
 RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE       = object_utils.create_type_identifier(object_id=2323, version=1)
+APP_LOADER_EVENT_MESSAGE_TYPE               = object_utils.create_type_identifier(object_id=2332, version=1)
+CONTAINER_STARTUP_EVENT_MESSAGE_TYPE        = object_utils.create_type_identifier(object_id=2333, version=1)
 TRIGGER_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2324, version=1)
 RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifier(object_id=2325, version=1)
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
@@ -36,6 +38,8 @@ INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE   = object_utils.create_type_identifie
 RESOURCE_LIFECYCLE_EVENT_ID = 1001
 CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
+APP_LOADER_EVENT_ID = 1075
+CONTAINER_STARTUP_EVENT_ID = 1076
 DATASOURCE_UPDATE_EVENT_ID = 1101
 INSTRUMENT_SAMPLE_DATA_EVENT_ID = 1102
 DATASOURCE_UNAVAILABLE_EVENT_ID = 1102
@@ -248,6 +252,35 @@ class ProcessLifecycleEventPublisher(ResourceLifecycleEventPublisher):
     """
     event_id = PROCESS_LIFECYCLE_EVENT_ID
 
+class InfrastructureEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for infrastructure related events. An abstract base class, should be
+    inherited and overridden.
+    """
+    pass
+
+class AppLoaderEventPublisher(InfrastructureEventPublisher):
+    """
+    Event Notification Publisher for Applications starting and stopping.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    msg_type = APP_LOADER_EVENT_MESSAGE_TYPE
+    event_id = APP_LOADER_EVENT_ID
+
+    class State:
+        STARTED = "STARTED"
+        STOPPED = "STOPPED"
+
+class ContainerStartupEventPublisher(InfrastructureEventPublisher):
+    """
+    Event Notification Publisher for a Container finishing its running and startup apps.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    msg_type = CONTAINER_STARTUP_EVENT_MESSAGE_TYPE
+    event_id = CONTAINER_STARTUP_EVENT_ID
+
 class TriggerEventPublisher(EventPublisher):
     """
     Base Publisher class for "triggered" Event Notifications.
@@ -442,6 +475,29 @@ class ProcessLifecycleEventSubscriber(ResourceLifecycleEventSubscriber):
     The "origin" parameter in this class' initializer should be the process' exchange name.
     """
     event_id = PROCESS_LIFECYCLE_EVENT_ID
+
+class InfrastructureEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for infrastructure related events. An abstract base class, should be
+    inherited and overridden.
+    """
+    pass
+
+class AppLoaderEventSubscriber(InfrastructureEventSubscriber):
+    """
+    Event Notification Subscriber for Applications starting and stopping.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    event_id = APP_LOADER_EVENT_ID
+
+class ContainerStartupEventSubscriber(InfrastructureEventSubscriber):
+    """
+    Event Notification Subscriber for a Container finishing its running and startup apps.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    event_id = CONTAINER_STARTUP_EVENT_ID
 
 class TriggerEventSubscriber(EventSubscriber):
     """
