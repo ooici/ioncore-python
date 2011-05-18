@@ -101,8 +101,16 @@ class ManageDataResourceSubscription(object):
         self.rc  = ais.rc
         self.ac  = AssociationClient(proc=ais)
         self.asc = AssociationServiceClient()
-        self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
-        self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
+
+        self.ais = ais
+        # Lazy initialize this when it is needed
+        #self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
+        self.pfn = None
+
+        # Lazy initialize this when it is needed
+        #self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
+        self.pfd = None
+
         self.nac = NotificationAlertServiceClient(proc=ais)
 
 
@@ -323,10 +331,14 @@ class ManageDataResourceSubscription(object):
             Response.error_str = errString
             defer.returnValue(Response)
 
+
+        if self.pfn is None:
+            pubfact = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=self.ais)
+            self.pfn = yield pubfact.build()
+
                 
         # Publish the new subscription notification
-        publisher = yield self.pfn.build(origin = dispatcherID)
-        yield publisher.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject)
+        yield self.pfn.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject, origin = dispatcherID)
 
         defer.returnValue(None)
 
@@ -471,8 +483,12 @@ class ManageDataResourceSubscription(object):
         dwfRes.dataset_id = SubscriptionInfo.data_src_id
         dwfRes.workflow_path = SubscriptionInfo.dispatcher_script_path
         # Publish the delete subscription notification
-        publisher = yield self.pfd.build(origin = dispatcherID)
-        yield publisher.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject)
+
+        if self.pfd is None:
+            pubfact = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=self.ais)
+            self.pfd = yield pubfact.build()
+
+        yield self.pfd.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject, origin = dispatcherID)
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()
