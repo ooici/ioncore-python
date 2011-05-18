@@ -206,7 +206,7 @@ class DispatcherTest(IonTestCase):
         pid = proc.spawn()
         log.debug('DispatcherTest.test_dispatcher(): spawned dispatcher')
         # sleeping to let dispatcher startup
-        yield pu.asleep(6)
+        yield pu.asleep(10)
         log.debug('DispatcherTest.test_dispatcher(): ***************** ending test ****************')
         
            
