@@ -9,6 +9,7 @@
 import os
 import sys
 import fcntl
+import re
 
 from twisted.application import service
 from twisted.internet import defer
@@ -43,7 +44,7 @@ class Options(usage.Options):
                 ["broker_credfile", None, None, "File containing broker username and password"],
                 ["boot_script", "b", None, "Boot script (python source)."],
                 ["lockfile", None, None, "Lockfile used to denote container startup completion"],
-                ["args", "a", None, "Additional startup arguments such as sysname=me" ],
+                ["args", "a", '', "Additional startup arguments such as sysname=me" ],
                     ]
     optFlags = [
                 ["no_shell", "n", "Do not start shell"],
@@ -65,6 +66,22 @@ class Options(usage.Options):
         @see CapabilityContainer.start_scripts
         """
         self['scripts'] = args
+
+    def postOptions(self):
+        """
+        Hack to actually make the -s option work since it was never
+        implemented by whoever added it.
+        """
+        if self['sysname']:
+            if self['args'].count('sysname'):
+                """I guess it's a good idea to override a redundantly
+                supplied sysname in args"""
+                args = self['args']
+                new_args = re.sub("sysname=\w+", "sysname=%s" % (self['sysname'],), args)
+                self['args'] = new_args
+            else:
+                self['args'] = 'sysname=%s, %s' % (self['sysname'], self['args'],)
+
 
 # Keep a reference to the CC service instance
 cc_instance = None
