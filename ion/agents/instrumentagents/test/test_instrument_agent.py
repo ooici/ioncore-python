@@ -713,19 +713,30 @@ class TestInstrumentAgent(IonTestCase):
         result = reply['result']
         transaction_id = reply['transaction_id']
         result_1 = result
-        
-        self.assert_(InstErrorCode.is_ok(success))
+
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(transaction_id,None)
         self.assertEqual(type(result),dict)
-        self.assertEqual(result.keys().sort(),InstrumentCapability.list().sort())
-        self.assertEqual(all(map(lambda x: AgentCommand.has(x),result[InstrumentCapability.OBSERVATORY_COMMANDS][1])),True)
-        self.assertEqual(all(map(lambda x: AgentParameter.has(x),result[InstrumentCapability.OBSERVATORY_PARAMS][1])),True)
-        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[InstrumentCapability.OBSERVATORY_STATUSES][1])),True)
-        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[InstrumentCapability.OBSERVATORY_METADATA][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_COMMANDS][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_PARAMS][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_STATUSES][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_METADATA][1])),True)
+
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_CHANNELS][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_CHANNELS][1],None)
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_COMMANDS][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_COMMANDS][1],None)
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_METADATA][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_METADATA][1],None)
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_PARAMS][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_PARAMS][1],None)
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_STATUSES][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_STATUSES][1],None)
+        
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_COMMANDS][0]))
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_COMMANDS][1]).sort(),AgentCommand.list().sort())
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_METADATA][0]))
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_METADATA][1]).sort(),MetadataParameter.list().sort())
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_PARAMS][0]))
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_PARAMS][1]).sort(),AgentParameter.list().sort())
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_STATUSES][0]))
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_STATUSES][1]).sort(),AgentStatus.list().sort())
         
         # Get all capabilities with an explicit list.
         params = InstrumentCapability.list()
@@ -735,7 +746,7 @@ class TestInstrumentAgent(IonTestCase):
         transaction_id = reply['transaction_id']
         result_2 = result
         
-        self.assert_(InstErrorCode.is_ok(success))
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(transaction_id,None)
         self.assertEqual(type(result),dict)
         self.assertEqual(result_2,result_1)
@@ -757,12 +768,16 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(type(result),dict)
         self.assertEqual(transaction_id,None)
-        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_STATUSES][0]))
+        
+        
+        self.assert_(InstErrorCode.is_error(result[InstrumentCapability.DEVICE_COMMANDS][0]))
+        self.assertEqual(result[InstrumentCapability.DEVICE_COMMANDS][1],None)
+        
         self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_METADATA][0]))
-        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.DEVICE_COMMANDS][0]))
-        self.assertEqual(all(map(lambda x: AgentStatus.has(x),result[InstrumentCapability.OBSERVATORY_STATUSES][1])),True)
-        self.assertEqual(all(map(lambda x: MetadataParameter.has(x),result[InstrumentCapability.OBSERVATORY_METADATA][1])),True)
-        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result[InstrumentCapability.DEVICE_COMMANDS][1])),True)        
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_METADATA][1]).sort(),MetadataParameter.list().sort())
+        self.assert_(InstErrorCode.is_ok(result[InstrumentCapability.OBSERVATORY_STATUSES][0]))
+        self.assertEqual(list(result[InstrumentCapability.OBSERVATORY_STATUSES][1]).sort(),AgentStatus.list().sort())
+
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_1'][0]))
         self.assertEqual(result['CAP_BAD_CAPABILITY_1'][1],None)
         self.assert_(InstErrorCode.is_error(result['CAP_BAD_CAPABILITY_2'][0]))
@@ -821,7 +836,7 @@ class TestInstrumentAgent(IonTestCase):
         transaction_id_8 = transaction_id
         result_8 = result
         
-        self.assert_(InstErrorCode.is_ok(success))
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result_8,result_1)
         self.assertEqual(transaction_id_8,transaction_id_4)
         

@@ -133,6 +133,9 @@ class AppLoader(object):
         log.info("Application '%s' started successfully. Root sup-id=%s" % (
                 appdef.name, appdef._supid))
 
+        # @TODO: can't import state names here
+        yield AppLoader._publish_notice(appdef.name, "STARTED")
+
     @classmethod
     @defer.inlineCallbacks
     def stop_application(cls, container, appdef):
@@ -143,8 +146,35 @@ class AppLoader(object):
         try:
             yield defer.maybeDeferred(appdef._mod_loaded.stop,
                                       container, appdef._state)
+
+            # @TODO: can't import state names here
+            yield AppLoader._publish_notice(appdef.name, "STOPPED")
+
         except Exception, ex:
             log.exception("Application %s stop failed" % appdef.name)
+
+    @classmethod
+    @defer.inlineCallbacks
+    def _publish_notice(cls, app_name, state, **kwargs):
+        """
+        Publish an event notification about the starting or stopping of an application.
+        """
+
+        # imports must be constrained here or we get cyclical problems!
+        from ion.core.process.process import Process
+        from ion.services.dm.distribution.events import AppLoaderEventPublisher
+
+        p = Process(spawnargs={'proc-name':'AppLoaderPublisherProcess'})
+        yield p.spawn()
+        pub = AppLoaderEventPublisher(process=p)
+        yield pub.initialize()
+        yield pub.activate()
+        # we don't want to register with PSC here, this is too low level
+
+        yield pub.create_and_publish_event(origin=app_name, app_name=app_name, state=state, **kwargs)
+
+        yield pub.terminate()
+        yield p.terminate()
 
 class AppDefinition(object):
     """

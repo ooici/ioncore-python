@@ -1139,7 +1139,8 @@ class ProcessClientBase(object):
         @param proc a IProcess instance as originator of messages
         """
         if not proc:
-            proc = Process()
+            procname = kwargs.get('proc-name', self.__class__.__name__ + "_aproc")
+            proc = Process(spawnargs={'proc-name':procname})
         self.proc = proc
 
     @defer.inlineCallbacks
