@@ -125,7 +125,9 @@ class CapabilityContainer(service.Service):
         yield pub.initialize()
         yield pub.activate()
 
-        yield pub.create_and_publish_event(origin=self.container.id)
+        evmsg = yield pub.create_event(origin=self.container.id)
+        evmsg.additional_data.startup_names.extend(self.config['scripts'])
+        yield pub.publish_event(evmsg, origin=self.container.id)
 
         yield pub.terminate()
         yield p.terminate()
