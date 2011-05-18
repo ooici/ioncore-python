@@ -8,6 +8,7 @@
 
 import os
 import sys
+import fcntl
 
 from twisted.application import service
 from twisted.internet import defer
@@ -41,6 +42,7 @@ class Options(usage.Options):
                 ["broker_password", None, "guest", ""],
                 ["broker_credfile", None, None, "File containing broker username and password"],
                 ["boot_script", "b", None, "Boot script (python source)."],
+                ["lockfile", None, None, "Lockfile used to denote container startup completion"],
                 ["args", "a", None, "Additional startup arguments such as sysname=me" ],
                     ]
     optFlags = [
@@ -86,6 +88,13 @@ class CapabilityContainer(service.Service):
         # use it for whatever is needed.
         self.defer_started = defer.Deferred()
 
+        self.lockfile = None
+        lockfilepath = self.config.get('lockfile', None)
+        if not lockfilepath is None:
+            self.lockfile = open(lockfilepath, 'w')
+            result = fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
+            #assert(result == 0)
+
     @defer.inlineCallbacks
     def startService(self):
         """
@@ -112,6 +121,11 @@ class CapabilityContainer(service.Service):
         log.info("All startup actions completed.")
 
         # signal successful container start
+        if self.lockfile:
+            fcntl.fcntl(self.lockfile, fcntl.LOCK_EX, os.O_NDELAY)
+            self.lockfile.close()
+            # The spawning process must cleanup the lockfile to avoid race conditions
+
         self.defer_started.callback(True)
 
         # event notify that the startup is good to go!
@@ -136,6 +150,7 @@ class CapabilityContainer(service.Service):
     def stopService(self):
         yield self.container.terminate()
         service.Service.stopService(self)
+
         log.info("Container stopped.")
 
     @defer.inlineCallbacks
