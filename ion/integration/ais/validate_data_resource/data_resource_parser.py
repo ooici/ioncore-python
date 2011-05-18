@@ -8,10 +8,6 @@
 
 
 
-from ply.lex import lex
-from ply.yacc import yacc
-
-
 class ParseException(Exception):
     pass
 
@@ -38,7 +34,11 @@ class Lexer(object):
     def t_NUMBER(self, t):
         r"NaN|(-?\d+(\.\d+)?(E-?\d+)?)"
         #print t.value, "becomes", float(t.value)
-        t.value = float(t.value)
+        val = float(t.value)
+        if str(int(val)) == t.value:
+            t.value = int(t.value)
+        else:
+            t.value = float(t.value)
         return t
 
     # Define a rule so we can track line numbers
@@ -106,24 +106,30 @@ class Parser(object):
     def p_lineitem(self, p):
         """lineitem : NAME NAME meat SEMI
                 |   NAME NAME NAME SEMI """
-        ret = {p[2] : {"TYPE" : p[1], "VALUE" : p[3]}}
+
+        val = p[3]
+
+        #collapse number non-lists to just the number
+        if isinstance(val, type([])) and 1 == len(val):
+            val = val[0]
+
+        ret = {p[2] : {"TYPE" : p[1], "VALUE" : val}}
         p[0] = ret
 
 
     def p_meat(self, p):
         """meat : LITERAL
-              |   NUMBER
               |   numberlist"""
 
-        if type(0.0) == type(p[1]):
-            p[0] = p[1]       # use the number as-is
+        if type([]) == type(p[1]):
+            p[0] = p[1]       # use the numberlist as-is
         else:
             p[0] = p[1][1:-1] # strip quotes from literal
 
     def p_numberlist(self, p):
-        """numberlist : NUMBER COMMA numberlist"""
-        p[3].append(p[1])
-        p[0] = p[3]
+        """numberlist : numberlist COMMA NUMBER"""
+        p[1].append(p[3])
+        p[0] = p[1]
 
     def p_numberlist_term(self, p):
         """numberlist : NUMBER"""
