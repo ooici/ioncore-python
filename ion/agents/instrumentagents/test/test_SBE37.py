@@ -679,9 +679,19 @@ class TestSBE37(IonTestCase):
         params = [SBE37Capability.DEVICE_ALL]
         reply = yield self.driver_client.get_capabilities(params)
         success = reply['success']
-        result = reply['result']        
+        result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(result.keys().sort(),SBE37Capability.list().sort())
+        self.assertEqual(list(result[SBE37Capability.DEVICE_COMMANDS]).sort(),
+                         SBE37Command.list().sort())
+        self.assertEqual(list(result[SBE37Capability.DEVICE_METADATA]).sort(),
+                         SBE37MetadataParameter.list().sort())
+        self.assertEqual(list(result[SBE37Capability.DEVICE_PARAMS]).sort(),
+                         SBE37Parameter.list().sort())
+        self.assertEqual(list(result[SBE37Capability.DEVICE_STATUSES]).sort(),
+                         SBE37Status.list().sort())
+        self.assertEqual(list(result[SBE37Capability.DEVICE_CHANNELS]).sort(),
+                         SBE37Channel.list().sort())
         
         # Dissolve the connection to the device.
         reply = yield self.driver_client.disconnect()
@@ -845,10 +855,10 @@ class TestSBE37(IonTestCase):
         self.assertIsInstance(result.get('temperature',None),float)
         self.assertIsInstance(result.get('salinity',None),float)
         self.assertIsInstance(result.get('pressure',None),float)
-        self.assertIsInstance(result.get('sound velocity',None),float)
+        self.assertIsInstance(result.get('sound_velocity',None),float)
         self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('time',None),tuple)
-        self.assertIsInstance(result.get('date',None),tuple)
+        self.assertIsInstance(result.get('time',None),str)
+        self.assertIsInstance(result.get('date',None),str)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Test and verify autosample mode.
@@ -898,10 +908,10 @@ class TestSBE37(IonTestCase):
             self.assertIsInstance(sample.get('temperature'),float)
             self.assertIsInstance(sample.get('salinity'),float)
             self.assertIsInstance(sample.get('pressure',None),float)
-            self.assertIsInstance(sample.get('sound velocity',None),float)
+            self.assertIsInstance(sample.get('sound_velocity',None),float)
             self.assertIsInstance(sample.get('conductivity',None),float)
-            self.assertIsInstance(sample.get('time',None),tuple)
-            self.assertIsInstance(sample.get('date',None),tuple)
+            self.assertIsInstance(sample.get('time',None),str)
+            self.assertIsInstance(sample.get('date',None),str)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         
