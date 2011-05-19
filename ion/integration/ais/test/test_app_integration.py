@@ -260,36 +260,36 @@ class AppIntegrationTest(IonTestCase):
         if numResReturned > 0:
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
-        #
-        # Now that we have a valid datasetID, create a subscription for it, and then
-        # test to see if the NotificationSet comes back.
-        #
-
-        log.debug('Calling __createSubscriptions with dsID: ' + dsID + ' and userID: ' + self.user_id)
-        yield self.__createSubscriptions(dsID, self.user_id)
-        
-        log.debug('Calling findDataResources to get list of resources with no bounds to test NotificationSet.')
-        # create a request message 
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
-        
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
-        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail("findDataResources failed: " + rspMsg.error_str)
-
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
-
-        #
-        # Validate the fields first
-        #
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        
-        #
-        # Now validate that notification has been set on the correct datasetID
-        #
-        self.__validateNotificationSet(rspMsg.message_parameters_reference[0].dataResourceSummary, dsID)
+            #
+            # Now that we have a valid datasetID, create a subscription for it, and then
+            # test to see if the NotificationSet comes back.
+            #
+    
+            log.debug('Calling __createSubscriptions with dsID: ' + dsID + ' and userID: ' + self.user_id)
+            yield self.__createSubscriptions(dsID, self.user_id)
+            
+            log.debug('Calling findDataResources to get list of resources with no bounds to test NotificationSet.')
+            # create a request message 
+            reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+            reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+            
+            rspMsg = yield self.aisc.findDataResources(reqMsg)
+            if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+                self.fail("findDataResources failed: " + rspMsg.error_str)
+    
+            numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+            log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+    
+            #
+            # Validate the fields first
+            #
+            self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+            
+            #
+            # Now validate that notification has been set on the correct datasetID
+            #
+            self.__validateNotificationSet(rspMsg.message_parameters_reference[0].dataResourceSummary, dsID)
         
 
     @defer.inlineCallbacks
