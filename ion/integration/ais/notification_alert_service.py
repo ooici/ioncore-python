@@ -155,6 +155,8 @@ class NotificationAlertService(ServiceProcess):
                    log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except smtplib.SMTPException:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
+                except ex:
+                    log.warning('NotificationAlertService.handle_offline_event Error: %s' %str(ex))
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
     @defer.inlineCallbacks
@@ -222,6 +224,8 @@ class NotificationAlertService(ServiceProcess):
                        log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                     except smtplib.SMTPException:
                         log.info('NotificationAlertService.handle_update_event Error: unable to send email')
+                    except ex:
+                        log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
                     log.info('NotificationAlertService.handle_update_event completed ')
 
 
