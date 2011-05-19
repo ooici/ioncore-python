@@ -1314,7 +1314,7 @@ class DataStoreService(ServiceProcess):
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
-            log.info("Instantiating Store")
+            log.info("Instantiating Cassandra Store")
 
             storage_provider = self._storage_conf[STORAGE_PROVIDER]
             keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
