@@ -52,8 +52,23 @@ INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
 INSTRUMENT_AGENT_TYPE = object_utils.create_type_identifier(object_id=4302, version=1)
 #IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
-INSTRUMENTDATA_EVENT_ID = 5001
-
+AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
+AIS_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9002, version=1)
+AIS_RESPONSE_ERROR_TYPE = object_utils.create_type_identifier(object_id=9003, version=1)
+CREATE_INSTRUMENT_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9301, version=1)
+CREATE_INSTRUMENT_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9302, version=1)
+START_INSTRUMENT_AGENT_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9303, version=1)
+START_INSTRUMENT_AGENT_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9304, version=1)
+START_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9305, version=1)
+START_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9306, version=1)
+STOP_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9307, version=1)
+STOP_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9308, version=1)
+GET_INSTRUMENT_STATE_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9309, version=1)
+GET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9310, version=1)
+SET_INSTRUMENT_STATE_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9311, version=1)
+SET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9312, version=1)
+GET_INSTRUMENT_LIST_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9313, version=1)
+GET_INSTRUMENT_LIST_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9314, version=1)
 
 
 """
@@ -97,9 +112,10 @@ class InstrumentIntegrationService(ServiceProcess):
 
     def slc_init(self):
         self.rc = ResourceClient(proc=self)
-        self.ac    = AssociationClient(proc=self)
+        self.ac = AssociationClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
         self.mc = MessageClient(proc = self)
+        log.info('Finishing slc_init')
 
         
     @defer.inlineCallbacks
@@ -220,9 +236,13 @@ class InstrumentIntegrationService(ServiceProcess):
         for idref in result.idrefs:
             log.info("IIService op_getInstrumentList list: %s", idref)
             key_list.append(idref.key)
-
-        res_value = {'result':key_list }
-        yield self.reply_ok(msg, res_value)
+        
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_INSTRUMENT_LIST_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].result = str(key_list)
+        log.info("IIService op_getInstrumentList key_list %s"%str(key_list))
+        yield self.reply_ok(msg, rspMsg)
         
 
     @defer.inlineCallbacks
@@ -231,38 +251,43 @@ class InstrumentIntegrationService(ServiceProcess):
         Service operation: Accepts a dictionary containing user inputs.
         Updates the instrument registry.
         """
-        userInput = content['userInput']
+        log.info('In createNewInstrument')
+        name = content.message_parameters_reference.name
+        log.info('name: %s'%name)
+        description = content.message_parameters_reference.description
+        log.info('description: %s'%description)
+        manufacturer = content.message_parameters_reference.manufacturer
+        log.info('manufacturer: %s'%manufacturer)
+        model = content.message_parameters_reference.model
+        log.info('model: %s'%model)
+        serial_num = content.message_parameters_reference.serial_num
+        log.info('serial_num: %s'%serial_num)
+        fw_version = content.message_parameters_reference.fw_version
+        log.info('fw_version: %s'%fw_version)
 
         resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Test Instrument Resource', ResourceDescription='A test instrument resource')
 
         log.info("IIService op_create_new_instrument created resource")
 
         # Set the attributes
-        if 'name' in userInput:
-            resource.name = str(userInput['name'])
-
-        if 'description' in userInput:
-            resource.description = str(userInput['description'])
-
-        if 'manufacturer' in userInput:
-            resource.manufacturer = str(userInput['manufacturer'])
-
-        if 'model' in userInput:
-            resource.model = str(userInput['model'])
-
-        if 'serial_num' in userInput:
-            resource.serial_num = str(userInput['serial_num'])
-
-        if 'fw_version' in userInput:
-            resource.fw_version = str(userInput['fw_version'])
+        resource.name = name
+        resource.description = description
+        resource.manufacturer = manufacturer
+        resource.model = model
+        resource.serial_num = serial_num
+        resource.fw_version = fw_version
 
         yield self.rc.put_instance(resource, 'Save instrument resource')
         res_id = resource.ResourceIdentity
         log.info("IIService op_create_new_instrument stored resource. identity: %s ", res_id)
 
-        res_value = {'instrument_id':res_id }
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(CREATE_INSTRUMENT_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].instrument_resource_id = res_id
 
-        yield self.reply_ok(msg, res_value)
+        log.info('Replying')
+        yield self.reply_ok(msg, rspMsg)
 
 
     @defer.inlineCallbacks
@@ -273,7 +298,7 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         log.info("IIService op_startAutoSampling")
         # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['instrument_id']
+        commandInput = content.message_parameters_reference.instrument_resource_id
 
         # get the agent resource for this instrument
         agent_resource_id = yield self.getAgentForInstrument(commandInput)
@@ -298,11 +323,13 @@ class InstrumentIntegrationService(ServiceProcess):
        # Put the instrument back into passive mode
         reply = yield self.op_cleanupInstrument(transaction_id)
 
-        res_value = {'result':result }
-        yield self.reply_ok(msg, res_value)
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(START_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].result = result
 
-        res_value = {'result':result }
-        yield self.reply_ok(msg, res_value)
+        log.info('Replying')
+        yield self.reply_ok(msg, rspMsg)
 
     @defer.inlineCallbacks
     def op_stopAutoSampling(self, content, headers, msg):
@@ -312,7 +339,7 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         log.info("IIService op_startAutoSampling")
         # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['instrument_id']
+        commandInput = content.message_parameters_reference.instrument_resource_id
 
         # get the agent resource for this instrument
         agent_resource_id = yield self.getAgentForInstrument(commandInput)
@@ -344,11 +371,16 @@ class InstrumentIntegrationService(ServiceProcess):
                 yield self.reply_err(msg, "Unable to transition instrument state")
                 return
                 
-       # Put the instrument back into passive mode
+        # Put the instrument back into passive mode
         reply = yield self.op_cleanupInstrument(transaction_id)
 
-        res_value = {'result':result }
-        yield self.reply_ok(msg, res_value)
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(STOP_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].result = result
+
+        log.info('Replying')
+        yield self.reply_ok(msg, rspMsg)
 
     @defer.inlineCallbacks
     def op_getInstrumentState(self, content, headers, msg):
@@ -357,7 +389,7 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         log.info("IIService op_getInstrumentState")
         # Step 1: Extract the arguments from the UI generated message content
-        commandInput = content['instrument_id']
+        commandInput = content.message_parameters_reference.instrument_resource_id
 
         # get the agent resource for this instrument
         agent_resource_id = yield self.getAgentForInstrument(commandInput)
@@ -365,7 +397,7 @@ class InstrumentIntegrationService(ServiceProcess):
 
         instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
 
-       # Put the instrument in a state to accept commands
+        # Put the instrument in a state to accept commands
         transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
         #transaction_id = reply['tid']
 
@@ -380,11 +412,16 @@ class InstrumentIntegrationService(ServiceProcess):
             yield self.reply_err(msg, "Unable to transition instrument state")
             return
 
-       #  Put the instrument back into passive mode
+        #  Put the instrument back into passive mode
         reply = yield self.op_cleanupInstrument(transaction_id)
-        
-        res_value = {'result':result }
-        yield self.reply_ok(msg, res_value)
+
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].result = result
+
+        log.info('Replying')
+        yield self.reply_ok(msg, rspMsg)
 
     @defer.inlineCallbacks
     def op_setInstrumentState(self, content, headers, msg):
@@ -393,8 +430,9 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         log.info("IIService op_setInstrumentState")
         # Step 1: Extract the arguments from the UI generated message content
-        instrument_id = content['instrument_id']
-        parameters = content['parameters']
+        instrument_id = content.message_parameters_reference.instrument_resource_id
+        parameters = content.message_parameters_reference.parameters
+
         log.info("IIService op_setInstrumentState  inst id: %s   parameters: %s", instrument_id, parameters)
 
         # get the agent resource for this instrument
@@ -402,7 +440,7 @@ class InstrumentIntegrationService(ServiceProcess):
         log.info("IIService op_setInstrumentState agent resource: %s", agent_resource_id)
         instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
 
-       # Put the instrument in a state to accept commands
+        # Put the instrument in a state to accept commands
         transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
 
         # Set driver parameters.
@@ -418,9 +456,16 @@ class InstrumentIntegrationService(ServiceProcess):
        #  Put the instrument back into passive mode
         reply = yield self.op_cleanupInstrument(transaction_id)
 
-        res_value = {'result':result }
-        yield self.reply_ok(msg, res_value)
+#        res_value = {'result':result }
+#        yield self.reply_ok(msg, res_value)
 
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(SET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].result = result
+
+        log.info('Replying')
+        yield self.reply_ok(msg, rspMsg)
 
     @defer.inlineCallbacks
     def op_startInstrumentAgent(self, content, headers, msg):
@@ -428,22 +473,30 @@ class InstrumentIntegrationService(ServiceProcess):
         Service operation: Starts an instrument agent for a type of
         instrument.
         """
+        log.info('In startInstrumentAgent')
+#        userInput = content['userInput']
+        inst_id = content.message_parameters_reference.name
+        log.info('name: %s'%inst_id)
+        model = content.message_parameters_reference.model
+        log.info('model: %s'%model)
+        inst_resource_id = content.message_parameters_reference.instrument_resource_id
+        log.info('instrument_resource_id: %s'%inst_resource_id)
 
-        log.info("IIService op_start_instrument_agent start")
-        if 'instrument_id' in content:
-            inst_id = str(content['instrument_id'])
-        else:
-            raise ValueError("Input for instrument_id not present")
-
-        if 'instrumentResourceID' in content:
-            inst_resource_id = str(content['instrumentResourceID'])
-        else:
-            raise ValueError("Input for instrumentResourceID not present")
-
-        if 'model' in content:
-            model = str(content['model'])
-        else:
-            raise ValueError("Input for model not present")
+#        log.info("IIService op_start_instrument_agent start")
+#        if 'instrument_id' in content:
+#            inst_id = str(content['instrument_id'])
+#        else:
+#            raise ValueError("Input for instrument_id not present")
+#
+#        if 'instrumentResourceID' in content:
+#            inst_resource_id = str(content['instrumentResourceID'])
+#        else:
+#            raise ValueError("Input for instrumentResourceID not present")
+#
+#        if 'model' in content:
+#            model = str(content['model'])
+#        else:
+#            raise ValueError("Input for model not present")
 
         if model != 'SBE37':
             raise ValueError("Only SBE37 supported!")
@@ -526,8 +579,10 @@ class InstrumentIntegrationService(ServiceProcess):
         instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Test Instrument Agent Resource', ResourceDescription='A test instrument resource')
 
         # Set the attributes
-        instrumentAgentResource.name = content['model']
-        instrumentAgentResource.description = content['model']
+#        instrumentAgentResource.name = content['model']
+#        instrumentAgentResource.description = content['model']
+        instrumentAgentResource.name = model
+        instrumentAgentResource.description = model
         instrumentAgentResource.class_name = 'SBE37InstrumentAgent'
         instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE37_IA'
         instrumentAgentResource.process_id = str(self.svc_id)
@@ -559,9 +614,14 @@ class InstrumentIntegrationService(ServiceProcess):
         log.info('IIService op_start_instrument_agent DataEvent activation complete')
         """
 
+#        res_value = {'instrument_agent_resource_id':inst_agnt_id, 'instrument_agent_process_id':str(self.svc_id)}
+#        yield self.reply_ok(msg, res_value)
 
-        res_value = {'instrument_agent_resource_id':inst_agnt_id, 'instrument_agent_process_id':str(self.svc_id)}
-        yield self.reply_ok(msg, res_value)
+        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference.add()
+        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(START_INSTRUMENT_AGENT_RESPONSE_MSG_TYPE)
+        rspMsg.message_parameters_reference[0].instrument_agent_resource_id = inst_agnt_id
+        rspMsg.message_parameters_reference[0].instrument_agent_process_id = str(self.svc_id)
 
     @defer.inlineCallbacks
     def op_stopInstrumentAgent(self, content, headers, msg):
@@ -616,7 +676,7 @@ class InstrumentIntegrationService(ServiceProcess):
 
         if len(results)  != 1 :
             log.error('IIService  Instrument Agent association not found')
-            defer.returnValue()
+            defer.returnValue(result)
 
         for association in results:
             log.info('IIService Associated Source for Instrument: ' + \
@@ -649,10 +709,11 @@ class InstrumentIntegrationClient(ServiceClient):
 
     @defer.inlineCallbacks
     def createNewInstrument(self, userInput):
-        reqcont = {}
-        reqcont['userInput'] = userInput
+#        reqcont = {}
+#        reqcont['userInput'] = userInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('createNewInstrument', reqcont)
+#        (cont, hdrs, msg) = yield self.rpc_send('createNewInstrument', reqcont)
+        (cont, hdrs, msg) = yield self.rpc_send('createNewInstrument', userInput)
         defer.returnValue(cont)
 
 
