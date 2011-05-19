@@ -115,7 +115,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent then get and set the status
         """
-        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
+        raise unittest.SkipTest('Can screw up instrument state if others are testing.')
 
         log.info("IIServiceTest test_createAndSetInstrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
@@ -180,7 +180,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent, start sampling and catch the events
         """
-        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
+        raise unittest.SkipTest('Can screw up instrument state if others are testing.')
         
         log.info("IIServiceTest test_createInstrumentStartSampling Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
