@@ -209,10 +209,15 @@ class Container(BasicLifecycleObject):
         log.warning('fatalError event')
         log.warning(str(ex))
         f = failure.Failure()
-        log.warning(str(f.getTraceback()))
-        f.printDetailedTraceback()
         log.info("The container suffered a fatal error event and is crashing.")
         log.info("The last traceback, in full detail, was written to stdout.")
+        try:
+            log.warning(str(f.getTraceback()))
+            f.printDetailedTraceback()
+            log.info("The last traceback, in full detail, was written to stdout.")
+        except failure.NoCurrentExceptionError:
+            log.info("No Exception to be logged")
+
         if not self._fatal_error_encountered:
             self._fatal_error_encountered = True
             from twisted.internet import reactor
