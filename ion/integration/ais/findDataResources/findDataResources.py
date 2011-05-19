@@ -101,6 +101,7 @@ class FindDataResources(object):
         self.ac = AssociationClient(proc=ais)
         self.nac = NotificationAlertServiceClient(proc=ais)
 
+        self.__subscriptionList = None
         self.metadataCache = ais.getMetadataCache()
         self.bUseMetadataCache = True
 
@@ -114,7 +115,17 @@ class FindDataResources(object):
 
         log.debug('findDataResources Worker Class Method')
 
+        if msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            userID = msg.message_parameters_reference.user_ooi_id
+        else:
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS findDataResources error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [user_ooi_id] not found in message"
+            defer.returnValue(Response)
+        
         self.downloadURL       = 'Uninitialized'
+        yield self.__loadSubscriptionList(userID)
         
         #
         # Create the response message to which we will attach the list of
@@ -383,7 +394,8 @@ class FindDataResources(object):
                     #
                     # Set the notificationSet flag; this is not efficient at all
                     #
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = yield self.__isNotificationSet(userID, dSetResID)
+                    #rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
+                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = self.__isNotificationSet(dSetResID)
                     #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
                     rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, dSetMetadata, ownerID, dSetResID)
@@ -460,6 +472,8 @@ class FindDataResources(object):
 
         # ..(object)
         state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        #state_ref.lcs = state_ref.LifeCycleState.NEW
+        #state_ref.lcs = state_ref.LifeCycleState.COMMISSIONED
         state_ref.lcs = state_ref.LifeCycleState.ACTIVE
         pair.object = state_ref
 
@@ -679,27 +693,36 @@ class FindDataResources(object):
         #rspPayload.update_interval_seconds = dSource.update_interval_seconds
         rspPayload.update_interval_seconds = dSource['update_interval_seconds']
 
-
     @defer.inlineCallbacks
-    def __isNotificationSet(self, userID, dSetID):        
+    def __loadSubscriptionList(self, userID):        
+        """
+        Get the list of subscriptions for the given user and save it in the
+        private global __subscriptionList variable.
+        """
         
-        log.debug('__isNotificationSet()')
-        
-        #
-        # Now call AIS to find the subscriptions
-        #
+        log.debug('__loadSubscriptionList()')
         reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = userID
 
         reply = yield self.nac.getSubscriptionList(reqMsg)
-        numSubsReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
+        self.__subscriptionList = reply.message_parameters_reference[0].subscriptionListResults
+
+
+    def __isNotificationSet(self, dSetID):
+        """
+        Iterate through the user's list of subscriptions and test for the given
+        dataset ID; it it's there, a subscription exists for the dataset.  The
+        user's list of subscriptions in loaded before this is called.
+        """
         
-        for result in reply.message_parameters_reference[0].subscriptionListResults:
-            if dSetID == result.subscriptionInfo.data_src_id:
-                defer.returnValue(True)
+        log.debug('__isNotificationSet()')
+        
+        for subscription in self.__subscriptionList:
+            if dSetID == subscription.subscriptionInfo.data_src_id:
+                return True
             
-        defer.returnValue(False)
+        return False
         
         
 
