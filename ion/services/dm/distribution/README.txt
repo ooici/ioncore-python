@@ -22,7 +22,7 @@ The second web service is used specifically to demonstrate
 the publishing of instrument sample data.  This web server
 is started by running:
 
-bin/twistd -n cc res/deploy/instrumentwebmonitor.rel [ion/services/dm/distribution/test/instrument_notifytest.py]
+bin/twistd -n cc res/deploy/r1deploy.rel [ion/services/dm/distribution/test/instrument_notifytest.py]
 
 where instrument_notifytest.py is an optional test script that publishes
 a new instrument sample data event every 5 seconds.
