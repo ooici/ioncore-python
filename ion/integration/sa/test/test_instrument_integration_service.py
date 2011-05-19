@@ -88,7 +88,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent and get the list of instruments
         """
-        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
+        #raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
 
         log.info("IIServiceTest test_createInstrument Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
@@ -176,7 +176,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def XXXtest_createInstrumentStartSampling(self):
+    def test_createInstrumentStartSampling(self):
         """
         Create an instrument, create associated instrument agent, start sampling and catch the events
         """
