@@ -110,11 +110,11 @@
         },
 
         {'name':'cdm_validation_service', 'version':'0.1',
-                                          'processapp':('cdm_validation_service', 'ion.integration.eoi.validation.cdm_validation_service', 'CdmValidationService'),
+                                      'processapp':('cdm_validation_service', 'ion.integration.eoi.validation.cdm_validation_service', 'CdmValidationService'),
         },
         
-        {'name':'instrumentIntegrationService', 'version':'0.1',
-                                                'processapp':('instrumentIntegrationService', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationService'),
+        {'name':'instrument_integration_service', 'version':'0.1',
+                                     'processapp':('instrument_integration_service', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationService'),
         },
 
         {'name':'app_integration',    'version':'0.1',
