@@ -219,7 +219,13 @@ class InstrumentIntegrationService(ServiceProcess):
         key_list = []
         for idref in result.idrefs:
             log.info("IIService op_getInstrumentList list: %s", idref)
-            key_list.append(idref.key)
+
+            #create the instance
+            instrument = yield self.rc.get_instance(idref)
+            #create a structure of the attributes
+            inst_info = {'id':idref, 'name':instrument.name, 'description':instrument.description, 'manufacturer':instrument.manufacturer, 'model':instrument.model, 'serial_num':instrument.serial_num, 'fw_version':instrument.fw_version}
+
+            key_list.append(str(inst_info))
 
         res_value = {'result':key_list }
         yield self.reply_ok(msg, res_value)
