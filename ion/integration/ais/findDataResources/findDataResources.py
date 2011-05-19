@@ -92,6 +92,12 @@ class FindDataResources(object):
     ALL = 0
     BY_USER = 1
     
+    #
+    # Resource states to pass as parameters to self.__getDataResources()
+    #
+    PRIVATE = 0
+    PUBLIC = 1
+    
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
         self.ais = ais
@@ -135,8 +141,8 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
-        # Get the list of dataset resource IDs
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        # Get the list of PRIVATE dataset resource IDs by owner
+        dSetResults = yield self.__findPrivateDatasetResourcesByOwner(userID)
         if dSetResults == None:
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -145,9 +151,28 @@ class FindDataResources(object):
             Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
             
-        log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
+        dSetList = dSetResults.idrefs
+        
+        for object in dSetList:
+            log.error('object: ' + str(object.key))
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg, typeFlag = self.ALL)
+        log.info('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by.' + str(userID))
+
+        # Get the list of PUBLIC dataset resource IDs
+        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PUBLIC)
+        if dSetResults == None:
+            log.error('Error finding resources.')
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS findDataResources error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "No DatasetIDs were found."
+            defer.returnValue(Response)
+
+        log.info('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
+
+        log.info('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
+
+        yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
 
         defer.returnValue(rspMsg)
 
@@ -193,7 +218,7 @@ class FindDataResources(object):
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults, rspMsg, typeFlag = self.BY_USER)
+        yield self.__getDataResources(msg, dSetResults.idrefs, rspMsg, typeFlag = self.BY_USER)
         
         defer.returnValue(rspMsg)
 
@@ -282,7 +307,7 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __getDataResources(self, msg, dSetResults, rspMsg, typeFlag = ALL):
+    def __getDataResources(self, msg, dSetList, rspMsg, typeFlag = ALL):
         """
         Given the list of datasetIDs, determine in the data represented by
         the dataset is within the given spatial and temporal bounds, and
@@ -312,8 +337,8 @@ class FindDataResources(object):
         
         i = 0
         j = 0
-        while i < len(dSetResults.idrefs):
-            dSetResID = dSetResults.idrefs[i].key
+        while i < len(dSetList):
+            dSetResID = dSetList[i].key
             log.debug('Working on dataset: ' + dSetResID)
 
             if self.bUseMetadataCache:            
@@ -432,14 +457,14 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType):
+    def __findResourcesOfType(self, resourceType, resourceState):
 
         log.debug('__findResourcesOfType() entry')
         
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
         #
-        # Set up a resource type search term using:
+        # Set up a search term using:
         # - TYPE_OF_ID as predicate
         # - object of type: resourceType parameter as object
         #
@@ -454,13 +479,12 @@ class FindDataResources(object):
         # ..(object)
         type_ref = request.CreateObject(IDREF_TYPE)
         type_ref.key = resourceType
-        
         pair.object = type_ref
 
         # 
-        # Set up a life cycle state term using:
+        # Set up a search term using:
         # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        # - LCS_REFERENCE_TYPE object set to given resourceState as object
         #
         pair = request.pairs.add()
 
@@ -472,10 +496,13 @@ class FindDataResources(object):
 
         # ..(object)
         state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        #state_ref.lcs = state_ref.LifeCycleState.NEW
-        #state_ref.lcs = state_ref.LifeCycleState.COMMISSIONED
-        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        if resourceState == self.PRIVATE:
+            state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        else:
+            state_ref.lcs = state_ref.LifeCycleState.COMMISSIONED
         pair.object = state_ref
+
+        log.info('Getting resources of type: %s' % (resourceType))
 
         try:
             result = yield self.asc.get_subjects(request)
@@ -495,7 +522,7 @@ class FindDataResources(object):
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
         #
-        # Set up an owned_by_id search term using:
+        # Set up a search term using:
         # - OWNED_BY_ID as predicate
         # - LCS_REFERENCE_TYPE object set to ACTIVE as object
         #
@@ -514,7 +541,7 @@ class FindDataResources(object):
         pair.object = type_ref
 
         #
-        # Set up an owned_by_id search term using:
+        # Set up a search term using:
         # - TYPE_OF_ID as predicate
         # - object of type: resourceType parameter as object
         #
@@ -531,7 +558,79 @@ class FindDataResources(object):
         type_ref.key = resourceType
         pair.object = type_ref
         
-        log.info('Calling get_subjects with owner: ' + owner)
+        log.info('Getting resources of type %s with owner: %s' % (resourceType, owner))
+
+        try:
+            result = yield self.asc.get_subjects(request)
+        
+        except AssociationServiceError:
+            log.error('__findResourcesOfTypeAndOwner: association error!')
+            defer.returnValue(None)
+        
+        defer.returnValue(result)
+
+
+    @defer.inlineCallbacks
+    def __findPrivateDatasetResourcesByOwner(self, owner):
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        #
+        # Set up a search term using:
+        # - TYPE_OF_ID as predicate
+        # - object of type: resourceType parameter as object
+        #
+        pair = request.pairs.add()
+    
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+        pair.object = type_ref
+
+        #
+        # Set up a search term using:
+        # - OWNED_BY_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = owner
+        
+        pair.object = type_ref
+
+        # 
+        # Set up a search term using:
+        # - HAS_LIFE_CYCLE_STATE_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to ACTIVE (private) as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
+        log.info('Getting private datasets with owner: ' + owner)
 
         try:
             result = yield self.asc.get_subjects(request)

@@ -309,13 +309,26 @@ class AppIntegrationTest(IonTestCase):
         # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         
+        log.debug('Calling findDataResources to get list of resources with no bounds.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
         #
         # Send a message with bounds
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = 30
         reqMsg.message_parameters_reference.maxLatitude  = 45
         reqMsg.message_parameters_reference.minLongitude = -75
@@ -342,7 +355,8 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minVertical  = 10
         reqMsg.message_parameters_reference.maxVertical  = 20
         reqMsg.message_parameters_reference.posVertical  = 'down'
@@ -363,7 +377,8 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minVertical  = 10
         reqMsg.message_parameters_reference.maxVertical  = 20
         reqMsg.message_parameters_reference.posVertical  = 'up'
