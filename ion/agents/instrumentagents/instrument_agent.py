@@ -747,7 +747,7 @@ class InstrumentAgent(Process):
         @retval A dict with 'success' success/fail string and
             'transaction_id' transaction ID UUID string.
         """
-        
+
         assert(isinstance(content,dict)), 'Expected a dict content.'
         acq_timeout = content.get('acq_timeout',None)
         exp_timeout = content.get('exp_timeout',None)
@@ -760,7 +760,8 @@ class InstrumentAgent(Process):
         
         result = {'success':None,'transaction_id':None}
         
-        (success,tid) = yield self._request_transaction(acq_timeout,exp_timeout)
+        (success,tid) = yield self._request_transaction(acq_timeout,
+                                        exp_timeout,headers['sender'])
         result['success'] = success
         result['transaction_id'] = tid
             
@@ -828,12 +829,13 @@ class InstrumentAgent(Process):
             return (InstErrorCode.LOCKED_RESOURCE,None)
 
 
-    def _request_transaction(self,acq_timeout,exp_timeout):
+    def _request_transaction(self,acq_timeout,exp_timeout,requester):
         """
         @param acq_timeout An integer in seconds to wait to acquire a new
             transaction.
         @param exp_timeout An integer in seconds to allow the new transaction
             to remain open.
+        @param requester A process ID for requester.
         @retval A deferred that will fire when the a new transaction has
             been constructed or timeout occurs. The deferred value is a
             tuple (success/fail,transaction_id).
@@ -894,7 +896,8 @@ class InstrumentAgent(Process):
             
             acq_timeout_call = reactor.callLater(acq_timeout,acquisition_timeout)
             
-            self._pending_transactions.append((d,acq_timeout_call,exp_timeout))
+            self._pending_transactions.append((d,acq_timeout_call,exp_timeout,
+                                               requester))
             
             return d
         
@@ -952,7 +955,8 @@ class InstrumentAgent(Process):
             # If there is a pending transaction, issue a new transaction
             # and cancel the acquisition timeout.
             if len(self._pending_transactions) > 0:
-                (d,call,exp_timeout) = self._pending_transactions.pop(0)
+                (d,call,exp_timeout,requester) = \
+                    self._pending_transactions.pop(0)
                 call.cancel()
                 (success,tid) = self._start_transaction(exp_timeout)
                 d.callback((success,tid))
@@ -1630,8 +1634,10 @@ class InstrumentAgent(Process):
                     
                 # Pending transactions.
                 if arg == AgentStatus.PENDING_TRANSACTIONS or arg == AgentStatus.ALL:
+                    pending_transaction_pids = \
+                        [item[3] for item in self._pending_transactions]
                     result[AgentStatus.PENDING_TRANSACTIONS] = \
-                        (InstErrorCode.OK,self._pending_transactions)                
+                        (InstErrorCode.OK,pending_transaction_pids)                
 
         # Unknown error.
         except:
