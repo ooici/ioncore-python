@@ -116,7 +116,7 @@ class ConsoleManhole(manhole.ColoredManhole):
                 pass
 
 def makeNamespace():
-    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess
+    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
     from ion.core.id import Id
 
     namespace = locals()
