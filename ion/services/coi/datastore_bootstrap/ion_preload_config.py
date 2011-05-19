@@ -43,6 +43,10 @@ CONTENT_CFG = 'content'
 CONTENT_ARGS_CFG = 'content_args'
 PRELOAD_CFG = 'preload'
 OWNER_ID = 'owner'
+LCS_CFG = 'life cycle state'
+
+COMMISSIONED = 'commissioned'
+
 
 # Set some constants used system wide!:
 
@@ -541,7 +545,8 @@ ntas2_dataset_name:{
                       DESCRIPTION_CFG:'An example of an NTAS Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':ntas2_dataset_loc},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 whots1_dataset_name:{
@@ -561,7 +566,8 @@ whots2_dataset_name:{
                       DESCRIPTION_CFG:'An example of a WHOTS Near Real Time Mooring Data System Dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':whots2_dataset_loc},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_dataset_name:{
@@ -571,7 +577,8 @@ moanalua_rain_dataset_name:{
                       DESCRIPTION_CFG:'An example of a rain gauge dataset from moanalua',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':moanalua_rain_dataset_loc},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_dataset_name:{
@@ -657,7 +664,8 @@ ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803
                       DESCRIPTION_CFG:'An example of a data source for the NTAS RT dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[ntas2_dataset_name][ID_CFG]},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
@@ -675,7 +683,8 @@ whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E0480
                       DESCRIPTION_CFG:'An example of a data source for the WHOTS NRT dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[whots2_dataset_name][ID_CFG]},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04806',
@@ -684,7 +693,8 @@ moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28
                       DESCRIPTION_CFG:'An example of a rain gauge data source from moanalua',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_moanalua_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[moanalua_rain_dataset_name][ID_CFG]},
-                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG]
+                      OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
+                      LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04807',
