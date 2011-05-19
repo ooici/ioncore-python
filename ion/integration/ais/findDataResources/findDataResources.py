@@ -170,6 +170,16 @@ class FindDataResources(object):
 
         log.info('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
 
+        #
+        # Add the PUBLIC datasets to the list of private datasets
+        #
+        i = len(dSetList)
+        j = 0
+        for dSetID in dSetResults.idrefs:
+            dSetList.add()
+            dSetList[i] = dSetResults.idrefs[j]
+            i = i + 1
+
         log.info('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
 
         yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
