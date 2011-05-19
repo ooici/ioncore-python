@@ -124,7 +124,12 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.update()\n')
-        Response = yield self.delete(msg)
+        reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptions.add();
+        reqMsg.message_parameters_reference.subscriptions[0].user_ooi_id  = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
+        reqMsg.message_parameters_reference.subscriptions[0].data_src_id  = msg.message_parameters_reference.subscriptionInfo.data_src_id
+        Response = yield self.delete(reqMsg)
         if Response.MessageType != AIS_RESPONSE_ERROR_TYPE:
             Response = yield self.create(msg)
         defer.returnValue(Response)
@@ -363,12 +368,8 @@ class ManageDataResourceSubscription(object):
              defer.returnValue(Response)
              
         for Subscription in msg.message_parameters_reference.subscriptions:
-            reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-            reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
-            reqMsg.message_parameters_reference.subscriptionInfo = Subscription
-
             # check that user_ooi_id is present in GPB
-            if not reqMsg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
+            if not Subscription.IsFieldSet('user_ooi_id'):
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
@@ -376,12 +377,17 @@ class ManageDataResourceSubscription(object):
                 defer.returnValue(Response)
     
             # check that data_src_id is present in GPB
-            if not reqMsg.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
+            if not Subscription.IsFieldSet('data_src_id'):
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
                 Response.error_str = "Required field [data_src_id] not found in message"
                 defer.returnValue(Response)
+
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+            reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = Subscription.user_ooi_id
+            reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = Subscription.data_src_id
 
             try:
                 log.debug("delete: calling notification alert service getSubscription()")
@@ -433,7 +439,7 @@ class ManageDataResourceSubscription(object):
                     defer.returnValue(Reply)
     
             except ReceivedApplicationError, ex:
-                log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
+                log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex.msg_content.MessageResponseBody)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  ex.msg_content.MessageResponseCode
                 Response.error_str =  ex.msg_content.MessageResponseBody

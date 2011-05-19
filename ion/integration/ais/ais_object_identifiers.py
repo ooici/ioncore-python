@@ -427,7 +427,7 @@ message SubscriptionDeleteReqMsg {
       _VERSION = 1;
     }
 
-    optional net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptionInfo = 1;
+    repeated net.ooici.integration.ais.common.aisSubscriptionInfo.SubscriptionInfoType subscriptions = 1;
 }
 """
 
