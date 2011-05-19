@@ -1,0 +1,24 @@
+{
+    "type":"release",
+    "name":"Bootlevel 6",
+    "version": "0.1",
+    "description": "Release 1 Bootlevel 6",
+    "ioncore" : "0.4.7",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+
+#-------------#
+# Bootlevel 6 #
+#-------------#
+        # Add attribute store service
+        {'name': 'attribute_store', 'version':'0.1',
+                                  'processapp' :
+        ('attribute_store','ion.services.coi.attributestore','AttributeStoreService'),
+        },
+
+
+    ]
+}
