@@ -1,0 +1,32 @@
+{
+    "type":"release",
+    "name":"Bootlevel 8",
+    "version": "0.1",
+    "description": "Release 1 Bootlevel 8",
+    "ioncore" : "0.4.7",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+        {'name':'pubsub',               'version':'0.1',
+                                        'processapp':('pubsub','ion.services.dm.distribution.pubsub_service','PubSubService'),
+        },
+
+        # Add scheduler service
+        {'name':'scheduler', 'version':'0.1',
+        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
+        },
+
+        # Add Dataset Controller Service
+        {'name':'dataset_controller',   'version':'0.1',
+                                        'processapp':('dataset_controller','ion.services.dm.inventory.dataset_controller','DatasetController'),
+                                        'config': {
+                                            'ion.services.dm.inventory.dataset_controller':{
+                                                'do-init': True}
+                                            },
+        },
+
+
+    ]
+}

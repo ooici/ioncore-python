@@ -23,5 +23,5 @@
                                         'processapp':('preservation_manager','ion.services.dm.preservation.cassandra_manager_agent','CassandraManagerService'),
                                         'config':{}
         },
-
+    ]
 }

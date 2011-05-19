@@ -30,6 +30,7 @@ def info():
     print "  rpc_send(to,op,content): Send an RPC message"
     print "  spawn(module): Spawn a process from a module"
     print "  makeprocess(): Returns a new Process object (spawn is called but may not be done yet)"
+    print "  ping(servicename): Pings a named service in this container's sysname. Returns a deferred."
     print "Variables:"
     print "  control: shell control"
     print "  procs: dict of local process names -> pid"
@@ -236,3 +237,18 @@ def makeprocess():
     p.spawn()
 
     return p
+
+def ping(servicename):
+
+    # rescope to system, if not specified already
+    prefix = pu.get_scoped_name('', 'system')
+    if prefix not in servicename:
+        servicename = pu.get_scoped_name(servicename, 'system')
+
+    def pingok(arg):
+        print "\nPing ok:", servicename, "\n"
+
+    d = rpc_send(servicename, "ping")
+    d.addCallback(pingok)
+
+    return d

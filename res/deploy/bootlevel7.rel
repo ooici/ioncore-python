@@ -1,0 +1,20 @@
+{
+    "type":"release",
+    "name":"Bootlevel 7",
+    "version": "0.1",
+    "description": "Release 1 Bootlevel 7",
+    "ioncore" : "0.4.7",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+        # Add Agent Management Service
+        # Add Logger Service
+        # Add Policy Decision Service
+
+        {'name':'identity_registry',    'version':'0.1',
+                                        'processapp':('identity_registry','ion.services.coi.identity_registry','IdentityRegistryService'),
+        },
+    ]
+}

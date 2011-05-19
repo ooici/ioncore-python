@@ -246,6 +246,17 @@ class Process(BasicLifecycleObject):
             log.debug("NEW LCOS ADDED DURING INIT")
             yield self._advance_life_cycle_objects(BasicStates.S_READY)
 
+        # create plc change publisher
+        from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
+        self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
+
+        # manually move through initialize, then add to registered LCOs so we don't have to advance manually anymore
+        yield self._plcc_pub.initialize()
+        yield self.register_life_cycle_object(self._plcc_pub)
+
+        # publish initialize -> ready transition
+        yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.READY)
+
     def plc_init(self):
         """
         Process life cycle event: on initialization of process (once)
@@ -295,6 +306,9 @@ class Process(BasicLifecycleObject):
         if len(self._registered_life_cycle_objects) > pre_active_lco_len:
             log.debug("NEW LCOS ADDED DURING ACTIVE")
             yield self._advance_life_cycle_objects(BasicStates.S_ACTIVE)
+
+        # publish ready -> active transition
+        yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.ACTIVE)
 
 
     def plc_activate(self):
@@ -346,6 +360,9 @@ class Process(BasicLifecycleObject):
         """
         @retval Deferred
         """
+        # publish active -> terminate transition
+        yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.TERMINATED)
+
         # Clean up all TCP connections and listening ports
         for connector in self.connectors:
             # XXX What is the best way to unit test this?
@@ -370,6 +387,9 @@ class Process(BasicLifecycleObject):
 
     @defer.inlineCallbacks
     def on_error(self, cause= None, *args, **kwargs):
+
+        # publish whatever -> error transition - hopefully this works!
+        yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.ERROR)
 
         if len(self._registered_life_cycle_objects) > 0:
             log.debug("Attempting to TERMINATE all registered LCOs")
