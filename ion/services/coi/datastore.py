@@ -46,7 +46,7 @@ from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, LCS_CFG, COMMISSIONED
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID
@@ -1513,6 +1513,9 @@ class DataStoreService(ServiceProcess):
             resource_name = description[NAME_CFG]
             resource_type = description[TYPE_CFG]
             content = description[CONTENT_CFG]
+
+            # LCS is optional!
+            res_lcs = description.get(LCS_CFG)
         except KeyError, ke:
             log.info(ke)
             return None
@@ -1551,7 +1554,12 @@ class DataStoreService(ServiceProcess):
         resource.resource_type = res_type
 
         # State is set to new by default
-        resource.lcs = resource.LifeCycleState.ACTIVE
+        if res_lcs == COMMISSIONED:
+            resource.lcs = resource.LifeCycleState.COMMISSIONED
+        else:
+            resource.lcs = resource.LifeCycleState.ACTIVE
+
+
 
         resource_instance = resource_client.ResourceInstance(resource_repository)
 

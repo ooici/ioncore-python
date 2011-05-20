@@ -387,6 +387,8 @@ class DatasetController(ServiceProcess):
     def _get_active_dataset_resources(self):
         """
         get the dataset ids to create the tds ncml
+
+        No longer only gets active datasets - should be renamed!
         """
 
 
@@ -410,7 +412,7 @@ class DatasetController(ServiceProcess):
 
         pair.object = type_ref
 
-
+        '''
         #### Add a life cycle state request
         pair = query.pairs.add()
 
@@ -426,6 +428,8 @@ class DatasetController(ServiceProcess):
         # @TODO What state should we use?
         state_ref.lcs = state_ref.LifeCycleState.ACTIVE
         pair.object = state_ref
+        '''
+
 
         result = yield self.asc.get_subjects(query)
 

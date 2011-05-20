@@ -2620,13 +2620,8 @@ class SBE37Driver(InstrumentDriver):
             sample_time = time.strptime(match.group(15),', %m-%d-%Y, %H:%M:%S')
         
         if sample_time:
-            #sample_data['date'] = (sample_time[2],sample_time[1],sample_time[0])
-            #sample_data['time'] = (sample_time[3],sample_time[4],sample_time[5])            
-            #sample_data['date'] = '%i-%i-%i' % (sample_time[1],sample_time[2],sample_time[0])
-            #sample_data['time'] = '%i:%i:%i' % (sample_time[3],sample_time[4],sample_time[5]) 
             sample_data['device_time'] = \
                 '%4i-%02i-%02iT:%02i:%02i:%02i' % sample_time[:6]
-            print sample_time
 
         # Add UTC time from driver in iso 8601 format.
         sample_data['driver_time'] = datetime.datetime.utcnow().isoformat()

@@ -23,6 +23,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER
                                                                     HAS_A_ID, \
                                                                     ROOT_USER_ID, \
                                                                     ANONYMOUS_USER_ID, \
+                                                                    MYOOICI_USER_ID, \
                                                                     DISPATCHER_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient
@@ -246,8 +247,9 @@ class AppIntegrationTest(IonTestCase):
         # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
-        
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = MYOOICI_USER_ID
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
@@ -258,38 +260,41 @@ class AppIntegrationTest(IonTestCase):
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         if numResReturned > 0:
+            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
-        #
-        # Now that we have a valid datasetID, create a subscription for it, and then
-        # test to see if the NotificationSet comes back.
-        #
-
-        log.debug('Calling __createSubscriptions with dsID: ' + dsID + ' and userID: ' + self.user_id)
-        yield self.__createSubscriptions(dsID, self.user_id)
-        
-        log.debug('Calling findDataResources to get list of resources with no bounds to test NotificationSet.')
-        # create a request message 
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
-        
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
-        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail("findDataResources failed: " + rspMsg.error_str)
-
-        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
-
-        #
-        # Validate the fields first
-        #
-        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        
-        #
-        # Now validate that notification has been set on the correct datasetID
-        #
-        self.__validateNotificationSet(rspMsg.message_parameters_reference[0].dataResourceSummary, dsID)
+            #
+            # Now that we have a valid datasetID, create a subscription for it, and then
+            # test to see if the NotificationSet comes back.
+            #
+    
+            log.debug('Calling __createSubscriptions with dsID: ' + dsID + ' and userID: ' + self.user_id)
+            yield self.__createSubscriptions(dsID, self.user_id)
+            
+            log.debug('Calling findDataResources to get list of resources with no bounds to test NotificationSet.')
+            # create a request message 
+            reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+            reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+            
+            rspMsg = yield self.aisc.findDataResources(reqMsg)
+            if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+                self.fail("findDataResources failed: " + rspMsg.error_str)
+    
+            numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+            log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+    
+            #
+            # Validate the fields first
+            #
+            self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+            
+            #
+            # Now validate that notification has been set on the correct datasetID
+            #
+            self.__validateNotificationSet(rspMsg.message_parameters_reference[0].dataResourceSummary, dsID)
+        else:
+            log.error('test_notificationSet: No datasets returned!')
         
 
     @defer.inlineCallbacks
@@ -309,13 +314,26 @@ class AppIntegrationTest(IonTestCase):
         # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         
+        log.debug('Calling findDataResources to get list of resources with no bounds.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
         #
         # Send a message with bounds
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minLatitude  = 30
         reqMsg.message_parameters_reference.maxLatitude  = 45
         reqMsg.message_parameters_reference.minLongitude = -75
@@ -342,7 +360,8 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minVertical  = 10
         reqMsg.message_parameters_reference.maxVertical  = 20
         reqMsg.message_parameters_reference.posVertical  = 'down'
@@ -363,7 +382,8 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         reqMsg.message_parameters_reference.minVertical  = 10
         reqMsg.message_parameters_reference.maxVertical  = 20
         reqMsg.message_parameters_reference.posVertical  = 'up'
