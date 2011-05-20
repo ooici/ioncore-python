@@ -238,7 +238,8 @@ class AppIntegrationTest(IonTestCase):
         yield self.createUser()
 
         #
-        # Send a message with no bounds
+        # Send a message with no bounds to get a list of dataset ID's; then
+        # take one of those IDs and create a subscription on it.
         #
         
         # Create a message client

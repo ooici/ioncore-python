@@ -153,9 +153,6 @@ class FindDataResources(object):
             
         dSetList = dSetResults.idrefs
         
-        for object in dSetList:
-            log.error('object: ' + str(object.key))
-
         log.info('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by.' + str(userID))
 
         # Get the list of PUBLIC dataset resource IDs

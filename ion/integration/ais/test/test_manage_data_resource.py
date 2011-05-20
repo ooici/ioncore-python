@@ -33,6 +33,7 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
+                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
                                                                     DATARESOURCE_SCHEDULE_TYPE_ID
 
 
@@ -45,7 +46,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATA_SOURCE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATA_SOURCE_ID, \
+                                                                    SAMPLE_PROFILE_DATASET_ID
 
 
 
@@ -182,7 +184,7 @@ class AISManageDataResourceTest(IonTestCase):
         create_resp = yield self._createDataResource()
 
         #try the delete
-        yield self._deleteDataResource(create_resp.data_source_id)
+        yield self._deleteDataResource(create_resp.data_set_id)
 
     @defer.inlineCallbacks
     def test_createUpdateDeleteDataResource(self):
@@ -194,11 +196,11 @@ class AISManageDataResourceTest(IonTestCase):
 
         #run the update 
         log.info("FULL USAGE 2/3: update")
-        yield self._updateDataResource(create_resp.data_source_id)
+        yield self._updateDataResource(create_resp.data_set_id)
 
-        #try the delete
+        #try the deleet
         log.info("FULL USAGE 3/3: delete")
-        yield self._deleteDataResource(create_resp.data_source_id)
+        yield self._deleteDataResource(create_resp.data_set_id)
         log.info("Create/Update/Delete/COMPLETE")
 
 
@@ -231,16 +233,44 @@ class AISManageDataResourceTest(IonTestCase):
         """
 
         log.info("Updating a sample data resource")
-        yield self._updateDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
-
+        yield self._updateDataResource(SAMPLE_PROFILE_DATASET_ID)
 
     @defer.inlineCallbacks
-    def _updateDataResource(self, data_source_resource_id):
-        log.info("_updateDataResource(%s) " % data_source_resource_id)
+    def test_sampleDataAssociations(self):
+        """
+        see if the sample data sets are properly associated
+        """
+        
+        dataset_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
+        self.failIfEqual(None, dataset_resource, "Data set resource doesn't appear to exist")
 
-        initial_resource = yield self.rc.get_instance(data_source_resource_id)
+        datasrc_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        self.failIfEqual(None, datasrc_resource, "Data source resource doesn't appear to exist")
+
+
+        a_datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
+                                                                  HAS_A_ID, 
+                                                                  DATASOURCE_RESOURCE_TYPE_ID)
+
+        self.failIfEqual(None, a_datasrc_resource, "Data source resource doesn't appear to be associated with set")
+
+        log.info("retrieved datasrc resource: %s" % a_datasrc_resource.ResourceIdentity)
+
+    @defer.inlineCallbacks
+    def _updateDataResource(self, data_set_resource_id):
+
+        log.info("_updateDataResource(%s) " % data_set_resource_id)
+
+        dataset_resource = yield self.rc.get_instance(data_set_resource_id)
+
         log.info("Fetching the data resource manually to find out what's in it")
 
+        initial_resource = yield self._getOneAssociationSubject(dataset_resource, 
+                                                                HAS_A_ID, 
+                                                                DATASOURCE_RESOURCE_TYPE_ID)
+        
+        log.info("Fetched data source resource %s" % initial_resource.ResourceIdentity)
+ 
         #before 
         b4_max_ingest_millis            = initial_resource.max_ingest_millis
         b4_update_interval_seconds      = initial_resource.update_interval_seconds
@@ -277,7 +307,7 @@ class AISManageDataResourceTest(IonTestCase):
         ais_req_msg.message_parameters_reference = update_req_msg
 
         #what we want it to be
-        update_req_msg.data_source_resource_id      = SAMPLE_PROFILE_DATA_SOURCE_ID
+        update_req_msg.data_set_resource_id         = data_set_resource_id
         update_req_msg.max_ingest_millis            = fr_max_ingest_millis
         update_req_msg.update_interval_seconds      = fr_update_interval_seconds
         update_req_msg.update_start_datetime_millis = fr_update_start_datetime_millis
@@ -354,13 +384,13 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete one of the sample data sources
         """
-        yield self._deleteDataResource(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        yield self._deleteDataResource(SAMPLE_PROFILE_DATASET_ID)
         #yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
 
 
 
     @defer.inlineCallbacks
-    def _deleteDataResource(self, data_source_id):
+    def _deleteDataResource(self, data_set_id):
 
 
         log.info("Creating and wrapping delete request")
@@ -369,7 +399,7 @@ class AISManageDataResourceTest(IonTestCase):
         ais_req_msg.message_parameters_reference = delete_req_msg
 
 
-        delete_req_msg.data_source_resource_id.append(data_source_id)
+        delete_req_msg.data_set_resource_id.append(data_set_id)
 
 
         result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg)
@@ -391,7 +421,7 @@ class AISManageDataResourceTest(IonTestCase):
                              "Expected 1 deletion, got " + str(num_deletions))
 
         #check that it's gone
-        dsrc = yield self.rc.get_instance(data_source_id)
+        dsrc = yield self.rc.get_instance(data_set_id)
         self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
                              "deleteDataResource apparently didn't mark anything retired")
 
@@ -510,6 +540,36 @@ class AISManageDataResourceTest(IonTestCase):
 
 
 
+    @defer.inlineCallbacks
+    def _getOneAssociationSubject(self, the_object, the_predicate, the_subject_type):
+        """
+        @brief get the subject side of an association when you only expect one
+        @return id of what you're after
+        """
+
+        #can also do subject=
+        found = yield self.ac.find_associations(obj=the_object, \
+                                                predicate_or_predicates=the_predicate)
+
+        association = None
+        for a in found:
+            mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
+            mystery_resource_type = mystery_resource.ResourceTypeID.key
+            if the_subject_type == mystery_resource.ResourceTypeID.key:
+                if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
+                    #FIXME: if not association is None then we have data inconsistency!
+                    association = a
+
+        #this is an error case!
+        if None is association:
+            defer.returnValue(None)
+
+
+        the_resource = yield self.rc.get_associated_resource_subject(association)
+        defer.returnValue(the_resource)
+
+
+
 
     @defer.inlineCallbacks
     def _getAssociatedObjects(self, the_subject, the_predicate, the_object_type):
@@ -520,7 +580,7 @@ class AISManageDataResourceTest(IonTestCase):
 
         #can also do obj=
         found = yield self.ac.find_associations(subject=the_subject, \
-                                                predicate_or_predicates=HAS_A_ID)
+                                                predicate_or_predicates=the_predicate)
 
         associations = []
         for a in found:

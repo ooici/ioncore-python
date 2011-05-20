@@ -51,7 +51,6 @@ LOGGING_INFO_EVENT_ID = 3003
 LOGGING_ERROR_EVENT_ID = 3002
 LOGGING_CRITICAL_EVENT_ID = 3001
 DATABLOCK_EVENT_ID = 4001
-INSTRUMENT_SAMPLE_DATA_EVENT_ID = 5001
 
 
 class EventPublisher(Publisher):
@@ -394,15 +393,6 @@ class DataBlockEventPublisher(DataEventPublisher):
     The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
-
-class InstrumentSampleDataEventPublisher(DataEventPublisher):
-    """
-    Event Notification Publisher for Subscription Modifications.
-
-    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
-    """
-    event_id = INSTRUMENT_SAMPLE_DATA_EVENT_ID
-    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 #
 #
 # ################################################################################
@@ -610,13 +600,4 @@ class DataBlockEventSubscriber(DataEventSubscriber):
     The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
-
-class InstrumentSampleDataEventSubscriber(DataEventSubscriber):
-    """
-    Event Notification Subscriber for Instrument Data.
-
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
-    """
-    event_id = INSTRUMENT_SAMPLE_DATA_EVENT_ID
-    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 

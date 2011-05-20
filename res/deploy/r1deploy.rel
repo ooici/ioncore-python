@@ -83,7 +83,7 @@
 
         # Add scheduler service
         {'name':'scheduler', 'version':'0.1',
-        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
+                                        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
         },
 
         # Add Dataset Controller Service
@@ -112,12 +112,23 @@
         },
 
         {'name':'cdm_validation_service', 'version':'0.1',
-                                          'processapp':('cdm_validation_service', 'ion.integration.eoi.validation.cdm_validation_service', 'CdmValidationService'),
+                                      'processapp':('cdm_validation_service', 'ion.integration.eoi.validation.cdm_validation_service', 'CdmValidationService'),
         },
-
+        
+        {'name':'instrument_integration_service', 'version':'0.1',
+                                     'processapp':('instrument_integration_service', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationService'),
+        },
 
         {'name':'app_integration',    'version':'0.1',
                                       'processapp':('app_integration','ion.integration.ais.app_integration_service','AppIntegrationService'),
+        },
+
+        {'name':'eventmonitor',       'version':'0.1',
+                                      'processapp':('eventmonitor','ion.services.dm.distribution.eventmonitor','EventMonitorService'),
+        },
+
+        {'name':'instrument_web_monitor',       'version':'0.1',
+                                      'processapp':('instrument_web_monitor','ion.services.dm.distribution.instrument_web_monitor','InstrumentWebMonitorService'),
         },
 
 #-------------#
