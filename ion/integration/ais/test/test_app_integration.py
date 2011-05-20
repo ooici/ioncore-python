@@ -23,6 +23,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER
                                                                     HAS_A_ID, \
                                                                     ROOT_USER_ID, \
                                                                     ANONYMOUS_USER_ID, \
+                                                                    MYOOICI_USER_ID, \
                                                                     DISPATCHER_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient
@@ -246,8 +247,9 @@ class AppIntegrationTest(IonTestCase):
         # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
-        
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = MYOOICI_USER_ID
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
@@ -258,6 +260,7 @@ class AppIntegrationTest(IonTestCase):
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         if numResReturned > 0:
+            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
             #
@@ -290,6 +293,8 @@ class AppIntegrationTest(IonTestCase):
             # Now validate that notification has been set on the correct datasetID
             #
             self.__validateNotificationSet(rspMsg.message_parameters_reference[0].dataResourceSummary, dsID)
+        else:
+            log.error('test_notificationSet: No datasets returned!')
         
 
     @defer.inlineCallbacks
