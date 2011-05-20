@@ -50,6 +50,7 @@ class DriverChannel(BaseEnum):
     PRESSURE = 'CHANNEL_PRESSURE'
     CONDUCTIVITY = 'CHANNEL_CONDUCTIVITY'    
     ALL = 'CHANNEL_ALL'
+    GPS = 'CHANNEL_GPS'
 
 """
 Common driver commands.

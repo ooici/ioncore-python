@@ -857,8 +857,8 @@ class TestSBE37(IonTestCase):
         self.assertIsInstance(result.get('pressure',None),float)
         self.assertIsInstance(result.get('sound_velocity',None),float)
         self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('time',None),str)
-        self.assertIsInstance(result.get('date',None),str)
+        self.assertIsInstance(result.get('device_time',None),str)
+        self.assertIsInstance(result.get('driver_time',None),str)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         # Test and verify autosample mode.
@@ -910,8 +910,8 @@ class TestSBE37(IonTestCase):
             self.assertIsInstance(sample.get('pressure',None),float)
             self.assertIsInstance(sample.get('sound_velocity',None),float)
             self.assertIsInstance(sample.get('conductivity',None),float)
-            self.assertIsInstance(sample.get('time',None),str)
-            self.assertIsInstance(sample.get('date',None),str)
+            self.assertIsInstance(sample.get('device_time',None),str)
+            self.assertIsInstance(sample.get('driver_time',None),str)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
         

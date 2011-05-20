@@ -101,8 +101,16 @@ class ManageDataResourceSubscription(object):
         self.rc  = ais.rc
         self.ac  = AssociationClient(proc=ais)
         self.asc = AssociationServiceClient()
-        self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
-        self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
+
+        self.ais = ais
+        # Lazy initialize this when it is needed
+        #self.pfn = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=ais)
+        self.pfn = None
+
+        # Lazy initialize this when it is needed
+        #self.pfd = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=ais)
+        self.pfd = None
+
         self.nac = NotificationAlertServiceClient(proc=ais)
 
 
@@ -116,7 +124,12 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.update()\n')
-        Response = yield self.delete(msg)
+        reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptions.add();
+        reqMsg.message_parameters_reference.subscriptions[0].user_ooi_id  = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
+        reqMsg.message_parameters_reference.subscriptions[0].data_src_id  = msg.message_parameters_reference.subscriptionInfo.data_src_id
+        Response = yield self.delete(reqMsg)
         if Response.MessageType != AIS_RESPONSE_ERROR_TYPE:
             Response = yield self.create(msg)
         defer.returnValue(Response)
@@ -323,10 +336,14 @@ class ManageDataResourceSubscription(object):
             Response.error_str = errString
             defer.returnValue(Response)
 
+
+        if self.pfn is None:
+            pubfact = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=self.ais)
+            self.pfn = yield pubfact.build()
+
                 
         # Publish the new subscription notification
-        publisher = yield self.pfn.build(origin = dispatcherID)
-        yield publisher.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject)
+        yield self.pfn.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject, origin = dispatcherID)
 
         defer.returnValue(None)
 
@@ -343,91 +360,97 @@ class ManageDataResourceSubscription(object):
         log.info('ManageDataResourceSubscription.delete()\n')
 
         # check that subscriptionInfo is present in GPB
-        if not msg.message_parameters_reference.IsFieldSet('subscriptionInfo'):
+        if not msg.message_parameters_reference.IsFieldSet('subscriptions'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscriptionInfo] not found in message"
+             Response.error_str = "Required field [subscriptions] not found in message"
              defer.returnValue(Response)
+             
+        for Subscription in msg.message_parameters_reference.subscriptions:
+            # check that user_ooi_id is present in GPB
+            if not Subscription.IsFieldSet('user_ooi_id'):
+                # build AIS error response
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+                Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                Response.error_str = "Required field [user_ooi_id] not found in message"
+                defer.returnValue(Response)
+    
+            # check that data_src_id is present in GPB
+            if not Subscription.IsFieldSet('data_src_id'):
+                # build AIS error response
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+                Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                Response.error_str = "Required field [data_src_id] not found in message"
+                defer.returnValue(Response)
 
-        # check that user_ooi_id is present in GPB
-        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-            # build AIS error response
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
-            Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
-            defer.returnValue(Response)
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+            reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = Subscription.user_ooi_id
+            reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = Subscription.data_src_id
 
-        # check that data_src_id is present in GPB
-        if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-            # build AIS error response
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
-            Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [data_src_id] not found in message"
-            defer.returnValue(Response)
-
-        try:
-            log.debug("delete: calling notification alert service getSubscription()")
-            subscription = yield self.nac.getSubscription(msg)
-            log.info('getSubscription returned:\n %s'%subscription.message_parameters_reference[0].subscriptionListResults[0])
-
-            log.debug("delete: calling notification alert service removeSubscription()")
-            reply = yield self.nac.removeSubscription(msg)
-
-            # Now determine if subscription type includes a dispatcher.  If so, we need to delete
-            # the dispatcher workflow by:
-            #   1. Finding the dispatcher associated with this user.
-            #   2. Finding the dispatcher workflow associated with this subscription.
-            #   3. Deleting the dispatcher workflow.
-
-            SubscriptionInfo = subscription.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo
-            if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
-                (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
-                log.info("delete: deleting dispatcher workflow")
-
-                log.info('Getting user resource instance')
-                UserID = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
-                try:
-                    self.userRes = yield self.rc.get_instance(UserID)
-                except ResourceClientError:
-                    errString = 'Error getting instance of userID: ' + UserID
-                    log.error(errString)
-                    # build AIS error response
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                    Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
-                    Response.error_str = errString
-                    defer.returnValue(Response)
-                log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
-
-                # get the user's dispatcher
-                dispatcherID = yield self.__findDispatcher(self.userRes)
-                if (dispatcherID is None):
-                    # build AIS error response
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                    Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    errString = 'Dispatcher not found for userID' + UserID
-                    Response.error_str = errString
-                    defer.returnValue(Response)
-                else:
-                    log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
-                    
-                # delete the workflow
-                Reply = yield self.__deleteDispatcherWorkflow(SubscriptionInfo, dispatcherID)
-                defer.returnValue(Reply)
-
-        except ReceivedApplicationError, ex:
-            log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-            Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  ex.msg_content.MessageResponseBody
-            defer.returnValue(Response)
+            try:
+                log.debug("delete: calling notification alert service getSubscription()")
+                subscription = yield self.nac.getSubscription(reqMsg)
+                log.info('getSubscription returned:\n %s'%subscription.message_parameters_reference[0].subscriptionListResults[0])
+    
+                log.debug("delete: calling notification alert service removeSubscription()")
+                reply = yield self.nac.removeSubscription(reqMsg)
+    
+                # Now determine if subscription type includes a dispatcher.  If so, we need to delete
+                # the dispatcher workflow by:
+                #   1. Finding the dispatcher associated with this user.
+                #   2. Finding the dispatcher workflow associated with this subscription.
+                #   3. Deleting the dispatcher workflow.
+    
+                SubscriptionInfo = subscription.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo
+                if ((SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.DISPATCHER) or 
+                    (SubscriptionInfo.subscription_type == SubscriptionInfo.SubscriptionType.EMAILANDDISPATCHER)):
+                    log.info("delete: deleting dispatcher workflow")
+    
+                    log.info('Getting user resource instance')
+                    UserID = reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id
+                    try:
+                        self.userRes = yield self.rc.get_instance(UserID)
+                    except ResourceClientError:
+                        errString = 'Error getting instance of userID: ' + UserID
+                        log.error(errString)
+                        # build AIS error response
+                        Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                        Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
+                        Response.error_str = errString
+                        defer.returnValue(Response)
+                    log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+    
+                    # get the user's dispatcher
+                    dispatcherID = yield self.__findDispatcher(self.userRes)
+                    if (dispatcherID is None):
+                        # build AIS error response
+                        Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                        Response.error_num = Response.ResponseCodes.NOT_FOUND
+                        errString = 'Dispatcher not found for userID' + UserID
+                        Response.error_str = errString
+                        defer.returnValue(Response)
+                    else:
+                        log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
+                        
+                    # delete the workflow
+                    Reply = yield self.__deleteDispatcherWorkflow(SubscriptionInfo, dispatcherID)
+                    defer.returnValue(Reply)
+    
+            except ReceivedApplicationError, ex:
+                log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex.msg_content.MessageResponseBody)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                Response.error_num =  ex.msg_content.MessageResponseCode
+                Response.error_str =  ex.msg_content.MessageResponseBody
+                defer.returnValue(Response)
         
-        except ApplicationError, ex:
-            log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-            Response.error_num =  ex.response_code
-            Response.error_str =  str(ex)
-            defer.returnValue(Response)
+            except ApplicationError, ex:
+                log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+                Response.error_num =  ex.response_code
+                Response.error_str =  str(ex)
+                defer.returnValue(Response)
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()
@@ -471,8 +494,12 @@ class ManageDataResourceSubscription(object):
         dwfRes.dataset_id = SubscriptionInfo.data_src_id
         dwfRes.workflow_path = SubscriptionInfo.dispatcher_script_path
         # Publish the delete subscription notification
-        publisher = yield self.pfd.build(origin = dispatcherID)
-        yield publisher.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject)
+
+        if self.pfd is None:
+            pubfact = PublisherFactory(publisher_type=DelSubscriptionEventPublisher, process=self.ais)
+            self.pfd = yield pubfact.build()
+
+        yield self.pfd.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject, origin = dispatcherID)
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.message_parameters_reference.add()

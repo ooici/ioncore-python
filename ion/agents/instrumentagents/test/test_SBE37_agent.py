@@ -50,7 +50,8 @@ returned by ifconfig to cause the tests to run for you locally.
 """
 
 allowed_mac_addr_list = [
-    '00:26:bb:19:83:33'         # Edward's Macbook
+    '00:26:bb:19:83:33',         # Edward's Macbook
+    'f8:1e:df:e6:d2:07'
     ]
 
 mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
@@ -63,7 +64,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    'test_execute_instrument',
+#    'test_execute_instrument',
     'test_state_transitions',
     'test_get_capabilities',
     'dummy'
@@ -423,8 +424,8 @@ class TestSBE37Agent(IonTestCase):
         self.assertIsInstance(result.get('sound_velocity',None),float)
         self.assertIsInstance(result.get('pressure',None),float)
         self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('time',None),str)
-        self.assertIsInstance(result.get('date',None),str)
+        self.assertIsInstance(result.get('device_time',None),str)
+        self.assertIsInstance(result.get('driver_time',None),str)
         
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
@@ -468,8 +469,8 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('pressure',None),float)
             self.assertIsInstance(sample.get('sound_velocity',None),float)
             self.assertIsInstance(sample.get('conductivity',None),float)
-            self.assertIsInstance(sample.get('time',None),str)
-            self.assertIsInstance(sample.get('date',None),str)
+            self.assertIsInstance(sample.get('device_time',None),str)
+            self.assertIsInstance(sample.get('driver_time',None),str)
         
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,tid)

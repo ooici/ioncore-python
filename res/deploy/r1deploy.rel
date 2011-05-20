@@ -49,8 +49,10 @@
                                         'processapp':('exchange_management','ion.services.coi.exchange.exchange_management','ExchangeManagementService'),
         },
 
-        # Add persistent archive service
-        
+        {'name':'preservation_manager',  'version':'0.1',
+                                        'processapp':('resource_registry','ion.services.dm.preservation.cassandra_manager_agent','CassandraManagerService'),
+                                        'config':{}
+        },
 
 #-------------#
 # Bootlevel 6 #

@@ -1,0 +1,27 @@
+{
+    "type":"release",
+    "name":"Bootlevel 5",
+    "version": "0.1",
+    "description": "Release 1 Bootlevel 5",
+    "ioncore" : "0.4.7",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+
+
+
+#-------------#
+# Bootlevel 5 #
+#-------------#
+        {'name':'exchange_management',  'version':'0.1',
+                                        'processapp':('exchange_management','ion.services.coi.exchange.exchange_management','ExchangeManagementService'),
+        },
+
+        {'name':'preservation_manager',  'version':'0.1',
+                                        'processapp':('preservation_manager','ion.services.dm.preservation.cassandra_manager_agent','CassandraManagerService'),
+                                        'config':{}
+        },
+    ]
+}
