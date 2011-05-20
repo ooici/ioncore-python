@@ -29,6 +29,7 @@ from ion.util.iontime import IonTime
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
+                                                                    DATASOURCE_RESOURCE_TYPE_ID, \
                                                                     DATARESOURCE_SCHEDULE_TYPE_ID
 
 
@@ -94,10 +95,10 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            if not (msg.IsFieldSet("data_source_resource_id")):
+            if not (msg.IsFieldSet("data_set_resource_id")):
 
                 errtext = "ManageDataResource.update(): " + \
-                    "required fields not provided (data_source_resource_id)"
+                    "required fields not provided (data_set_resource_id)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -105,9 +106,13 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            datasrc_resource  = yield self.rc.get_instance(msg.data_source_resource_id)
-            log.info("These should be equal: %s %s" % (msg.data_source_resource_id, datasrc_resource.ResourceIdentity))
+            dataset_resource = yield self.rc.get_instance(msg.data_set_resource_id)
+            datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
+                                                                    HAS_A_ID, 
+                                                                    DATASOURCE_RESOURCE_TYPE_ID)
 
+            assert(not datasrc_resource is None)
+            
             if msg.IsFieldSet("update_interval_seconds"):
 
                 #if we are rescheduling or turning off updates, delete scheduled events
@@ -236,10 +241,10 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
-            if not (msg.IsFieldSet("data_source_resource_id")):
+            if not (msg.IsFieldSet("data_set_resource_id")):
 
                 errtext = "ManageDataResource.delete(): " + \
-                    "required fields not provided (data_source_resource_id)"
+                    "required fields not provided (data_set_resource_id)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -250,16 +255,18 @@ class ManageDataResource(object):
             #store ids that were deleted, and return them later.
             deletions = []
             delete_resources = []
-            for data_source_resource_id in msg.data_source_resource_id:
+            for data_set_resource_id in msg.data_set_resource_id:
 
                 #FIXME: if user does not own this data set, don't delete it
 
-                log.info("Getting instance of data source resource")
-                datasrc_resource = yield self.rc.get_instance(data_source_resource_id)
-                log.info("Getting instance of dataset resource from association")
-                dataset_resource = yield self._getOneAssociationObject(datasrc_resource, 
+                log.info("Getting instance of data set resource with id = %s" % data_set_resource_id)
+                dataset_resource = yield self.rc.get_instance(data_set_resource_id)
+                log.info("Getting instance of datasource resource from association")
+                datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
                                                                        HAS_A_ID, 
-                                                                       DATASET_RESOURCE_TYPE_ID)
+                                                                       DATASOURCE_RESOURCE_TYPE_ID)
+
+                log.info("got data src resource with id: %s" % datasrc_resource.ResourceIdentity)
 
                 log.info("Deleting any attached scheduled ingest events")
                 yield self._deleteAllScheduledEvents(datasrc_resource)
@@ -274,7 +281,7 @@ class ManageDataResource(object):
                     delete_resources.append(dataset_resource)
 
 
-                deletions.append(data_source_resource_id)
+                deletions.append(data_set_resource_id)
 
 
             log.info("putting all resource changes in one big transaction, " \
@@ -509,14 +516,18 @@ class ManageDataResource(object):
         @brief delete any scheduled events from scheduler and storage
         """
 
-        log.info("Getting instances of scheduled task resources associated with this data source")
+        log.info("Getting instances of scheduled task resources associated with this data source: %s"
+                 % data_source_resource.ResourceIdentity)
         while True:
             sched_task_rsrc = yield self._getOneAssociationObject(data_source_resource, 
                                                                   HAS_A_ID, 
                                                                   DATARESOURCE_SCHEDULE_TYPE_ID)
 
             #how we exit
-            if None is sched_task_rsrc: defer.returnValue(None)
+            if None is sched_task_rsrc: 
+                log.info("No scheduled ingest events found")
+                defer.returnValue(None)
+            
 
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
@@ -603,6 +614,39 @@ class ManageDataResource(object):
 
 
         the_resource = yield self.rc.get_associated_resource_object(association)
+        defer.returnValue(the_resource)
+
+    @defer.inlineCallbacks
+    def _getOneAssociationSubject(self, the_object, the_predicate, the_subject_type):
+        """
+        @brief get the subject side of an association when you only expect one
+        @return id of what you're after
+        """
+
+        #can also do subject=
+        found = yield self.ac.find_associations(obj=the_object, \
+                                                predicate_or_predicates=HAS_A_ID)
+
+        association = None
+        for a in found:
+            mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
+            mystery_resource_type = mystery_resource.ResourceTypeID.key
+            log.info("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
+            log.info("Want type %s, got type %s" 
+                     % (the_subject_type, mystery_resource_type))
+            if the_subject_type == mystery_resource.ResourceTypeID.key:
+                if mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
+                    log.info("FOUND ONE, but it's retired")
+                else:
+                    #FIXME: if not association is None then we have data inconsistency!
+                    association = a
+
+        #this is an error case!
+        if None is association:
+            defer.returnValue(None)
+
+
+        the_resource = yield self.rc.get_associated_resource_subject(association)
         defer.returnValue(the_resource)
 
 
