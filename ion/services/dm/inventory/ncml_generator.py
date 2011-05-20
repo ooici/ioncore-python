@@ -108,8 +108,8 @@ def rsync_ncml(local_filepath, server_url):
     @param server_url rsync URL of the server
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    args = ['-r', '-p', '--include', '"*.ncml"',
-            '-v', '--stats', '--delete', local_filepath + '/', server_url]
+    args = ['-r', '--perms', '--include', '"*.ncml"',
+            '-v', '-h', '--delete', local_filepath + '/', server_url]
     rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
 
