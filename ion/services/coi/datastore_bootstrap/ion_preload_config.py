@@ -612,7 +612,8 @@ profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_data_source_resource,
-                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]}
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]},
+                      LCS_CFG : COMMISSIONED
                       },
 
 traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5',
@@ -620,7 +621,8 @@ traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5'
                       NAME_CFG:traj_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source,
-                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]}
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]},
+                      LCS_CFG : COMMISSIONED
                       },
 
 station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F6',
@@ -628,7 +630,8 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       NAME_CFG:station_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source,
-                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]}
+                      CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]},
+                      LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04800',
