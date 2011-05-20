@@ -166,12 +166,12 @@ class EventPublisher(Publisher):
         assert self.msg_type
 
         if not kwargs.has_key('datetime'):
-            log.warn("Automatically setting 'datetime' field")
+            log.debug("Automatically setting 'datetime' field")
             kwargs['datetime'] = time.time()
 
         # copy kwargs into local list
         msgargs = kwargs.copy()
-        log.warn("create_event has %d kwargs to set" % len(msgargs))
+        log.debug("create_event has %d kwargs to set" % len(msgargs))
 
         # create base event message, assign values from kwargs
         event_msg = yield self._mc.create_instance(EVENT_MESSAGE_TYPE)
