@@ -50,8 +50,7 @@ returned by ifconfig to cause the tests to run for you locally.
 """
 
 allowed_mac_addr_list = [
-    '00:26:bb:19:83:33',         # Edward's Macbook
-    'f8:1e:df:e6:d2:07'
+    '00:26:bb:19:83:33'         # Edward's Macbook
     ]
 
 mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
@@ -64,7 +63,7 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-#    'test_execute_instrument',
+    'test_execute_instrument',
     'test_state_transitions',
     'test_get_capabilities',
     'dummy'
