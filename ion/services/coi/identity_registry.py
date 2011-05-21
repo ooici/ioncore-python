@@ -230,6 +230,7 @@ class IdentityRegistryService(ServiceProcess):
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
         identity.subject = cert_info['subject']
+        log.debug('User subject: <%s> OOI ID: <%s>', identity.subject, identity.ResourceIdentity)
 
         identity.name = ""
         identity.institution = ""
