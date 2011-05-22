@@ -153,10 +153,7 @@ class FindDataResources(object):
             
         dSetList = dSetResults.idrefs
         
-        for object in dSetList:
-            log.error('object: ' + str(object.key))
-
-        log.info('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by.' + str(userID))
+        log.debug('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by ' + str(userID))
 
         # Get the list of PUBLIC dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PUBLIC)
@@ -168,7 +165,7 @@ class FindDataResources(object):
             Response.error_str = "No DatasetIDs were found."
             defer.returnValue(Response)
 
-        log.info('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
+        log.debug('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
 
         #
         # Add the PUBLIC datasets to the list of private datasets
@@ -179,8 +176,9 @@ class FindDataResources(object):
             dSetList.add()
             dSetList[i] = dSetResults.idrefs[j]
             i = i + 1
+            j = j + 1
 
-        log.info('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
+        log.debug('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
 
         yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
 
@@ -380,19 +378,20 @@ class FindDataResources(object):
             # in the list
             #
             if bounds.isInBounds(dSetMetadata):                
+                log.debug('dataset %s in bounds' % (dSetMetadata['title']))
 
-                dSourceResID = dSetMetadata['DSourceID']
-                if dSourceResID is None:
-                    log.error('dSourceResID is None')
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                          MessageName='AIS findDataResources error response')
-                    Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Datasource not found."
-                    defer.returnValue(Response)
-                    
                 if self.bUseMetadataCache:            
+                    dSourceResID = dSetMetadata['DSourceID']
+                    if dSourceResID is None:
+                        log.error('dSourceResID is None')
+                        Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                              MessageName='AIS findDataResources error response')
+                        Response.error_num = Response.ResponseCodes.NOT_FOUND
+                        Response.error_str = "Datasource not found."
+                        defer.returnValue(Response)
+
                     dSource = self.metadataCache.getDSetMetadata(dSourceResID)
-                    if dSetMetadata is None:
+                    if dSource is None:
                         log.error('metadata not found for datasourceID: ' + dSourceResID)
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
@@ -401,11 +400,12 @@ class FindDataResources(object):
                         defer.returnValue(Response)
                     
                 else:
+                    dSourceResID = yield self.getAssociatedSource(dSetResID)
                     try:
                         dSource = yield self.rc.get_instance(dSourceResID)
                     
                     except ResourceClientError: 
-                        log.error('ResourceClientError Exception!')
+                        log.error('ResourceClientError Exception! Could not get instance for ID: %s' % (dSourceResID))
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
@@ -429,11 +429,15 @@ class FindDataResources(object):
                     #
                     # Set the notificationSet flag; this is not efficient at all
                     #
-                    #rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = self.__isNotificationSet(dSetResID)
-                    #rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
-                    rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
+                    if self.bUseMetadataCache:            
+                        rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = self.__isNotificationSet(dSetResID)
+                        rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource['registration_datetime_millis']
+                    else:
+                        rspMsg.message_parameters_reference[0].dataResourceSummary[j].notificationSet = False
+                        rspMsg.message_parameters_reference[0].dataResourceSummary[j].date_registered = dSource.registration_datetime_millis
+                        
                     self.__loadRspPayload(rspMsg.message_parameters_reference[0].dataResourceSummary[j].datasetMetadata, dSetMetadata, ownerID, dSetResID)
+                    
                 else:
                     #
                     # This was a findDataResourcesByUser request; do not include
@@ -458,8 +462,7 @@ class FindDataResources(object):
     
                 j = j + 1
             else:
-                log.debug("isInBounds is FALSE")
-
+                log.debug('dataset %s is OUT OF bounds <-------------' % (dSetMetadata['title']))
             
             i = i + 1
 
@@ -512,7 +515,7 @@ class FindDataResources(object):
             state_ref.lcs = state_ref.LifeCycleState.COMMISSIONED
         pair.object = state_ref
 
-        log.info('Getting resources of type: %s' % (resourceType))
+        log.debug('Getting resources of type: %s' % (resourceType))
 
         try:
             result = yield self.asc.get_subjects(request)
@@ -521,7 +524,10 @@ class FindDataResources(object):
             log.error('__findResourcesOfType: association error!')
             defer.returnValue(None)
 
-        log.debug('__findResourcesOfType() exit')
+        for dset in result.idrefs:
+            log.error('found ds: %s ' % (dset.key))
+            
+        log.debug('__findResourcesOfType() exit: found %d resources' % len(result.idrefs))
         
         defer.returnValue(result)
 
@@ -646,9 +652,11 @@ class FindDataResources(object):
             result = yield self.asc.get_subjects(request)
         
         except AssociationServiceError:
-            log.error('__findResourcesOfTypeAndOwner: association error!')
+            log.error('__findPrivateResourcesByOwner: association error!')
             defer.returnValue(None)
-        
+
+        log.debug('__findPrivateResourcesByOwner() exit: found %d resources' % len(result.idrefs))
+       
         defer.returnValue(result)
 
 

@@ -55,12 +55,13 @@ setup( name = 'ioncore',
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ply==3.4',
            'pysnmp==4.1.16a',
-           'ionproto>=0.3.24',
+           'ionproto>=0.3.24-pl8',
                           ],
        entry_points = {
                         'console_scripts': [
                             'ion-admin=ion.core.env.ion_admin:main',
-                            'cassandra-cfg=ion.core.data.cassandra_schema_script:main',
+                            'cassandra-setup=ion.core.data.cassandra_schema_script:main',
+                            'cassandra-teardown=ion.core.data.cassandra_teardown_script:main',
                             ],
                         },
        include_package_data = True,

@@ -238,7 +238,8 @@ class AppIntegrationTest(IonTestCase):
         yield self.createUser()
 
         #
-        # Send a message with no bounds
+        # Send a message with no bounds to get a list of dataset ID's; then
+        # take one of those IDs and create a subscription on it.
         #
         
         # Create a message client
@@ -334,13 +335,15 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
-        reqMsg.message_parameters_reference.minLatitude  = 30
-        reqMsg.message_parameters_reference.maxLatitude  = 45
-        reqMsg.message_parameters_reference.minLongitude = -75
+        #reqMsg.message_parameters_reference.minLatitude  = 30
+        #reqMsg.message_parameters_reference.maxLatitude  = 45
+        #reqMsg.message_parameters_reference.minLongitude = -75
+        #reqMsg.message_parameters_reference.maxLongitude = -70
+        reqMsg.message_parameters_reference.minLongitude = -90
         reqMsg.message_parameters_reference.maxLongitude = -70
         reqMsg.message_parameters_reference.minVertical  = 20
         reqMsg.message_parameters_reference.maxVertical  = 30
-        reqMsg.message_parameters_reference.posVertical  = 'down'
+        #reqMsg.message_parameters_reference.posVertical  = 'down'
         reqMsg.message_parameters_reference.minTime      = '2011-03-01T00:00:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
         

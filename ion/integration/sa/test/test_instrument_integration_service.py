@@ -22,6 +22,28 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.services.dm.distribution.events import DataEventSubscriber, DataBlockEventSubscriber
 
+from ion.core.messaging.message_client import MessageClient
+
+from ion.core.object import object_utils
+
+AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
+AIS_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9002, version=1)
+AIS_RESPONSE_ERROR_TYPE = object_utils.create_type_identifier(object_id=9003, version=1)
+CREATE_INSTRUMENT_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9301, version=1)
+CREATE_INSTRUMENT_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9302, version=1)
+START_INSTRUMENT_AGENT_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9303, version=1)
+START_INSTRUMENT_AGENT_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9304, version=1)
+START_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9305, version=1)
+START_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9306, version=1)
+STOP_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9307, version=1)
+STOP_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9308, version=1)
+GET_INSTRUMENT_STATE_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9309, version=1)
+GET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9310, version=1)
+SET_INSTRUMENT_STATE_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9311, version=1)
+SET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9312, version=1)
+GET_INSTRUMENT_LIST_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9313, version=1)
+GET_INSTRUMENT_LIST_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9314, version=1)
+
 import ion.util.procutils as pu
 
 
@@ -38,7 +60,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
 
         services = [
             {
-                'name':'instrumentIntegrationService',
+                'name':'instrument_integration_service',
                 'module':'ion.integration.sa.instrument_integration_service',
                 'class':'InstrumentIntegrationService'
             },
@@ -88,27 +110,42 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         Create an instrument, create associated instrument agent and get the list of instruments
         """
-        #raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
+        raise unittest.SkipTest('Maurice, check to see if this should be skipped in trial.')
 
-        log.info("IIServiceTest test_createInstrument Now testing: Create instrument from UI")
-        userUpdate = {'manufacturer' : "SeaBird Electronics",
-                 'model' : "unknown model",
-                 'serial_num' : "1234",
-                 'fw_version' : "1"}
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
 
-        result = yield self.iic.createNewInstrument(userUpdate)
-        instrument_id = result['instrument_id']
-        log.info("IIServiceTest test_createInstrument  instrument id: %s ", result['instrument_id'] )
+        # create the register_user request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Create instrument request')
+        msg.message_parameters_reference = msg.CreateObject(CREATE_INSTRUMENT_REQUEST_MSG_TYPE)
 
-        result = yield self.iic.startInstrumentAgent("SeaBird Electronics", instrument_id, "SBE37")
-        instrument_agent_process_id = result['instrument_agent_process_id']
-        instrument_agent_resource_id = result['instrument_agent_resource_id']
+        msg.message_parameters_reference.manufacturer = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.serial_num = '1234'
+        msg.message_parameters_reference.fw_version = '1'
+
+        rspMsg = yield self.iic.createNewInstrument(msg)
+        
+        instrument_id = rspMsg.message_parameters_reference[0].instrument_resource_id
+        log.info("IIServiceTest test_createInstrument  instrument id: %s ", instrument_id )
+
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Start instrument agent request')
+        msg.message_parameters_reference = msg.CreateObject(START_INSTRUMENT_AGENT_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.name = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
+
+        rspMsg = yield self.iic.startInstrumentAgent(msg)
+        
+        instrument_agent_process_id = rspMsg.message_parameters_reference[0].instrument_agent_resource_id
+        instrument_agent_resource_id = rspMsg.message_parameters_reference[0].instrument_agent_process_id
         log.info("IIServiceTest test_create_instrument  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
 
-        result = yield self.iic.getInstrumentList()
-        log.info("IIServiceTest test_createInstrument  instrument list: %s ", result['result'] )
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Instrument list request')
+        msg.message_parameters_reference = msg.CreateObject(GET_INSTRUMENT_LIST_REQUEST_MSG_TYPE)
 
-
+        rspMsg = yield self.iic.getInstrumentList(msg)
+        log.info("IIServiceTest test_createInstrument  instrument list: %s ", str(rspMsg))
 
     @defer.inlineCallbacks
     def test_createAndSetInstrument(self):
@@ -117,58 +154,74 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         raise unittest.SkipTest('Can screw up instrument state if others are testing.')
 
-        log.info("IIServiceTest test_createAndSetInstrument Now testing: Create instrument from UI")
-        userUpdate = {'manufacturer' : "SeaBird Electronics",
-                 'model' : "unknown model",
-                 'serial_num' : "1234",
-                 'fw_version' : "1"}
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
 
-        result = yield self.iic.createNewInstrument(userUpdate)
-        instrument_id = result['instrument_id']
-        log.info("IIServiceTest test_createAndSetInstrument  instrument id: %s ", result['instrument_id'] )
+        # create the register_user request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Create instrument request')
+        msg.message_parameters_reference = msg.CreateObject(CREATE_INSTRUMENT_REQUEST_MSG_TYPE)
 
-        result = yield self.iic.startInstrumentAgent("SeaBird Electronics", instrument_id, "SBE37")
-        instrument_agent_process_id = result['instrument_agent_process_id']
-        instrument_agent_resource_id = result['instrument_agent_resource_id']
-        log.info("IIServiceTest test_createAndSetInstrument  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
+        msg.message_parameters_reference.manufacturer = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.serial_num = '1234'
+        msg.message_parameters_reference.fw_version = '1'
 
+        rspMsg = yield self.iic.createNewInstrument(msg)
+        
+        instrument_id = rspMsg.message_parameters_reference[0].instrument_resource_id
+        log.info("IIServiceTest test_createInstrument  instrument id: %s ", instrument_id )
 
-        result = yield self.iic.getInstrumentState(instrument_id)
-        log.info("IIServiceTest test_createInstrument  instrument state: %s ", result['result'] )
-        resultDict = result['result']
-        log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 1: %s ",resultDict[(DriverChannel.INSTRUMENT,'INTERVAL')] )
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Start instrument agent request')
+        msg.message_parameters_reference = msg.CreateObject(START_INSTRUMENT_AGENT_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.name = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
 
+        rspMsg = yield self.iic.startInstrumentAgent(msg)
+        
+        instrument_agent_process_id = rspMsg.message_parameters_reference[0].instrument_agent_resource_id
+        instrument_agent_resource_id = rspMsg.message_parameters_reference[0].instrument_agent_process_id
+        log.info("IIServiceTest test_create_instrument  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
+
+        stateReqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Get instrument state request')
+        stateReqMsg.message_parameters_reference = msg.CreateObject(GET_INSTRUMENT_STATE_REQUEST_MSG_TYPE)
+        stateReqMsg.message_parameters_reference.instrument_resource_id = instrument_id
+
+        rspMsg = yield self.iic.getInstrumentState(stateReqMsg)
+        properties = rspMsg.message_parameters_reference[0].properties
+
+        log.info("IIServiceTest test_createInstrument  instrument state: %s ", str(properties))
 
         # Set a few parameters. This will test the device set functions
         # and set up the driver for sampling commands.
-        params = {}
-        params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 4
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Set instrument state request')
+        msg.message_parameters_reference = msg.CreateObject(SET_INSTRUMENT_STATE_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
+        msg.message_parameters_reference.properties.navg = 1
+        msg.message_parameters_reference.properties.interval = 4
 
-        result = yield self.iic.setInstrumentState(instrument_id, params)
-        log.info("IIServiceTest test_createAndSetInstrument  instrument state: %s ", result['result'] )
-
+        rspMsg = yield self.iic.setInstrumentState(msg)
+        log.info("IIServiceTest test_createAndSetInstrument  instrument status: %s ", rspMsg.message_parameters_reference[0].status)
 
         # Verify the set changes were made.
-        result = yield self.iic.getInstrumentState(instrument_id)
-        #log.info("IIServiceTest test_createInstrument  instrument state: %s ", result['result'] )
-        resultDict = result['result']
-        intervalReturned = resultDict[(DriverChannel.INSTRUMENT,'INTERVAL')][1]
+        rspMsg = yield self.iic.getInstrumentState(stateReqMsg)
+        intervalReturned = rspMsg.message_parameters_reference[0].properties.interval
         log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 2: %s ",intervalReturned)
 
         if intervalReturned != 4:
             self.fail('InstrumentIntegrationServiceTest: test_createAndSetInstrument returned incorrect interval after set operation.')
 
-        origparams = {}
-        origparams[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        origparams[(DriverChannel.INSTRUMENT,'INTERVAL')] = 5
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Set instrument state request')
+        msg.message_parameters_reference = msg.CreateObject(SET_INSTRUMENT_STATE_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
+        msg.message_parameters_reference.properties.navg = 1
+        msg.message_parameters_reference.properties.interval = 5
 
-        result = yield self.iic.setInstrumentState(instrument_id, origparams)
+        rspMsg = yield self.iic.setInstrumentState(msg)
 
         # Verify the set changes were made.
-        result = yield self.iic.getInstrumentState(instrument_id)
-        resultDictFinal = result['result']
-        intervalReturned = resultDictFinal[(DriverChannel.INSTRUMENT,'INTERVAL')][1]
+        rspMsg = yield self.iic.getInstrumentState(stateReqMsg)
+        intervalReturned = rspMsg.message_parameters_reference[0].properties.interval
         log.info("IIServiceTest test_createAndSetInstrument  INSTRUMENT INTERVAL 3: %s ", intervalReturned)
 
         if intervalReturned != 5:
@@ -182,20 +235,35 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         """
         raise unittest.SkipTest('Can screw up instrument state if others are testing.')
         
-        log.info("IIServiceTest test_createInstrumentStartSampling Now testing: Create instrument from UI")
-        userUpdate = {'manufacturer' : "SeaBird Electronics",
-                 'model' : "unknown model",
-                 'serial_num' : "1234",
-                 'fw_version' : "1"}
 
-        result = yield self.iic.createNewInstrument(userUpdate)
-        instrument_id = result['instrument_id']
-        log.info("IIServiceTest test_createInstrumentStartSampling  instrument id: %s ", result['instrument_id'] )
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
 
-        result = yield self.iic.startInstrumentAgent("SeaBird Electronics", instrument_id, "SBE37")
-        instrument_agent_process_id = result['instrument_agent_process_id']
-        instrument_agent_resource_id = result['instrument_agent_resource_id']
-        log.info("IIServiceTest test_createInstrumentStartSampling  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
+        # create the register_user request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Create instrument request')
+        msg.message_parameters_reference = msg.CreateObject(CREATE_INSTRUMENT_REQUEST_MSG_TYPE)
+
+        msg.message_parameters_reference.manufacturer = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.serial_num = '1234'
+        msg.message_parameters_reference.fw_version = '1'
+
+        rspMsg = yield self.iic.createNewInstrument(msg)
+        
+        instrument_id = rspMsg.message_parameters_reference[0].instrument_resource_id
+        log.info("IIServiceTest test_createInstrument  instrument id: %s ", instrument_id )
+
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Start instrument agent request')
+        msg.message_parameters_reference = msg.CreateObject(START_INSTRUMENT_AGENT_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.name = 'SeaBird Electronics'
+        msg.message_parameters_reference.model = 'SBE37'
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
+
+        rspMsg = yield self.iic.startInstrumentAgent(msg)
+        
+        instrument_agent_process_id = rspMsg.message_parameters_reference[0].instrument_agent_resource_id
+        instrument_agent_resource_id = rspMsg.message_parameters_reference[0].instrument_agent_process_id
+        log.info("IIServiceTest test_create_instrument  instrument agent resource id: %s   process id: %s", instrument_agent_resource_id, instrument_agent_process_id )
 
         #self.sub = DataEventSubscriber(process=self.sup, origin=instrument_agent_process_id)  DataBlockEventSubscriber
         self.sub = DataBlockEventSubscriber(process=self.sup, origin=instrument_agent_process_id)
@@ -207,17 +275,21 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         log.info('IIServiceTest test_createInstrumentStartSampling DatasetSupplementAddedEvent activation complete')
 
         # Start autosampling.
-        result = yield self.iic.startAutoSampling(instrument_id)
-        log.info("IIServiceTest test_createInstrumentStartSampling  startAutoSampling: %s ", result['result'] )
-        resultDict = result['result']
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Start instrument sampling request')
+        msg.message_parameters_reference = msg.CreateObject(START_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
+
+        rspMsg = yield self.iic.startAutoSampling(msg)
+        log.info("IIServiceTest test_createInstrumentStartSampling  startAutoSampling: %s ", rspMsg.message_parameters_reference[0].status)
 
         # Wait for a few samples to arrive.
         yield pu.asleep(20)
 
         # Stop autosampling.
-        result = yield self.iic.stopAutoSampling(instrument_id)
-        log.info("IIServiceTest test_createInstrumentStartSampling  Stop autosampling: %s ", result['result'] )
-        resultDict = result['result']
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Stop instrument sampling request')
+        msg.message_parameters_reference = msg.CreateObject(STOP_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE)
+        msg.message_parameters_reference.instrument_resource_id = instrument_id
 
-        log.info("IIServiceTest test_createInstrumentStartSampling Finished testing: Create instrument from UI")
+        rspMsg = yield self.iic.stopAutoSampling(msg)
+        log.info("IIServiceTest test_createInstrumentStartSampling  Stop autosampling: %s ", rspMsg.message_parameters_reference[0].status)
 
