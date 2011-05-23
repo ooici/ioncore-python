@@ -496,6 +496,7 @@ traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
                       DESCRIPTION_CFG:'An example of a trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':trj_dataset_loc},
+                      LCS_CFG : COMMISSIONED
                       },
 
 station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
@@ -504,6 +505,7 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       DESCRIPTION_CFG:'An example of a station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
+                      LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_dataset_name:{
