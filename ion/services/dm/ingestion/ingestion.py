@@ -314,27 +314,50 @@ class IngestionService(ServiceProcess):
         yield self._subscriber.terminate()
         self._subscriber = None
 
-        if ingest_res:
-            log.debug("Ingest succeeded, respond to original request")
+        data_details = self.get_data_details(content)
+
+        ingest_res.update(data_details)
+
+        if ingest_res.has_key(EM_ERROR):
+            log.info("Ingest Failed!")
+
+            yield self._notify_ingest(ingest_res)
+            
+        else:
+            log.info("Ingest succeeded!")
+
+            # If the dataset / source is new 
+            if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
+
+                data_source = yield self.rc.get_instance(content.datasource_id)
+
+                if data_source.is_public == True:
+
+                    data_source.ResourceLifeCycleState = data_source.COMMISSIONED
+                    self.dataset.ResourceLifeCycleState = self.dataset.COMMISSIONED
+
+                else:
+
+                    data_source.ResourceLifeCycleState = data_source.ACTIVE
+                    self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
-            data_details = self.get_data_details(content)
+                yield self.rc.put_resource_transaction([self.dataset, data_source])
 
-            ingest_res.update(data_details)
 
-            yield self.rc.put_instance(self.dataset)
+            else:
 
-            # send notification we performed an ingest
+                yield self.rc.put_instance(self.dataset)
+
+
             yield self._notify_ingest(ingest_res)
 
-
-            # now reply ok to the original message
-            yield self.reply_ok(msg)
-        else:
-            log.debug("Ingest failed, error back to original request")
-            raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
-
         self.dataset=None
+
+        # now reply ok to the original message
+        yield self.reply_ok(msg)
+
+
 
         log.info('op_ingest - Complete')
 
@@ -370,6 +393,8 @@ class IngestionService(ServiceProcess):
     def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
+
+        This method is really not needed but I like it for testing...
         """
 
         log.debug('_notify_ingest - Start')

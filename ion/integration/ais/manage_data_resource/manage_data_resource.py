@@ -428,6 +428,9 @@ class ManageDataResource(object):
 
 
 
+            """
+            Moved this functionality to the ingestion services where it simplifies the interactions.
+
             #event to subscribe to
             log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
             self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
@@ -438,8 +441,7 @@ class ManageDataResource(object):
             yield self._subscriber.register()
             yield self._subscriber.initialize()
             yield self._subscriber.activate()
-
-
+            """
 
             yield self.rc.put_resource_transaction(resource_transaction)
 

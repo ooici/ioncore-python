@@ -454,6 +454,7 @@ class JavaAgentWrapper(ServiceProcess):
 
         (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
 
+        self._registered_life_cycle_objects.remove(self._subscriber)
         yield self._subscriber.terminate()
         self._subscriber = None
 
