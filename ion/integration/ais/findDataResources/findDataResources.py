@@ -103,7 +103,7 @@ class FindDataResources(object):
         self.ais = ais
         self.rc = ResourceClient(proc=ais)
         self.mc = ais.mc
-        self.asc = AssociationServiceClient()
+        self.asc = AssociationServiceClient(proc=ais)
         self.ac = AssociationClient(proc=ais)
         self.nac = NotificationAlertServiceClient(proc=ais)
 
@@ -524,9 +524,6 @@ class FindDataResources(object):
             log.error('__findResourcesOfType: association error!')
             defer.returnValue(None)
 
-        for dset in result.idrefs:
-            log.error('found ds: %s ' % (dset.key))
-            
         log.debug('__findResourcesOfType() exit: found %d resources' % len(result.idrefs))
         
         defer.returnValue(result)
