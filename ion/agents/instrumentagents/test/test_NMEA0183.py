@@ -131,7 +131,7 @@ class TestNMEADevice(IonTestCase):
 
         print '\n          ----- test_configure -----'
 
-        if not force and 'test_configure' in SKIP_TESTS:
+        if 'test_configure' in SKIP_TESTS:
             raise unittest.SkipTest('Test is implicitly marked for skip.')
 
         params = self.driver_config
