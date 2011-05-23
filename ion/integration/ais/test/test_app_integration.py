@@ -105,6 +105,7 @@ class AppIntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        log.debug('AppIntegrationTest.setUp():')
         yield self._start_container()
 
         store.Store.kvs.clear()
@@ -195,21 +196,6 @@ class AppIntegrationTest(IonTestCase):
         self.ac  = AssociationClient(proc=sup)
         self._proc = Process()
 
-        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
-        f = None
-        id = None
-
-        """        
-        try:
-            f = open('dispatcher.id', 'r')
-            id = f.read().strip()
-            # @todo: ensure this resource exists in the ResourceRepo
-        except IOError:
-             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
-        finally:
-            if f is not None:
-                f.close()
-        """
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -1018,56 +1004,72 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
         
         msg.message_parameters_reference.resource_type = "datasets"
+        log.debug('getResourcesOfType: calling AIS to get datasets')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "identities"
+        log.debug('getResourcesOfType: calling AIS to get identities')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "datasources"
+        log.debug('getResourcesOfType: calling AIS to get datasources')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "epucontrollers"
+        log.debug('getResourcesOfType: calling AIS to get epucontrollers')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
 
     @defer.inlineCallbacks
     def test_getResource(self):

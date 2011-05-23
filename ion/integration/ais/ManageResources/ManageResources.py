@@ -108,17 +108,13 @@ class ManageResources(object):
       defer.returnValue(Response)
 
 
+   @defer.inlineCallbacks
    def __findEpuControllers(self):
       log.debug('__findEpuControllers')
       d = DictObj
-      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
-      """
-      d.idrefs = ['dataservices_epu_controller',
-                  'agentservices_epu_controller',
-                  'associationservices_epu_controller']
-      """
-      d.idrefs = self.eclc.list()
-      return d
+      d.idrefs = yield self.eclc.list()
+      log.debug('__findEpuControllers: returning '+str(d))
+      defer.returnValue(d)
 
 
    @defer.inlineCallbacks
@@ -126,7 +122,8 @@ class ManageResources(object):
 
       if resourceType == EPU_CONTROLLER_TYPE_ID:
          # get the resources from the EPU management
-         defer.returnValue(self.__findEpuControllers())
+         result = yield self.__findEpuControllers()
+         defer.returnValue(result)
       
       # get the resources out of the Association Service
       request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
