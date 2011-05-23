@@ -200,7 +200,7 @@ class EventPublisher(Publisher):
         @param origin       The origin to use in the topic. If not set, uses the origin set in the initializer.
         """
         origin = origin or self._origin
-        assert origin and origin != "unknown"
+        assert origin and origin != "unknown", 'Error - No origin publishing event message:\n %s' % str(event_msg)
 
         routing_key=self.topic(origin)
         log.debug("Publishing message to %s" % routing_key)
