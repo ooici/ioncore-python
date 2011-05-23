@@ -25,6 +25,9 @@ from ion.core.exception import ConfigurationError, FatalError, StartupError
 from ion.core.ioninit import ion_config
 from ion.util.config import Config
 
+from ion.core.process.process import Process
+from ion.services.dm.distribution.events import AppLoaderEventPublisher
+
 START_PERMANENT = "permanent"
 
 class AppLoader(object):
@@ -161,11 +164,12 @@ class AppLoader(object):
         """
 
         # imports must be constrained here or we get cyclical problems!
-        from ion.core.process.process import Process
-        from ion.services.dm.distribution.events import AppLoaderEventPublisher
 
         p = Process(spawnargs={'proc-name':'AppLoaderPublisherProcess'})
-        yield p.spawn()
+        # don't spawn - we don't want to register with the proc_manager, as they are never removed?
+        yield p.initialize()
+        yield p.activate()
+
         pub = AppLoaderEventPublisher(process=p)
         yield pub.initialize()
         yield pub.activate()

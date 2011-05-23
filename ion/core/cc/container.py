@@ -28,9 +28,10 @@ from ion.core.intercept.interceptor_system import InterceptorSystem
 from ion.core.messaging.exchange import ExchangeManager
 from ion.core.pack.application import AppLoader
 from ion.core.pack.app_manager import AppManager
-from ion.core.process.proc_manager import ProcessManager
+from ion.core.process.proc_manager import ProcessManager, Process
 from ion.util.state_object import BasicLifecycleObject
 from ion.util.config import Config
+from ion.services.dm.distribution.events import ContainerLifecycleEventPublisher
 
 CONF = ioninit.config(__name__)
 CF_is_config = Config(CONF.getValue('interceptor_system')).getObject()
@@ -115,12 +116,7 @@ class Container(BasicLifecycleObject):
 
         # now that we've activated, can publish ContainerLifecycleEvents as we need the exchange_manager in place.
         # this is the first chance we have to construct this publisher though.
-
-        # have to import here or we get cyclical problems
-        from ion.services.dm.distribution.events import ContainerLifecycleEventPublisher
-        from ion.core.process.process import Process
-
-        p = Process(spawnargs={'proc-name': 'ContainerLCEPubProc'})
+        p = Process(spawnargs={'proc-name': 'ContainerLCEPubProcess'})
         yield p.spawn()
 
         self._lc_pub = ContainerLifecycleEventPublisher(origin=self.id, process=p)
