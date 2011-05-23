@@ -22,6 +22,8 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.cc import container
 from ion.util.path import adjust_dir
+from ion.services.dm.distribution.events import ContainerStartupEventPublisher
+from ion.core.process.process import Process
 
 class Options(usage.Options):
     """
@@ -145,12 +147,11 @@ class CapabilityContainer(service.Service):
         self.defer_started.callback(True)
 
         # event notify that the startup is good to go!
-
-        # must do imports here or we get cyclical import problems
-        from ion.services.dm.distribution.events import ContainerStartupEventPublisher
-        from ion.core.process.process import Process
         p = Process(spawnargs={'proc-name':'ContainerStartupPubProcess'})
-        yield p.spawn()
+        # don't spawn - we don't want to register with the proc_manager, as they are never removed?
+        yield p.initialize()
+        yield p.activate()
+
         pub = ContainerStartupEventPublisher(process=p)
         yield pub.initialize()
         yield pub.activate()
