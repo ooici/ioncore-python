@@ -615,7 +615,6 @@ profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_data_source_resource,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[profile_dataset_name][ID_CFG]},
-                      LCS_CFG : COMMISSIONED
                       },
 
 traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5',
