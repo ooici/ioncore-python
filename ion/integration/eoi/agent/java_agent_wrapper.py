@@ -524,7 +524,7 @@ class JavaAgentWrapper(ServiceProcess):
         except OOIObjectError, oe:
             log.debug('No start time attribute found in dataset!' + str(oe))
 
-            start_time_seconds = calendar.timegm(datetime.datetime.utcnow()) - datasource.update_interval_seconds
+            start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
         if testing:
@@ -533,7 +533,8 @@ class JavaAgentWrapper(ServiceProcess):
             end_time_seconds = start_time_seconds + deltaTime
         else:
             log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
-            end_time_seconds = calendar.timegm(datetime.datetime.utcnow())
+            # Get upto one day in the future?
+            end_time_seconds = calendar.timegm(time.gmtime()) + 86400
 
         stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
         log.info('Getting Data Start time: %s' % stime)
