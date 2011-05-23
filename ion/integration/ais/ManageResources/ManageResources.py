@@ -15,6 +15,7 @@ from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
+from ion.integration.eoi.epu_controller_list.controller_list_client import EPUControllerListClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
                                                                     identity_res_type_name, \
@@ -86,8 +87,9 @@ class ManageResources(object):
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
       self.mc = ais.mc
-      self.asc = AssociationServiceClient()
-      self.rc = ResourceClient()
+      self.asc = AssociationServiceClient(proc=ais)
+      self.rc = ResourceClient(proc=ais)
+      self.eclc = EPUControllerListClient(proc=ais)
         
 
    @defer.inlineCallbacks
@@ -108,11 +110,14 @@ class ManageResources(object):
 
    def __findEpuControllers(self):
       log.debug('__findEpuControllers')
-      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
       d = DictObj
+      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
+      """
       d.idrefs = ['dataservices_epu_controller',
                   'agentservices_epu_controller',
                   'associationservices_epu_controller']
+      """
+      d.idrefs = self.eclc.list()
       return d
 
 
