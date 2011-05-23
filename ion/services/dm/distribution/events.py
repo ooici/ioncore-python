@@ -200,7 +200,7 @@ class EventPublisher(Publisher):
         @param origin       The origin to use in the topic. If not set, uses the origin set in the initializer.
         """
         origin = origin or self._origin
-        assert origin and origin != "unknown"
+        assert origin and origin != "unknown", 'Error - No origin publishing event message:\n %s' % str(event_msg)
 
         routing_key=self.topic(origin)
         log.debug("Publishing message to %s" % routing_key)
@@ -393,6 +393,14 @@ class DataBlockEventPublisher(DataEventPublisher):
     The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
+
+class InstrumentSampleDataEventPublisher(DataBlockEventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 #
 #
 # ################################################################################
@@ -600,4 +608,12 @@ class DataBlockEventSubscriber(DataEventSubscriber):
     The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
     event_id = DATABLOCK_EVENT_ID
+
+class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
+    """
+    Event Notification Subscriber for Instrument Data.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    msg_type = INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE
 

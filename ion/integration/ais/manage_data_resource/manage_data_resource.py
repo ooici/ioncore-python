@@ -132,6 +132,9 @@ class ManageDataResource(object):
                                                                            HAS_A_ID, 
                                                                            DATASET_RESOURCE_TYPE_ID)
 
+                    # @TODO Must update the existing scheduled event if it exists!
+                    # May have to delete and re add?
+
                     #dataset_id = dataset_resource.ResourceIdentity
                     sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
                                                                   msg.update_start_datetime_millis,
@@ -499,10 +502,11 @@ class ManageDataResource(object):
         req_msg = yield self.mc.create_instance(SCHEDULER_ADD_REQ_TYPE)
         req_msg.interval_seconds       = interval
         req_msg.start_time             = start_time
+        req_msg.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+
         req_msg.payload                = req_msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         req_msg.payload.dataset_id     = dataset_id
         req_msg.payload.datasource_id  = datasource_id
-        req_msg.payload.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
         log.info("sending request to scheduler")
         response = yield self.sc.add_task(req_msg)

@@ -232,32 +232,9 @@ class IngestionService(ServiceProcess):
 
         yield self.dataset.Repository.fetch_links(ba_links)
 
-        try:
-            att = self.dataset.root_group.FindAttributeByName('title')
-            title = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            title = 'None Given'
-
-
-        try:
-            att = self.dataset.root_group.FindAttributeByName('references')
-            references = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            references = 'None Given'
-
-
-
-        data_details = {EM_TITLE:title,
-                       EM_URL:references,
-                       EM_DATA_SOURCE:content.datasource_id,
-                       EM_DATASET:content.dataset_id,
-                       }
-
         log.debug('_prepare_ingest - Complete')
 
-        defer.returnValue(data_details)
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def _setup_ingestion_topic(self, content):
@@ -295,7 +272,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        data_details = yield self._prepare_ingest(content)
+        yield self._prepare_ingest(content)
 
         log.info('Created dataset details, Now setup subscriber...')
 
@@ -340,6 +317,9 @@ class IngestionService(ServiceProcess):
         if ingest_res:
             log.debug("Ingest succeeded, respond to original request")
 
+
+            data_details = self.get_data_details(content)
+
             ingest_res.update(data_details)
 
             yield self.rc.put_instance(self.dataset)
@@ -358,6 +338,32 @@ class IngestionService(ServiceProcess):
 
         log.info('op_ingest - Complete')
 
+
+    def get_data_details(self, content):
+        try:
+            att = self.dataset.root_group.FindAttributeByName('title')
+            title = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            title = 'None Given'
+
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('references')
+            references = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            references = 'None Given'
+
+
+
+        data_details = {EM_TITLE:title,
+                       EM_URL:references,
+                       EM_DATA_SOURCE:content.datasource_id,
+                       EM_DATASET:content.dataset_id,
+                       }
+
+        return data_details
 
 
     @defer.inlineCallbacks

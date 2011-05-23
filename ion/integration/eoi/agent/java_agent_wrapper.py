@@ -26,6 +26,9 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 
+from ion.services.dm.distribution.publisher_subscriber import Subscriber
+
+
 from ion.core.exception import ApplicationError
 
 from ion.core import ioninit
@@ -396,9 +399,9 @@ class JavaAgentWrapper(ServiceProcess):
         self.__ingest_ready_deferred = defer.Deferred()
         
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
-        log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
-        if self.__ingest_client is None:
-            self.__ingest_client = IngestionClient(proc=self)
+        #log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
+        #if self.__ingest_client is None:
+        #    self.__ingest_client = IngestionClient(proc=self)
         
         reply_to        = self.receiver.name
         ingest_timeout  = context.max_ingest_millis
@@ -412,7 +415,8 @@ class JavaAgentWrapper(ServiceProcess):
         begin_msg.reply_to                  = reply_to
         begin_msg.ingest_service_timeout    = ingest_timeout
 
-        perform_ingest_deferred = self.__ingest_client.ingest(begin_msg)
+        # Can't use client because we want to access the defered and change the timeout!
+        perform_ingest_deferred = self.rpc_send(self.get_scoped_name('system',"ingestion"), "ingest", begin_msg, timeout=ingest_timeout)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
@@ -421,25 +425,44 @@ class JavaAgentWrapper(ServiceProcess):
         log.debug("Ingest is ready to receive data!")
         context.xp_name = irmsg.xp_name
         context.ingest_topic = irmsg.publish_topic
-        
+
+
+        log.info('Create subscriber to bump timeouts...')
+        self._subscriber = Subscriber(xp_name="magnet.topic",
+                                             binding_key=content.dataset_id,
+                                             process=self)
+
+        def increase_timeout(data):
+            log.debug("INCREASING TIMEOUT")
+            log.debug(dir(perform_ingest_deferred))
+            perform_ingest_deferred.rpc_call.delay(ingest_timeout/1000)
+
+        self._subscriber.ondata = increase_timeout
+
+
+        yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
+
+
 #        yield  self.__ingest_client.demo(ingest_topic)
         log.info("@@@--->>> Sending update request to Dataset Agent with context...")
         log.debug("..." + str(context))
-        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=60) # @attention: where should this timeout come from?
-
-        # @TODO check the result from the dataset agent!
-
-        log.info('Dataset Agent Reply Content: %s' % str(content))
-        log.info('Dataset Agent Reply Headers: %s' % str(headers))
-
+        yield self.send(self.agent_binding, self.agent_update_op, context)
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
-        yield perform_ingest_deferred
+
+
+
+        (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
+
+        yield self._subscriber.terminate()
+        self._subscriber = None
 
         log.debug('Ingestion is complete on the ingestion services side...')
 
 
-        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
+        if headers.get('protocol') == 'rpc':
+            res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
+
         #yield msg.ack()
         log.info('**** Ingestion COMPLETE! ****')
         
@@ -524,7 +547,7 @@ class JavaAgentWrapper(ServiceProcess):
         except OOIObjectError, oe:
             log.debug('No start time attribute found in dataset!' + str(oe))
 
-            start_time_seconds = calendar.timegm(datetime.datetime.utcnow()) - datasource.update_interval_seconds
+            start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
         if testing:
@@ -533,7 +556,8 @@ class JavaAgentWrapper(ServiceProcess):
             end_time_seconds = start_time_seconds + deltaTime
         else:
             log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
-            end_time_seconds = calendar.timegm(datetime.datetime.utcnow())
+            # Get upto one day in the future?
+            end_time_seconds = calendar.timegm(time.gmtime()) + 86400
 
         stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
         log.info('Getting Data Start time: %s' % stime)
@@ -706,7 +730,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.6.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.8.jar')
 
         if not os.path.exists(jar_pathname):
             log.error("JAR for dataset agent (%s) not found" % jar_pathname)
@@ -817,7 +841,7 @@ class JavaAgentWrapperClient(ServiceClient):
         log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
 
 #        (content, headers, msg) = yield self.send('update_request', change_event)
-        yield self.rpc_send('update_request', change_event, timeout=100)
+        yield self.rpc_send('update_request', change_event, timeout=300)
         
         defer.returnValue(None)
         

@@ -404,7 +404,7 @@ class WrapperType(type):
             # Special methods for certain object types:
             WrapperType._add_specializations(cls, obj_type, clsDict)
 
-            VALIDATE_ATTRS = False
+            VALIDATE_ATTRS = True
             if VALIDATE_ATTRS:
                 def obj_setter(self, k, v):
                     if self._init and not hasattr(self, k):
