@@ -16,9 +16,9 @@ import subprocess
 SERPORTMASTER = './serPortMaster'
 SERPORTSLAVE = './serPortSlave'
 AISGPSapp1 = ['./simGPS0183app']
-AISGPSapp2 = ['ion/agents/instrumentagents/simGPS0183app']
+AISGPSapp2 = ['../ion/agents/instrumentagents/simulators/simGPS0183app']
 SOCATapp1 = './socat'
-SOCATapp2 = 'ion/agents/instrumentagents/socat'
+SOCATapp2 = '../ion/agents/instrumentagents/simulators/socat'
 SOCATmaster = 'pty,link=' + SERPORTMASTER + ',raw,echo=0'
 SOCATslave = 'pty,link=' + SERPORTSLAVE + ',raw,echo=0'
 SERPORTMODE = 'w+'
@@ -60,6 +60,7 @@ class NMEA0183Simulator:
                                         stdout=self._nullDescriptor.fileno(),
                                         stderr=self._nullDescriptor.fileno())
             except OSError:
+                print '\n          ***** Current directory: %s' % os.getcwd()
                 return
 
         print '          ***** Successfully created virtual serial ports.'
@@ -90,6 +91,7 @@ class NMEA0183Simulator:
                                          stdout=self._serDescriptor.fileno(),
                                          stderr=self._nullDescriptor.fileno())
             except Exception, e:
+                print '\n          ***** Current directory: %s' % os.getcwd()
                 print e
 
         print '          ***** Successfully launched simulator.'

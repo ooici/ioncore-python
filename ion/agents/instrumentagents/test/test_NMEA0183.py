@@ -8,10 +8,8 @@
 import re
 import os
 import time
-
 from twisted.internet import defer
 from twisted.trial import unittest
-
 import ion.util.ionlog
 import ion.util.procutils as pu
 from ion.test.iontest import IonTestCase
@@ -27,12 +25,9 @@ from ion.agents.instrumentagents.driver_NMEA0183 \
     import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
-
 import  ion.agents.instrumentagents.simulators.sim_NMEA0183 as sim
 
-
 log = ion.util.ionlog.getLogger(__name__)
-
 
 def dump_dict(d, d2 = None):
     print
@@ -41,7 +36,6 @@ def dump_dict(d, d2 = None):
             print key, ' ', val, ' ', d2.get(key, None)
         else:
             print key, ' ', val
-
 
 """
     These tests require the following apps stored in ioncore-python:

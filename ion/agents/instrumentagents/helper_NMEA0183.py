@@ -9,47 +9,46 @@
 from string import hexdigits
 from ion.agents.instrumentagents.instrument_constants import *
 
-
 # Constants
-
-CRLF                = "\r\n"
-MIN_NMEA_LEN        = 8
-MAX_NMEA_LEN        = 82
-gpsNAN              = -999.9
-
+CR = '\r'
+LF = '\n'
+CRLF = '\r\n'
+MIN_NMEA_LEN = 6
+MAX_NMEA_LEN = 82
+gpsNAN = -999.9
 
 class NMEAErrorCode (InstErrorCode):
     """
     Additional error codes unique to NMEA strings.
     """
-    OK                          = ['OK']
-    INVALID_NMEA_STRING         = ['INVALID_NMEA','NMEA String improperly configured.']
-    UNKNOWN_NMEA_CODE           = ['UNKNOWN_NMEA','5-character NMEA code is not defined.']
-    INVALID_DATA_ITEMS          = ['NO_NMEA_DATA','Not enough data items for the defined NMEA data type.']
-    INTERNAL_ERROR              = ['INTERNAL_ERROR','Internal code error.']
+    OK = ['OK']
+    INVALID_NMEA_STRING = ['INVALID_NMEA','NMEA String improperly configured.']
+    INVALID_CHECKSUM = ['INVALID_CHECKSUM', 'Checksums do not agree.']
+    UNKNOWN_NMEA_CODE = ['UNKNOWN_NMEA','5-character NMEA code is not defined.']
+    INVALID_DATA_ITEMS = ['NO_NMEA_DATA','Exepected more data items']
+    INTERNAL_ERROR = ['INTERNAL_ERROR','Internal code error.']
 
-    
 class NMEADefs (BaseEnum):
     """
     Instructions to parse known NMEA strings.
     """
 
-    newsOffset                  = { 'N': 1, 'E': 1, 'W': -1, 'S': -1 }
-    fixQuality                  = ({ 0: 'Invalid' },
-                                   { 1: 'GPS Fix (SPS)' },
-                                   { 2: 'DGPS Fix' },
-                                   { 3: 'PPS Fix' },
-                                   { 4: 'Real Time Kinematic' },
-                                   { 5: 'Float RTK' },
-                                   { 6: 'Estimated (dead reckon)' },
-                                   { 7: 'Manual Input Mode' },
-                                   { 8: 'Simulation Mode' })
+    newsOffset = {'N': 1, 'E': 1, 'W': -1, 'S': -1}
+    fixQuality = ({0: 'Invalid'},
+                  {1: 'GPS Fix (SPS)'},
+                  {2: 'DGPS Fix'},
+                  {3: 'PPS Fix'},
+                  {4: 'Real Time Kinematic'},
+                  {5: 'Float RTK'},
+                  {6: 'Estimated (dead reckon)'},
+                  {7: 'Manual Input Mode'},
+                  {8: 'Simulation Mode'})
 
-    dataActive                  = {'A': 'Autonomous',
-                                   'D': 'Differential',
-                                   'E': 'Estimated',
-                                   'N': 'Not Valid',
-                                   'S': 'Simulated' }
+    dataActive = {'A': 'Autonomous',
+                  'D': 'Differential',
+                  'E': 'Estimated',
+                  'N': 'Not Valid',
+                  'S': 'Simulated'}
 
     # NMEA_CD  string  5-character NMEA data type code
     # DESC     string  Short description of the NMEA sentence
@@ -75,7 +74,6 @@ class NMEADefs (BaseEnum):
     # WEEK_NO  int     GPS week number (0 to 1023)
     # SECONDS  int     GPS seconds (0 to 604799)
     # LEAPSEC  int     GPS leap second count
-
 
     nmeaTypes = { \
     'GPGGA': {'Parsing': ['GPS Fix Data',    #0
@@ -107,15 +105,16 @@ class NMEADefs (BaseEnum):
                           'ALT_GEO',
                           'GEOUNIT',
                           'DATA_AC']},
-    'XXXXX': {'Parsing': ['Dummy Heartbeat'],  #0
+    'XXXXX': {'Parsing': ['Dummy Heartbeat',  # 0
+                          'IGNORE'],         # 1
                'Output': ['NMEA_CD']},
-    'GPGLL': {'Parsing': ['GPS Latitude and Longitude',  #0
-                          'RAW_LAT',         #1
-                          'LAT_DIR',         #2
-                          'RAW_LON',         #3
-                          'LON_DIR',         #4
-                          'UTC_HMS',         #5
-                          'DATA_AC'],       #6
+    'GPGLL': {'Parsing': ['GPS Latitude and Longitude',  # 0
+                          'RAW_LAT',         # 1
+                          'LAT_DIR',         # 2
+                          'RAW_LON',         # 3
+                          'LON_DIR',         # 4
+                          'UTC_HMS',         # 5
+                          'DATA_AC'],        # 6
                'Output': ['NMEA_CD',
                           'DESC',
                           'GPS_LAT',
@@ -125,18 +124,18 @@ class NMEADefs (BaseEnum):
                           'SEC',
                           'MS',              # Only if GPS > 1hz
                           'DATA_AC']},
-    'GPRMC': {'Parsing': ['Recommended Minimum Senence C', #0
-                          'UTC_HMS',         #1
-                          'STATUS',          #2
-                          'RAW_LAT',         #3
-                          'LAT_DIR',         #4
-                          'RAW_LON',         #5
-                          'LON_DIR',         #6
-                          'SPD_KTS',         #7
-                          'TRK_DEG',         #8
-                          'DATE',            #9
-                          'RAW_MAG'          #10
-                          'MAG_DIR'],        #11
+    'GPRMC': {'Parsing': ['Recommended Minimum Senence C', # 0
+                          'UTC_HMS',         # 1
+                          'STATUS',          # 2
+                          'RAW_LAT',         # 3
+                          'LAT_DIR',         # 4
+                          'RAW_LON',         # 5
+                          'LON_DIR',         # 6
+                          'SPD_KTS',         # 7
+                          'TRK_DEG',         # 8
+                          'DATE',            # 9
+                          'RAW_MAG'          # 10
+                          'MAG_DIR'],        # 11
                'Output': ['HOUR',
                           'MIN',
                           'SEC',
@@ -151,21 +150,21 @@ class NMEADefs (BaseEnum):
                           'MONTH',
                           'YEAR',
                           'MAG_VAR']},
-    'PGRMC': {'Parsing': ['Garmin Sensor Configuration Information', #0
-                          'FIX_MODE',        #1
-                          'ALT_MSL',         #2
-                          'E_DATUM',         #3
-                          'SM_AXIS',         #4
-                          'DATUMIFF',        #5
-                          'DATUM_DX',        #6
-                          'DATUM_DY',        #7
-                          'DATUM_DZ',        #8
-                          'DIFFMODE',        #9
-                          'BAUD_RT',         #10
-                          'IGNORE',          #11
-                          'MP_OUT',          #12
-                          'MP_LEN',          #13
-                          'DED_REC'],        #14
+    'PGRMC': {'Parsing': ['Garmin Sensor Configuration Information', # 0
+                          'FIX_MODE',        # 1
+                          'ALT_MSL',         # 2
+                          'E_DATUM',         # 3
+                          'SM_AXIS',         # 4
+                          'DATUMIFF',        # 5
+                          'DATUM_DX',        # 6
+                          'DATUM_DY',        # 7
+                          'DATUM_DZ',        # 8
+                          'DIFFMODE',        # 9
+                          'BAUD_RT',         # 10
+                          'IGNORE',          # 11
+                          'MP_OUT',          # 12
+                          'MP_LEN',          # 13
+                          'DED_REC'],        # 14
                'Output': ['FIX_MODE',
                           'ALT_MSL',
                           'E_DATUM',
@@ -179,22 +178,22 @@ class NMEADefs (BaseEnum):
                           'MP_OUT',
                           'MP_LEN',
                           'DED_REC']},
-    'PGRMF': {'Parsing': ['Garmin GPS Fix Data Sentence', #0
-                          'WEEK_NO',         #1
-                          'SECONDS',         #2
-                          'UTC_DMY',         #3
-                          'UTC_HMS',         #4
-                          'LEAPSEC',         #5
-                          'RAW_LAT',         #6
-                          'LAT_DIR',         #7
-                          'RAW_LON',         #8
-                          'LON_DIR',         #9
-                          'GPSMODE',         #10
-                          'FIXTYPE',         #11
-                          'SPD_KPH',         #12
-                          'COURSE',          #13
-                          'PDOP',            #14
-                          'TDOP'],           #15
+    'PGRMF': {'Parsing': ['Garmin GPS Fix Data Sentence', # 0
+                          'WEEK_NO',         # 1
+                          'SECONDS',         # 2
+                          'UTC_DMY',         # 3
+                          'UTC_HMS',         # 4
+                          'LEAPSEC',         # 5
+                          'RAW_LAT',         # 6
+                          'LAT_DIR',         # 7
+                          'RAW_LON',         # 8
+                          'LON_DIR',         # 9
+                          'GPSMODE',         # 10
+                          'FIXTYPE',         # 11
+                          'SPD_KPH',         # 12
+                          'COURSE',          # 13
+                          'PDOP',            # 14
+                          'TDOP'],           # 15
                'Output': ['DAY',
                           'MONTH',
                           'YEAR',
@@ -212,7 +211,6 @@ class NMEADefs (BaseEnum):
                           'PDOP',
                           'TDOP']}}
 
-
 class NMEAString ():
     """
     Representation of a single ASCII NMEA string.
@@ -224,17 +222,15 @@ class NMEAString ():
         @param  nmeaString  Complete NMEA line from $ to <CR><LF>
         """
 
-        self.nmeaStr                    = nmeaString
-        self.valid                      = self.ValidateNMEA()
-
+        self.nmeaStr = nmeaString
+        self.valid = self.ValidateNMEA()
 
     def IsValid (self):
         """
         Reports on the validity of the NMEA string.
         @retval             OK, otherwise relevant error code
         """
-        return                          self.valid
-
+        return self.valid
 
     def GetNMEAData (self):
         """
@@ -243,43 +239,41 @@ class NMEAString ():
         """
 
         if NMEAErrorCode.is_error (self.valid):
-            return                      self.valid
-        parsedOK                        = self.ParseNMEA()
+            return self.valid
+        parsedOK = self.ParseNMEA()
         if NMEAErrorCode.is_error (parsedOK):
-            return                      parsedOK
-        return                          self.dataOut
+            return parsedOK
+        return self.dataOut
 
-    
     def NMEAChecksum (self, nmeaCS, checkH, checkL):
         """
         Calculates NMEA checksum and compares it with the in-string value.
-        @param  nmeaCS      Only the characters between '$' and '*' exclusive
-        @param  checkH      left (most significant) hex nibble of the NMEA's checksum
-        @param  checkL      right (least significant) hex nibble of the NMEA's checksum
-        @retval             OK if checksums match, otherwise relevant error code
+        @param  nmeaCS Only the characters between '$' and '*' exclusive
+        @param  checkH left (most sig.) hex nibble of the NMEA's checksum
+        @param  checkL right (least sig.) hex nibble of the NMEA's checksum
+        @retval        OK if checksums match, otherwise relevant error code
         """
 
         # Validate the hex nibbles
         if checkH not in hexdigits or checkL not in hexdigits:
-            return                      NMEAErrorCode.INVALID_NMEA_STRING
+            return NMEAErrorCode.INVALID_NMEA_STRING
 
         # Calculate checksum
         # checksum = 8-bit XOR of all chars in string
         # result is an 8-bit number (0 to 255)
-        cs                              = ord (reduce (lambda x, y: chr (ord (x) ^ ord (y)), nmeaCS))
-        calcLow                         = chr (48 + (cs & 15))          # CS and 00001111
-        calcHigh                        = chr (48 + ((cs & 240) >> 4))  # CS and 11110000
+        cs = ord (reduce (lambda x, y: chr (ord (x) ^ ord (y)), nmeaCS))
+        calcLow = chr (48 + (cs & 15))           # CS and 00001111
+        calcHigh = chr (48 + ((cs & 240) >> 4))  # CS and 11110000
 
         # Validate calculated against what the NMEA string said it should be
         if (calcLow == checkL and calcHigh == checkH):
-            return                      NMEAErrorCode.OK
-        return                          NMEAErrorCode.INVALID_NMEA_STRING
-
+            return NMEAErrorCode.OK
+        return NMEAErrorCode.INVALID_NMEA_STRING
 
     def ValidateNMEA (self):
         """
         Checks that an NMEA string is valid.
-        @retval             OK if valid NMEA string, otherwise relevant error code
+        @retval OK if valid NMEA string, otherwise relevant error code
         """
 
         # Rules for a valid NMEA string:
@@ -294,39 +288,63 @@ class NMEAString ():
         #       - Checksum = 8-bit XOR of all chars between $ and * exclusive
 
         # Validate NMEA string length
-        nmeaLen                         = len (self.nmeaStr)
-        if  nmeaLen < MIN_NMEA_LEN or nmeaLen > MAX_NMEA_LEN:
-            return                      NMEAErrorCode.INVALID_NMEA_STRING
+        nmeaLen = len (self.nmeaStr)
+        if nmeaLen < MIN_NMEA_LEN or nmeaLen > MAX_NMEA_LEN:
+            return NMEAErrorCode.INVALID_NMEA_STRING
 
-        # Validate '$' and <CR><LF>
-        if (self.nmeaStr[0] != '$') or (self.nmeaStr[-2:] != CRLF):
-            return                      NMEAErrorCode.INVALID_NMEA_STRING
+        # Validate '$'
+        if self.nmeaStr[0] != '$':
+            return NMEAErrorCode.INVALID_NMEA_STRING
 
-        # Verify a valid 5-char code after the '$'
-        self.nmeaType                   = self.nmeaStr[1:6]
+        # Properly formed NMEA strings must end in <CR><LF>
+        # Reality is that some devices don't do it or that middleware changes
+        # it to some variant.  It is also convenient in testing to not have
+        # them in place.
+        # Therefore, this code does not enforce the presence of <CR><LF> and
+        # in fact allows any combination of <CR>, <LF>, both, or none.
+        self.nmeaStr.rstrip()
+
+        # Verify that there is at least one data element to parse
+        # 0 1 2
+        #  $ X ,<end>    minimum possible NMEA string
+        try:
+            firstComma = self.nmeaStr.index(',', 2)
+        except ValueError:
+            return NMEAErrorCode.INVALID_NMEA_STRING
+
+        # Strip out NMEA type code and verify it is known to this parser
+        self.nmeaType = self.nmeaStr[1:firstComma]
         if not NMEADefs.nmeaTypes.has_key (self.nmeaType):
-            return                      NMEAErrorCode.UNKNOWN_NMEA_CODE
+            return NMEAErrorCode.UNKNOWN_NMEA_CODE
 
         # Validate CEHCKSUM (if there is one)
-        if self.nmeaStr[-5] != '*':
-            self.nmeaData               = self.nmeaStr[6:]
-            return                      NMEAErrorCode.OK
-        goodSum                         = self.NMEAChecksum (self.nmeaStr[1:-5], self.nmeaStr[-4], self.nmeaStr[-3])
-        if NMEAErrorCode.is_ok          (goodSum):
-            self.nmeaData               = self.nmeaStr[1:-5]
-        return                          goodSum
+        #       Since <CR><LF> was stripped off, '*' marking the
+        #       checksum will always be at location [-3]
+        # -3 -2 -1
+        #   *  F  F<end>
+        if self.nmeaStr[-3] == '*':
+            self.nmeaData = self.nmeaStr[1: -3]  # Strip off checksum and '$'
+            goodSum = self.NMEAChecksum (self.nmeaData,
+                                         self.nmeaStr[-2],
+                                         self.nmeaStr[-1])
+            if NMEAErrorCode.is_error(goodSum):
+                return NMEAErrorCode.INVALID_CHECKSUM
 
-        
+        else:
+            self.nmeaData = self.nmeaStr[1:]     # Strip off checksum
+        return NMEAErrorCode.OK
+
     def NMEAStrToFloat (self, inStr):
         """
         Converts string to float for NMEA string processing.
         @param  inStr       Input float as a string
         @retval             Float value or gpsNAN on not a float value error
         """
+
         try:
-            return                      float (inStr)
+            return float (inStr)
         except:
-            return                      gpsNAN
+            return gpsNAN
 
     def NMEADegMinToDecDeg (self, inFloat):
         """
@@ -334,119 +352,136 @@ class NMEAString ():
         @param  inFloat     Input float value
         @retval             Float in decimal degrees
         """
-        deg                 = int (inFloat / 100.0)
-        min                 = inFloat - (deg * 100.0)
-        return              deg + min / 60.0
 
+        deg = int (inFloat / 100.0)
+        min = inFloat - (deg * 100.0)
+        return deg + min / 60.0
 
     def ParseNMEA (self):
         """
         Main parsing routine for an NMEA string.
-        @retval             Dict containing nmeaDefs and parsed values or error relevant code
+        @retval Dict of nmeaDefs and parsed values or error relevant code
         """
 
-        parsed                          = self.nmeaData.upper().split (',')
-        nmeaType                        = parsed[0]
-        howToParse                      = (NMEADefs.nmeaTypes.get (nmeaType, 'NODT'))
+        parsed = self.nmeaData.upper().split (',')
+        nmeaType = parsed[0]
+        howToParse = NMEADefs.nmeaTypes.get (nmeaType, 'NODT')
         if howToParse == 'NODT':
-            return                      NMEAErrorCode.UNKNOWN_NMEA_CODE
-        howToParse                      = howToParse['Parsing']
+            return NMEAErrorCode.UNKNOWN_NMEA_CODE
+        howToParse = howToParse['Parsing']
         if howToParse == 'NODT':
-            return                      NMEAErrorCode.INTERNAL_ERROR
+            return NMEAErrorCode.INTERNAL_ERROR
 
-        
+
         # Must have enough data elements to parse
         if len (parsed) < len (howToParse):
-            return                      NMEAErrorCode.INVALID_DATA_ITEMS
+            return NMEAErrorCode.INVALID_DATA_ITEMS
 
         # Break apart the data values and deal with each type
-        nmeaType                        = parsed[0]
-        dataOut                         = {}
-        dataOut['NMEA_CD']              = nmeaType          # NMEA_CD  string  5-character NMEA data type code
-        dataOut['DESC']                 = howToParse[0]     # DESC     string  Short description of the NMEA sentence
-        rawLat                          = gpsNAN
-        rawLon                          = gpsNAN
+        nmeaType = parsed[0]
+        dataOut = {}
+
+        # NMEA_CD  string  5-character NMEA data type code
+        dataOut['NMEA_CD'] = nmeaType
+
+        # DESC     string  Short description of the NMEA sentence
+        dataOut['DESC'] = howToParse[0]
+
+        rawLat = gpsNAN
+        rawLon = gpsNAN
 
         for howTo in howToParse[1:]:
 
-            item                        = parsed[howToParse.index (howTo)]
+            item = parsed[howToParse.index (howTo)]
 
-            # UTC_HMS  double  UTC time on a 24hr clock as HHMMSS.S (1hz GPS as HHMMSS)     ex: 123519.2  = 12:35:19.2
+            # UTC_HMS  double  UTC time on a 24hr clock as HHMMSS.S
+            #                  (1hz GPS as HHMMSS)
+            #                  ex: 123519.2  = 12:35:19.2
             if howTo == 'UTC_HMS':
                 # Valid time is HHMMSS or HHMMSS.S
-                decPos                  = item.find ('.')
+                decPos = item.find ('.')
                 if (len (item) == 6) or (decPos == 6):
-                    dataOut['HOUR']     = int (item[:2])
-                    dataOut['MIN']      = int (item[2:4])
-                    dataOut['SEC']      = int (item[4:6])
+                    dataOut['HOUR'] = int (item[:2])
+                    dataOut['MIN'] = int (item[2:4])
+                    dataOut['SEC'] = int (item[4:6])
                     if decPos == 6:
-                        dataOut['MS']   = int (float (item[6:]) * 1000.0)
+                        dataOut['MS'] = int (float (item[6:]) * 1000.0)
 
-            # RAW_LAT  double  Lat as ddmm.mmm, needs converting to decimal degrees    ex: 4807.038  = 48deg 7.038min
+            # RAW_LAT  double  Lat as ddmm.mmm, needs converting to dec. deg.
+            #                  ex: 4807.038  = 48deg 7.038min
             if howTo == 'RAW_LAT':
-                rawLat                  = self.NMEAStrToFloat (item)
+                rawLat = self.NMEAStrToFloat (item)
                 
             # LAT_DIR  char    N or S (if S, lat is negative)
             if howTo == 'LAT_DIR':
-                offset                  = NMEADefs.newsOffset.get (item, gpsNAN)
-                rawLat                  = self.NMEADegMinToDecDeg (rawLat) * offset
+                offset = NMEADefs.newsOffset.get (item, gpsNAN)
+                rawLat = self.NMEADegMinToDecDeg (rawLat) * offset
                 if abs (rawLat) <= 90.0:
-                    dataOut['GPS_LAT']  = rawLat
+                    dataOut['GPS_LAT'] = rawLat
 
-            # RAW_LON  double  Lon as dddmm.sss, needs converting to decimal degrees   ex: 01131.051 = 11deg 31.051min
+            # RAW_LON  double  Lon as dddmm.sss, needs converting to dec. deg.
+            #                  ex: 01131.051 = 11deg 31.051min
             if howTo == 'RAW_LON':
-                rawLon                  = self.NMEAStrToFloat (item)
+                rawLon = self.NMEAStrToFloat (item)
 
             # LON_DIR  char    E or W (if W, lon is negative)
             if howTo == 'LON_DIR':
-                offset                  = NMEADefs.newsOffset.get (item, gpsNAN)
-                rawLon                  = self.NMEADegMinToDecDeg (rawLon) * offset
+                offset = NMEADefs.newsOffset.get (item, gpsNAN)
+                rawLon = self.NMEADegMinToDecDeg (rawLon) * offset
                 if abs (rawLon) <= 180.0:
                     dataOut['GPS_LON']  = rawLon
 
-            # FIX_QUA  int     See fixQuality list above                               ex: 2         = DGPS Fix
+            # FIX_QUA  int     See fixQuality list above
+            #                  ex: 2         = DGPS Fix
             if howTo == 'FIX_QUA':
                 if item.isdigit():
-                    i                   = int (item)
+                    i = int (item)
                     if i < 9:
                         dataOut['FIX_QUA'] = NMEADefs.fixQuality[i]
 
-            # NUM_SAT  int     Number of tracked satellites (<10 may have  leading 0)  ex: 08        = 8 satellites
+            # NUM_SAT  int Number of tracked satellites (<10 may have leading 0)
+            #              ex: 08        = 8 satellites
             if howTo == 'NUM_SAT':
                 if item.isdigit():
                     item                = int (item)
                     if i < 25:
                         dataOut['NUM_SAT'] = i
 
-            # HOR_DOP  double  Relative accuracy of horizontal position (in m)         ex: 0.9       = .9 meters HDOP
+            # HOR_DOP  double  Relative accuracy of horizontal position (in m)
+            #                  ex: 0.9       = .9 meters HDOP
             if howTo == 'HOR_DOP':
                 f                       = self.NMEAStrToFloat (item)
                 if f != gpsNAN:
                     dataOut['HDOP']     = f
 
-            # ALT_MSL  double  Altitude above mean sea level (MSL)                     ex: 545.4     = 545.4 alt MSL
+            # ALT_MSL  double  Altitude above mean sea level (MSL)
+            #                  ex: 545.4     = 545.4 alt MSL
             if howTo == 'ALT_MSL':
-                rawAlt                  = self.NMEAStrToFloat (item)
+                rawAlt = self.NMEAStrToFloat (item)
                 if rawAlt != gpsNAN:
                     dataOut['ALT_MSL']  = rawAlt
 
-            # MSLUNIT  char    Units for altitude mean sea level, M = meters
+            # MSLUNIT  char    Units for altitude mean sea level
+            #                  M = meters
             if howTo == 'MSLUNIT':
                 if item == 'M':
                     dataOut['MSLUNIT']  = item
                 
-            # ALT_GEO  double  Altitude above mean geoid (usually WGS84?)              ex: 342.7     = 342.7 alt MSL
+            # ALT_GEO  double  Altitude above mean geoid (usually WGS84?)
+            #                  ex: 342.7     = 342.7 alt MSL
             if howTo == 'MSLUNIT':
-                rawAlt                  = self.NMEAStrToFloat (item)
+                rawAlt = self.NMEAStrToFloat (item)
                 if rawAlt != gpsNAN:
                     dataOut['ALT_GEO']  = rawAlt
 
-            # GEOUNIT  char    Units for altitude geoid, M = meters
+            # GEOUNIT  char    Units for altitude geoid
+            #                  M = meters
             if howTo == 'GEOUNIT':
                 if item == 'M':
                     dataOut['GEOUNIT']  = item
 
-            # DATA_AC  char    See dataActive list above                               ex: A
+            # DATA_AC  char    See dataActive list above
+            #                  ex: A
             if howTo == 'DATA_AC':
                 da                      = NMEADefs.dataActive.get (item, 'NODT')
                 if da != 'NODT':
@@ -459,7 +494,8 @@ class NMEAString ():
                 else:
                     dataOut['GPSMODE']  = 'A'
 
-            # FIXTYPE  char   Whether fixed, fixed to 2D or has 3D fix
+            # FIXTYPE  char   Whether fixed
+            #                 fixed to 2D or has 3D fix
             if howTo == 'FIXTYPE':
                 if item == '3':
                     dataOut['FIXTYPE']  = '3D'
@@ -470,35 +506,39 @@ class NMEAString ():
 
             # SPD_KPH  double  Speed over ground in kph
             if howTo == 'SPD_KPH':
-                kph                     = self.NMEAStrToFloat (item)
+                kph = self.NMEAStrToFloat (item)
                 if kph != gpsNAN:
-                    mps                 = kph * 0.277777778
+                    mps = kph * 0.277777778
                     dataOut['SPD_KPH']  = kph
                     dataOut['SPD_MPS']  = mps
 
-            # COURSE   int  Track heading 0-359 degrees
+            # COURSE   int  Track heading
+            #               0-359 degrees
             if howTo == 'COURSE':
                 if item.isdigit():
-                    course              = int (item)
+                    course = int (item)
                     if course >= 0 and course <= 359:
                         dataOut['COURSE'] = course
 
-            # PDOP     int  Position dilution of precision, 0 to 9 rounded to nearest int
+            # PDOP     int  Position dilution of precision
+            #               0 to 9 rounded to nearest int
             if howTo == 'PDOP':
                 if item.isdigit():
-                    dop                 = int (item)
+                    dop = int (item)
                     if dop >= 0 and dop <= 359:
                         dataOut['PDOP'] = dop
 
-            # TDOP     int  Time dilution of precision, 0 to 9 rounded to nearest int
+            # TDOP     int  Time dilution of precision
+            #               0 to 9 rounded to nearest int
             if howTo == 'TDOP':
                 if item.isdigit():
-                    dop                 = int (item)
+                    dop = int (item)
                     if dop >= 0 and dop <= 359:
                         dataOut['TDOP'] = dop
 
 
-            # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE A = Automatic, 3 = 3D only
+            # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE
+            #                A  = Automatic, 3 = 3D only
             if howTo == 'FIX_MODE':
                 if item == '3':
                     dataOut['FIX_MODE'] = '3D'
@@ -508,7 +548,7 @@ class NMEAString ():
             # E_DATUM  int  Earth datum ID number
             if howTo == 'E_DATUM':
                 if item.isdigit():
-                    datum               = int (item)
+                    datum = int (item)
                     if datum == 96:
                         dataOut['E_DATUM'] = 'USERDEF'
                     if datum == 100:
@@ -517,19 +557,24 @@ class NMEAString ():
                         dataOut['E_DATUM'] = 'NOT_WGS84'
 
             # SM_AXIS   Relevant only if E_DATUM == USERDEF
-            if howTo == 'SM_AXIS':      pass
+            if howTo == 'SM_AXIS':
+                pass
 
             # DATUMIFF   Relevant only if E_DATUM == USERDEF
-            if howTo == 'DATUMIFF':     pass
+            if howTo == 'DATUMIFF':
+                pass
 
             # DATUM_DX   Relevant only if E_DATUM == USERDEF
-            if howTo == 'DATUM_DX':     pass
+            if howTo == 'DATUM_DX':
+                pass
 
             # DATUM_DY   Relevant only if E_DATUM == USERDEF
-            if howTo == 'DATUM_DY':     pass
+            if howTo == 'DATUM_DY':
+                pass
 
             # DATUM_DZ   Relevant only if E_DATUM == USERDEF
-            if howTo == 'DATUM_DZ':     pass
+            if howTo == 'DATUM_DZ':
+                pass
 
             # DIFFMODE  char  Differential mode
             if howTo == 'DIFFMODE':
@@ -541,35 +586,39 @@ class NMEAString ():
             # BAUD_RT  int  NMEA 0183 Baud Rate
             if howTo == 'BAUD_RT':
                 if item.isdigit():
-                    baud                = int (item)
-                    if   baud == 3:     dataOut['BAUD_RT'] = '4800'
-                    elif baud == 4:     dataOut['BAUD_RT'] = '9600'
-                    elif baud == 5:     dataOut['BAUD_RT'] = '19200'
-                    elif baud == 6:     dataOut['BAUD_RT'] = '300'
-                    elif baud == 7:     dataOut['BAUD_RT'] = '600'
-                    elif baud == 8:     dataOut['BAUD_RT'] = '38400'
+                    baud = int (item)
+                    if   baud == 3:
+                        dataOut['BAUD_RT'] = '4800'
+                    elif baud == 4:
+                        dataOut['BAUD_RT'] = '9600'
+                    elif baud == 5:
+                        dataOut['BAUD_RT'] = '19200'
+                    elif baud == 6:
+                        dataOut['BAUD_RT'] = '300'
+                    elif baud == 7:
+                        dataOut['BAUD_RT'] = '600'
+                    elif baud == 8:
+                        dataOut['BAUD_RT'] = '38400'
 
             # MP_OUT  int  Measurement Pulse Output
             if howTo == 'MP_OUT':
                 if item.isdigit():
-                    mpo                 = int (item)
-                    if mpo == 2:        dataOut['MP_OUT'] = 'ENABLED'
-                    else:               dataOut['MP_OUT'] = 'DISABLED'
+                    mpo = int (item)
+                    if mpo == 2:
+                        dataOut['MP_OUT'] = 'ENABLED'
+                    else:
+                        dataOut['MP_OUT'] = 'DISABLED'
 
             # MP_LEN  int  Measurement Pulse Output pulse length ((n+1)* 20ms)
             if howTo == 'MP_LEN':
                 if item.isdigit():
-                    dataOut['MP_LEN']   = (1 + int (item)) * 20
+                    dataOut['MP_LEN'] = (1 + int (item)) * 20
 
             # DED_REC  float  Ded. Reckoning valid time 0.2 to 30.0 sec
             if howTo == 'DED_REC':
-                dr                      = self.NMEAStrToFloat (item)
+                dr = self.NMEAStrToFloat (item)
                 if dr >= 0.2 or dr <= 30.0:
-                    dataOut['DED_REC']  = dr
+                    dataOut['DED_REC'] = dr
 
-        self.dataOut                    = dataOut
-        return                          NMEAErrorCode.OK
-
-
-    
-#
+        self.dataOut = dataOut
+        return NMEAErrorCode.OK
