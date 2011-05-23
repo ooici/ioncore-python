@@ -195,7 +195,7 @@ class ResourceClient(object):
         try:
             result = yield self.workbench.pull(self.datastore_service, reference, excluded_types=excluded_types)
         except workbench.WorkBenchError, ex:
-            log.warn(ex)
+            log.error('Resource client error during pull operation: Resource ID "%s" \nException - %s' % (reference, str(ex)))
             raise ResourceClientError(
                 'Could not pull the requested resource from the datastore. Workbench exception: \n %s' % ex)
 
@@ -204,7 +204,7 @@ class ResourceClient(object):
         try:
             yield repo.checkout(branch)
         except repository.RepositoryError, ex:
-            log.debug('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
+            log.error('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
             raise ResourceClientError('Could not checkout branch during get_instance.')
 
         # Create a resource instance to return
