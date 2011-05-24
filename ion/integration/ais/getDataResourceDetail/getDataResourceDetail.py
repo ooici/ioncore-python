@@ -56,7 +56,7 @@ class GetDataResourceDetail(object):
             defer.returnValue(Response)
 
         if self.bUseMetadataCache:            
-            ds = self.metadataCache.getDSet(dSetResID)
+            ds = yield self.metadataCache.getDSet(dSetResID)
             if ds is None:
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -65,7 +65,7 @@ class GetDataResourceDetail(object):
                 Response.error_str = "No Data Set Found for Dataset ID: " + dSetResID
                 defer.returnValue(Response)
 
-            dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
+            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
             dSourceResID = dSetMetadata['DSourceID']
             ownerID = dSetMetadata['OwnerID']
 
@@ -122,7 +122,7 @@ class GetDataResourceDetail(object):
 
         log.debug('Associated datasourceID: ' + dSourceResID)
         if self.bUseMetadataCache:
-            dSource = self.metadataCache.getDSource(dSourceResID)
+            dSource = yield self.metadataCache.getDSource(dSourceResID)
         else:
             dSource = yield self.rc.get_instance(dSourceResID)
 
