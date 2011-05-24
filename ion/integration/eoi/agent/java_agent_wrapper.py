@@ -527,11 +527,11 @@ class JavaAgentWrapper(ServiceProcess):
             start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
 
         except OOIObjectError, oe:
-            log.exception('No start time attribute found in new dataset!')
+            log.exception('No start time attribute found in new dataset! This is okay - expected!')
             start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
         except AttributeError, ae:
-            log.exception('No start time attribute found in empty dataset!')
+            log.exception('No start time attribute found in empty dataset! This is bad - should not happen!')
             start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
