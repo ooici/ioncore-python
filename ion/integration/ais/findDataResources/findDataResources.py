@@ -55,7 +55,7 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
     @defer.inlineCallbacks
     def ondata(self, data):
         log.debug("DataResourceUpdateEventSubscriber received a message:\n")
-                  
+
         #
         # Don't have any way to get the datasource ID (from the trial test),
         # so for for now get the cached dataset metadata and get the source
@@ -63,15 +63,23 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         dSetResID = data['content'].additional_data.dataset_id
         #dSourceResID = data['content'].additional_data.datasource_id
         dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-        dSourceResID = dSourceResID = dSetMetadata['DSourceID']
-        
 
         #
-        # Delete the dataset and datasource metadata
+        # If dataset does not exist, this must be a new dataset; skip the
+        # delete step.
         #
-        log.debug('deleting %s, %s from metadataCache' %(dSetResID, dSourceResID))
-        yield self.metadataCache.deleteDSetMetadata(dSetResID)
-        yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
+        if dSetMetadata is not None:
+            dSourceResID = dSetMetadata['DSourceID']
+
+            #
+            # Delete the dataset and datasource metadata
+            #
+            log.debug('deleting %s, %s from metadataCache' %(dSetResID, dSourceResID))
+            yield self.metadataCache.deleteDSetMetadata(dSetResID)
+            yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
+
+        else:
+            dSourceResID = data['content'].additional_data.datasource_id
 
         #
         # Now  reload the dataset and datasource metadata
