@@ -185,12 +185,15 @@ class TestNMEADevice(IonTestCase):
 
         # Establish connection to device and verify.
 
-        print '          ----- Establish connection'
+        print '\n\n\n          ----- Establish connection'
         reply = yield self.driver_client.connect()
 #        except Exception, e:
 #            print '          ----- Exception: %s' % e
 #            self.fail               ('Could not connect to the device.')
+
+        print '\n\n\n          ----- Get State after establishing connection'
         current_state = yield self.driver_client.get_state()
+        print '\n\n\n          ----- Got State: %s' % current_state
         success = reply['success']
         result = reply['result']
 
@@ -199,13 +202,14 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # Dissolve the connection to the device.
+        print '\n\n\n          ----- Disconnect'
         reply = yield self.driver_client.disconnect()
+        print '\n\n\n          ----- Get State after disconnecting'
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
         self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result, params)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
         
 
