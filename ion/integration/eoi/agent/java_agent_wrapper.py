@@ -16,6 +16,9 @@ from ion.core.process.process import Process, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.resource_client import \
     ResourceClient
+from ion.services.dm.distribution.events import ScheduleEventSubscriber, TRIGGER_EVENT_MESSAGE_TYPE
+from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+
 from ion.util.os_process import OSProcess
 from ion.util.state_object import BasicStates
 from twisted.internet import defer, reactor
@@ -59,6 +62,27 @@ class JavaAgentWrapperException(ApplicationError):
     Be careful using this - there is no process to notify of the error on ingest!
     """
 
+class UpdateHandler(ScheduleEventSubscriber):
+    """
+    This class provides the messaging hooks to invoke rsync on receipt
+    of scheduler messages.
+    """
+    def __init__(self, hook_fn, *args, **kwargs):
+        self.hook_fn = hook_fn
+        ScheduleEventSubscriber.__init__(self, *args, **kwargs)
+
+    @defer.inlineCallbacks
+    def ondata(self, data):
+        log.debug('Got an update event message from the scheduler')
+
+        content = data['content']
+
+        update_msg = content.additional_data.payload
+
+
+        yield self.hook_fn(update_msg.dataset_id, update_msg.datasource_id)
+
+
 class JavaAgentWrapper(ServiceProcess):
     """
     Class designed to facilitate (Java) Dataset Agent's tight interaction with ION in
@@ -92,87 +116,8 @@ class JavaAgentWrapper(ServiceProcess):
         self.__ingest_client = None
         self.__ingest_ready_deferred = None
         
-        # Step 3: Setup the dataset context dictionary (to simulate acquiring context from the dataset registry)
-        # @todo: remove 'callbck', it is no longer used
-        self.__dataset_context_dict = {"sos_station_st":{"source_type":"SOS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://sdf.ndbc.noaa.gov/sos/server.php?",
-                                              "start_time":"2008-08-01T00:00:00Z",
-                                              "end_time":"2008-08-02T00:00:00Z",
-                                              "property":"sea_water_temperature",
-                                              "stationId":"41012"},
-                                        "sos_station_sal":{"source_type":"SOS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://sdf.ndbc.noaa.gov/sos/server.php?",
-                                              "start_time":"2008-08-01T00:00:00Z",
-                                              "end_time":"2008-08-02T00:00:00Z",
-                                              "property":"salinity",
-                                              "stationId":"41012"},
-                                        "sos_glider_st":{"source_type":"SOS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://sdf.ndbc.noaa.gov/sos/server.php?",
-                                              "start_time":"2010-07-26T00:00:00Z",
-                                              "end_time":"2010-07-27T00:00:00Z",
-                                              "property":"sea_water_temperature",
-                                              "stationId":"48900"},
-                                        "sos_glider_sal":{"source_type":"SOS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://sdf.ndbc.noaa.gov/sos/server.php?",
-                                              "start_time":"2010-07-26T00:00:00Z",
-                                              "end_time":"2010-07-27T00:00:00Z",
-                                              "property":"salinity",
-                                              "stationId":"48900"},
-                                        "usgs_multi_test":{"source_type":"USGS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://waterservices.usgs.gov/nwis/iv?",
-                                              "start_time":"2010-10-10T00:00:00Z",
-                                              "end_time":"2010-10-12T00:00:00Z",
-                                              "property":["00010", "00060"],
-                                              "stationId":["01362500","01463500","01646500"]},
-                                        "usgs_station_temp":{"source_type":"USGS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://waterservices.usgs.gov/nwis/iv?",
-                                              "start_time":"2010-10-10T00:00:00Z",
-                                              "end_time":"2010-10-12T00:00:00Z",
-                                              "property":"00010",
-                                              "stationId":"01463500"},
-                                        "usgs_station_sflow":{"source_type":"USGS",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://waterservices.usgs.gov/nwis/iv?",
-                                              "start_time":"2010-10-10T00:00:00Z",
-                                              "end_time":"2010-10-12T00:00:00Z",
-                                              "property":"00060",
-                                              "stationId":"01463500"},
-                                        "aoml_xbt_all":{"source_type":"AOML",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://www.aoml.noaa.gov/cgi-bin/trinanes/datosxbt.cgi?",
-                                              "start_time":"2010-09-10T00:00:00Z",
-                                              "end_time":"2010-09-12T00:00:00Z",
-                                              "type":"xbt",
-                                              "left":"-82.0",
-                                              "right":"-60.0",
-                                              "bottom":"31.0",
-                                              "top":"47.0"},
-                                        "aoml_ctd_all":{"source_type":"AOML",
-                                              "callback":"data_message_callback",
-                                              "base_url":"http://www.aoml.noaa.gov/cgi-bin/trinanes/datosxbt.cgi?",
-                                              "start_time":"2010-09-10T00:00:00Z",
-                                              "end_time":"2010-09-12T00:00:00Z",
-                                              "type":"ctd",
-                                              "left":"-82.0",
-                                              "right":"-60.0",
-                                              "bottom":"31.0",
-                                              "top":"47.0"}}
-        
-        # Step 4: Attach a receiver for incoming callbacks during initialization
-#        self.callbacks_id = Id(self.id.local+"cb", self.id.container)
-#        self.callbacks_receiver = ProcessReceiver(
-#                                    label=self.proc_name,
-#                                    name=self.callbacks_id.full,
-#                                    group=self.proc_group,
-#                                    process=self,
-#                                    handler=self.receive)
-
+        self.queue_name = self.spawn_args.get('queue_name',
+                                            CONF.getValue('queue_name', default='java_agent_wrapper_updates'))
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -192,7 +137,17 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 2: Spawn the associated external child process (if not already done)
         res = yield defer.maybeDeferred(self._spawn_dataset_agent)
-    
+
+        # Step 3: Setup schedule event subscriber
+        log.debug('Creating new message receiver for scheduled updates')
+        self.update_handler = UpdateHandler(self._update_request,
+                                queue_name=self.queue_name,
+                                origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                process=self)
+        # Add the receiver as a registered life cycle object
+        yield self.register_life_cycle_object(self.update_handler)
+
+
     @defer.inlineCallbacks
     def slc_activate(self):
         '''
@@ -386,14 +341,28 @@ class JavaAgentWrapper(ServiceProcess):
         log.info("<<<---@@@ Service received operation 'update_request'.  Grabbing update context and Delegating to underlying dataset agent...")
         if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
             raise TypeError('The given content must be an instance or a wrapped instance %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
-        
+
+        result = yield self._update_request(content.dataset_id, content.data_source_id)
+
+        if result:
+            yield self.reply_ok(msg,'Java agent wrapper succeeded!')
+            
+        else:
+            yield self.reply_err(msg,'Java agent wrapper failed!')
+
+
+
+    @defer.inlineCallbacks
+    def _update_request(self, dataset_id, data_source_id):
+    
         # Step 1: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
         try:
-            context = yield self._get_dataset_context(content.dataset_id, content.data_source_id)
+            context = yield self._get_dataset_context(dataset_id, data_source_id)
         except KeyError, ex:
-            yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
-        
+            log.exception('Faild to get dataset context!')
+            defer.returnValue(False)
+
         # Step 2: Setup a deferred so that we can wait for the Ingest Service to respond before sending data messages
         log.debug('Setting up ingest ready deferred...')
         self.__ingest_ready_deferred = defer.Deferred()
@@ -406,12 +375,12 @@ class JavaAgentWrapper(ServiceProcess):
         reply_to        = self.receiver.name
         ingest_timeout  = context.max_ingest_millis
         
-        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
+        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (dataset_id, reply_to, ingest_timeout))
 
         # Create the PerformIngestMessage
         begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
-        begin_msg.dataset_id                = content.dataset_id
-        begin_msg.datasource_id             = content.data_source_id
+        begin_msg.dataset_id                = dataset_id
+        begin_msg.datasource_id             = data_source_id
         begin_msg.reply_to                  = reply_to
         begin_msg.ingest_service_timeout    = ingest_timeout
 
@@ -429,7 +398,7 @@ class JavaAgentWrapper(ServiceProcess):
 
         log.info('Create subscriber to bump timeouts...')
         self._subscriber = Subscriber(xp_name="magnet.topic",
-                                             binding_key=content.dataset_id,
+                                             binding_key=dataset_id,
                                              process=self)
 
         def increase_timeout(data):
@@ -460,13 +429,7 @@ class JavaAgentWrapper(ServiceProcess):
 
         log.debug('Ingestion is complete on the ingestion services side...')
 
-
-        if headers.get('protocol') == 'rpc':
-            res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
-
-        #yield msg.ack()
-        log.info('**** Ingestion COMPLETE! ****')
-        
+        defer.returnValue(True)
 
     @defer.inlineCallbacks
     def op_ingest_ready(self, content, headers, msg):
@@ -540,14 +503,35 @@ class JavaAgentWrapper(ServiceProcess):
             testing = True
         msg.source_type = datasource.source_type
 
+        """
+        log.debug(dataset)
+        log.debug('SKNIDNSOSKNDSOKNDSLDNJDSNBSD')
+        log.debug(dataset.Resource)
+        log.debug('SKNIDNSOSKNDSOKNDSLDNJDSNBSD')
+
+        log.debug(dataset.ResourceObject)
+        log.debug('SKNIDNSOSKNDSOKNDSLDNJDSNBSD ro' + str(type(dataset.ResourceObject)))
+        log.debug(dataset.ResourceObject.Debug())
+
+        log.debug(dir(dataset))
+
+        rg = dataset.root_group
+        log.debug('SKNIDNSOSKNDSOKNDSLDNJDSNBSD rg' + str(type(rg)))
+        log.debug(rg.Debug())
+        log.debug(dataset.ResourceObject.PPrint())
+        """
+
         try:
             string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
             # Get the time since epoch in seconds.
             start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
 
         except OOIObjectError, oe:
-            log.debug('No start time attribute found in dataset!' + str(oe))
+            log.exception('No start time attribute found in new dataset!')
+            start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
+        except AttributeError, ae:
+            log.exception('No start time attribute found in empty dataset!')
             start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
