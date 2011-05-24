@@ -64,7 +64,7 @@ class AppIntegrationService(ServiceProcess):
         yield self.metadataCache.loadDataSources()
 
         log.debug('instantiating DataResourceUpdateEventSubscriber')
-        subscriber = DataResourceUpdateEventSubscriber(process = self)
+        subscriber = DataResourceUpdateEventSubscriber(self, process = self)
         yield subscriber.initialize()
         yield subscriber.activate()
         
