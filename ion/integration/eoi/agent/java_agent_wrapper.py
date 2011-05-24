@@ -531,19 +531,20 @@ class JavaAgentWrapper(ServiceProcess):
 
         except OOIObjectError, oe:
             log.exception('No start time attribute found in new dataset! This is okay - expected!')
-            start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
+            #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
+            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
 
         except AttributeError, ae:
             log.exception('No start time attribute found in empty dataset! This is bad - should not happen!')
-            start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
+            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
+            #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
         if testing:
-            log.debug('\n\n\n\nTESTING\n\n\n\n')
+            log.debug('Using Test Detla time....')
             deltaTime = 3*86400 # 3 days in seconds
             end_time_seconds = start_time_seconds + deltaTime
         else:
-            log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
             # Get upto one day in the future?
             end_time_seconds = calendar.timegm(time.gmtime()) + 86400
 
