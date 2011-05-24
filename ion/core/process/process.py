@@ -38,6 +38,9 @@ from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
 
+# despite being from services.dm this is safe - events should be moved to core sometime soon! @TODO
+from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
+
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
 from ion.core.ioninit import request
@@ -186,6 +189,10 @@ class Process(BasicLifecycleObject):
         self.connectors = []
         self.listeners = []
 
+        # publisher for lifecycle change notifications
+        self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
+        self.add_life_cycle_object(self._plcc_pub)
+
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
 
@@ -245,14 +252,6 @@ class Process(BasicLifecycleObject):
         if len(self._registered_life_cycle_objects) > pre_init_lco_len:
             log.debug("NEW LCOS ADDED DURING INIT")
             yield self._advance_life_cycle_objects(BasicStates.S_READY)
-
-        # create plc change publisher
-        from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
-        self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
-
-        # manually move through initialize, then add to registered LCOs so we don't have to advance manually anymore
-        yield self._plcc_pub.initialize()
-        yield self.register_life_cycle_object(self._plcc_pub)
 
         # publish initialize -> ready transition
         yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.READY)

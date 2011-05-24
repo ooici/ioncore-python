@@ -24,6 +24,8 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE, bootstrap_byte_array_dataset
 
+from ion.services.dm.ingestion.ingestion import CREATE_DATASET_TOPICS_MSG_TYPE
+
 from ion.core.object.object_utils import create_type_identifier
 
 from ion.util.itv_decorator import itv
@@ -113,6 +115,21 @@ class IngestionTest(IonTestCase):
     def tearDown(self):
         # You must explicitly clear the registry in case cassandra is used as a back end!
         yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_create_dataset_topics(self):
+        """
+        """
+
+        msg = yield self.proc.message_client.create_instance(CREATE_DATASET_TOPICS_MSG_TYPE)
+
+        msg.dataset_id = 'ABC'
+
+        result = yield self._ic.create_dataset_topics(msg)
+
+        result.MessageResponseCode = result.ResponseCodes.OK
+
 
     @defer.inlineCallbacks
     def test_recv_dataset(self):

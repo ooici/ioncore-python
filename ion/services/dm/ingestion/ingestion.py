@@ -155,7 +155,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_create_dataset_topics(self, content, headers, msg):
+    def op_create_dataset_topics(self, content, headers, msg_in):
         """
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
@@ -169,14 +169,14 @@ class IngestionService(ServiceProcess):
         msg.exchange_space_name = 'swapmeet'
 
         rc = yield self._pscclient.declare_exchange_space(msg)
-        #self._xs_id = rc.id_list[0]
+        self._xs_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(XP_TYPE)
         msg.exchange_point_name = 'science_data'
         msg.exchange_space_id = self._xs_id
 
         rc = yield self._pscclient.declare_exchange_point(msg)
-        #self._xp_id = rc.id_list[0]
+        self._xp_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(TOPIC_TYPE)
         msg.topic_name = content.dataset_id
@@ -185,7 +185,7 @@ class IngestionService(ServiceProcess):
 
         rc = yield self._pscclient.declare_topic(msg)
 
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg_in)
 
         log.info('op_create_dataset_topics - Complete')
 
@@ -232,32 +232,9 @@ class IngestionService(ServiceProcess):
 
         yield self.dataset.Repository.fetch_links(ba_links)
 
-        try:
-            att = self.dataset.root_group.FindAttributeByName('title')
-            title = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            title = 'None Given'
-
-
-        try:
-            att = self.dataset.root_group.FindAttributeByName('references')
-            references = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            references = 'None Given'
-
-
-
-        data_details = {EM_TITLE:title,
-                       EM_URL:references,
-                       EM_DATA_SOURCE:content.datasource_id,
-                       EM_DATASET:content.dataset_id,
-                       }
-
         log.debug('_prepare_ingest - Complete')
 
-        defer.returnValue(data_details)
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def _setup_ingestion_topic(self, content):
@@ -295,7 +272,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        data_details = yield self._prepare_ingest(content)
+        yield self._prepare_ingest(content)
 
         log.info('Created dataset details, Now setup subscriber...')
 
@@ -337,33 +314,87 @@ class IngestionService(ServiceProcess):
         yield self._subscriber.terminate()
         self._subscriber = None
 
-        if ingest_res:
-            log.debug("Ingest succeeded, respond to original request")
+        data_details = self.get_data_details(content)
 
-            ingest_res.update(data_details)
+        ingest_res.update(data_details)
 
-            yield self.rc.put_instance(self.dataset)
+        if ingest_res.has_key(EM_ERROR):
+            log.info("Ingest Failed!")
 
-            # send notification we performed an ingest
             yield self._notify_ingest(ingest_res)
-
-
-            # now reply ok to the original message
-            yield self.reply_ok(msg)
+            
         else:
-            log.debug("Ingest failed, error back to original request")
-            raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
+            log.info("Ingest succeeded!")
+
+            # If the dataset / source is new 
+            if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
+
+                data_source = yield self.rc.get_instance(content.datasource_id)
+
+                if data_source.is_public == True:
+
+                    data_source.ResourceLifeCycleState = data_source.COMMISSIONED
+                    self.dataset.ResourceLifeCycleState = self.dataset.COMMISSIONED
+
+                else:
+
+                    data_source.ResourceLifeCycleState = data_source.ACTIVE
+                    self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
+
+
+                yield self.rc.put_resource_transaction([self.dataset, data_source])
+
+
+            else:
+
+                yield self.rc.put_instance(self.dataset)
+
+
+            yield self._notify_ingest(ingest_res)
 
         self.dataset=None
 
+        # now reply ok to the original message
+        yield self.reply_ok(msg)
+
+
+
         log.info('op_ingest - Complete')
 
+
+    def get_data_details(self, content):
+        try:
+            att = self.dataset.root_group.FindAttributeByName('title')
+            title = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            title = 'None Given'
+
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('references')
+            references = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            references = 'None Given'
+
+
+
+        data_details = {EM_TITLE:title,
+                       EM_URL:references,
+                       EM_DATA_SOURCE:content.datasource_id,
+                       EM_DATASET:content.dataset_id,
+                       }
+
+        return data_details
 
 
     @defer.inlineCallbacks
     def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
+
+        This method is really not needed but I like it for testing...
         """
 
         log.debug('_notify_ingest - Start')
