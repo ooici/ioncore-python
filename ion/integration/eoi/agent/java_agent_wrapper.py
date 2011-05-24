@@ -403,7 +403,6 @@ class JavaAgentWrapper(ServiceProcess):
 
         def increase_timeout(data):
             log.debug("INCREASING TIMEOUT")
-            log.debug(dir(perform_ingest_deferred))
             if hasattr(perform_ingest_deferred, 'rpc_call'):
                 perform_ingest_deferred.rpc_call.delay(ingest_timeout/1000)
 
