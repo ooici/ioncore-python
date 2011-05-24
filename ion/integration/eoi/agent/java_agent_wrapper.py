@@ -721,7 +721,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.9.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.10.jar')
 
         if not os.path.exists(jar_pathname):
             log.error("JAR for dataset agent (%s) not found" % jar_pathname)
