@@ -51,10 +51,13 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         self.msgs = []
         self.metadataCache = ais.getMetadataCache()
         DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
+        log.debug('DataResourceUpdateEventSubscriber initialized')
 
                 
     def ondata(self, data):
-        log.debug("QuickEventSubscriber received a message:\n" + \
+        #log.error("DataResourceUpdateEventSubscriber received a message:\n")
+                  
+        log.debug("DataResourceUpdateEventSubscriber received a message:\n" + \
                   "\tname = %s\n" + \
                   "\tdatasource_id = %s\n" + \
                   "\tdataset_id = %s\n" + \
@@ -73,25 +76,32 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
                   data['content'].additional_data.number_of_timesteps
                   )
 
+
+        #
+        # Don't have any way to get the datasource ID (from the trial test),
+        # so for for now get the cached dataset metadata and get the source
+        #
+        #log.error('getting metadata to get sourceID')
+        dSetResID = data['content'].additional_data.dataset_id
+        #dSourceResID = data['content'].additional_data.datasource_id
+        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
+        dSourceResID = dSourceResID = dSetMetadata['DSourceID']
+        
+
         #
         # Delete the dataset and datasource metadata
         #
-        yield self.metadataCache.deleteDSetMetadata(data['content'].additional_data.dataset_id)
-        yield self.metadataCache.deleteDSourceMetadata(data['content'].additional_data.datasource_id)
+        log.debug('deleting %s, %s from metadataCache' %(dSetResID, dSourceResID))
+        yield self.metadataCache.deleteDSetMetadata(dSetResID)
+        yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
 
         #
         # Now  reload the dataset and datasource metadata
         #
-        yield self.metadataCache.getDSetMetadata(data['content'].additional_data.dataset_id)
-        yield self.metadataCache.getDSourceMetadata(data['content'].additional_data.datasource_id)
+        log.debug('putting new metadata in cache')
+        yield self.metadataCache.putDSetMetadata(dSetResID)
+        yield self.metadataCache.putDSourceMetadata(dSourceResID)
         
-        #content = data['content']
-
-        #if hasattr(content, 'Repository'):
-        #    content.Repository.persistent = True
-
-        #self.msgs.append(data)
-
     
 class FindDataResources(object):
 
