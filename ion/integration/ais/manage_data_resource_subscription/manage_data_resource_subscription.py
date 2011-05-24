@@ -568,17 +568,6 @@ class ManageDataResourceSubscription(object):
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
-
-        #
-        # Create a response message; we need to filter the results from
-        # the notification alert service (delete some, and I don't know of
-        # a way to delete anything right now, so I'll add only those that
-        # meet the filter criteria)
-        #
-        rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
-        rspMsg.message_parameters_reference.add()
-        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
-        
         #
         # Instantiate a bounds object, and load it up with the given bounds
         # info
@@ -591,7 +580,7 @@ class ManageDataResourceSubscription(object):
         #
         for result in reply.message_parameters_reference[0].subscriptionListResults:
             dSetResID = result.datasetMetadata.data_resource_id
-            dSetMetadata = self.metadataCache.getDSetMetadata(dSetResID)
+            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
             if not dSetMetadata is None:
                 if bounds.isInBounds(dSetMetadata) == False:                
                     del result
