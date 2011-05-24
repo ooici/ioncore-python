@@ -45,43 +45,21 @@ DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
 DNLD_DIR_PATH = '/dodsC/ooiciData/'
 DNLD_FILE_TYPE = '.ncml.html'
 
-
 class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
         self.msgs = []
         self.metadataCache = ais.getMetadataCache()
         DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
-        log.debug('DataResourceUpdateEventSubscriber initialized')
 
                 
+    @defer.inlineCallbacks
     def ondata(self, data):
-        #log.error("DataResourceUpdateEventSubscriber received a message:\n")
+        log.debug("DataResourceUpdateEventSubscriber received a message:\n")
                   
-        log.debug("DataResourceUpdateEventSubscriber received a message:\n" + \
-                  "\tname = %s\n" + \
-                  "\tdatasource_id = %s\n" + \
-                  "\tdataset_id = %s\n" + \
-                  "\ttitle = %s\n" + \
-                  "\turl = %s\n" + \
-                  "\tstart_datetime_millis = %s\n" + \
-                  "\tend_datetime_millis = %s\n" + \
-                  "\tnumber_of_timesteps = %s\n",
-                  data['content'].name,
-                  data['content'].additional_data.datasource_id,
-                  data['content'].additional_data.dataset_id,
-                  data['content'].additional_data.title,
-                  data['content'].additional_data.url,
-                  data['content'].additional_data.start_datetime_millis,
-                  data['content'].additional_data.end_datetime_millis,
-                  data['content'].additional_data.number_of_timesteps
-                  )
-
-
         #
         # Don't have any way to get the datasource ID (from the trial test),
         # so for for now get the cached dataset metadata and get the source
         #
-        #log.error('getting metadata to get sourceID')
         dSetResID = data['content'].additional_data.dataset_id
         #dSourceResID = data['content'].additional_data.datasource_id
         dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
@@ -101,7 +79,6 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         log.debug('putting new metadata in cache')
         yield self.metadataCache.putDSetMetadata(dSetResID)
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
-        
     
 class FindDataResources(object):
 

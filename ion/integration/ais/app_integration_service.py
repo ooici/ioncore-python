@@ -65,9 +65,9 @@ class AppIntegrationService(ServiceProcess):
 
         log.debug('instantiating DataResourceUpdateEventSubscriber')
         self.subscriber = DataResourceUpdateEventSubscriber(self, process = self)
-        yield self.subscriber.initialize()
-        yield self.subscriber.activate()
-        #self.register_life_cycle_object(self.subscriber)
+        #yield self.subscriber.initialize()
+        #yield self.subscriber.activate()
+        self.register_life_cycle_object(self.subscriber)
         
         
     def getMetadataCache(self):
