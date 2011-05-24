@@ -155,7 +155,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_create_dataset_topics(self, content, headers, msg):
+    def op_create_dataset_topics(self, content, headers, msg_in):
         """
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
@@ -169,14 +169,14 @@ class IngestionService(ServiceProcess):
         msg.exchange_space_name = 'swapmeet'
 
         rc = yield self._pscclient.declare_exchange_space(msg)
-        #self._xs_id = rc.id_list[0]
+        self._xs_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(XP_TYPE)
         msg.exchange_point_name = 'science_data'
         msg.exchange_space_id = self._xs_id
 
         rc = yield self._pscclient.declare_exchange_point(msg)
-        #self._xp_id = rc.id_list[0]
+        self._xp_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(TOPIC_TYPE)
         msg.topic_name = content.dataset_id
@@ -185,7 +185,7 @@ class IngestionService(ServiceProcess):
 
         rc = yield self._pscclient.declare_topic(msg)
 
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg_in)
 
         log.info('op_create_dataset_topics - Complete')
 
