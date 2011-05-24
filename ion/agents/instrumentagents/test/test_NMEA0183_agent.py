@@ -68,6 +68,7 @@ class TestNMEA0183Agent (IonTestCase):
 
     @defer.inlineCallbacks
     def setUp (self):
+        raise unittest.SkipTest('Not working yet')
 
         print "\n||||||| TestNMEA0183Agent.setUp\n"     #DEBUG
 
