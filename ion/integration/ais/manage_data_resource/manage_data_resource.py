@@ -172,7 +172,8 @@ class ManageDataResource(object):
                     dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
 
-            yield self.rc.put_instance(datasrc_resource)
+            # This could be cleaned up to go faster - only call put if it is modified!
+            yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
 
         except ReceivedApplicationError, ex:
