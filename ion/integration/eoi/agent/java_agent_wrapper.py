@@ -578,7 +578,7 @@ class JavaAgentWrapper(ServiceProcess):
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
-    def _get_associated_data_source_id(dataset_id):
+    def _get_associated_data_source_id(self, dataset_id):
         result = ""
         
         # Step 1: Build the request Predicate Object Query message
@@ -620,7 +620,7 @@ class JavaAgentWrapper(ServiceProcess):
         defer.returnValue( result)
 
     @defer.inlineCallbacks
-    def _get_associated_dataset_id(data_source_id):
+    def _get_associated_dataset_id(self, data_source_id):
         result = ""
         
         # Step 1: Build the request Subject Predicate Query message
