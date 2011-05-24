@@ -36,6 +36,7 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RE
 from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+#from ion.integration.ais.findDataResources import DataResourceUpdateEventSubscriber
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -1620,10 +1621,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
 
     @defer.inlineCallbacks
-    def test_cacheUpdate(self):
+    def test_updateDataResourceCache(self):
         """
         Test to see if wildcards match for subscribers
         """
+
+        log.debug('Testing updateDataResourceCache.')
+
+
         subproc = Process()
         yield subproc.spawn()
         #test_origin = "%s.%s" % ("chan1", str(subproc.id))
@@ -1632,31 +1637,61 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         testsub = TestDataResourceUpdateEventSubscriber(process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
-        
-        # Setup the publisher
-        pub1 = DatasetSupplementAddedEventPublisher(process=self._proc)
-        yield pub1.initialize()
-        yield pub1.activate()
-        
-        yield pu.asleep(1.0)
-        
-        yield pub1.create_and_publish_event(
-            name = "TestUpdateEvent",
-            origin = "DATASET RESOURCE ID",
-            dataset_id = "dataresrc123",
-            datasource_id = "dataresrc123",
-            title = "TODO",
-            url = "TODO",
-            start_datetime_millis = 10000,
-            end_datetime_millis = 11000,
-            number_of_timesteps = 7
-            )
 
-        # Pause to make sure we catch the message
-        yield pu.asleep(1.0)
+        #
+        # Send a message with no bounds to get a list of dataset ID's; then
+        # take one of those IDs and create a subscription on it.
+        #
         
-        self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
 
+        # create a request message 
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        #reqMsg.message_parameters_reference.user_ooi_id  = MYOOICI_USER_ID
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
+
+        if numResReturned > 0:
+            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
+            dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
+
+            # Setup the publisher
+            pub1 = DatasetSupplementAddedEventPublisher(process=self._proc)
+            yield pub1.initialize()
+            yield pub1.activate()
+            
+            yield pu.asleep(1.0)
+            
+            yield pub1.create_and_publish_event(
+                name = "TestUpdateDataResourceCache",
+                origin = "SOME DATASET RESOURCE ID",
+                dataset_id = dsID,
+                datasource_id = "no way to get this!",
+                title = "TODO",
+                url = "TODO",
+                start_datetime_millis = 10000,
+                end_datetime_millis = 11000,
+                number_of_timesteps = 7
+                )
+    
+            # Pause to make sure we catch the message
+            yield pu.asleep(3.0)
+            
+            #self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
+
+        else:
+            log.error('test_notificationSet: No datasets returned!')
+        
 
     def __validateDatasetByOwnerMetadata(self, metadata):
         log.debug('__validateDataResourceSummary()')

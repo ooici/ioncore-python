@@ -234,6 +234,13 @@ class MetadataCache(object):
 
         yield self.__lockCache()
 
+        #
+        # Set the persistent flag to False
+        #
+        dSetMetadata = self.__metadata[dSetID]
+        dSet = dSetMetadata[DSET]
+        dSet.Repository.persistent = False
+
         try:
             self.__metadata.pop(dSetID)
             returnValue = True
@@ -322,6 +329,13 @@ class MetadataCache(object):
         log.debug('deleteDSourceMetadata')
 
         yield self.__lockCache()
+        
+        #
+        # Set the persistent flag to False
+        #
+        dSourceMetadata = self.__metadata[dSourceID]
+        dSource = dSourceMetadata[DSOURCE]
+        dSource.Repository.persistent = False
 
         try:
             self.__metadata.pop(dSourceID)
