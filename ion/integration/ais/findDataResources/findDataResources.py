@@ -356,7 +356,7 @@ class FindDataResources(object):
             if self.bUseMetadataCache:            
                 dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
                 if dSetMetadata is None:
-                    log.error('metadata not found for datasetID: ' + dSetResID)
+                    log.info('metadata not found for datasetID: ' + dSetResID)
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
@@ -387,7 +387,7 @@ class FindDataResources(object):
                 if self.bUseMetadataCache:            
                     dSourceResID = dSetMetadata['DSourceID']
                     if dSourceResID is None:
-                        log.error('dSourceResID is None')
+                        log.info('dSourceResID is None')
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
@@ -396,7 +396,7 @@ class FindDataResources(object):
 
                     dSource = yield self.metadataCache.getDSetMetadata(dSourceResID)
                     if dSource is None:
-                        log.error('metadata not found for datasourceID: ' + dSourceResID)
+                        log.info('metadata not found for datasourceID: ' + dSourceResID)
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
