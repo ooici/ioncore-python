@@ -577,9 +577,13 @@ class ManageDataResource(object):
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
 
-        #casrefs... hopefully this is right
-        #datasrc_resource.authentication                = msg.authentication
-        #datasrc_resource.search_pattern                = msg.search_pattern
+        if msg.IsFieldSet('authentication'):
+            log.info("Setting datasource: authentication")
+            datasrc_resource.authentication                = msg.authentication
+
+        if msg.IsFieldSet('search_pattern'):
+            log.info("Setting datasource: search_pattern")
+            datasrc_resource.search_pattern                = msg.search_pattern
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 

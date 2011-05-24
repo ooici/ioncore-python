@@ -571,9 +571,11 @@ class JavaAgentWrapper(ServiceProcess):
         msg.max_ingest_millis = datasource.max_ingest_millis
 
         if datasource.IsFieldSet('authentication'):
+            log.info('Setting: authentication')
             msg.authentication = datasource.authentication
 
         if datasource.IsFieldSet('search_pattern'):
+            log.info('Setting: search_patern')
             msg.search_pattern = datasource.search_pattern
         
         defer.returnValue(msg)
