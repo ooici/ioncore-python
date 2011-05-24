@@ -297,7 +297,7 @@ class JavaAgentWrapper(ServiceProcess):
     @property
     def asc(self):
         if self._asc is None:
-            self._asc == AssociationServiceClient(proc=self)
+            self._asc = AssociationServiceClient(proc=self)
         return self._asc
 
     def _osp_terminate_callback(self, result):
