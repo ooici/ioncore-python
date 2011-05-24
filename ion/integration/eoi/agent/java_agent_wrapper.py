@@ -23,6 +23,9 @@ from ion.util.os_process import OSProcess
 from ion.util.state_object import BasicStates
 from twisted.internet import defer, reactor
 import ion.util.ionlog
+
+from ion.core.exception import IonError
+
 import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 from ion.services.dm.ingestion.ingestion import IngestionClient
@@ -715,11 +718,11 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.8.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.9.jar')
 
         if not os.path.exists(jar_pathname):
             log.error("JAR for dataset agent (%s) not found" % jar_pathname)
-            raise Exception("JAR for dataset agent (%s)" % str(CONF))
+            raise IonError("JAR for dataset agent not found: (%s)" % jar_pathname)
         
         parent_host_name = self.container.exchange_manager.message_space.hostname
         parent_xp_name = self.container.exchange_manager.exchange_space.name
