@@ -62,6 +62,7 @@ CDM_STRING_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, ver
 CDM_OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
 
 CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+CDM_ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
 SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
 PERFORM_INGEST_MSG_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
@@ -457,7 +458,7 @@ class IngestionService(ServiceProcess):
                         else:
                             i += 1
             else:
-                var.content = resource_instance.CreateObject(array_structure_type)
+                var.content = self.dataset.CreateObject(CDM_ARRAY_STRUCTURE_TYPE)
 
         yield msg.ack()
 
