@@ -11,8 +11,7 @@ TODO
 Refactor Merge to use a proxy repository for the readonly objects - they must live in a seperate workspace.
 
 """
-from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE
-
+from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, sha1_to_hex
 
 import weakref
 from twisted.internet import threads, reactor, defer
@@ -1343,7 +1342,7 @@ class Repository(ObjectContainer):
         
     def log_commits(self,branchname=None):
         
-        if branchname == None:
+        if branchname is None:
             branchname = self._current_branch.branchkey
         
         branch = self.get_branch(branchname)
@@ -1361,8 +1360,30 @@ class Repository(ObjectContainer):
                             cref = pref.commitref
                             log.info('Commit: \n' + str(cref))
                             break # There should be only one parent ancestor from a branch
-                
-        
+
+    def list_parent_commits(self,branchname=None):
+
+        if branchname is None:
+            branchname = self._current_branch.branchkey
+
+        branch = self.get_branch(branchname)
+
+        if len(branch.commitrefs) is not 1:
+            return None
+
+        cref = branch.commitrefs[0]
+        keys=[]
+
+        while cref:
+
+            keys.append(sha1_to_hex(cref.MyId))
+
+            if cref.parentrefs:
+                cref = cref.parentrefs[0].commitref
+            else:
+                cref = False
+        return keys
+
     def stash(self, name):
         """
         Stash the current workspace for later reference

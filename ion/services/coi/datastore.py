@@ -263,6 +263,14 @@ class DataStoreWorkbench(WorkBench):
         # Back to boiler plate op_pull
         ####
 
+        print 'DKNSKSNSKNSKSNDJKSBN'
+        print 'DKNSKSNSKNSKSNDJKSBN'
+        print repo
+        print 'DKNSKSNSKNSKSNDJKSBN'
+        import pprint
+        print pprint.pprint(repo.list_parent_commits(repo.branches[0].branchkey))
+        print 'DKNSKSNSKNSKSNDJKSBN'
+
         my_commits = self.list_repository_commits(repo)
 
         puller_has = request.commit_keys

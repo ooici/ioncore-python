@@ -834,11 +834,13 @@ class MulitDataStoreTest(IonTestCase):
 
             repo.commit('The %d commit!' % i)
 
-            log.info('Commit and push workbench test object:\n%s' % self.wb1.workbench)
+            log.info('Commit #%d and push workbench test object:\n%s' % (i, self.wb1.workbench))
             yield self.wb1.workbench.push('datastore', repo)
 
         tp = Process()
         yield tp.spawn()
+
+        print repo.log_commits()
 
         for i in range(4):
             tp.workbench.clear()
@@ -850,21 +852,6 @@ class MulitDataStoreTest(IonTestCase):
             repo.checkout('master')
 
             self.assertEqual(repo.root_object.person[0].id,n-1)
-
-
-
-            
-
-
-
-
-
-
-
-
-
-
-
 
 
 
