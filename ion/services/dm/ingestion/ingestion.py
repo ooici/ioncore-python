@@ -316,8 +316,14 @@ class IngestionService(ServiceProcess):
 
         data_details = self.get_data_details(content)
 
-        ingest_res.update(data_details)
+        if isinstance(ingest_res, dict):
+            ingest_res.update(data_details)
 
+        else:
+            ingest_res={EM_ERROR:'Ingestion Failed!'}
+            ingest_res.update(data_details)
+            
+        datasource = None
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed!")
 
@@ -344,9 +350,12 @@ class IngestionService(ServiceProcess):
                     self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
-        yield self.rc.put_resource_transaction([self.dataset, data_source])
 
+        resources=[self.dataset]
+        if datasource is not None:
+            resources.append(datasource)
 
+        yield self.rc.put_resource_transaction(resources)
 
         yield self._notify_ingest(ingest_res)
 
