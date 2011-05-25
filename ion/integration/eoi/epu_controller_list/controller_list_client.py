@@ -27,9 +27,11 @@ class EPUControllerListClient(ServiceClient):
         """Query the EPUControllerListService
         """
         log.debug("EPUControllerListClient.list")
+        log.debug("loaded modules =\n")
+        log.debug(str(sys.modules))
         yield self._check_init()
-        if 'unittest' in sys.modules.keys():
-            log.debug("controller_list_client.list: Returning static list for unit testing")
+        if 'ion.integration.ais.test.test_app_integration' in sys.modules.keys():
+            log.debug("controller_list_client.list: Returning static list for AIS unit testing")
             defer.returnValue(['dataservices_epu_controller',
                                'agentservices_epu_controller',
                                'associationservices_epu_controller'])
