@@ -36,9 +36,9 @@ from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient, CDM_BOUNDED_ARRAY_TYPE
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, ION_RESOURCE_TYPES_CFG, ION_PREDICATES_CFG, ION_IDENTITIES_CFG
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID, HAS_A_ID
 
 from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE
 from ion.core.object.gpb_wrapper import StructureElement
@@ -687,6 +687,185 @@ class CassandraBackedDataStoreTest(DataStoreTest):
 
     def test_put_blobs(self):
         raise unittest.SkipTest("This test does not work with the cassandra backend.")
+
+
+class MulitDataStoreTest(IonTestCase):
+    """
+    Testing Datastore service.
+    """
+
+    preload = { ION_PREDICATES_CFG:False,
+                ION_RESOURCE_TYPES_CFG:False,
+                ION_IDENTITIES_CFG:False,
+                ION_DATASETS_CFG:False,
+                ION_AIS_RESOURCES_CFG:False}
+
+    services = [
+
+            {'name':'ds2','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:preload}
+                },
+            {'name':'ds3','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:preload}
+                },
+            {'name':'ds4','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:preload}
+                },
+
+            # Start this one last to preload...
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+                }, # The first one does the preload by default
+
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}
+                },
+        ]
+
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+        yield self.setup_services()
+
+    @defer.inlineCallbacks
+    def setup_services(self):
+
+        self.sup = yield self._spawn_processes(self.services)
+
+
+        child_ds1 = yield self.sup.get_child_id('ds1')
+        log.debug('Process ID:' + str(child_ds1))
+        self.ds1 = self._get_procinstance(child_ds1)
+
+        child_ds2 = yield self.sup.get_child_id('ds2')
+        log.debug('Process ID:' + str(child_ds2))
+        self.ds2 = self._get_procinstance(child_ds2)
+
+        child_ds3 = yield self.sup.get_child_id('ds3')
+        log.debug('Process ID:' + str(child_ds3))
+        self.ds3 = self._get_procinstance(child_ds3)
+
+        child_ds4 = yield self.sup.get_child_id('ds4')
+        log.debug('Process ID:' + str(child_ds4))
+        self.ds4 = self._get_procinstance(child_ds4)
+
+
+        child_proc1 = yield self.sup.get_child_id('workbench_test1')
+        log.info('Process ID:' + str(child_proc1))
+        workbench_process1 = self._get_procinstance(child_proc1)
+        self.wb1 = workbench_process1
+
+        repo = workbench_process1.workbench.create_repository(addresslink_type)
+        ab=repo.root_object
+
+        p = repo.create_object(person_type)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '123 456 7890'
+
+        ab.owner = p
+
+        ab.person.add()
+        ab.person[0] = p
+
+        p = repo.create_object(person_type)
+        p.name='John'
+        p.id = 222
+        p.email = 'd222@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '321 456 7890'
+
+        ab.person.add()
+        ab.person[1] = p
+
+        ab.title='Datastore Addressbook'
+
+        repo.commit()
+
+        self.repo_key = repo.repository_key
+
+
+    def test_instantiate(self):
+        pass
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        log.info('Tearing Down Test Container')
+
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_pull_stuff(self):
+        log.info('starting multi pull test...')
+
+        tp = Process()
+        yield tp.spawn()
+
+        n = 8
+        for i in range(n):
+            tp.workbench.clear()
+            yield tp.workbench.pull('datastore',HAS_A_ID)
+
+            hasa = tp.workbench.get_repository(HAS_A_ID)
+            yield hasa.checkout('master')
+
+            hasa.root_object.word = 'has_a'
+
+
+    @defer.inlineCallbacks
+    def test_push_pull(self):
+        log.info('starting multi push test...')
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        n=12
+        for i in range(n):
+
+            repo.root_object.person[0].id = i
+
+            repo.commit('The %d commit!' % i)
+
+            log.info('Commit and push workbench test object:\n%s' % self.wb1.workbench)
+            yield self.wb1.workbench.push('datastore', repo)
+
+        tp = Process()
+        yield tp.spawn()
+
+        for i in range(4):
+            tp.workbench.clear()
+
+            log.info('Pull the object back to new process - # %d' % i)
+            yield tp.workbench.pull('datastore', self.repo_key)
+
+            repo = tp.workbench.get_repository(self.repo_key)
+            repo.checkout('master')
+
+            self.assertEqual(repo.root_object.person[0].id,n-1)
+
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class DataStoreExtractDataTest(IonTestCase):

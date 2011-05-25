@@ -716,6 +716,9 @@ class WorkBench(object):
         When the operation is complete - the transfer of all objects in the
         repository is complete.
         """
+
+        log.info('push - start')
+
         targetname = self._process.get_scoped_name('system', origin)
 
         # Make a list of the repositories to push if it is not already one
@@ -779,7 +782,9 @@ class WorkBench(object):
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
 
-        
+
+        log.info('push - complete')
+
         defer.returnValue(result)
         # @TODO - check results?
 

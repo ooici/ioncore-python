@@ -157,16 +157,23 @@ class DataStoreWorkbench(WorkBench):
         defer.returnValue(blobs)
 
     @defer.inlineCallbacks
-    def _resolve_repo_state(self, repository_key):
+    def _resolve_repo_state(self, repository_key, fail_if_not_found=True):
         """
         @returns Repo.
         """
 
+        log.info('_resolve_repo_state: start')
+
         repo = self.get_repository(repository_key)
         if repo is None:
             #if it does not exist make a new one
+            log.debug('Repository is not loaded - get it from the persistent store')
+
             repo = repository.Repository(repository_key=repository_key)
             self.put_repository(repo)
+        else:
+            log.debug('Repository is loaded - merge it with the state in the persistent store')
+
 
         # Must reconstitute the head and merge with existing
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
@@ -178,14 +185,21 @@ class DataStoreWorkbench(WorkBench):
 
         rows = yield self._commit_store.query(q)
 
-        if len(rows) == 0:
+        if fail_if_not_found and len(rows) == 0:
             raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
+
+        log.debug('Found %d commits in the store' % len(rows))
 
         for key, columns in rows.items():
 
-            blob = columns[VALUE]
-            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            repo.index_hash[key] = wse
+
+            if key not in repo.index_hash:
+                blob = columns[VALUE]
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                repo.index_hash[key] = wse
+            else:
+                wse = repo.index_hash.get(key)
+
 
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
@@ -207,16 +221,22 @@ class DataStoreWorkbench(WorkBench):
                         branch.branchkey = name
                         link = branch.commitrefs.add()
 
-                    cref = repo._load_element(wse)
-                    repo._commit_index[cref.MyId]=cref
-                    cref.ReadOnly = True
-
+                    if key not in repo._commit_index:
+                        cref = repo._load_element(wse)
+                        repo._commit_index[cref.MyId]=cref
+                        cref.ReadOnly = True
+                    else:
+                        cref = repo._commit_index.get(key)
+                        
                     link.SetLink(cref)
 
                 # Check to make sure the mutable is upto date with the commits...
 
         # Do the update!
         self._update_repo_to_head(repo, new_head)
+
+
+        log.info('_resolve_repo_state: complete')
 
         # return repository
         defer.returnValue(repo)
@@ -312,6 +332,11 @@ class DataStoreWorkbench(WorkBench):
 
         for repostate in pushmsg.repositories:
 
+
+            repo = yield self._resolve_repo_state(repostate.repository_key, fail_if_not_found=False)
+            repo.cached = True
+
+            """
             repo = self.get_repository(repostate.repository_key)
             if repo is None:
                 #if it does not exist make a new one
@@ -368,8 +393,10 @@ class DataStoreWorkbench(WorkBench):
                         link.SetLink(cref)
 
             # Now the repo is up to date on the data store side...
+            """
 
 
+            repo_keys = set(self.list_repository_blobs(repo))
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
