@@ -865,7 +865,7 @@ class TestInstrumentAgent(IonTestCase):
                 
         subproc = Process()
         yield subproc.spawn()
-        testsub = TestEventSubscriber(origin=str(self.svc_id),
+        testsub = TestEventSubscriber(origin=('agent.' + str(self.svc_id)),
                                       process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
@@ -877,7 +877,7 @@ class TestInstrumentAgent(IonTestCase):
         
         # check the event
         yield pu.asleep(1.0)
-        self.assertEqual(len(testsub.msgs), 1)
+        self.assertEqual(len(testsub.msgs), 2)
         #print testsub.msgs[0]
         #print testsub.msgs[0]['content']
         #self.assertEqual(testsub.msgs[0]['content'].name, u"Transaction ended!")

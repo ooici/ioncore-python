@@ -151,7 +151,9 @@ class InstrumentAgent(Process):
         self.event_publisher_origin = str(self.id)
 
         """
-        The PubSub publisher for informational/log events
+        The PubSub publisher for informational/log events. These include
+        agent op errors, transaction events, driver state changes, driver
+        and agent config changes.
         """
         self._log_publisher = \
             InfoLoggingEventPublisher(process=self,
@@ -165,7 +167,7 @@ class InstrumentAgent(Process):
                                     origin=self.event_publisher_origin)
 
         """
-        The PubSub publisher for state change events
+        The PubSub publisher for agent state change events.
         """
         self._state_publisher = \
             BusinessStateModificationEventPublisher(process=self,
@@ -533,7 +535,7 @@ class InstrumentAgent(Process):
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.IDLE)
 
@@ -598,7 +600,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                     description=AgentState.OBSERVATORY_MODE)
             pass
@@ -671,7 +673,7 @@ class InstrumentAgent(Process):
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                             description=AgentState.DIRECT_ACCESS_MODE)
             pass
@@ -760,9 +762,18 @@ class InstrumentAgent(Process):
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_start_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin = "agent.%s" % self.event_publisher_origin
-            yield self._log_publisher.create_and_publish_event(origin=origin,
-                description=desc_str)
+            #origin = "agent.%s" % self.event_publisher_origin
+            #yield self._log_publisher.create_and_publish_event(origin=origin,
+            #    description=desc_str)
+        
+        else:
+            desc_str = 'opened transaction %s' % tid
+            
+        origin = "agent.%s" % self.event_publisher_origin
+        yield self._log_publisher.create_and_publish_event(origin=origin,
+            description=desc_str)
+            
+
 
         yield self.reply_ok(msg, result)
 
@@ -898,22 +909,31 @@ class InstrumentAgent(Process):
         @param content A uuid specifying the current transaction to end.
         @retval success/fail message.
         """
-
+        
+        tid = self.transaction_id
+        
         result = self._end_transaction(content)
 
         # Publish an end transaction message...mainly as a test for now
-        yield self._log_publisher.create_and_publish_event(\
-                                            name="Transaction ended!")
+        # yield self._log_publisher.create_and_publish_event(\
+        #                                    name="Transaction ended!")
 
         # Publish any errors.
         success = result['success']
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_end_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin = "agent.%s" % self.event_publisher_origin
-            yield self._log_publisher.create_and_publish_event(origin=origin,
-                description=desc_str)
+            #origin = "agent.%s" % self.event_publisher_origin
+            #yield self._log_publisher.create_and_publish_event(origin=origin,
+            #    description=desc_str)
+            
+        else:
+            desc_str = 'closed transaction %s' % tid
 
+        origin = "agent.%s" % self.event_publisher_origin
+        yield self._log_publisher.create_and_publish_event(origin=origin,
+            description=desc_str)
+            
         yield self.reply_ok(msg, result)
 
     def _end_transaction(self, tid):
@@ -1812,7 +1832,7 @@ class InstrumentAgent(Process):
 
             # Publish any errors.
             if InstErrorCode.is_error(success):
-                desc_str = 'Error in op_get_observatory_status: ' + \
+                desc_str = 'Error in op_get_observatory_capabilities: ' + \
                            InstErrorCode.get_string(success)
                 origin = "agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=\
@@ -2371,10 +2391,10 @@ class InstrumentAgent(Process):
                         json_val = json.dumps(self._data_buffer)
                         self._data_buffer = []
 
-            # If not in streaming mode, always publish data upon receipt.
-            else:
-                #strval = self._get_data_string(value)
-                json_val = json.dumps([value])
+                # If not in streaming mode, always publish data upon receipt.
+                else:
+                    #strval = self._get_data_string(value)
+                    json_val = json.dumps([value])
 
             #if len(strval) > 0:
             if json_val != None:

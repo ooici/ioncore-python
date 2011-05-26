@@ -17,7 +17,12 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 import ion.util.procutils as pu
+from ion.core.process.process import Process
 from ion.core.exception import ReceivedError
+from ion.services.dm.distribution.events import DataBlockEventSubscriber
+from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+from ion.services.dm.distribution.events \
+    import BusinessStateChangeSubscriber
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -28,7 +33,8 @@ from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
-from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
+from ion.agents.instrumentagents.instrument_constants \
+    import InstrumentCapability
 from ion.agents.instrumentagents.instrument_constants import MetadataParameter
 from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
@@ -63,11 +69,13 @@ RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    'test_execute_instrument',
+    #'test_execute_instrument',
     'test_state_transitions',
     'test_get_capabilities',
     'dummy'
 ]    
+
+PRINT_PUBLICATIONS = (True, False)[0]
 
 class TestSBE37Agent(IonTestCase):
 
@@ -81,6 +89,7 @@ class TestSBE37Agent(IonTestCase):
         
         yield self._start_container()
 
+
         # Driver and agent configuration. Configuration data will ultimatly be
         # accessed via some persistance mechanism: platform filesystem
         # or a device registry. For now, we pass all configuration data
@@ -92,7 +101,7 @@ class TestSBE37Agent(IonTestCase):
             'ipaddr':sbe_host
         }
         agent_config = {}
-        
+
         # Process description for the SBE37 driver.
         driver_desc = {
             'name':'SBE37_driver',
@@ -129,13 +138,75 @@ class TestSBE37Agent(IonTestCase):
         processes = [
             agent_desc
         ]
-        
+
         # Spawn agent and driver, create agent client.
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('instrument_agent')
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,
-                                                                target=self.svc_id)        
-        
+                                                            target=self.svc_id)        
+
+        # Setup a subscriber to a data event topic
+        class TestDataSubscriber(DataBlockEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                DataBlockEventSubscriber.__init__(self, *args, **kwargs)
+                print 'listening for data at ' + kwargs.get('origin','none') 
+
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'data subscriber ondata:'
+                    print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        origin_str = DriverChannel.INSTRUMENT + '.' + str(self.svc_id)
+        datasub = TestDataSubscriber(origin=origin_str,process=self.sup)
+        yield datasub.initialize()
+        yield datasub.activate()
+
+        # Setup a subscriber to agent errors, transactions, config changes.
+        class TestInfoSubscriber(InfoLoggingEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)                
+                print 'listening for info at ' + kwargs.get('origin','none')          
+                
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'logging subscriber ondata:'
+                    print content.description
+                    #print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        # origin_str = 'agent.' + str(self.svc_id)
+        infosub = TestInfoSubscriber(process=self.sup)
+        yield infosub.initialize()
+        yield infosub.activate()
+
+        # Setup a subscriber to agent state changes.
+        class TestStateSubscriber(BusinessStateChangeSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                BusinessStateChangeSubscriber.__init__(self, *args, **kwargs)
+                print 'listening for state at ' + kwargs.get('origin','none') 
+
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'state subscriber ondata:'
+                    print content.description
+                    #print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        origin_str = 'agent.' + str(self.svc_id)
+        statesub = TestStateSubscriber(origin=origin_str,process=self.sup)
+        yield statesub.initialize()
+        yield statesub.activate()
+
 
     @defer.inlineCallbacks
     def tearDown(self):
