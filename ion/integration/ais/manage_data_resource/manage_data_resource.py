@@ -172,7 +172,8 @@ class ManageDataResource(object):
                     dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
 
-            yield self.rc.put_instance(datasrc_resource)
+            # This could be cleaned up to go faster - only call put if it is modified!
+            yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
 
         except ReceivedApplicationError, ex:
@@ -428,6 +429,9 @@ class ManageDataResource(object):
 
 
 
+            """
+            Moved this functionality to the ingestion services where it simplifies the interactions.
+
             #event to subscribe to
             log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
             self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
@@ -438,8 +442,7 @@ class ManageDataResource(object):
             yield self._subscriber.register()
             yield self._subscriber.initialize()
             yield self._subscriber.activate()
-
-
+            """
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
@@ -574,9 +577,13 @@ class ManageDataResource(object):
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
 
-        #casrefs... hopefully this is right
-        #datasrc_resource.authentication                = msg.authentication
-        #datasrc_resource.search_pattern                = msg.search_pattern
+        if msg.IsFieldSet('authentication'):
+            log.info("Setting datasource: authentication")
+            datasrc_resource.authentication                = msg.authentication
+
+        if msg.IsFieldSet('search_pattern'):
+            log.info("Setting datasource: search_pattern")
+            datasrc_resource.search_pattern                = msg.search_pattern
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 

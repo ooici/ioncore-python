@@ -33,6 +33,8 @@ from ion.util.iontime import IonTime
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
+from ion.integration.ais.common.metadata_cache import  MetadataCache
+
 from ion.core.intercept.policy import get_dispatcher_id_for_user
 
 from ion.core.object import object_utils
@@ -44,6 +46,7 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        GET_SUBSCRIPTION_LIST_REQ_TYPE, \
+                                                       GET_SUBSCRIPTION_LIST_RESP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE, \
                                                        DELETE_SUBSCRIPTION_RSP_TYPE, \
@@ -112,6 +115,8 @@ class ManageDataResourceSubscription(object):
         self.pfd = None
 
         self.nac = NotificationAlertServiceClient(proc=ais)
+        self.metadataCache = ais.getMetadataCache()
+
 
 
     @defer.inlineCallbacks
@@ -573,7 +578,13 @@ class ManageDataResourceSubscription(object):
         #
         # Now iterate through the list, filtering by the bounds
         #
-        
+        for result in reply.message_parameters_reference[0].subscriptionListResults:
+            dSetResID = result.datasetMetadata.data_resource_id
+            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
+            if not dSetMetadata is None:
+                if bounds.isInBounds(dSetMetadata) == False:                
+                    del result
+   
 
         defer.returnValue(reply)
 

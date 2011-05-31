@@ -224,8 +224,6 @@ class SpatialTemporalBounds(object):
         """
         log.debug('__isInLongitudeBounds()')
 
-        log.error('__isInLongitudeBounds(): bounds min is %s, bounds max is %s' % (bounds['minLon'], bounds['maxLon']))
-
         #
         # If bounds min is greater than metadata max, bounds must be completely
         # outside data; return False

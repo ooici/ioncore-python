@@ -161,9 +161,24 @@ class DatasetController(ServiceProcess):
                                             CONF.getValue('task_id',
                                                           default=str(uuid.uuid4())))
 
-        self.walrus = self.spawn_args.get('do-init',
-                                            CONF.getValue('do-init',
-                                            default=False))
+        self.walrus = ioninit.cont_args.get('do-init',
+                                            self.spawn_args.get('do-init',
+                                                CONF.getValue('do-init',
+                                                    default=False)))
+
+        if isinstance(self.walrus, (str, unicode)):
+            if self.walrus == 'False':
+                self.walrus = False
+            elif self.walrus == 'True':
+                self.walrus = True
+            else:
+                raise Exception("Invalid input to dataset controller: argument 'do-init' is True or False" )
+        elif not isinstance(self.walrus, bool):
+            raise Exception("Invalid input to dataset controller: argument 'do-init' is True or False" )
+
+
+
+
 
         log.debug('Update interval: %f' % self.update_interval)
         log.debug('NcML URL: %s Local path: %s' % (self.server_url, self.ncml_path))

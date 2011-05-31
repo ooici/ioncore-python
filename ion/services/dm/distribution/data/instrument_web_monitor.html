@@ -50,24 +50,24 @@
 
             // Create the data tables
             this.conductivity_data = new google.visualization.DataTable();
-            this.conductivity_data.addColumn('string', 'x');
-            this.conductivity_data.addColumn('number', 'Instrument 1');
+            this.conductivity_data.addColumn('string', 'Date');
+            this.conductivity_data.addColumn('number', 'S/m');
 
             this.pressure_data = new google.visualization.DataTable();
-            this.pressure_data.addColumn('string', 'x');
-            this.pressure_data.addColumn('number', 'Instrument 1');
+            this.pressure_data.addColumn('string', 'Date');
+            this.pressure_data.addColumn('number', 'dB');
 
             this.salinity_data = new google.visualization.DataTable();
-            this.salinity_data.addColumn('string', 'x');
-            this.salinity_data.addColumn('number', 'Instrument 1');
+            this.salinity_data.addColumn('string', 'Date');
+            this.salinity_data.addColumn('number', 'psu');
 
             this.sound_velocity_data = new google.visualization.DataTable();
-            this.sound_velocity_data.addColumn('string', 'x');
-            this.sound_velocity_data.addColumn('number', 'Instrument 1');
+            this.sound_velocity_data.addColumn('string', 'Date');
+            this.sound_velocity_data.addColumn('number', 'm/s');
 
             this.temperature_data = new google.visualization.DataTable();
-            this.temperature_data.addColumn('string', 'x');
-            this.temperature_data.addColumn('number', 'Instrument 1');
+            this.temperature_data.addColumn('string', 'Date');
+            this.temperature_data.addColumn('number', 'C');
        
             // Create the visualizations
             this.conductivity_lineChart = new google.visualization.LineChart(document.getElementById('conductivity_visualization'));
@@ -123,7 +123,7 @@
                                  var salinity = datapoint.salinity;
                                  var sound_velocity = datapoint.sound_velocity;
                                  var temperature = datapoint.temperature;
-                                 var time = datapoint.time;
+                                 var time = datapoint.device_time;
 
                                  // Update the data tables
                                  this.conductivity_data.addRow([time,conductivity]);
@@ -167,15 +167,15 @@
   </div><!-- end .ui-layout-north -->
 
   <div class="ui-layout-center">
-        <h2>Conductivity</h2>
+        <h3>Conductivity</h3>
         <div id="conductivity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
-        <h2>Pressure</h2>
+        <h3>Pressure</h3>
         <div id="pressure_visualization" style="align: center; width: 1000px; height: 150px;"></div>
-        <h2>Salinity</h2>
+        <h3>Salinity</h3>
         <div id="salinity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
-        <h2>Sound Velocity</h2>
+        <h3>Sound Velocity</h3>
         <div id="sound_velocity_visualization" style="align: center; width: 1000px; height: 150px;"></div>
-        <h2>Temperature</h2>
+        <h3>Temperature</h3>
         <div id="temperature_visualization" style="align: center; width: 1000px; height: 150px;"></div>
   </div><!-- end .ui-layout-center -->
 

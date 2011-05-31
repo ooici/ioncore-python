@@ -204,7 +204,7 @@ class ResourceClient(object):
         try:
             yield repo.checkout(branch)
         except repository.RepositoryError, ex:
-            log.error('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
+            log.exception('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
             raise ResourceClientError('Could not checkout branch during get_instance.')
 
         # Create a resource instance to return
