@@ -133,7 +133,8 @@ class IonTestCase(unittest.TestCase):
         """
         log.debug("============Closing ION container============")
         if self.twisted_container_service: #hack
-            yield self.twisted_container_service.stopService()
+            if self.twisted_container_service.running:
+                yield self.twisted_container_service.stopService()
 
         self.test_sup = None
         # Cancel any delayed calls, such as timeouts, looping calls etc.
