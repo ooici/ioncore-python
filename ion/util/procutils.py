@@ -188,6 +188,18 @@ def currenttime_ms():
     return int(currenttime() * 1000)
 
 
+def isnan(x):
+    """
+    Python 2.5 does not support isnan in the math module.
+    Using string conversion is the safest method - comparison with self does not always work...
+    http://stackoverflow.com/questions/944700/how-to-check-for-nan-in-python
+    """
+
+    return str(float(x)).lower() == 'nan'
+
+    
+
+
 def get_ion_path(filename):
     """
     @brief running twisted and trial can do nasty things to the path and the current working directory. This method
