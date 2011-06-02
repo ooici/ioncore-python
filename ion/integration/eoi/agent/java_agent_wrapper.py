@@ -551,7 +551,7 @@ class JavaAgentWrapper(ServiceProcess):
         stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
         log.info('Getting Data Start time: %s' % stime)
         etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
-        log.info('Getting Data Start time: %s' % etime)
+        log.info('Getting Data End time: %s' % etime)
 
         msg.start_datetime_millis = start_time_seconds * 1000
 
