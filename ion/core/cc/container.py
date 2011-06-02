@@ -204,10 +204,10 @@ class Container(BasicLifecycleObject):
         """
         log.warning('fatalError event')
         log.warning(str(ex))
-        f = failure.Failure()
-        log.info("The container suffered a fatal error event and is crashing.")
-        log.info("The last traceback, in full detail, was written to stdout.")
         try:
+            f = failure.Failure()
+            log.info("The container suffered a fatal error event and is crashing.")
+            log.info("The last traceback, in full detail, was written to stdout.")
             log.warning(str(f.getTraceback()))
             f.printDetailedTraceback()
             log.info("The last traceback, in full detail, was written to stdout.")

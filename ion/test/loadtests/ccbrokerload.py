@@ -12,7 +12,6 @@ import sys
 import time
 
 from twisted.internet import defer, reactor
-from carrot import connection, messaging
 
 from ion.test.loadtest import LoadTest, LoadTestOptions
 import ion.util.procutils as pu
