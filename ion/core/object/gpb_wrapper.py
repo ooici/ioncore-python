@@ -1445,17 +1445,25 @@ class Wrapper(object):
             if isinstance(field, (WrappedMessageProperty)):
                 try:
                     val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  '), offset)
+                except AttributeError, ae:
+                    log.error(ae)
+                    val = 'Field Value - None'
                 except Exception, ex:
                     log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
                     continue
                 
             elif isinstance(field, WrappedRepeatedCompositeProperty):
+
                 try:
                     val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  ',name=name), offset)
+                except AttributeError, ae:
+                    log.error(ae)
+                    val = 'Field Value - None'
+
                 except Exception, ex:
                     log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
                     continue
 
             elif isinstance(field, WrappedRepeatedScalarProperty):
@@ -1702,8 +1710,12 @@ class ContainerWrapper(object):
         n = min(10, length)
 
         for i in range(n):
-            val = self[i].PPrint(offset=offset + '  ')
-            msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+            try:
+                val = self[i].PPrint(offset=offset + '  ')
+                msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+            except AttributeError, ae:
+
+                msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  'Repeated Link Not Set!')
 
         if length > 10:
             msg += offset + '... truncated printing list at 10 items!\n'
