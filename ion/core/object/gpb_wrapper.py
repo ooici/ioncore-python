@@ -31,6 +31,8 @@ from ion.core.object.cdm_methods import group
 from ion.core.object.cdm_methods import attribute_merge
 
 import ion.util.ionlog
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 
@@ -404,7 +406,7 @@ class WrapperType(type):
             # Special methods for certain object types:
             WrapperType._add_specializations(cls, obj_type, clsDict)
 
-            VALIDATE_ATTRS = True
+            VALIDATE_ATTRS = CONF.getValue('VALIDATE_ATTRS',True)
             if VALIDATE_ATTRS:
                 def obj_setter(self, k, v):
                     if self._init and not hasattr(self, k):
@@ -422,9 +424,9 @@ class WrapperType(type):
 
             WrapperType._type_cache[msgType] = clsType
 
+
         # Finally allow the instantiation to occur, but slip in our new class type
         obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
-
 
         return obj
 
@@ -663,6 +665,8 @@ class Wrapper(object):
         """
         To avoid invalidating during when there is a hash conflict in the workspace - set the twin...
         """
+
+        self.__no_string = CONF.getValue('STR_GPBS',False)
 
         # Hack to prevent setting properties in a class instance
         self._init = True
@@ -1213,6 +1217,12 @@ class Wrapper(object):
         else:
             msg = '\n' +self._gpbMessage.__str__()
         '''
+
+        if not self.__no_string:
+            return 'GPB NO STRING!'
+
+        #log.critical('HOLY SHIT STILL HERE!')
+
         if self._source is self:
             msg = '\n %s \n'  % str(self._gpbMessage)
         else:
@@ -1435,17 +1445,25 @@ class Wrapper(object):
             if isinstance(field, (WrappedMessageProperty)):
                 try:
                     val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  '), offset)
+                except AttributeError, ae:
+                    log.error(ae)
+                    val = 'Field Value - None'
                 except Exception, ex:
                     log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
                     continue
                 
             elif isinstance(field, WrappedRepeatedCompositeProperty):
+
                 try:
                     val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  ',name=name), offset)
+                except AttributeError, ae:
+                    log.error(ae)
+                    val = 'Field Value - None'
+
                 except Exception, ex:
                     log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
                     continue
 
             elif isinstance(field, WrappedRepeatedScalarProperty):
@@ -1692,8 +1710,12 @@ class ContainerWrapper(object):
         n = min(10, length)
 
         for i in range(n):
-            val = self[i].PPrint(offset=offset + '  ')
-            msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+            try:
+                val = self[i].PPrint(offset=offset + '  ')
+                msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
+            except AttributeError, ae:
+
+                msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  'Repeated Link Not Set!')
 
         if length > 10:
             msg += offset + '... truncated printing list at 10 items!\n'
