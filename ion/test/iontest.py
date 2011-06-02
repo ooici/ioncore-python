@@ -193,7 +193,17 @@ class IonTestCase(unittest.TestCase):
 
     def _spawn_processes(self, procs, sup=None):
         sup = sup if sup else self.test_sup
-        return bootstrap.spawn_processes(procs, sup)
+        d = bootstrap.spawn_processes(procs, sup)
+        def spawn_error(reason):
+            """need to stopService here because by the next test case uses
+            a new instance of this class, which means we don't have
+            twisted_container_service anymore
+            """
+            d = self.twisted_container_service.stopService()
+            d.addBoth(lambda _: defer.fail(reason))
+            return d
+        d.addErrback(spawn_error)
+        return d
 
     def _spawn_process(self, process):
         return process.spawn()
