@@ -262,8 +262,14 @@ class NMEAString ():
         # checksum = 8-bit XOR of all chars in string
         # result is an 8-bit number (0 to 255)
         cs = ord (reduce (lambda x, y: chr (ord (x) ^ ord (y)), nmeaCS))
-        calcLow = chr (48 + (cs & 15))           # CS and 00001111
-        calcHigh = chr (48 + ((cs & 240) >> 4))  # CS and 11110000
+        low = 48 + (cs & 15)           # CS and 00001111
+        if low > 57:
+            low += 7;
+        high = 48 + ((cs & 240) >> 4)  # CS and 11110000
+        if high > 58:
+            high += 7;
+        calcLow = chr (low)
+        calcHigh = chr (high)
 
         # Validate calculated against what the NMEA string said it should be
         if (calcLow == checkL and calcHigh == checkH):
