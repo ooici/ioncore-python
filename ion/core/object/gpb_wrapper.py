@@ -720,6 +720,10 @@ class Wrapper(object):
                 log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by passing a wrapper from another repository')
 
+            if other.Invalid:
+                log.error('Error while invalidating self - other is invalid too!\nSelf: %s\nOther: %s'% (self.Debug(), other.Debug()))
+                raise OOIObjectError('Can not invalidate self with other when other is already invalid')
+
         else:
             other = self
 
@@ -728,7 +732,7 @@ class Wrapper(object):
 
         if other is not self:
             # If we are doing an invalidate to other...
-            self._merge_derived_wrappers(other)
+            self._merge_derived_wrappers(other._source)
 
         elif self.IsRoot:
             # If this is a straight invalidation - clear the derived wrappers if root
@@ -736,7 +740,7 @@ class Wrapper(object):
                 item.Invalidate()
 
         # Source must always be set to self or another gpb_wrapper object!
-        self._source = other
+        self._source = other._source
 
         self._derived_wrappers = None
         self._gpbMessage = None
@@ -759,10 +763,10 @@ class Wrapper(object):
 
                 if hasattr(self_obj, '__iter__'):
                     for arg1, arg2 in zip(self_obj, other_obj):
-                        arg1.Invalidate(arg2)
+                        arg1.Invalidate(other = arg2)
 
                 else:
-                    self_obj.Invalidate(other_obj)
+                    self_obj.Invalidate(other = other_obj)
 
 
     @property
@@ -966,6 +970,12 @@ class Wrapper(object):
         repo = self.Repository
 
         for link in  self.ChildLinks:
+
+            if link.Invalid:
+                log.error('Link in child links is invalid!')
+                log.debug('Current Wrapper: %s' % self.Debug())
+                log.debug('Invalid Link %s' % link.Debug())
+
             # Test to see if it is already serialized!
             child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
             #child_se = repo.index_hash.get(link.key, None)
@@ -1042,7 +1052,21 @@ class Wrapper(object):
         # now and the child will return as unmodified when the other parents ask it
         # to recurse commit.
 
+        log.debug('Current Wrapper: %s' % self.Debug())
+
+        cnt = 1
         for link in self.ParentLinks:
+            log.debug('Parrent Link # %d \n%s' % (cnt, link.Debug()))
+            cnt += 1
+
+
+        for link in self.ParentLinks:
+            if link.Invalid:
+                log.error('Link in parent links is invalid!')
+                log.debug('Current Wrapper: %s' % self.Debug())
+                log.debug('Invalid Link %s' % link.Debug())
+
+
             if link.key != se.key:
                 link.key = se.key
 
@@ -1110,6 +1134,7 @@ class Wrapper(object):
         # Else make a new one...
         inst = Wrapper(gpbMessage)
         inst._root = self.Root
+        inst._invalid=False
 
         # Add it to the list of objects which derive from the root wrapper
         self.DerivedWrappers[gpbMessage] = inst
