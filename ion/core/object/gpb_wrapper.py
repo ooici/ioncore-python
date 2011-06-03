@@ -1393,12 +1393,11 @@ class Wrapper(object):
         return self.GPBMessage.ByteSize()
 
     @GPBSource
-    def PPrint(self, offset='', fid=None):
+    def PPrint(self, offset=''):
 
-        if fid is None:
-            fid = StringIO.StringIO()
+        fid = StringIO.StringIO()
 
-        msg = '%s%s\n' % (offset, self.ObjectClass)
+        fid.write('%s%s\n' % (offset, self.ObjectClass))
 
         try:
             for name, field in self._Properties.iteritems():
@@ -1407,8 +1406,8 @@ class Wrapper(object):
                 except KeyError, ke:
                     log.debug('KeyError during get field: %s' % ke)
 
-                    msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (
-                    offset, name, field.field_type, 'KeyError - object not found in local workbench')
+                    fid.write('''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (
+                    offset, name, field.field_type, 'KeyError - object not found in local workbench'))
                     continue
 
                 if isinstance(field, WrappedMessageProperty):
@@ -1419,7 +1418,7 @@ class Wrapper(object):
                         val = 'Field Value - None'
                     except Exception, ex:
                         log.exception('Unexpected state in a WrappedMessageProperty.')
-                        msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
+                        fid.write('%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex))
                         continue
 
                 elif isinstance(field, WrappedRepeatedCompositeProperty):
@@ -1427,7 +1426,7 @@ class Wrapper(object):
                         val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset + '  ', name=name), offset)
                     except Exception, ex:
                         log.exception('Unexpected state in a WrappedRepeatedCompositeProperty.')
-                        msg += '%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex)
+                        fid.write('%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex))
                         continue
 
                 elif isinstance(field, WrappedRepeatedScalarProperty):
@@ -1445,10 +1444,14 @@ class Wrapper(object):
 
                     val = 'Field Value - "%s"' % str(item)
 
-                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name, field.field_type, val)
+                fid.write('''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name, field.field_type, val))
         except Exception, ex:
             log.exception('Unexpected Exception in PPrint Wrapper!')
-            msg += 'Exception! %s' % ex
+            fid.write('Exception! %s' % ex)
+
+        finally:
+            msg = fid.getvalue()
+            fid.close()
 
         return msg
 
@@ -1657,49 +1660,54 @@ class ContainerWrapper(object):
             yield self[i]
 
     @GPBSourceCW
-    def PPrint(self, offset='', name='items', fid=None):
+    def PPrint(self, offset='', name='items'):
 
-        msg = ''
+        length = len(self)
+
+        if length is 0:
+            return '%s[ ]' % offset
+        else:
+            fid = StringIO.StringIO()        
+            fid.write('%s[ # of %s - %i \n' % (offset, name, length))
+
+
         try:
-            length = len(self)
-
-            if length is 0:
-                return '%s[ ]' % offset
-            else:
-                msg = '%s[ # of %s - %i \n' % (offset, name, length)
 
                 #n = min(10, length)
 
             # Print all repeated composites
             for i in range(length):
-                log.debug('Printing field # %d' % i)
+                #log.debug('Printing field # %d' % i)
                 try:
                     val = self[i].PPrint(offset=offset + '  ')
-                    msg += '''%s%s# %i - %s  \n''' % (offset, name, i, val)
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, val))
 
                 except AttributeError, ae:
                     log.debug('Attribute error while calling pprint on repeated composite: %s' % ae)
-                    msg += '''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link Not Set!')
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link Not Set!'))
 
                 except KeyError, ke:
                     log.debug('KeyError while calling pprint on repeated composite: %s' % ke)
-                    msg += '''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link object not found!!')
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link object not found!!'))
 
                 except Exception, ex:
                     log.exception('Unexpected Exception while calling pprint on repeated composite')
-                    msg += '''%s%s# %i - Exception: %s  \n''' % (offset, name, i, ex)
+                    fid.write('''%s%s# %i - Exception: %s  \n''' % (offset, name, i, ex))
 
 
                     #if length > 10:
             #    msg += offset + '... truncated printing list at 10 items!\n'
 
 
-            msg += offset + '] '
+            fid.write(offset + '] ')
 
         except Exception, ex:
             log.exception('Unexpected Exception in PPrint CompositeContainer!')
-            msg += 'Exception! %s' % ex
+            fid.write('Exception! %s' % ex)
 
+        finally:
+            msg = fid.getvalue()
+            fid.close()
 
         return msg
 
