@@ -1379,11 +1379,25 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
-        log.debug('Testing updateDataResourceSubscription.')
+        import time
+        
+        def TimeStamp ():
+            TimeNow = time.time()
+            TimeStampStr = "(wall time = " + str (TimeNow) + \
+                           ", elapse time = " + str(TimeNow - self.StartTime) + \
+                           ", delta time = " + str(TimeNow - self.LastTime) + \
+                           ")"
+            self.LastTime = TimeNow
+            return TimeStampStr
+           
+        self.StartTime = time.time()
+        self.LastTime = self.StartTime
+        log.warning('test_updateDataResourceSubscription: started at ' + str(self.StartTime))
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
+        log.warning('test_updateDataResourceSubscription: created user ' + TimeStamp())
         
         #
         # Create dispatchers and associations
@@ -1394,6 +1408,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
         self.dispatcherID = self.dispatcherRes.ResourceIdentity
         log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+        log.warning('test_updateDataResourceSubscription: created dispatchers ' + TimeStamp())
             
         #
         # Now make an association between the user and this dispatcher
@@ -1419,7 +1434,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
-
+        log.warning('test_updateDataResourceSubscription: created associations ' + TimeStamp())
+ 
         # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -1442,6 +1458,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: created subscription ' + TimeStamp())
             
         # now update the subscription created above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1465,6 +1482,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
 
         # now update the subscription updated above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1488,6 +1506,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
 
     @defer.inlineCallbacks
     def test_deleteDataResourceSubscription(self):
