@@ -114,17 +114,19 @@ class Container(BasicLifecycleObject):
 
         yield self.app_manager.activate()
 
+
+        ## Lifecycle event publishing disabled for now 
         # now that we've activated, can publish ContainerLifecycleEvents as we need the exchange_manager in place.
         # this is the first chance we have to construct this publisher though.
-        p = Process(spawnargs={'proc-name': 'ContainerLCEPubProcess'})
-        yield p.spawn()
+        #p = Process(spawnargs={'proc-name': 'ContainerLCEPubProcess'})
+        #yield p.spawn()
 
-        self._lc_pub = ContainerLifecycleEventPublisher(origin=self.id, process=p)
-        yield self._lc_pub.initialize()
-        yield self._lc_pub.activate()
+        #self._lc_pub = ContainerLifecycleEventPublisher(origin=self.id, process=p)
+        #yield self._lc_pub.initialize()
+        #yield self._lc_pub.activate()
 
         # now publish the event
-        yield self._lc_pub.create_and_publish_event(state=ContainerLifecycleEventPublisher.State.ACTIVE)
+        #yield self._lc_pub.create_and_publish_event(state=ContainerLifecycleEventPublisher.State.ACTIVE)
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
@@ -140,9 +142,9 @@ class Container(BasicLifecycleObject):
 
         # technically this is not correct as we're still not quite TERMINATED, but for all intents and purposes..
         # we have to publish before we tear down the messaging framework
-        yield self._lc_pub.create_and_publish_event(state=self._lc_pub.State.TERMINATED)
-        yield self._lc_pub.terminate()
-        yield self._lc_pub._process.terminate()
+        #yield self._lc_pub.create_and_publish_event(state=self._lc_pub.State.TERMINATED)
+        #yield self._lc_pub.terminate()
+        #yield self._lc_pub._process.terminate()
 
         yield self.app_manager.terminate()
 
