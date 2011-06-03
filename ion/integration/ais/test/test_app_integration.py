@@ -1624,10 +1624,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_updateDataResourceCache(self):
-        """
-        Test to see if wildcards match for subscribers
-        """
-
         log.debug('Testing updateDataResourceCache.')
 
 
@@ -1642,7 +1638,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         #
         # Send a message with no bounds to get a list of dataset ID's; then
-        # take one of those IDs and create a subscription on it.
+        # take one of those IDs and publish a SupplementAdded event for it
         #
         
         # Create a message client
@@ -1656,15 +1652,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail("findDataResources failed: " + rspMsg.error_str)
+            self.fail("test_updateDataResourceCache failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+        log.debug('test_updateDataResourceCache returned: ' + str(numResReturned) + ' resources.')
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         if numResReturned > 0:
-            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
+            log.debug('test_updateDataResourceCache: %s datasets returned!' % (numResReturned))
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
             # Setup the publisher
@@ -1692,7 +1688,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             #self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
 
         else:
-            log.error('test_notificationSet: No datasets returned!')
+            log.error('test_updateDataResourceCache: No datasets returned!')
         
 
     def __validateDatasetByOwnerMetadata(self, metadata):
