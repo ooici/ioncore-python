@@ -146,13 +146,26 @@ class Container(BasicLifecycleObject):
         #yield self._lc_pub.terminate()
         #yield self._lc_pub._process.terminate()
 
+        if self._fatal_error_encountered:
+            log.info("Container terminating hard due to fatal error!")
+            yield defer.succeed(None)
+            defer.returnValue(None)
+
+        log.info("Terminating app_manager.")
         yield self.app_manager.terminate()
+        log.info("app_manager Terminated.")
 
+        log.info("Terminating proc_manager.")
         yield self.proc_manager.terminate()
+        log.info("proc_manager Terminated.")
 
+        log.info("Terminating interceptor_system.")
         yield self.interceptor_system.terminate()
+        log.info("interceptor_system Terminated.")
 
+        log.info("Terminating exchange_manager.")
         yield self.exchange_manager.terminate()
+        log.info("exchange_manager Terminated.")
 
         log.info("Container closed")
         Container._started = False
