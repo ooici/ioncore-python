@@ -14,7 +14,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
+from ion.services.cei.epu_controller_client import EPUControllerClient
 from ion.services.cei.epu_controller_list_client import EPUControllerListClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
