@@ -104,6 +104,9 @@ class AppIntegrationTest(IonTestCase):
     Testing Application Integration Service.
     """
 
+    # Set timeout for Trial tests
+    timeout = 40
+
     @defer.inlineCallbacks
     def setUp(self):
         log.debug('AppIntegrationTest.setUp():')
