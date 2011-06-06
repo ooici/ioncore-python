@@ -186,7 +186,7 @@ class WrappedMessageProperty(WrappedProperty):
     def __get__(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not get message (composite) property - %s - in a wrapper which is invalidated.' % self.name)
             # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
@@ -199,7 +199,7 @@ class WrappedMessageProperty(WrappedProperty):
     def _get_backdoor(self, wrapper):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not get message (composite) property - %s -in a wrapper which is invalidated.' % self.name)
             # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
@@ -210,7 +210,7 @@ class WrappedMessageProperty(WrappedProperty):
     def __set__(self, wrapper, value):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not set message (composite) property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not set message (composite) property - %s - in a wrapper which is invalidated.' % self.name)
 
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
@@ -230,14 +230,14 @@ class WrappedRepeatedScalarProperty(WrappedProperty):
     def __get__(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get repeated scalar property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not get repeated scalar property - %s - in a wrapper which is invalidated.'% self.name)
             # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
 
         return ScalarContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object')
+        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object' % self.name)
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
@@ -249,7 +249,7 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
     def __get__(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not "get" from a repeated composite property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not "get" from a repeated composite property - %s - in a wrapper which is invalidated.' % self.name)
 
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
@@ -260,7 +260,7 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
             raise OOIObjectError(
-                'Can not get_backdoor from a repeated composite property in a wrapper which is invalidated.')
+                'Can not get_backdoor from a repeated composite property - %s - in a wrapper which is invalidated.' % self.name)
 
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
@@ -269,7 +269,7 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
 
     def __set__(self, wrapper, value):
         raise AttributeError(
-            'Assignment is not allowed for field name "%s" of type Repeated Composite in ION Object' % self.name)
+            'Assignment is not allowed for field name - "%s" - of type Repeated Composite in ION Object' % self.name)
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
@@ -282,14 +282,14 @@ class WrappedScalarProperty(WrappedProperty):
         # This may be the result we were looking for, in the case of a simple scalar field
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get scalar property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not get scalar property - %s - in a wrapper which is invalidated.' % self.name)
 
         return getattr(wrapper.GPBMessage, self.name)
 
     def __set__(self, wrapper, value):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not set scalar property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not set scalar property - %s -in a wrapper which is invalidated.' % self.name)
 
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
@@ -702,7 +702,14 @@ class Wrapper(object):
         return self._source._invalid
 
     def Invalidate(self, other=None):
+
+
         if other is not None:
+
+            log.debug('Invalidating self:\n%s' % self.Debug())
+
+            log.debug('Invalidating self with Other:\n%s \n\n' % other.Debug())
+
             if self.ObjectType != other.ObjectType:
                 log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by merge when two objects are not the same type')
@@ -725,14 +732,18 @@ class Wrapper(object):
                 raise OOIObjectError('Can not invalidate self with other when other is already invalid')
 
         else:
+            log.debug('Invalidating self:\n%s' % self.Debug())
+
             other = self
 
-            if self._invalid:
+            #if self._invalid:
+            if self.Invalid:
                 return
 
         if other is not self:
             # If we are doing an invalidate to other...
             self._merge_derived_wrappers(other._source)
+
 
         elif self.IsRoot:
             # If this is a straight invalidation - clear the derived wrappers if root
@@ -760,7 +771,11 @@ class Wrapper(object):
                 self_obj = prop._get_backdoor(self)
 
                 other_obj = prop._get_backdoor(other)
+                if self_obj is other_obj:
+                    raise OOIObjectError('The back door property getter failed!')
 
+
+                log.debug('Invalidating message property: %s' % prop.name)
                 if hasattr(self_obj, '__iter__'):
                     for arg1, arg2 in zip(self_obj, other_obj):
                         arg1.Invalidate(other = arg2)
@@ -958,11 +973,14 @@ class Wrapper(object):
             raise OOIObjectError('Can not call Recurse Commit on a non root object wrapper.')
 
         self.recurse_count.count += 1
-        log.debug('Entering Recurse Commit: recurse counter - %d, child links - %d, objects to commit - %d' % (
-        self.recurse_count.count, len(self.ChildLinks), len(structure)))
+        local_cnt = self.recurse_count.count
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d' %
+              (local_cnt, type(self), len(self.ChildLinks), len(structure)))
 
         if not  self.Modified:
             # This object is already committed!
+            log.debug('Exiting Recurse Commit: recurse counter - %d' % local_cnt)
+
             return
 
         # Create the Structure Element in which the binary blob will be stored
@@ -1014,13 +1032,15 @@ class Wrapper(object):
         se.key = se.sha1
 
         # Determine whether I am a leaf
-        if len(self.ChildLinks) == 0:
+        if len(self.ChildLinks) is 0:
             se.isleaf = True
         else:
             se.isleaf = False
 
-        # Done setting up the Sturcture Element
+        # Done setting up the Structure Element
         structure[se.key] = se
+        # It does not matter if we are replacing an existing se with the same key - the content - including the child links must be identical!
+
 
         # This will be true for any object which is not a core object such as a commit
         # We don't want to worry about what is in the workspace - that is the repositories job.
@@ -1032,10 +1052,16 @@ class Wrapper(object):
             # Now deal with some nastyness
             # Possible DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure
             if se.key in repo._workspace:
+                # If this is true we have just done a lot of extra work to create the Structure element - but there is no way to know before creating it!
+
                 # Get the other object with the same name that is already committed...
                 other = repo._workspace[se.key]
 
+                #print "Self Plinks:",self.ParentLinks
+                #print "Other Plinks:",other.ParentLinks
                 other.ParentLinks.update(self.ParentLinks)
+
+                #print "Other Plinks After:",other.ParentLinks
 
                 # Invalidate ourself
                 self.Invalidate(other)
@@ -1044,20 +1070,22 @@ class Wrapper(object):
                 # Now add it back the workspace under the new name
                 repo._workspace[se.key] = self
 
-        self.MyId = se.key
-        self.Modified = False
+        # Test to see if we need to set MyId - don't mess up the case where self now points to another source which is already commited.
+        if self.MyId != se.key:
+            self.MyId = se.key
+            self.Modified = False
 
         # Set the key value for parent links!
         # This will only be reached once for a given child object. Set all parents
         # now and the child will return as unmodified when the other parents ask it
         # to recurse commit.
 
-        log.debug('Current Wrapper: %s' % self.Debug())
+        #log.debug('Current Wrapper: %s' % self.Debug())
 
-        cnt = 1
-        for link in self.ParentLinks:
-            log.debug('Parrent Link # %d \n%s' % (cnt, link.Debug()))
-            cnt += 1
+        #cnt = 1
+        #for link in self.ParentLinks:
+        #    log.debug('Parrent Link # %d \n%s' % (cnt, link.Debug()))
+        #    cnt += 1
 
 
         for link in self.ParentLinks:
@@ -1069,6 +1097,8 @@ class Wrapper(object):
 
             if link.key != se.key:
                 link.key = se.key
+
+        log.debug('Exiting Recurse Commit: recurse counter - %d' % local_cnt)
 
 
     @GPBSource
