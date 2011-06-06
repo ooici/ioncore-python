@@ -777,6 +777,7 @@ class Wrapper(object):
 
                 log.debug('Invalidating message property: %s' % prop.name)
                 if isinstance(self_obj, ContainerWrapper):
+                    # Make sure to get the derive object not what it links to!
                     for gpb_item_self, gpb_item_other in zip(self_obj._gpbcontainer, other_obj._gpbcontainer):
 
                         item_self = self_obj._wrapper._rewrap(gpb_item_self)
