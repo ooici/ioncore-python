@@ -679,8 +679,8 @@ class Process(BasicLifecycleObject):
             log.error(pprint.pprint(payload))
 
             if log.getEffectiveLevel() <= logging.INFO:
-                log.error('*** Message Content: \n \n')
-                log.error(str(payload.get('content', '## No Content! ##')))
+                log.info('*** Message Content: \n \n')
+                log.info(str(payload.get('content', '## No Content! ##')))
 
             log.error("*****End Non Conversation Application error in message processing*****")
 
@@ -699,8 +699,8 @@ class Process(BasicLifecycleObject):
             log.error(pprint.pprint(payload))
 
             if log.getEffectiveLevel() <= logging.WARN:
-                log.error('*** Message Content: \n \n')
-                log.error(str(payload.get('content', '## No Content! ##')))
+                log.warn('*** Message Content: \n \n')
+                log.warn(str(payload.get('content', '## No Content! ##')))
 
             log.error("*****End Non Conversation Container error in message processing*****")
 
