@@ -706,9 +706,9 @@ class Wrapper(object):
 
         if other is not None:
 
-            log.debug('Invalidating self:\n%s' % self.Debug())
+            #log.debug('Invalidating self:\n%s' % self.Debug())
 
-            log.debug('Invalidating self with Other:\n%s \n\n' % other.Debug())
+            #log.debug('Invalidating self with Other:\n%s \n\n' % other.Debug())
 
             if self.ObjectType != other.ObjectType:
                 log.error(self.Debug())
@@ -732,7 +732,7 @@ class Wrapper(object):
                 raise OOIObjectError('Can not invalidate self with other when other is already invalid')
 
         else:
-            log.debug('Invalidating self:\n%s' % self.Debug())
+            #log.debug('Invalidating self:\n%s' % self.Debug())
 
             other = self
 
