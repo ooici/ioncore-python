@@ -776,9 +776,13 @@ class Wrapper(object):
 
 
                 log.debug('Invalidating message property: %s' % prop.name)
-                if hasattr(self_obj, '__iter__'):
-                    for arg1, arg2 in zip(self_obj, other_obj):
-                        arg1.Invalidate(other = arg2)
+                if isinstance(self_obj, ContainerWrapper):
+                    for gpb_item_self, gpb_item_other in zip(self_obj._gpbcontainer, other_obj._gpbcontainer):
+
+                        item_self = self_obj._wrapper._rewrap(gpb_item_self)
+                        item_other = other_obj._wrapper._rewrap(gpb_item_other)
+
+                        item_self.Invalidate(other = item_other)
 
                 else:
                     self_obj.Invalidate(other = other_obj)
