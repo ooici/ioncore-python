@@ -164,6 +164,7 @@ class ManageDataResource(object):
                 datasrc_resource.max_ingest_millis = msg.max_ingest_millis
 
             if msg.IsFieldSet("is_public"):
+                datasrc_resource.is_public = msg.is_public
                 if not msg.is_public:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                     dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE

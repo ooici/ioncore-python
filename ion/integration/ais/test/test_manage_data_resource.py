@@ -278,12 +278,14 @@ class AISManageDataResourceTest(IonTestCase):
         b4_ion_title                    = initial_resource.ion_title
         #b4_ion_institution_id           = initial_resource.ion_institution_id
         b4_ion_description              = initial_resource.ion_description
-        log.info("Original values are %d, %d, %d, %s, %s" % (b4_max_ingest_millis,
-                                                             b4_update_interval_seconds,
-                                                             b4_update_start_datetime_millis,
-                                                             #b4_ion_institution_id,
-                                                             b4_ion_title,
-                                                             b4_ion_description))
+        b4_is_public                    = initial_resource.is_public
+        log.info("Original values are %d, %d, %d, %s, %s, %s" % (b4_max_ingest_millis,
+                                                                 b4_update_interval_seconds,
+                                                                 b4_update_start_datetime_millis,
+                                                                 #b4_ion_institution_id,
+                                                                 b4_ion_title,
+                                                                 b4_ion_description,
+                                                                 b4_is_public))
 
         log.info("Updating the resource based on what we found")
         fr_max_ingest_millis            = b4_max_ingest_millis + 1
@@ -292,14 +294,16 @@ class AISManageDataResourceTest(IonTestCase):
         #fr_ion_institution_id           = b4_ion_institution_id + "_updated"
         fr_ion_title                    = b4_ion_title + "_updated"
         fr_ion_description              = b4_ion_description + "_updated"
+        fr_is_public                    = not b4_is_public
+        
 
-
-        log.info("new values will be %d, %d, %d, %s, %s" % (fr_max_ingest_millis,
-                                                            fr_update_interval_seconds,
-                                                            fr_update_start_datetime_millis,
-                                                            #fr_ion_institution_id,
-                                                            fr_ion_title,
-                                                            fr_ion_description))
+        log.info("new values will be %d, %d, %d, %s, %s, %s" % (fr_max_ingest_millis,
+                                                                fr_update_interval_seconds,
+                                                                fr_update_start_datetime_millis,
+                                                                #fr_ion_institution_id,
+                                                                fr_ion_title,
+                                                                fr_ion_description,
+                                                                fr_is_public))
 
         log.info("Creating and wrapping update request message")
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -314,6 +318,7 @@ class AISManageDataResourceTest(IonTestCase):
         #update_req_msg.ion_institution_id           = fr_ion_institution_id
         update_req_msg.ion_title                    = fr_ion_title
         update_req_msg.ion_description              = fr_ion_description
+        update_req_msg.is_public                    = fr_is_public
 
         #actual update call
         result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
@@ -339,6 +344,13 @@ class AISManageDataResourceTest(IonTestCase):
         self.failUnlessEqual(fr_ion_title                     , updated_resource.ion_title)
         self.failUnlessEqual(fr_ion_description               , updated_resource.ion_description)
 
+        # jira bug OOIION-15
+        self.failUnlessEqual(fr_is_public                     , updated_resource.is_public)
+
+        if fr_is_public:
+            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.COMMISSIONED)
+        else:
+            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.ACTIVE)
 
 
     @defer.inlineCallbacks
@@ -555,7 +567,7 @@ class AISManageDataResourceTest(IonTestCase):
         for a in found:
             mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
             mystery_resource_type = mystery_resource.ResourceTypeID.key
-            if the_subject_type == mystery_resource.ResourceTypeID.key:
+            if the_subject_type == mystery_resource_type:
                 if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
                     #FIXME: if not association is None then we have data inconsistency!
                     association = a
