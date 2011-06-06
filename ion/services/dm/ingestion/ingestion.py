@@ -589,11 +589,15 @@ class IngestionService(ServiceProcess):
         if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
 
+        log.critical(self.dataset.root_group.PPrint())
+
+        log.critical('Starting commit')
         # Commit the current state of the supplement - ingest of new content is complete
         self.dataset.Repository.commit('Ingest received complete notification.')
 
         # The current branch on entering recv done is the supplement branch
         merge_branch = self.dataset.Repository.current_branch_key()
+
         # Merge it with the current state of the dataset in the datastore
         yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
 
@@ -606,6 +610,8 @@ class IngestionService(ServiceProcess):
 
         # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
+
+        log.critical('Starting Dimension LooP')
 
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []

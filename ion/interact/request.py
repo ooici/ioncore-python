@@ -209,8 +209,8 @@ class RequestParticipant(ConversationRole):
 
             log.error(pprint.pprint(headers))
             if log.getEffectiveLevel() <= logging.INFO:
-                log.error('*** Message Content: \n \n')
-                log.error(str(headers.get('content', '## No Content! ##')))
+                log.info('*** Message Content: \n \n')
+                log.info(str(headers.get('content', '## No Content! ##')))
             log.error("*****End Request Application error in message processing*****")
 
             # @todo Should we send an err or rather reject the msg?
@@ -225,8 +225,8 @@ class RequestParticipant(ConversationRole):
             log.error(pprint.pprint(headers))
 
             if log.getEffectiveLevel() <= logging.WARN:
-                log.error('*** Message Content: \n \n')
-                log.error(str(headers.get('content', '## No Content! ##')))
+                log.warn('*** Message Content: \n \n')
+                log.warn(str(headers.get('content', '## No Content! ##')))
 
             log.error("*****End Request Container error in message processing*****")
 

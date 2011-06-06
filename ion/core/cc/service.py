@@ -165,6 +165,7 @@ class CapabilityContainer(service.Service):
 
     @defer.inlineCallbacks
     def stopService(self):
+        log.info("Stopping container service.")
         yield self.container.terminate()
         service.Service.stopService(self)
 

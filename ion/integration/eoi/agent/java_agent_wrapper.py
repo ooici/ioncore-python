@@ -532,11 +532,11 @@ class JavaAgentWrapper(ServiceProcess):
         except OOIObjectError, oe:
             log.exception('No start time attribute found in new dataset! This is okay - expected!')
             #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
-            start_time_seconds = calendar.timegm(time.gmtime()) - 1800 #2*86400
+            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
 
         except AttributeError, ae:
             log.exception('No start time attribute found in empty dataset! This is bad - should not happen!')
-            start_time_seconds = calendar.timegm(time.gmtime()) - 1800 #2*86400
+            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
             #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
 
 
@@ -551,7 +551,7 @@ class JavaAgentWrapper(ServiceProcess):
         stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
         log.info('Getting Data Start time: %s' % stime)
         etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
-        log.info('Getting Data Start time: %s' % etime)
+        log.info('Getting Data End time: %s' % etime)
 
         msg.start_datetime_millis = start_time_seconds * 1000
 

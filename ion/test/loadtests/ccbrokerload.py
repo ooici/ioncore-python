@@ -12,7 +12,6 @@ import sys
 import time
 
 from twisted.internet import defer, reactor
-from carrot import connection, messaging
 
 from ion.test.loadtest import LoadTest, LoadTestOptions
 import ion.util.procutils as pu
@@ -260,6 +259,8 @@ class CCBrokerTest(LoadTest):
         msgSends = [btc.message_simple(msg) for msg in msgs for btc in [btc for btc in self.btcs]]
         yield defer.DeferredList(msgSends)
 
+        self.mc.workbench.manage_workbench_cache('Default Context')
+
         self.cur_state['msgsend'] += len(msgSends)
 
     @defer.inlineCallbacks
@@ -284,6 +285,7 @@ class CCBrokerTest(LoadTest):
             if rates['msgsend']: pieces.append('sent %.2f msgs/sec' % rates['msgsend'])
             if rates['msgrecv']: pieces.append('received %.2f msgs/sec' % rates['msgrecv'])
             print '#%s] (%s) %s' % (self.load_id, time.strftime('%H:%M:%S'), ', '.join(pieces))
+
 
     def summary(self):
         state = self.cur_state

@@ -157,6 +157,8 @@ class LargeCodecTest(unittest.TestCase):
         f.close()
         tar.close()
 
+        #print obj.PPrint()
+
         self.wb.put_repository(obj.Repository)
 
         # Now test copying it!
@@ -165,6 +167,9 @@ class LargeCodecTest(unittest.TestCase):
 
         # Set a nonsense field to see if we can copy the datastructure!
         repo.root_object = repo.copy_object(obj)
+
+        #print obj.PPrint()
+
 
         self.assertNotEqual(repo.root_object._repository, obj._repository)
 

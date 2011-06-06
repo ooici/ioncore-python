@@ -216,7 +216,7 @@ def unpack_structure(serialized_container):
     cref = repo.commit(comment='Message for you Sir!')
 
 
-    log.debug('unpack_structure: returning root_obj:'+str(root_obj))
+    log.debug('unpack_structure: returning root_obj')
 
     return root_obj
 
@@ -250,7 +250,6 @@ def _unpack_container(serialized_container):
 
         obj_dict[wse.key] = wse
 
-    log.debug('_unpack_container: returning head:\n' +str(head))
-    log.debug('_unpack_container: returning dictionary of objects:\n'+str(obj_dict))
+    log.debug('_unpack_container: returning head and dictionary of %d objects' % len(obj_dict))
 
     return head, obj_dict

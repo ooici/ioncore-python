@@ -151,7 +151,8 @@ class AppLoader(object):
                                       container, appdef._state)
 
             # @TODO: can't import state names here
-            yield AppLoader._publish_notice(appdef.name, "STOPPED")
+            # Disabled publishing (can't publish during terminate
+            #yield AppLoader._publish_notice(appdef.name, "STOPPED")
 
         except Exception, ex:
             log.exception("Application %s stop failed" % appdef.name)

@@ -104,6 +104,9 @@ class AppIntegrationTest(IonTestCase):
     Testing Application Integration Service.
     """
 
+    # Set timeout for Trial tests
+    timeout = 40
+
     @defer.inlineCallbacks
     def setUp(self):
         log.debug('AppIntegrationTest.setUp():')
@@ -1379,11 +1382,25 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
-        log.debug('Testing updateDataResourceSubscription.')
+        import time
+        
+        def TimeStamp ():
+            TimeNow = time.time()
+            TimeStampStr = "(wall time = " + str (TimeNow) + \
+                           ", elapse time = " + str(TimeNow - self.StartTime) + \
+                           ", delta time = " + str(TimeNow - self.LastTime) + \
+                           ")"
+            self.LastTime = TimeNow
+            return TimeStampStr
+           
+        self.StartTime = time.time()
+        self.LastTime = self.StartTime
+        log.warning('test_updateDataResourceSubscription: started at ' + str(self.StartTime))
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
+        log.warning('test_updateDataResourceSubscription: created user ' + TimeStamp())
         
         #
         # Create dispatchers and associations
@@ -1394,6 +1411,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
         self.dispatcherID = self.dispatcherRes.ResourceIdentity
         log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+        log.warning('test_updateDataResourceSubscription: created dispatchers ' + TimeStamp())
             
         #
         # Now make an association between the user and this dispatcher
@@ -1419,7 +1437,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
-
+        log.warning('test_updateDataResourceSubscription: created associations ' + TimeStamp())
+ 
         # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -1442,6 +1461,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: created subscription ' + TimeStamp())
             
         # now update the subscription created above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1465,6 +1485,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
 
         # now update the subscription updated above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -1488,6 +1509,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
 
     @defer.inlineCallbacks
     def test_deleteDataResourceSubscription(self):
@@ -1624,10 +1646,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_updateDataResourceCache(self):
-        """
-        Test to see if wildcards match for subscribers
-        """
-
         log.debug('Testing updateDataResourceCache.')
 
 
@@ -1642,7 +1660,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         #
         # Send a message with no bounds to get a list of dataset ID's; then
-        # take one of those IDs and create a subscription on it.
+        # take one of those IDs and publish a SupplementAdded event for it
         #
         
         # Create a message client
@@ -1656,15 +1674,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail("findDataResources failed: " + rspMsg.error_str)
+            self.fail("test_updateDataResourceCache failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+        log.debug('test_updateDataResourceCache returned: ' + str(numResReturned) + ' resources.')
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         if numResReturned > 0:
-            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
+            log.debug('test_updateDataResourceCache: %s datasets returned!' % (numResReturned))
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
             # Setup the publisher
@@ -1692,7 +1710,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             #self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
 
         else:
-            log.error('test_notificationSet: No datasets returned!')
+            log.error('test_updateDataResourceCache: No datasets returned!')
         
 
     def __validateDatasetByOwnerMetadata(self, metadata):

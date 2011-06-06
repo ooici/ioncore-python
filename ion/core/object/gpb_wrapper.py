@@ -8,8 +8,10 @@ These classes are the lowest level of the object management stack
 TODO:
 """
 
-from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
+from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex,\
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id, OOIObjectError
+
+import StringIO
 
 from ion.core.object.object_utils import CDM_GROUP_TYPE, CDM_DATASET_TYPE, CDM_ATTRIBUTE_TYPE, CDM_DIMENSION_TYPE, CDM_VARIABLE_TYPE
 
@@ -22,8 +24,6 @@ from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
 
-
-
 from ion.core.object.cdm_methods import dataset
 from ion.core.object.cdm_methods import variables
 from ion.core.object.cdm_methods import attribute
@@ -31,15 +31,13 @@ from ion.core.object.cdm_methods import group
 from ion.core.object.cdm_methods import attribute_merge
 
 import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+from ion.core import ioninit
 
+CONF = ioninit.config(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
 LINK_TYPE = create_type_identifier(object_id=3, version=1)
-
-
-
-
 
 class WrappedEnum(object):
     """ Data descriptor (like a property) for passing through GPB enums from the Wrapper. """
@@ -53,9 +51,10 @@ class WrappedEnum(object):
 
     def __set__(self, obj, value):
         raise AttributeError('Enums are read-only.')
-        
+
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
+
 
 class EnumType(type):
     """
@@ -67,13 +66,13 @@ class EnumType(type):
 
     def __call__(cls, enum_type_descriptor, *args, **kwargs):
         # Cache the custom-built classes
-        
+
         assert isinstance(enum_type_descriptor, descriptor.EnumDescriptor)
-            
+
         clsType = None
         enum_name = enum_type_descriptor.name
         enum_full_name = enum_type_descriptor.full_name
-        
+
         if enum_full_name in EnumType._type_cache:
             clsType = EnumType._type_cache[enum_full_name]
         else:
@@ -84,7 +83,6 @@ class EnumType(type):
             clsDict['lookup'] = lookup
 
             for name, val_desc in enum_type_descriptor.values_by_name.items():
-                
                 prop = WrappedEnum(val_desc.number)
 
                 clsDict[name] = prop
@@ -104,13 +102,14 @@ class EnumType(type):
         obj = super(EnumType, clsType).__call__(enum_type_descriptor, *args, **kwargs)
         return obj
 
+
 class EnumObject(object):
     '''
     A Class for GPB Enum access
     '''
 
     __metaclass__ = EnumType
-                
+
     def __init__(self, enum_type_descriptor):
         """
         Instantiate a class with properties to get GPB Enum Values
@@ -118,7 +117,6 @@ class EnumObject(object):
 
 
 class WrappedProperty(object):
-    
     def __init__(self, name, doc=None, field_type=None, field_enum=None):
         self.name = name
         if doc: self.__doc__ = doc
@@ -186,11 +184,10 @@ class WrappedMessageProperty(WrappedProperty):
     """ Data descriptor (like a property) for passing through GPB properties of Type Message from the Wrapper. """
 
     def __get__(self, wrapper, objtype=None):
-
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
-        # This may be the result we were looking for, in the case of a simple scalar field
+            raise OOIObjectError('Can not get message (composite) property - %s - in a wrapper which is invalidated.' % self.name)
+            # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
 
@@ -200,11 +197,10 @@ class WrappedMessageProperty(WrappedProperty):
         return result
 
     def _get_backdoor(self, wrapper):
-
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get message (composite) property in a wrapper which is invalidated.')
-        # This may be the result we were looking for, in the case of a simple scalar field
+            raise OOIObjectError('Can not get message (composite) property - %s -in a wrapper which is invalidated.' % self.name)
+            # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
 
@@ -212,10 +208,9 @@ class WrappedMessageProperty(WrappedProperty):
 
 
     def __set__(self, wrapper, value):
-
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not set message (composite) property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not set message (composite) property - %s - in a wrapper which is invalidated.' % self.name)
 
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
@@ -224,28 +219,29 @@ class WrappedMessageProperty(WrappedProperty):
         wrapper._set_parents_modified()
 
         return None
-    
+
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
+
 
 class WrappedRepeatedScalarProperty(WrappedProperty):
     """ Data descriptor (like a property) for passing through GPB properties of Type Repeated Scalar from the Wrapper. """
 
     def __get__(self, wrapper, objtype=None):
-
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get repeated scalar property in a wrapper which is invalidated.')
-        # This may be the result we were looking for, in the case of a simple scalar field
+            raise OOIObjectError('Can not get repeated scalar property - %s - in a wrapper which is invalidated.'% self.name)
+            # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
-        
+
         return ScalarContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object')
+        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Scalar in ION Object' % self.name)
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
+
 
 class WrappedRepeatedCompositeProperty(WrappedProperty):
     """ Data descriptor (like a property) for passing through GPB properties of Type Repeated Composite from the Wrapper. """
@@ -253,7 +249,7 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
     def __get__(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not "get" from a repeated composite property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not "get" from a repeated composite property - %s - in a wrapper which is invalidated.' % self.name)
 
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
@@ -263,7 +259,8 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
     def _get_backdoor(self, wrapper, objtype=None):
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get_backdoor from a repeated composite property in a wrapper which is invalidated.')
+            raise OOIObjectError(
+                'Can not get_backdoor from a repeated composite property - %s - in a wrapper which is invalidated.' % self.name)
 
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
@@ -271,10 +268,12 @@ class WrappedRepeatedCompositeProperty(WrappedProperty):
         return ContainerWrapper.factory(wrapper, field)
 
     def __set__(self, wrapper, value):
-        raise AttributeError('Assignment is not allowed for field name "%s" of type Repeated Composite in ION Object' % self.name)
+        raise AttributeError(
+            'Assignment is not allowed for field name - "%s" - of type Repeated Composite in ION Object' % self.name)
 
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
+
 
 class WrappedScalarProperty(WrappedProperty):
     """ Data descriptor (like a property) for passing through GPB properties of Type Scalar from the Wrapper. """
@@ -283,15 +282,14 @@ class WrappedScalarProperty(WrappedProperty):
         # This may be the result we were looking for, in the case of a simple scalar field
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not get scalar property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not get scalar property - %s - in a wrapper which is invalidated.' % self.name)
 
         return getattr(wrapper.GPBMessage, self.name)
 
     def __set__(self, wrapper, value):
-
         if wrapper.Invalid:
             log.error(wrapper.Debug())
-            raise OOIObjectError('Can not set scalar property in a wrapper which is invalidated.')
+            raise OOIObjectError('Can not set scalar property - %s -in a wrapper which is invalidated.' % self.name)
 
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
@@ -302,7 +300,7 @@ class WrappedScalarProperty(WrappedProperty):
         wrapper._set_parents_modified()
 
         return None
-    
+
     def __delete__(self, wrapper):
         raise AttributeError('Can not delete a Wrapper property for an ION Object field')
 
@@ -312,6 +310,7 @@ class CommitCounter(object):
     Class used to count the number of recursive calls to commit a data structure
     """
     count = 0
+
 
 class WrapperType(type):
     """
@@ -323,7 +322,6 @@ class WrapperType(type):
 
     _type_cache = {}
 
-
     recurse_counter = CommitCounter()
 
 
@@ -334,7 +332,6 @@ class WrapperType(type):
         if msgType in WrapperType._type_cache:
             clsType = WrapperType._type_cache[msgType]
         else:
-
             # Check that the object we are wrapping is a Google Message object
             if not isinstance(gpbMessage, message.Message):
                 raise OOIObjectError('Wrapper init argument must be an instance of a GPB message')
@@ -357,35 +354,39 @@ class WrapperType(type):
             # Add the enums of the message class
             if hasattr(descriptor, 'enum_types_by_name'):
                 for enum_name, enum_desc in descriptor.enum_types_by_name.iteritems():
-                    enum_obj            = EnumObject(enum_desc)
-                    clsDict[enum_name]  = enum_obj
-                    enums[enum_name]    = enum_obj
+                    enum_obj = EnumObject(enum_desc)
+                    clsDict[enum_name] = enum_obj
+                    enums[enum_name] = enum_obj
 
             # Add the property wrappers for each of the fields of the message
             for fieldName, field_desc in descriptor.fields_by_name.items():
                 fieldType = getattr(msgType, fieldName)
 
-                 # Add any enums for the fields the message contains
+                # Add any enums for the fields the message contains
                 enum_desc = field_desc.enum_type
                 field_enum = None
                 if enum_desc:
-                    field_enum              = EnumObject(enum_desc)
+                    field_enum = EnumObject(enum_desc)
                     clsDict[enum_desc.name] = field_enum
-                    enums[enum_desc.name]   = field_enum
+                    enums[enum_desc.name] = field_enum
 
                 field_type = field_desc.type
 
                 prop = None
                 if field_desc.label == field_desc.LABEL_REPEATED:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedRepeatedCompositeProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
+                        prop = WrappedRepeatedCompositeProperty(fieldName, doc=fieldType.__doc__, field_type=field_type,
+                                                                field_enum=field_enum)
                     else:
-                        prop = WrappedRepeatedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
+                        prop = WrappedRepeatedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type,
+                                                             field_enum=field_enum)
                 else:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedMessageProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
+                        prop = WrappedMessageProperty(fieldName, doc=fieldType.__doc__, field_type=field_type,
+                                                      field_enum=field_enum)
                     else:
-                        prop = WrappedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
+                        prop = WrappedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type,
+                                                     field_enum=field_enum)
 
                 clsDict[fieldName] = prop
                 properties[fieldName] = prop
@@ -394,17 +395,17 @@ class WrapperType(type):
             if clsDict.has_key('_MessageTypeIdentifier'):
                 mti = clsDict['_MessageTypeIdentifier']
                 obj_type = create_type_identifier(object_id=mti._ID,\
-                                                version=mti._VERSION)
+                                                  version=mti._VERSION)
             else:
                 obj_type = create_type_identifier(object_id=-99,\
-                                                version=1)
+                                                  version=1)
             clsDict['_gpb_type'] = obj_type
             # the obj_type can now be used for adding special methods to the Wrapper for certain types
 
             # Special methods for certain object types:
             WrapperType._add_specializations(cls, obj_type, clsDict)
 
-            VALIDATE_ATTRS = True
+            VALIDATE_ATTRS = CONF.getValue('VALIDATE_ATTRS', True)
             if VALIDATE_ATTRS:
                 def obj_setter(self, k, v):
                     if self._init and not hasattr(self, k):
@@ -417,32 +418,29 @@ class WrapperType(type):
 
             clsDict['_init'] = False
 
-
             clsType = WrapperType.__new__(WrapperType, clsName, (cls,), clsDict)
 
             WrapperType._type_cache[msgType] = clsType
 
+
         # Finally allow the instantiation to occur, but slip in our new class type
         obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
-
 
         return obj
 
 
-
     def _add_specializations(cls, obj_type, clsDict):
-
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
         #--------------------------------------------------------------#
         if obj_type == LINK_TYPE:
-
             @_gpb_source
-            def obj_setlink(self,value):
+            def obj_setlink(self, value):
                 if self.Invalid:
-                    raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+                    raise OOIObjectError(
+                        'Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
-                self.Repository.set_linked_object(self,value)
+                self.Repository.set_linked_object(self, value)
                 if not self.Modified:
                     self._set_parents_modified()
                 return
@@ -450,35 +448,33 @@ class WrapperType(type):
             clsDict['SetLink'] = obj_setlink
 
         elif obj_type == CDM_DATASET_TYPE:
-
-            clsDict['MakeRootGroup']            = dataset._make_root_group
-            clsDict['ShowVariableNames']        = dataset._get_variable_names
-            clsDict['ShowGlobalAttributes']     = dataset._get_group_attributes_for_display
-            clsDict['ShowVariableAttributes']   = dataset._get_variable_attributes_for_display
+            clsDict['MakeRootGroup'] = dataset._make_root_group
+            clsDict['ShowVariableNames'] = dataset._get_variable_names
+            clsDict['ShowGlobalAttributes'] = dataset._get_group_attributes_for_display
+            clsDict['ShowVariableAttributes'] = dataset._get_variable_attributes_for_display
 
         elif obj_type == CDM_GROUP_TYPE:
-
-            clsDict['AddGroup']                 = group._add_group_to_group
-            clsDict['AddAttribute']             = group._add_attribute
-            clsDict['AddDimension']             = group._add_dimension
-            clsDict['AddVariable']              = group._add_variable
-            clsDict['FindGroupByName']          = group._find_group_by_name
-            clsDict['FindAttributeByName']      = group._find_attribute_by_name
-            clsDict['FindDimensionByName']      = group._find_dimension_by_name
-            clsDict['FindVariableByName']       = group._find_variable_by_name
-            clsDict['FindVariableIndexByName']  = group._find_variable_index_by_name
+            clsDict['AddGroup'] = group._add_group_to_group
+            clsDict['AddAttribute'] = group._add_attribute
+            clsDict['AddDimension'] = group._add_dimension
+            clsDict['AddVariable'] = group._add_variable
+            clsDict['FindGroupByName'] = group._find_group_by_name
+            clsDict['FindAttributeByName'] = group._find_attribute_by_name
+            clsDict['FindDimensionByName'] = group._find_dimension_by_name
+            clsDict['FindVariableByName'] = group._find_variable_by_name
+            clsDict['FindVariableIndexByName'] = group._find_variable_index_by_name
             clsDict['FindAttributeIndexByName'] = group._find_attribute_index_by_name
-            clsDict['HasAttribute']             = group._cdm_resource_has_attribute
-            clsDict['RemoveAttribute']          = group._remove_attribute
-            clsDict['SetAttribute']             = group._set_attribute
-            clsDict['SetDimension']             = group._set_dimension
+            clsDict['HasAttribute'] = group._cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = group._remove_attribute
+            clsDict['SetAttribute'] = group._set_attribute
+            clsDict['SetDimension'] = group._set_dimension
 
-            clsDict['MergeAttSrc']              = attribute_merge.MergeAttSrc
-            clsDict['MergeAttDst']              = attribute_merge.MergeAttDst
-            clsDict['MergeAttGreater']          = attribute_merge.MergeAttGreater
-            clsDict['MergeAttLesser']           = attribute_merge.MergeAttLesser
-            clsDict['MergeAttDstOver']          = attribute_merge.MergeAttDstOver
-            clsDict['_GetNumericValue']         = attribute_merge._GetNumericValue
+            clsDict['MergeAttSrc'] = attribute_merge.MergeAttSrc
+            clsDict['MergeAttDst'] = attribute_merge.MergeAttDst
+            clsDict['MergeAttGreater'] = attribute_merge.MergeAttGreater
+            clsDict['MergeAttLesser'] = attribute_merge.MergeAttLesser
+            clsDict['MergeAttDstOver'] = attribute_merge.MergeAttDstOver
+            clsDict['_GetNumericValue'] = attribute_merge._GetNumericValue
 
 
 
@@ -505,41 +501,40 @@ class WrapperType(type):
 
 
         elif obj_type == CDM_ATTRIBUTE_TYPE:
-            
-            clsDict['GetValue']     = attribute._get_attribute_value_by_index
-            clsDict['GetValues']    = attribute._get_attribute_values
+            clsDict['GetValue'] = attribute._get_attribute_value_by_index
+            clsDict['GetValues'] = attribute._get_attribute_values
             # clsDict['SetValue'] = _get_attribute_values
             # clsDict['SetValues'] = _get_attribute_values
-            clsDict['GetLength']    = attribute._get_attribute_values_length
-            clsDict['GetDataType']  = attribute._get_attribute_data_type
-            clsDict['IsSameType']   = attribute._attribute_is_same_type
+            clsDict['GetLength'] = attribute._get_attribute_values_length
+            clsDict['GetDataType'] = attribute._get_attribute_data_type
+            clsDict['IsSameType'] = attribute._attribute_is_same_type
 
 
 
 
         elif obj_type == CDM_VARIABLE_TYPE:
-
-            clsDict['GetUnits']                 = variables._get_var_units
-            clsDict['GetStandardName']          = variables._get_var_std_name
-            clsDict['GetNumDimensions']         = variables._get_var_num_dims
-            clsDict['GetNumBoundedArrays']      = variables._get_var_num_ba
-            clsDict['AddAttribute']             = group._add_attribute
-            clsDict['FindAttributeByName']      = group._find_attribute_by_name
-            clsDict['FindDimensionByName']      = group._find_dimension_by_name
+            clsDict['GetUnits'] = variables._get_var_units
+            clsDict['GetStandardName'] = variables._get_var_std_name
+            clsDict['GetNumDimensions'] = variables._get_var_num_dims
+            clsDict['GetNumBoundedArrays'] = variables._get_var_num_ba
+            clsDict['AddAttribute'] = group._add_attribute
+            clsDict['FindAttributeByName'] = group._find_attribute_by_name
+            clsDict['FindDimensionByName'] = group._find_dimension_by_name
             clsDict['FindAttributeIndexByName'] = group._find_attribute_index_by_name
-            clsDict['HasAttribute']             = group._cdm_resource_has_attribute
-            clsDict['RemoveAttribute']          = group._remove_attribute
-            clsDict['SetAttribute']             = group._set_attribute
-            clsDict['SetDimension']             = group._set_dimension
+            clsDict['HasAttribute'] = group._cdm_resource_has_attribute
+            clsDict['RemoveAttribute'] = group._remove_attribute
+            clsDict['SetAttribute'] = group._set_attribute
+            clsDict['SetDimension'] = group._set_dimension
 
-            clsDict['GetValue']                 = variables.GetValue
+            clsDict['GetValue'] = variables.GetValue
 
-            clsDict['MergeAttSrc']              = attribute_merge.MergeAttSrc
-            clsDict['MergeAttDst']              = attribute_merge.MergeAttDst
-            clsDict['MergeAttGreater']          = attribute_merge.MergeAttGreater
-            clsDict['MergeAttLesser']           = attribute_merge.MergeAttLesser
-            clsDict['MergeAttDstOver']          = attribute_merge.MergeAttDstOver
-            clsDict['_GetNumericValue']         = attribute_merge._GetNumericValue
+            clsDict['MergeAttSrc'] = attribute_merge.MergeAttSrc
+            clsDict['MergeAttDst'] = attribute_merge.MergeAttDst
+            clsDict['MergeAttGreater'] = attribute_merge.MergeAttGreater
+            clsDict['MergeAttLesser'] = attribute_merge.MergeAttLesser
+            clsDict['MergeAttDstOver'] = attribute_merge.MergeAttDstOver
+            clsDict['_GetNumericValue'] = attribute_merge._GetNumericValue
+
 
 class Wrapper(object):
     '''
@@ -577,7 +572,6 @@ class Wrapper(object):
     __metaclass__ = WrapperType
 
 
-
     def __init__(self, gpbMessage):
         """
         Initialize the Wrapper class and set up it message type.
@@ -593,14 +587,13 @@ class Wrapper(object):
         to the wrapper for the root of the composite message.
         """
 
-
-        self._root=None
+        self._root = None
         """
         A reference to the root object wrapper for this protobuffer
         A composit protobuffer object may return
         """
 
-        self._invalid=None
+        self._invalid = None
         """
         Used to determine whether the wrapper is a currently valid object in the
         version framework. Invalid states can be created when old references to
@@ -621,17 +614,17 @@ class Wrapper(object):
         parsed until the object is needed!
         """
 
-        self._parent_links=None
+        self._parent_links = None
         """
         A list of all the other wrapper objects which link to me
         """
 
-        self._child_links=None
+        self._child_links = None
         """
         A list of my child link wrappers
         """
 
-        self._derived_wrappers=None
+        self._derived_wrappers = None
         """
         A container for all the wrapper objects which are rewrapped, derived
         from a root object wrapper
@@ -643,7 +636,7 @@ class Wrapper(object):
         counter value if it is still in the workspace.
         """
 
-        self._modified =  None # only exists in the root object
+        self._modified = None # only exists in the root object
         """
         Is this wrapper object modified or commited
         """
@@ -664,6 +657,8 @@ class Wrapper(object):
         To avoid invalidating during when there is a hash conflict in the workspace - set the twin...
         """
 
+        self.__no_string = CONF.getValue('STR_GPBS', False)
+
         # Hack to prevent setting properties in a class instance
         self._init = True
 
@@ -677,9 +672,7 @@ class Wrapper(object):
 
     GPBSource = _gpb_source
 
-
     GPBSourceRoot = _gpb_source_root
-
 
 
     @classmethod
@@ -696,7 +689,7 @@ class Wrapper(object):
         obj._root = obj
         obj._parent_links = set()
         obj._child_links = set()
-        obj._derived_wrappers={}
+        obj._derived_wrappers = {}
         obj._read_only = False
         obj._myid = '-1'
         obj._modified = True
@@ -707,15 +700,19 @@ class Wrapper(object):
     @property
     def Invalid(self):
         return self._source._invalid
-  
-    def Invalidate(self,other=None):
+
+    def Invalidate(self, other=None):
+
 
         if other is not None:
+
+            #log.debug('Invalidating self:\n%s' % self.Debug())
+
+            #log.debug('Invalidating self with Other:\n%s \n\n' % other.Debug())
 
             if self.ObjectType != other.ObjectType:
                 log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by merge when two objects are not the same type')
-
 
             if self._invalid:
                 log.error(self.Debug())
@@ -723,22 +720,30 @@ class Wrapper(object):
 
             if self._source is not self:
                 log.error(self.Debug())
-                raise OOIObjectError('It is unexpected to try and invalidate an object which already has an alternate source')
+                raise OOIObjectError(
+                    'It is unexpected to try and invalidate an object which already has an alternate source')
 
             if self.Repository is not other.Repository:
                 log.error(self.Debug())
                 raise OOIObjectError('Can not invalidate by passing a wrapper from another repository')
 
+            if other.Invalid:
+                log.error('Error while invalidating self - other is invalid too!\nSelf: %s\nOther: %s'% (self.Debug(), other.Debug()))
+                raise OOIObjectError('Can not invalidate self with other when other is already invalid')
+
         else:
+            #log.debug('Invalidating self:\n%s' % self.Debug())
+
             other = self
 
-            if self._invalid:
+            #if self._invalid:
+            if self.Invalid:
                 return
-
 
         if other is not self:
             # If we are doing an invalidate to other...
-            self._merge_derived_wrappers(other)
+            self._merge_derived_wrappers(other._source)
+
 
         elif self.IsRoot:
             # If this is a straight invalidation - clear the derived wrappers if root
@@ -746,7 +751,7 @@ class Wrapper(object):
                 item.Invalidate()
 
         # Source must always be set to self or another gpb_wrapper object!
-        self._source = other
+        self._source = other._source
 
         self._derived_wrappers = None
         self._gpbMessage = None
@@ -761,22 +766,27 @@ class Wrapper(object):
 
 
     def _merge_derived_wrappers(self, other):
-
         for name, prop in self._Properties.iteritems():
-
             if prop.field_type == 'TYPE_MESSAGE':
-
                 self_obj = prop._get_backdoor(self)
 
                 other_obj = prop._get_backdoor(other)
+                if self_obj is other_obj:
+                    raise OOIObjectError('The back door property getter failed!')
 
-                if hasattr(self_obj, '__iter__'):
 
-                    for arg1, arg2 in zip(self_obj, other_obj):
-                        arg1.Invalidate(arg2)
+                log.debug('Invalidating message property: %s' % prop.name)
+                if isinstance(self_obj, ContainerWrapper):
+                    # Make sure to get the derive object not what it links to!
+                    for gpb_item_self, gpb_item_other in zip(self_obj._gpbcontainer, other_obj._gpbcontainer):
+
+                        item_self = self_obj._wrapper._rewrap(gpb_item_self)
+                        item_other = other_obj._wrapper._rewrap(gpb_item_other)
+
+                        item_self.Invalidate(other = item_other)
 
                 else:
-                    self_obj.Invalidate(other_obj)
+                    self_obj.Invalidate(other = other_obj)
 
 
     @property
@@ -829,13 +839,11 @@ class Wrapper(object):
     @property
     @GPBSourceRoot
     def Repository(self):
-
         return self._repository
 
     @property
     @GPBSourceRoot
     def DerivedWrappers(self):
-
         return self._derived_wrappers
 
     @GPBSourceRoot
@@ -843,7 +851,7 @@ class Wrapper(object):
         return self._myid
 
     @GPBSourceRoot
-    def _set_myid(self,value):
+    def _set_myid(self, value):
         assert isinstance(value, str), 'myid is a string property'
         self._myid = value
 
@@ -858,7 +866,7 @@ class Wrapper(object):
         return self._parent_links
 
     @GPBSourceRoot
-    def _set_parent_links(self,value):
+    def _set_parent_links(self, value):
         """
         A list of all the wrappers which link to me
         """
@@ -888,7 +896,7 @@ class Wrapper(object):
         return self._read_only
 
     @GPBSourceRoot
-    def _set_readonly(self,value):
+    def _set_readonly(self, value):
         assert isinstance(value, bool), 'readonly is a boolen property'
         self._read_only = value
 
@@ -897,8 +905,9 @@ class Wrapper(object):
     @GPBSourceRoot
     def _get_modified(self):
         return self._modified
+
     @GPBSourceRoot
-    def _set_modified(self,value):
+    def _set_modified(self, value):
         assert isinstance(value, bool), 'modified is a boolen property'
         self._modified = value
 
@@ -906,15 +915,14 @@ class Wrapper(object):
 
 
     @GPBSource
-    def SetLinkByName(self,linkname,value):
+    def SetLinkByName(self, linkname, value):
         link = self.GetLink(linkname)
         link.SetLink(value)
 
     @GPBSource
-    def GetLink(self,linkname):
-
+    def GetLink(self, linkname):
         gpb = self.GPBMessage
-        link = getattr(gpb,linkname)
+        link = getattr(gpb, linkname)
         link = self._rewrap(link)
 
         if not link.ObjectType == LINK_TYPE:
@@ -922,7 +930,7 @@ class Wrapper(object):
         return link
 
     @GPBSource
-    def InParents(self,value):
+    def InParents(self, value):
         '''
         Check recursively to make sure the object is not already its own parent!
         '''
@@ -959,7 +967,7 @@ class Wrapper(object):
             child.SetStructureReadWrite()
 
     @GPBSource
-    def RecurseCommit(self,structure):
+    def RecurseCommit(self, structure):
         """
         Recursively build up the serialized structure elements which are needed
         to commit this wrapper and reset all the links using its CAS name.
@@ -970,10 +978,14 @@ class Wrapper(object):
             raise OOIObjectError('Can not call Recurse Commit on a non root object wrapper.')
 
         self.recurse_count.count += 1
-        log.debug('Entering Recurse Commit: recurse counter - %d, child links - %d, objects to commit - %d' % (self.recurse_count.count, len(self.ChildLinks), len(structure)) )
+        local_cnt = self.recurse_count.count
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d' %
+              (local_cnt, type(self), len(self.ChildLinks), len(structure)))
 
         if not  self.Modified:
             # This object is already committed!
+            log.debug('Exiting Recurse Commit: recurse counter - %d' % local_cnt)
+
             return
 
         # Create the Structure Element in which the binary blob will be stored
@@ -982,24 +994,27 @@ class Wrapper(object):
 
         for link in  self.ChildLinks:
 
+            if link.Invalid:
+                log.error('Link in child links is invalid!')
+                log.debug('Current Wrapper: %s' % self.Debug())
+                log.debug('Invalid Link %s' % link.Debug())
+
             # Test to see if it is already serialized!
             child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
             #child_se = repo.index_hash.get(link.key, None)
 
             #print 'Setting child Link:', child_se
             if  child_se is not None:
-
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
 
             else:
-
                 #print 'SE for child not found - determining number of child links'
 
                 child = repo.get_linked_object(link)
 
                 # Determine whether this is a leaf node
-                if len(child.ChildLinks)==0:
+                if len(child.ChildLinks) == 0:
                     link.isleaf = True
                 else:
                     link.isleaf = False
@@ -1022,13 +1037,15 @@ class Wrapper(object):
         se.key = se.sha1
 
         # Determine whether I am a leaf
-        if len(self.ChildLinks)==0:
-            se.isleaf=True
+        if len(self.ChildLinks) is 0:
+            se.isleaf = True
         else:
             se.isleaf = False
 
-        # Done setting up the Sturcture Element
+        # Done setting up the Structure Element
         structure[se.key] = se
+        # It does not matter if we are replacing an existing se with the same key - the content - including the child links must be identical!
+
 
         # This will be true for any object which is not a core object such as a commit
         # We don't want to worry about what is in the workspace - that is the repositories job.
@@ -1040,11 +1057,16 @@ class Wrapper(object):
             # Now deal with some nastyness
             # Possible DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure
             if se.key in repo._workspace:
+                # If this is true we have just done a lot of extra work to create the Structure element - but there is no way to know before creating it!
 
                 # Get the other object with the same name that is already committed...
                 other = repo._workspace[se.key]
 
+                #print "Self Plinks:",self.ParentLinks
+                #print "Other Plinks:",other.ParentLinks
                 other.ParentLinks.update(self.ParentLinks)
+
+                #print "Other Plinks After:",other.ParentLinks
 
                 # Invalidate ourself
                 self.Invalidate(other)
@@ -1053,19 +1075,35 @@ class Wrapper(object):
                 # Now add it back the workspace under the new name
                 repo._workspace[se.key] = self
 
-
-        self.MyId = se.key
-        self.Modified = False
+        # Test to see if we need to set MyId - don't mess up the case where self now points to another source which is already commited.
+        if self.MyId != se.key:
+            self.MyId = se.key
+            self.Modified = False
 
         # Set the key value for parent links!
         # This will only be reached once for a given child object. Set all parents
         # now and the child will return as unmodified when the other parents ask it
         # to recurse commit.
 
+        #log.debug('Current Wrapper: %s' % self.Debug())
+
+        #cnt = 1
+        #for link in self.ParentLinks:
+        #    log.debug('Parrent Link # %d \n%s' % (cnt, link.Debug()))
+        #    cnt += 1
+
+
         for link in self.ParentLinks:
+            if link.Invalid:
+                log.error('Link in parent links is invalid!')
+                log.debug('Current Wrapper: %s' % self.Debug())
+                log.debug('Invalid Link %s' % link.Debug())
+
 
             if link.key != se.key:
                 link.key = se.key
+
+        log.debug('Exiting Recurse Commit: recurse counter - %d' % local_cnt)
 
 
     @GPBSource
@@ -1080,16 +1118,13 @@ class Wrapper(object):
         for field in gpb.DESCRIPTOR.fields:
             # if the field is a composite - another message
             if field.message_type:
-
                 # Get the field of type message
-                gpb_field = getattr(gpb,field.name)
+                gpb_field = getattr(gpb, field.name)
 
 
                 # If it is a repeated container type
                 if isinstance(gpb_field, containers.RepeatedCompositeFieldContainer):
-
                     for item in gpb_field:
-
                         wrapped_item = self._rewrap(item)
                         if wrapped_item.ObjectType == LINK_TYPE:
                             self.ChildLinks.add(wrapped_item)
@@ -1109,12 +1144,11 @@ class Wrapper(object):
                     else:
                         item.FindChildLinks()
 
-    @GPBSource    
+    @GPBSource
     def AddParentLink(self, link):
         #if self.Invalid:
 
         for parent in self.ParentLinks:
-
             if parent.GPBMessage is link.GPBMessage:
                 break
         else:
@@ -1135,6 +1169,7 @@ class Wrapper(object):
         # Else make a new one...
         inst = Wrapper(gpbMessage)
         inst._root = self.Root
+        inst._invalid=False
 
         # Add it to the list of objects which derive from the root wrapper
         self.DerivedWrappers[gpbMessage] = inst
@@ -1153,7 +1188,6 @@ class Wrapper(object):
             # If it has already been modified we are done.
             return
         else:
-
             self.Modified = True
 
             # Get the repository
@@ -1172,7 +1206,6 @@ class Wrapper(object):
                 self.ParentLinks = set()
 
             else:
-
                 for link in self.ParentLinks:
                     # Tricky - set the message directly and call modified!
                     #link.GPBMessage.key = self.MyId
@@ -1182,7 +1215,6 @@ class Wrapper(object):
 
     @GPBSource
     def __eq__(self, other):
-
         if not isinstance(other, Wrapper):
             return False
 
@@ -1213,10 +1245,16 @@ class Wrapper(object):
         else:
             msg = '\n' +self._gpbMessage.__str__()
         '''
+
+        if not self.__no_string:
+            return 'GPB NO STRING!'
+
+        #log.critical('HOLY SHIT STILL HERE!')
+
         if self._source is self:
-            msg = '\n %s \n'  % str(self._gpbMessage)
+            msg = '\n %s \n' % str(self._gpbMessage)
         else:
-            msg = '\n %s \n'  % str(self._source._gpbMessage)
+            msg = '\n %s \n' % str(self._source._gpbMessage)
 
         return msg
 
@@ -1224,7 +1262,7 @@ class Wrapper(object):
         """
         Since Debug is for debugging it should never return an exception - no matter the state of the wrapper object
         """
-        output  = '================== GPB Wrapper ====================\n'
+        output = '================== GPB Wrapper ====================\n'
 
         key = self._myid
         try:
@@ -1238,17 +1276,15 @@ class Wrapper(object):
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
         # This is dangerous - this can result in an exception loop!
-        if hasattr(self._repository,'_dotgit') and not self._repository._dotgit.Invalid:
+        if hasattr(self._repository, '_dotgit') and not self._repository._dotgit.Invalid:
             output += 'Repository: %s \n' % str(self._repository.repository_key)
         else:
             output += 'Repository: %s \n' % str(self._repository)
-
 
         if self._root:
             output += 'Wrapper ParentLinks: %s \n' % str(self._parent_links)
             output += 'Wrapper ChildLinks: %s \n' % str(self._child_links)
             output += 'Wrapper Modified: %s \n' % self._root._modified
-
 
         output += 'Wrapper Type: %s \n' % str(self._gpb_type)
         # DO NOT UNCOMMENT THE FOLLOWING LINES unless you know what you are doing and you will recomment them!
@@ -1290,7 +1326,8 @@ class Wrapper(object):
             serialized = self.GPBMessage.SerializeToString()
         except message.EncodeError, ex:
             log.info(ex)
-            raise OOIObjectError('Could not serialize object - likely due to unset required field in a core object: %s' % str(self))
+            raise OOIObjectError(
+                'Could not serialize object - likely due to unset required field in a core object: %s' % str(self))
 
         return serialized
 
@@ -1310,21 +1347,20 @@ class Wrapper(object):
         number"""
 
         field_list = self.GPBMessage.ListFields()
-        fnames=[]
+        fnames = []
         for desc, val in field_list:
             fnames.append(desc.name)
         return fnames
 
     @GPBSource
     def IsFieldSet(self, field_name):
-
         GPBMessage = self.GPBMessage
         # Get the raw GPB field
         try:
             GPBField = getattr(GPBMessage, field_name)
         except AttributeError, ex:
-            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
-                    (str(self.ObjectClass), field_name))
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' %\
+                                 (str(self.ObjectClass), field_name))
 
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             return len(GPBField) > 0
@@ -1333,7 +1369,7 @@ class Wrapper(object):
             if len(GPBField) == 0:
                 return False
             for item in GPBField:
-                if len(item.ListFields())>0:
+                if len(item.ListFields()) > 0:
                     return True
             else:
                 return False
@@ -1347,7 +1383,6 @@ class Wrapper(object):
 
     @GPBSource
     def ClearField(self, field_name):
-
         GPBMessage = self.GPBMessage
 
         #if not GPBMessage.IsFieldSet(field_name):
@@ -1358,8 +1393,8 @@ class Wrapper(object):
         try:
             GPBField = getattr(GPBMessage, field_name)
         except AttributeError, ex:
-            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
-                    (str(self.ObjectClass), field_name))
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' %\
+                                 (str(self.ObjectClass), field_name))
 
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             del self.DerivedWrappers[GPBField]
@@ -1420,52 +1455,66 @@ class Wrapper(object):
     @GPBSource
     def PPrint(self, offset=''):
 
-        msg = '%s%s\n' % (offset, self.ObjectClass)
+        fid = StringIO.StringIO()
 
-        for name, field in self._Properties.iteritems():
+        fid.write('%s%s\n' % (offset, self.ObjectClass))
 
-            try:
-                field_val = field.__get__(self)
-            except KeyError, ke:
-                log.debug(ke)
-
-                msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, 'KeyError - object not found in local workbench')
-                continue
-
-            if isinstance(field, (WrappedMessageProperty)):
+        try:
+            for name, field in self._Properties.iteritems():
                 try:
-                    val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  '), offset)
-                except Exception, ex:
-                    log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
-                    continue
-                
-            elif isinstance(field, WrappedRepeatedCompositeProperty):
-                try:
-                    val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset+'  ',name=name), offset)
-                except Exception, ex:
-                    log.error(ex)
-                    msg += '%s Exception while printing field name - %s, Exception - %s' % (offset, name, ex)
+                    field_val = field.__get__(self)
+                except KeyError, ke:
+                    log.debug('KeyError during get field: %s' % ke)
+
+                    fid.write('''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (
+                    offset, name, field.field_type, 'KeyError - object not found in local workbench'))
                     continue
 
-            elif isinstance(field, WrappedRepeatedScalarProperty):
-                scalars = field_val
-                if len(scalars) > 20:
-                    val = '# of Values - %i: Field Values - "%s"... truncated at 20 values!' % (len(scalars), str(scalars[:20]))
+                if isinstance(field, WrappedMessageProperty):
+                    try:
+                        val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset + '  '), offset)
+                    except AttributeError, ae:
+                        log.debug('Unset CasRef Field Name: %s: Catching Attribute Error: %s ' % (name, ae))
+                        val = 'Field Value - None'
+                    except Exception, ex:
+                        log.exception('Unexpected state in a WrappedMessageProperty.')
+                        fid.write('%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex))
+                        continue
+
+                elif isinstance(field, WrappedRepeatedCompositeProperty):
+                    try:
+                        val = 'Field Value - \n%s \n%s' % (field_val.PPrint(offset=offset + '  ', name=name), offset)
+                    except Exception, ex:
+                        log.exception('Unexpected state in a WrappedRepeatedCompositeProperty.')
+                        fid.write('%s Exception while printing field name - %s, Exception - %s\n' % (offset, name, ex))
+                        continue
+
+                elif isinstance(field, WrappedRepeatedScalarProperty):
+                    scalars = field_val
+                    if len(scalars) > 20:
+                        val = '# of Values - %i: Field Values - "%s"... truncated at 20 values!' % (
+                        len(scalars), str(scalars[:20]))
+                    else:
+                        val = '# of Values - %i: Field Values - "%s"' % (len(scalars), str(scalars[:]))
+
                 else:
-                    val = '# of Values - %i: Field Values - "%s"' % (len(scalars), str(scalars[:]))
+                    item = field_val
+                    if field.field_type == 'TYPE_ENUM':
+                        item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
 
-            else:
+                    val = 'Field Value - "%s"' % str(item)
 
-                item = field_val
-                if field.field_type == 'TYPE_ENUM':
-                    item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
+                fid.write('''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name, field.field_type, val))
+        except Exception, ex:
+            log.exception('Unexpected Exception in PPrint Wrapper!')
+            fid.write('Exception! %s' % ex)
 
-                val = 'Field Value - "%s"' % str(item)
-
-            msg += '''%s{Field Name - "%s" : Field Type - %s : %s} \n''' % (offset, name,field.field_type, val)
+        finally:
+            msg = fid.getvalue()
+            fid.close()
 
         return msg
+
 
 class ContainerWrapper(object):
     """
@@ -1483,9 +1532,7 @@ class ContainerWrapper(object):
         self._source = self
 
     def GPBSourceCW(func):
-
         def call_func(self, *args, **kwargs):
-
             func_name = func.__name__
             '''
             print 'GPB INVALID CW'
@@ -1507,7 +1554,6 @@ class ContainerWrapper(object):
 
     @classmethod
     def factory(cls, wrapper, gpbcontainer):
-
         #print cls, type(wrapper), type(gpbcontainer)
         #objhash = hash(gpbcontainer)
         dw = wrapper.DerivedWrappers
@@ -1521,7 +1567,6 @@ class ContainerWrapper(object):
         return inst
 
 
-
     @property
     def Root(self):
         return self._wrapper._root
@@ -1532,7 +1577,6 @@ class ContainerWrapper(object):
         return self.Root.Invalid
 
     def Invalidate(self, source=None):
-
         self._gpbcontainer = None
         if source is not None:
             self._source = source
@@ -1551,14 +1595,14 @@ class ContainerWrapper(object):
         if item.ObjectType == LINK_TYPE:
             self.Repository.set_linked_object(item, value)
         else:
-            raise OOIObjectError('It is illegal to set a value of a repeated composite field unless it is a CASRef - Link')
+            raise OOIObjectError(
+                'It is illegal to set a value of a repeated composite field unless it is a CASRef - Link')
 
         self._wrapper._set_parents_modified()
 
 
     @GPBSourceCW
-    def SetLink(self,key,value):
-
+    def SetLink(self, key, value):
         if not isinstance(value, Wrapper):
             raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
 
@@ -1567,7 +1611,8 @@ class ContainerWrapper(object):
         if item.ObjectType == LINK_TYPE:
             self.Repository.set_linked_object(item, value)
         else:
-            raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
+            raise OOIObjectError(
+                'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
 
         self._wrapper._set_parents_modified()
 
@@ -1582,8 +1627,7 @@ class ContainerWrapper(object):
         return value
 
     @GPBSourceCW
-    def GetLink(self,key):
-
+    def GetLink(self, key):
         link = self._gpbcontainer.__getitem__(key)
         link = self._wrapper._rewrap(link)
         assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % linkname
@@ -1591,8 +1635,7 @@ class ContainerWrapper(object):
 
     @GPBSourceCW
     def GetLinks(self):
-
-        wrapper_list=[]
+        wrapper_list = []
         links = self._gpbcontainer[:] # Get all the links!
         for link in links:
             link = self._wrapper._rewrap(link)
@@ -1633,7 +1676,6 @@ class ContainerWrapper(object):
     # Composite specific methods:
     @GPBSourceCW
     def add(self):
-
         new_element = self._gpbcontainer.add()
 
         self._wrapper._set_parents_modified()
@@ -1643,7 +1685,7 @@ class ContainerWrapper(object):
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
 
-        wrapper_list=[]
+        wrapper_list = []
         for index in range(0, len(self))[start:stop]:
             wrapper_list.append(self.__getitem__(index))
 
@@ -1674,35 +1716,60 @@ class ContainerWrapper(object):
 
     @GPBSourceCW
     def __iter__(self):
-
         for i in range(len(self)):
             yield self[i]
 
     @GPBSourceCW
     def PPrint(self, offset='', name='items'):
 
-        msg = '%s[' % offset
         length = len(self)
 
         if length is 0:
             return '%s[ ]' % offset
         else:
-            msg = '%s[ # of %s - %i \n' % (offset, name, length)
-
-        n = min(10, length)
-
-        for i in range(n):
-            val = self[i].PPrint(offset=offset + '  ')
-            msg += '''%s%s# %i - %s  \n''' % (offset,name, i,  val)
-
-        if length > 10:
-            msg += offset + '... truncated printing list at 10 items!\n'
+            fid = StringIO.StringIO()        
+            fid.write('%s[ # of %s - %i \n' % (offset, name, length))
 
 
-        msg += offset + '] '
+        try:
+
+                #n = min(10, length)
+
+            # Print all repeated composites
+            for i in range(length):
+                #log.debug('Printing field # %d' % i)
+                try:
+                    val = self[i].PPrint(offset=offset + '  ')
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, val))
+
+                except AttributeError, ae:
+                    log.debug('Attribute error while calling pprint on repeated composite: %s' % ae)
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link Not Set!'))
+
+                except KeyError, ke:
+                    log.debug('KeyError while calling pprint on repeated composite: %s' % ke)
+                    fid.write('''%s%s# %i - %s  \n''' % (offset, name, i, 'Repeated Link object not found!!'))
+
+                except Exception, ex:
+                    log.exception('Unexpected Exception while calling pprint on repeated composite')
+                    fid.write('''%s%s# %i - Exception: %s  \n''' % (offset, name, i, ex))
+
+
+                    #if length > 10:
+            #    msg += offset + '... truncated printing list at 10 items!\n'
+
+
+            fid.write(offset + '] ')
+
+        except Exception, ex:
+            log.exception('Unexpected Exception in PPrint CompositeContainer!')
+            fid.write('Exception! %s' % ex)
+
+        finally:
+            msg = fid.getvalue()
+            fid.close()
 
         return msg
-
 
 
 class ScalarContainerWrapper(object):
@@ -1721,7 +1788,6 @@ class ScalarContainerWrapper(object):
 
     @classmethod
     def factory(cls, wrapper, gpbcontainer):
-
         # Check the root wrapper objects list of derived wrappers before making a new one
         #objhash = hash(gpbcontainer)
         dw = wrapper.DerivedWrappers
@@ -1736,9 +1802,7 @@ class ScalarContainerWrapper(object):
 
 
     def GPBSourceSCW(func):
-
         def call_func(self, *args, **kwargs):
-
             func_name = func.__name__
             '''
             print 'GPB INVALID CW'
@@ -1749,7 +1813,8 @@ class ScalarContainerWrapper(object):
             wrapper = self._wrapper._source
             if wrapper._invalid:
                 log.error(wrapper.Debug())
-                raise OOIObjectError('Can not access Invalidated Scalar Container Wrapper Object in function "%s"' % func_name)
+                raise OOIObjectError(
+                    'Can not access Invalidated Scalar Container Wrapper Object in function "%s"' % func_name)
 
             return func(self, *args, **kwargs)
 
@@ -1843,7 +1908,7 @@ class ScalarContainerWrapper(object):
     def __delslice__(self, start, stop):
         """Deletes the subset of items from between the specified indices."""
 
-        self._gpbcontainer._values.__delslice__(start,stop)
+        self._gpbcontainer._values.__delslice__(start, stop)
         self._gpbcontainer._message_listener.Modified()
         self._wrapper._set_parents_modified()
 
@@ -1853,10 +1918,10 @@ class ScalarContainerWrapper(object):
 
         if self is other:
             return True
-        # Special case for the same type which should be common and fast.
+            # Special case for the same type which should be common and fast.
         if isinstance(other, self.__class__):
             return other._gpbcontainer._values == self._gpbcontainer._values
-        # We are presumably comparing against some other sequence type.
+            # We are presumably comparing against some other sequence type.
         return other == self._gpbcontainer._values
 
     @GPBSourceSCW
@@ -1867,12 +1932,10 @@ class ScalarContainerWrapper(object):
 
     @GPBSourceSCW
     def __str__(self):
-
         return str(self._gpbcontainer._values)
 
     @GPBSourceSCW
     def __iter__(self):
-
         for i in range(len(self)):
             yield self[i]
 
@@ -1890,8 +1953,8 @@ class StructureElement(object):
     here. A set provides references to the child objects so that the content
     need not be decoded to find them.
     """
-    def __init__(self,se=None):
 
+    def __init__(self, se=None):
         if se:
             self._element = se
         else:
@@ -1899,8 +1962,7 @@ class StructureElement(object):
         self.ChildLinks = set()
 
     @classmethod
-    def parse_structure_element(cls,blob):
-
+    def parse_structure_element(cls, blob):
         se = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         se.ParseFromString(blob)
 
@@ -1908,7 +1970,7 @@ class StructureElement(object):
 
         if instance.key != instance.sha1:
             log.error('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (sha1_to_hex(instance.key), sha1_to_hex(instance.sha1)))
+                      'Element key %s, Calculated key %s' % (sha1_to_hex(instance.key), sha1_to_hex(instance.sha1)))
             raise StructureElementError('Error reading serialized structure element. Sha1 value does not match.')
 
         return instance
@@ -1955,7 +2017,7 @@ class StructureElement(object):
         return self._element.type
 
     #@type.setter
-    def _set_type(self,obj_type):
+    def _set_type(self, obj_type):
         self._element.type.object_id = obj_type.object_id
         self._element.type.version = obj_type.version
 
@@ -1966,7 +2028,7 @@ class StructureElement(object):
         return self._element.value
 
     #@value.setter
-    def _set_value(self,value):
+    def _set_value(self, value):
         self._element.value = value
 
     value = property(_get_value, _set_value)
@@ -1977,12 +2039,12 @@ class StructureElement(object):
         return self._element.key
 
     #@key.setter
-    def _set_key(self,value):
+    def _set_key(self, value):
         self._element.key = value
 
     key = property(_get_key, _set_key)
 
-    def _set_isleaf(self,value):
+    def _set_isleaf(self, value):
         self._element.isleaf = value
 
     def _get_isleaf(self):
@@ -1992,8 +2054,8 @@ class StructureElement(object):
 
     def __str__(self):
         msg = ''
-        if len(self._element.key)==20:
-            msg  = 'Hexkey: "'+sha1_to_hex(self._element.key) +'"\n'
+        if len(self._element.key) == 20:
+            msg = 'Hexkey: "' + sha1_to_hex(self._element.key) + '"\n'
         return msg + self._element.__str__()
 
     def serialize(self):
@@ -2001,7 +2063,6 @@ class StructureElement(object):
 
 
     def __sizeof__(self):
-
         #size = len(self._element.value) + 34
         #print 'Esimtate: ', size
         #print 'GPB Size: ', self._element.ByteSize()
