@@ -109,7 +109,7 @@ class AppIntegrationTest(IonTestCase):
     timeout = 40
     
     # set to None to turn off timing logging, set to anything else to turn on timing logging
-    AnalyzeTiming = True
+    AnalyzeTiming = None
     
     class TimeStampsClass (object):
         pass

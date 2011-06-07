@@ -48,7 +48,7 @@ class AppIntegrationService(ServiceProcess):
                                              dependencies=[])
 
     # set to None to turn off timing logging, set to anything else to turn on timing logging
-    AnalyzeTiming = True
+    AnalyzeTiming = None
     
     class TimeStampsClass (object):
         pass
