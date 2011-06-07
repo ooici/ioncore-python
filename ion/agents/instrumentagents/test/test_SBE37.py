@@ -68,7 +68,7 @@ SKIP_TESTS = [
     'test_get_metadata',
     'test_get_status',
     'test_get_capabilities',
-    'test_execute',
+    #'test_execute',
     'test_execute_direct',
     'dummy'
 ]
@@ -286,7 +286,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
-        timeout = 30
+        timeout = 60
         
         # Get all parameters and verify. Store the current config for later.
         params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
@@ -970,7 +970,7 @@ class TestSBE37(IonTestCase):
         
         # Send raw bytes commands to the device.
         bytes = 'to_be_done'
-        timeout = 10
+        timeout = 60
         reply = yield self.driver_client.execute_direct(bytes,timeout)
             
         success = reply['success']
