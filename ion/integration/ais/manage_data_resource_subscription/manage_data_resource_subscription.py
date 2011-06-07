@@ -9,6 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+import time
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
@@ -116,8 +117,7 @@ class ManageDataResourceSubscription(object):
 
         self.nac = NotificationAlertServiceClient(proc=ais)
         self.metadataCache = ais.getMetadataCache()
-
-
+ 
 
     @defer.inlineCallbacks
     def update(self, msg):
@@ -149,7 +149,10 @@ class ManageDataResourceSubscription(object):
         @GPB{Returns,9204,1}
         @retval success
         """
-        log.info('ManageDataResourceSubscription.createDataResourceSubscription()\n')
+        if  self.ais.AnalyzeTiming != None:
+            self.ais.TimeStamps.StartTime = time.time()
+            self.ais.TimeStamps.LastTime = self.ais.TimeStamps.StartTime
+            log.warning('ManageDataResourceSubscription.create: started at ' + str(self.ais.TimeStamps.StartTime))
 
         if msg.MessageType != AIS_REQUEST_MSG_TYPE:
             raise NotificationAlertError('Expected message class AIS_REQUEST_MSG_TYPE, received %s')
@@ -199,6 +202,8 @@ class ManageDataResourceSubscription(object):
         try:
             log.debug("create: calling notification alert service addSubscription()")
             reply = yield self.nac.addSubscription(msg)
+            if  self.ais.AnalyzeTiming != None:
+                log.warning('ManageDataResourceSubscription.create: added subscription ' + self.ais.TimeStamp())
  
             Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
             Response.message_parameters_reference.add()
@@ -230,6 +235,8 @@ class ManageDataResourceSubscription(object):
                     defer.returnValue(Response)
                 log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                 self.userID = self.userRes.ResourceIdentity
+                if  self.ais.AnalyzeTiming != None:
+                    log.warning('ManageDataResourceSubscription.create: got user instance ' + self.ais.TimeStamp())
 
                 dispatcherID = yield self.__findDispatcher(self.userRes)
                 if (dispatcherID is None):
@@ -242,11 +249,15 @@ class ManageDataResourceSubscription(object):
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
+                if  self.ais.AnalyzeTiming != None:
+                    log.warning('ManageDataResourceSubscription.create: found dispatcher ' + self.ais.TimeStamp())
 
                 #
                 # Create a dispatcher workflow
                 #
                 yield self.__createDispatcherWorkflow(msg.message_parameters_reference, dispatcherID)
+                if  self.ais.AnalyzeTiming != None:
+                    log.warning('ManageDataResourceSubscription.create: created workflow ' + self.ais.TimeStamp())
 
             Response.message_parameters_reference[0] = Response.CreateObject(SUBSCRIBE_DATA_RESOURCE_RSP_TYPE)
             Response.message_parameters_reference[0].success  = True
@@ -298,11 +309,16 @@ class ManageDataResourceSubscription(object):
     @defer.inlineCallbacks
     def __createDispatcherWorkflow(self, createInfo, dispatcherID):
  
+        if  self.ais.AnalyzeTiming != None:
+            log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: started at ' + self.ais.TimeStamp())
+
         log.debug('__createDispatcherWorkflow')
 
         dispatcherRes = yield self.rc.get_instance(dispatcherID)
         subscriptionInfo = createInfo.subscriptionInfo
         datasetInfo = createInfo.datasetMetadata
+        if  self.ais.AnalyzeTiming != None:
+            log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: got dispatcher instance ' + self.ais.TimeStamp())
 
         #
         # Create the dispatcher workflow resource
@@ -313,6 +329,8 @@ class ManageDataResourceSubscription(object):
         dwfRes.user_ooi_id = subscriptionInfo.user_ooi_id
         dwfRes.workflow_path = subscriptionInfo.dispatcher_script_path
         yield self.rc.put_instance(dwfRes)
+        if  self.ais.AnalyzeTiming != None:
+            log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: put workflow instance ' + self.ais.TimeStamp())
 
         log.debug('Creating association between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID)        
 
@@ -331,6 +349,8 @@ class ManageDataResourceSubscription(object):
             #
             log.debug('Storing association: ' + str(association))
             yield self.rc.put_instance(association)
+            if  self.ais.AnalyzeTiming != None:
+                log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: put association ' + self.ais.TimeStamp())
 
         except AssociationClientError, ex:
             errString = 'Error creating assocation between dispatcherID: ' + dispatcherID + ' and workflowID: ' + workflowID + '. ex: ' + str(ex)
@@ -345,10 +365,14 @@ class ManageDataResourceSubscription(object):
         if self.pfn is None:
             pubfact = PublisherFactory(publisher_type=NewSubscriptionEventPublisher, process=self.ais)
             self.pfn = yield pubfact.build()
+            if  self.ais.AnalyzeTiming != None:
+                log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: built publisher factory ' + self.ais.TimeStamp())
 
                 
         # Publish the new subscription notification
         yield self.pfn.create_and_publish_event(dispatcher_workflow = dwfRes.ResourceObject, origin = dispatcherID)
+        if  self.ais.AnalyzeTiming != None:
+            log.warning('ManageDataResourceSubscription.__createDispatcherWorkflow: published event ' + self.ais.TimeStamp())
 
         defer.returnValue(None)
 
@@ -362,7 +386,10 @@ class ManageDataResourceSubscription(object):
         @GPB{Returns,9206,1}
         @retval success
         """
-        log.info('ManageDataResourceSubscription.delete()\n')
+        if  self.ais.AnalyzeTiming != None:
+            self.ais.TimeStamps.StartTime = time.time()
+            self.ais.TimeStamps.LastTime = self.ais.TimeStamps.StartTime
+            log.warning('ManageDataResourceSubscription.delete: started at ' + str(self.ais.TimeStamps.StartTime))
 
         # check that subscriptionInfo is present in GPB
         if not msg.message_parameters_reference.IsFieldSet('subscriptions'):
@@ -398,10 +425,14 @@ class ManageDataResourceSubscription(object):
                 log.debug("delete: calling notification alert service getSubscription()")
                 subscription = yield self.nac.getSubscription(reqMsg)
                 log.info('getSubscription returned:\n %s'%subscription.message_parameters_reference[0].subscriptionListResults[0])
+                if  self.ais.AnalyzeTiming != None:
+                    log.warning('ManageDataResourceSubscription.delete: got subscription ' + self.ais.TimeStamp())
     
                 log.debug("delete: calling notification alert service removeSubscription()")
                 reply = yield self.nac.removeSubscription(reqMsg)
-    
+                if  self.ais.AnalyzeTiming != None:
+                    log.warning('ManageDataResourceSubscription.delete: removed subscription ' + self.ais.TimeStamp())
+   
                 # Now determine if subscription type includes a dispatcher.  If so, we need to delete
                 # the dispatcher workflow by:
                 #   1. Finding the dispatcher associated with this user.
@@ -426,6 +457,8 @@ class ManageDataResourceSubscription(object):
                         Response.error_str = errString
                         defer.returnValue(Response)
                     log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
+                    if  self.ais.AnalyzeTiming != None:
+                        log.warning('ManageDataResourceSubscription.delete: got user instance ' + self.ais.TimeStamp())
     
                     # get the user's dispatcher
                     dispatcherID = yield self.__findDispatcher(self.userRes)
@@ -439,8 +472,12 @@ class ManageDataResourceSubscription(object):
                     else:
                         log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
                         
+                    if  self.ais.AnalyzeTiming != None:
+                        log.warning('ManageDataResourceSubscription.delete: found dispatcher ' + self.ais.TimeStamp())
                     # delete the workflow
                     Reply = yield self.__deleteDispatcherWorkflow(SubscriptionInfo, dispatcherID)
+                    if  self.ais.AnalyzeTiming != None:
+                        log.warning('ManageDataResourceSubscription.delete: removed workflow ' + self.ais.TimeStamp())
                     defer.returnValue(Reply)
     
             except ReceivedApplicationError, ex:
