@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 """
-@file ion/agents/instrumentagents/SBE37_driver.py
+@file ion/agents/instrumentagents/SBE37_driver_nbda.py
 @author Edward Hunter
-@brief Driver code for SeaBird SBE-37 CTD
+@brief Driver code for SeaBird SBE-37 CTD. This module uses send and forget
+sytle agent announcment (non-blocking driver announcement) messaging and has
+a more complex state handling logic and command processing flow than
+SBE37_driver.py
 """
 
 import re
@@ -53,7 +56,7 @@ class SBE37Prompt(BaseEnum):
     PROMPT = 'S>'
     NEWLINE = '\r\n'
     BAD_COMMAND = '?cmd S>'
-    STOP_AUTOSAMPLE = 'S>\r\n'
+
 
 # Device states.
 class SBE37State(DriverState):
@@ -204,7 +207,64 @@ class DeviceIOParser:
             return self.getval(match)
         else:
             return None
+    
+    
+class DeviceCommandSpecification:
+    """
+    A translation unit of a op_* function call into a sequence of low level
+    device commands for use by the appropriate state handler for writing the
+    commands to the device, managing the construction of a reply and
+    firing the deferred returned by the op_* call upon completion.
+    """
+    
+    def __init__(self,command):
+        self.command = command
+        self.device_command_buffer = None
+        self.previous_key = None
+        self.errors = False
+        self.deferred = None
+        self.timeoutf = None
+        self.reply = {'success':None,'result':{}}
         
+    def do_reply(self):
+        """
+        Fire the command deferred with reply.
+        """
+        if self.timeoutf != None:
+            self.timeoutf.cancel()
+            self.timeoutf = None
+        if self.deferred != None:
+            d,self.deferred = self.deferred, None
+            d.callback(self.reply)
+    
+    def do_timeout(self):
+        """
+        Fire the command deferred with timeout error.
+        """
+        reply = {'success':InstErrorCode.TIMEOUT,'result':{}}
+        if self.deferred != None:
+            d,self.deferred = self.deferred, None
+            d.callback(reply)
+        self.timeoutf = None
+    
+    def set_success(self,success_val,fail_val):
+        """
+        Set the overall command success message according to
+        any accumulated errors.
+        """
+        if self.errors:
+            self.reply['success'] = fail_val
+        else:
+            self.reply['success'] = success_val
+    
+    def set_previous_result(self,prev_result):
+        """
+        For composite device commands that set a success or other result
+        with each device command response prompt, use this function to
+        build up the composite result.
+        """
+        if self.previous_key != None:
+            self.reply['result'][self.previous_key] = prev_result
     
 ###############################################################################
 # Seabird Electronics 37-SMP MicroCAT driver.
@@ -269,17 +329,22 @@ class SBE37Driver(InstrumentDriver):
         in the stop reply, for example.
         """
         self._sample_buffer = []
-                        
+                
         """
-        The deferred that signals a prompt was acquired.
+        The queue of driver-level commands to be executed by the device.
         """
-        self._prompt_acquired_deferred = None
+        self._driver_command_buffer = []  
+       
+        """
+        The queue of instrument-level commands expanded from driver commands
+        to be sent to the device.
+        """
+        self._device_command_buffer = []
         
         """
-        The deferred that signals a prompt was acquired in autosample
-        mode.
+        The deferred that handles blocking on connect messages.
         """
-        self._autosample_prompt_acquired_deferred = None
+        self._connection_complete_deferred = None        
         
         """
         Device IO Logfile parameters. The device io log is used to precisely
@@ -642,6 +707,9 @@ class SBE37Driver(InstrumentDriver):
             SBE37State.CONNECTING : self.state_handler_connecting,
             SBE37State.DISCONNECTING : self.state_handler_disconnecting,
             SBE37State.CONNECTED : self.state_handler_connected,
+            SBE37State.ACQUIRE_SAMPLE : self.state_handler_acquire_sample,
+            SBE37State.UPDATE_PARAMS : self.state_handler_update_params,
+            SBE37State.SET : self.state_handler_set,
             SBE37State.AUTOSAMPLE : self.state_handler_autosample
         }
         
@@ -657,7 +725,6 @@ class SBE37Driver(InstrumentDriver):
     ###########################################################################
 
          
-    @defer.inlineCallbacks
     def state_handler_unconfigured(self,event,params):
         """
         Event handler for STATE_UNCONFIGURED.
@@ -668,47 +735,33 @@ class SBE37Driver(InstrumentDriver):
         STATE_DISCONNECTED if successful.
         EVENT_INITIALIZE: Reset communication parameters to null values.
         """
-        
-        yield
+
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
-        
         if event == SBE37Event.ENTER:
-            
             # Announce the state change to agent.                        
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.UNCONFIGURED}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)
-            
-            # Initialize driver configuration.
+            self.send(self.proc_supid,'driver_event_occurred',content)
             self._initialize()
 
         elif event == SBE37Event.EXIT:
             pass
         
         elif event == SBE37Event.INITIALIZE:
-            
-            # Initialize driver configuration.
             self._initialize()
-
-        elif event == SBE37Event.CONFIGURE:
             
-            # Attempt to configure driver, switch to disconnected
-            # if successful.
-            success = self._configure(params)
-            if InstErrorCode.is_ok(success):
+        elif event == SBE37Event.CONFIGURE:
+            if self._configure(params):
                 next_state = SBE37State.DISCONNECTED
-
+        
         else:
             success = InstErrorCode.INCORRECT_STATE
-            
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)
         
     
-    @defer.inlineCallbacks
     def state_handler_disconnected(self,event,params):
         """
         Event handler for STATE_DISCONNECTED.
@@ -719,47 +772,43 @@ class SBE37Driver(InstrumentDriver):
         EVENT_CONNECT: Switch to STATE_CONNECTING.
         """
         
-        yield
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
         
         if event == SBE37Event.ENTER:
-
+            
             # Announce the state change to agent.            
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)
+            self.send(self.proc_supid,'driver_event_occurred',content)
+            
+            # If we enter a disconnect state with the connection complete
+            # defered defined, then we are entering from a previous connection
+            # in response to a disconnect comment. Fire the deferred with
+            # reply to indicate successful disconnect.
+            if self._connection_complete_deferred:
+                d,self._connection_complete_deferred = \
+                    self._connection_complete_deferred,None
+                reply = {'success':InstErrorCode.OK,'result':None}
+                d.callback(reply)
             
         elif event == SBE37Event.EXIT:
             pass
 
         elif event == SBE37Event.INITIALIZE:
-            
-            # Switch back to unconfigured state.
             next_state = SBE37State.UNCONFIGURED         
                     
         elif event == SBE37Event.CONNECT:
-            
-            # Switch to connecting state which will initiate connection to
-            # instrument hardware.
             next_state = SBE37State.CONNECTING         
-        
-        elif event == SBE37Event.CONFIGURE:
-            
-            # Attempt to alter driver configuration. Stays in current
-            # connectable configuration if the attempt is invalid.
-            success = self._configure(params)
-        
+                    
         else:
             success = InstErrorCode.INCORRECT_STATE
             
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_connecting(self,event,params):
         """
         Event handler for STATE_CONNECTING.
@@ -769,10 +818,8 @@ class SBE37Driver(InstrumentDriver):
         EVENT_CONNECTION_COMPLETE: Switch to STATE_UPDATE_PARAMS.
         EVENT_CONNECTION_FAILED: Switch to STATE_DISCONNECTED.
         """
-        yield
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
         
         if event == SBE37Event.ENTER:
@@ -781,36 +828,26 @@ class SBE37Driver(InstrumentDriver):
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTING}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)
+            self.send(self.proc_supid,'driver_event_occurred',content)
 
-            # Attempt to set up a tcp connection to the serial server.
-            cc = ClientCreator(reactor, InstrumentConnection, self)
-            self._instrument_connection = yield cc.connectTCP(self._ipaddr,
-                                                          int(self._ipport))        
-            if self._instrument_connection:
-                self._instrument_connection.transport.setTcpNoDelay(1)
-
+            self.getConnected()
+            
         elif event == SBE37Event.EXIT:
             pass
                     
         elif event == SBE37Event.CONNECTION_COMPLETE:
-            # If connection valid, update parameters and switch to connected.
-            if self._instrument_connection:
-                yield self._update_params()
-                next_state = SBE37State.CONNECTED
-                
-            # else, return to disconnected.
-            else:
-                success = InstErrorCode.DRIVER_CONNECT_FAILED
-                next_state = SBE37State.DISCONNECTED
+            next_state = SBE37State.UPDATE_PARAMS
                     
+        elif event == SBE37Event.CONNECTION_FAILED:
+            # Error message to agent here.
+            next_state = SBE37State.DISCONNECTED
+
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_disconnecting(self,event,params):
         """
         Event handler for STATE_DISCONNECTING.
@@ -820,10 +857,8 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DISCONNECT_COMPLETE: Switch to STATE_DISCONNECTED.
         """
         
-        yield
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
             
         if event == SBE37Event.ENTER:
@@ -832,44 +867,36 @@ class SBE37Driver(InstrumentDriver):
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)            
-
-            # Drop the driver connection.            
-            if self._instrument_connection:
-                self._instrument_connection.transport.loseConnection()
-                       
+            self.send(self.proc_supid,'driver_event_occurred',content)            
+            
+            self.getDisconnected()
+            
         elif event == SBE37Event.EXIT:
             pass
                     
         elif event == SBE37Event.DISCONNECT_COMPLETE:
-            
-            # Switch to disconnected when connection is dropped by the
-            # framework.
             next_state = SBE37State.DISCONNECTED
 
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_connected(self,event,params):
         """
         Event handler for STATE_CONNECTED.
         EVENT_ENTER: Fire deferred in connection request on initial entry.
         If a command is queued, switch to command specific state for handling.
-        EVENT_EXIT: Pass.
+        EVENT_EXIT: Pass.        
         EVENT_DISCONNECT: Switch to STATE_DISCONNECTING.
         EVENT_COMMAND_RECEIVED: If a command is queued, switch to command
         specific state for handling.
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        yield
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
 
         if event == SBE37Event.ENTER:
@@ -878,92 +905,154 @@ class SBE37Driver(InstrumentDriver):
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.CONNECTED}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)            
+            self.send(self.proc_supid,'driver_event_occurred',content)            
+            
+            # If we enter connected with the connection complete deferred
+            # defined we are establishing the initial connection in response
+            # to a connect command. Send the reply to indicate successful
+            # connection.
+            if self._connection_complete_deferred:
+                d,self._connection_complete_deferred = \
+                    self._connection_complete_deferred,None
+                reply = {'success':InstErrorCode.OK,'result':None}
+                d.callback(reply)
             
         elif event == SBE37Event.EXIT:
             pass
             
         elif event == SBE37Event.DISCONNECT:
-
-            # Switch to disconnecting state.            
             next_state = SBE37State.DISCONNECTING
-                
-            
-        elif event == SBE37Event.GET:
-            
-            # Get specified parameters from driver and setup result.
-            result = self._get_parameters(params)
-            success = result['success']
-            result = result['result']
-        
+                    
         elif event == SBE37Event.SET:
+            next_state = SBE37State.SET
             
-            # Set specified parameters to hardware, update driver
-            # parameters and setup result.
-            result = yield self._set_parameters(params)
-            yield self._update_params()
-            success = result['success']
-            result = result['result']
-            
-            # Do expanded set command checking here.
-            
-            # If any of the sets were successful, publish the
-            # config change.
-            if any(result.values()):
-                self._debug_print('modified configuration')
-                config = self._get_parameters([(SBE37Channel.ALL,
-                                                SBE37Parameter.ALL)])
-                content = {'type':DriverAnnouncement.CONFIG_CHANGE,
-                           'transducer':SBE37Channel.INSTRUMENT,
-                           'value':config}
-                yield self.send(self.proc_supid,'driver_event_occurred',
-                                content)
-                
         elif event == SBE37Event.ACQUIRE_SAMPLE:
-            
-            # Acquire a data sample.
-            result = yield self._acquire_sample()
-            success = result['success']
-            result = result['result']
-                        
-            # Publish result if successful.
-            if len(result)>0:
-                self._debug_print('received samples',result)
-                content = {'type':DriverAnnouncement.DATA_RECEIVED,
-                           'transducer':SBE37Channel.INSTRUMENT,'value':result}
-                yield self.send(self.proc_supid,'driver_event_occurred',
-                                content)                                                
+            next_state = SBE37State.ACQUIRE_SAMPLE
             
         elif event == SBE37Event.START_AUTOSAMPLE:
-            
-            # Switch to autosample mode. 
             next_state = SBE37State.AUTOSAMPLE
             
         elif event == SBE37Event.TEST:
-            
-            # Switch to test mode.
             next_state = SBE37State.TEST
             
         elif event == SBE37Event.CALIBRATE:
-            
-            # Switch to calibrate mode.
             next_state = SBE37State.CALIBRATE
             
         elif event == SBE37Event.RESET:
-            
-            # Switch to reset mode.
             next_state = SBE37State.RESET
             
         elif event == SBE37Event.DATA_RECEIVED:
             pass
-  
+                
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)
+
+        
+    def state_handler_acquire_sample(self,event,params):
+        """
+        Event handler for STATE_ACQUIRE_SAMPLE.
+        Events handled:
+        EVENT_ENTER: Initialize command buffers and start looping wakeup.
+        EVENT_EXIT: Clear buffers and send reply.        
+        EVENT_PROMPTED: Cancel wakeup, write device commands, parse output
+        and populate reply. Switch to STATE_CONNECTED.
+        EVENT_DATA_RECEIVED: Pass.
+        """
+        
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(event)
+
+        if event == SBE37Event.ENTER:
+                        
+            # Announce the state change to agent.            
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.ACQUIRE_SAMPLE}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
+                        
+            # Initialize data buffer and copy device command buffer over
+            # from the acquire command spec.
+            command_spec = self._driver_command_buffer[0]
+            self._data_lines = []
+            self._sample_buffer = []
+            self._device_command_buffer = command_spec.device_command_buffer
+                        
+            # Start the looping wakeup.
+            self._start_wakeup(2.0)
+            
+        elif event == SBE37Event.EXIT:
+
+            # Clear the data buffer.
+            self._data_lines = []
+            #self._device_command_buffer = []
+            
+            # Pop the command spec, set success and fire the reply deferred.
+            command_spec = self._driver_command_buffer.pop(0)
+            if len(self._sample_buffer)==0:
+                command_spec.errors = True
+            elif len(self._sample_buffer)==1:
+                command_spec.reply['result'] = self._sample_buffer[0]
+            else:
+                command_spec.reply['result'] = self._sample_buffer
+                
+            command_spec.set_success(InstErrorCode.OK,
+                                     InstErrorCode.ACQUIRE_SAMPLE_ERR)
+            command_spec.do_reply()
+            self._sample_buffer = []        
+                    
+                    
+        elif event == SBE37Event.PROMPTED:
+                        
+                    
+            # Cancel looping wakeup if active.
+            self._stop_wakeup()
+                
+            # Pop the device command.
+            try:
+                
+                cmd = self._device_command_buffer.pop(0)
+            
+            # If no further commands, parse output, set result and switch
+            # state.
+            except IndexError:
+                    
+                next_state = SBE37State.CONNECTED
+
+            # Write the device command.
+            else:
+                
+                self._write_command(cmd+SBE37Prompt.NEWLINE)
+                                
+        elif event == SBE37Event.DATA_RECEIVED:
+
+            #content = {'type':DriverAnnouncement.STATE_CHANGE,
+            # 'transducer':SBE37Channel.INSTRUMENT,
+            #           'value':SBE37State.UNCONFIGURED}
+            #self.send(self.proc_supid,'driver_event_occurred',content)
+        
+
+            # Parse the data buffer for sample output. Publish these as
+            # appropriate, and package them in the reply if the option
+            # has been set.
+            samples = self._parse_sample_output()
+            if len(samples)>0:
+                self._sample_buffer += samples
+                if len(samples)==1:
+                    samples = samples[0]                
+                self._debug_print('received samples',samples)
+                content = {'type':DriverAnnouncement.DATA_RECEIVED,
+                           'transducer':SBE37Channel.INSTRUMENT,'value':samples}
+                self.send(self.proc_supid,'driver_event_occurred',content)                                                
+            
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+        
+        return (success,next_state)
 
 
-    @defer.inlineCallbacks
     def state_handler_autosample(self,event,params):
         """
         Event handler for STATE_AUTOSAMPLE.
@@ -977,10 +1066,8 @@ class SBE37Driver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
         
-        yield
         success = InstErrorCode.OK
         next_state = None
-        result = None
         self._debug_print(event)
 
         if event == SBE37Event.ENTER:
@@ -989,52 +1076,293 @@ class SBE37Driver(InstrumentDriver):
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.AUTOSAMPLE}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)                                    
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
 
-            # Clear data lines and sample buffer.
+            # Clear the data buffer and copy the device command buffer
+            # from the autosample command spec.
+            command_spec = self._driver_command_buffer[0]
             self._data_lines = []
             self._sample_buffer = []
-            
-            # Get the prompt and send start command without waiting for
-            # response prompt.
-            prompt = yield self._get_prompt()
-            yield self._do_cmd_no_prompt('startnow')
+            self._device_command_buffer = command_spec.device_command_buffer
                         
-        elif event == SBE37Event.EXIT:            
+            # Start the looping wakeup.
+            self._start_wakeup(2.0)
 
-            # Clear data lines and sample buffer.
+        elif event == SBE37Event.EXIT:
+
+            # Pop the command spec.                
+            command_spec = self._driver_command_buffer.pop(0)
+
+            # If this is a stop command with getdata arg, populate the reply.
+            drv_cmd = command_spec.command
+            if list(drv_cmd) == [SBE37Command.STOP_AUTO_SAMPLING,'GETDATA']:
+                if len(self._sample_buffer)==0:
+                    command_spec.errors = True
+                elif len(self._sample_buffer)==1:
+                    command_spec.reply['result'] = self._sample_buffer[0]
+                else:
+                    command_spec.reply['result'] = self._sample_buffer
+
+            # Clear the data buffer, set success and fire reply deferred.
             self._data_lines = []
             self._sample_buffer = []
-                  
+            command_spec.set_success(InstErrorCode.OK,
+                                     InstErrorCode.ACQUIRE_SAMPLE_ERR)
+            command_spec.do_reply()
+                                    
+        elif event == SBE37Event.PROMPTED:
+            
+            # Cancel looping wakeup if active.
+            self._stop_wakeup()
+
+            # Get the driver command.                
+            command_spec = self._driver_command_buffer[0]
+            drv_cmd = command_spec.command
+
+            if drv_cmd[0] == SBE37Command.START_AUTO_SAMPLING:
+
+                # Pop the pending autosample device command.
+                try:
+                    cmd = self._device_command_buffer.pop(0)
+
+                except IndexError:
+                    pass
+
+                # Write autosample device command, remove command spec
+                # from buffer, set result and fire the reply deferred.
+                else:
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
+                    self._driver_command_buffer.pop(0)
+                    command_spec.set_success(InstErrorCode.OK,
+                                             InstErrorCode.ACQUIRE_SAMPLE_ERR)
+                    command_spec.do_reply()
+                    
+            elif drv_cmd[0] == SBE37Command.STOP_AUTO_SAMPLING:
+
+                # Pop pending autosample stop device command.
+                try:
+                    cmd = self._device_command_buffer.pop(0)
+                
+                # If no further autosample stop device commands, send wakeup
+                # until we get the correct prompt to ensure we are in the
+                # right state.
+                except IndexError:
+                    if self._line_buffer == '':
+                        self._wakeup()
+                    else:
+                        next_state = SBE37State.CONNECTED
+
+                # Write the autosample stop device command.                
+                else:
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
+                    
         elif event == SBE37Event.STOP_AUTOSAMPLE:
 
-            # Get the autosample prompt, issue stop command, get
-            # regular prompt, store results if option set, switch to
-            # connected.
-            prompt = yield self._get_autosample_prompt()
-            prompt = yield self._do_cmd_no_prompt('stop')
-            prompt = yield self._get_prompt()
-            if 'GETDATA' in params:
-                result = self._sample_buffer
-            next_state = SBE37State.CONNECTED
+            # Do not clear data buffer, copy over the stop autosample
+            # device command buffer.
+            command_spec = self._driver_command_buffer[0]
+            self._device_command_buffer = command_spec.device_command_buffer
+
+            # Start the looping wakeup.
+            self._start_wakeup(2.0)
             
         elif event == SBE37Event.DATA_RECEIVED:
             
-            # Data received in autosample mode.
-            # Parse line buffer for samples, store in sample buffer
-            # and publish if any are found.
+            # Parse the data buffer for sample output. Publish these as
+            # appropriate, and package them in the reply if the option
+            # has been set.
             samples = self._parse_sample_output()
             if len(samples)>0:
                 self._sample_buffer += samples
+                if len(samples)==1:
+                    samples = samples[0]
                 self._debug_print('received samples',samples)
                 content = {'type':DriverAnnouncement.DATA_RECEIVED,
                            'transducer':SBE37Channel.INSTRUMENT,'value':samples}
-                yield self.send(self.proc_supid,'driver_event_occurred',content)                                                
+                self.send(self.proc_supid,'driver_event_occurred',content)                                                
             
-        else:            
+        else:
+            
             success = InstErrorCode.INCORRECT_STATE
         
-        defer.returnValue((success,next_state,result))
+        return (success,next_state)           
+
+
+    def state_handler_update_params(self,event,params):
+        """
+        Event handler for STATE_UPDATE_PARAMS.
+        EVENT_ENTER: Init command variables, populate device command buffer
+        and send wakeup.
+        EVENT_EXIT: Clear command variables.        
+        EVENT_PROMPTED: Write next command to device. If done, read param
+        values from data buffer and switch to STATE_CONNECTED.
+        EVENT_DATA_RECEIVED: Pass.
+        """
+        
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(event)
+
+        if event == SBE37Event.ENTER:
+            
+            # Announce the state change to agent.            
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.UPDATE_PARAMS}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                    
+              
+            # Clear data buffer and populate device command buffer directly.
+            self._data_lines = []
+            self._device_command_buffer = ['DS','DC']
+           
+            # Start looping wakeup.
+            self._start_wakeup(2.0)
+            
+        elif event == SBE37Event.EXIT:
+            
+            # Clear data buffer.
+            self._data_lines = []
+
+            # Pop the current command spec. If it exists, it triggered
+            # this update.
+            try:
+                
+                command_spec = self._driver_command_buffer.pop(0)
+            
+            # No command spec, update triggered internally. No action
+            # required.
+            except IndexError:
+                
+                pass
+            
+            # Current command spec exists, fire reply deferred.
+            else:
+                
+                command_spec.do_reply()
+                    
+            # Announce the config change to agent. This assumes
+            # that param updates occur one-to-one with config changes.
+            paramdict = self.get_parameter_dict()
+            content = {'type':DriverAnnouncement.CONFIG_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':paramdict}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                                
+                    
+        elif event == SBE37Event.PROMPTED:
+            
+            # Cancel the looping wakeup if active.
+            self._stop_wakeup()
+
+            if self._line_buffer == '':
+                self._debug_print('detected empty line buffer')
+                self._wakeup()
+                
+            else:
+            
+                # Pop the next pending device command.
+                try:
+                    
+                    cmd = self._device_command_buffer.pop(0)
+    
+                # If no further device command, parse the device output and
+                # switch state.
+                except IndexError:
+                    
+                    self._read_param_values(self._data_lines)
+                    next_state = SBE37State.CONNECTED
+    
+                # Write command to device.
+                else:
+                    self._write_command(cmd+SBE37Prompt.NEWLINE)
+                
+        elif event == SBE37Event.DATA_RECEIVED:
+            pass
+                
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+
+        return (success,next_state)
+
+
+    def state_handler_set(self,event,params):
+        """
+        Event handler for STATE_SET.
+        EVENT_ENTER: Init command variables, populate device command buffer
+        and start looping wakeup.
+        EVENT_EXIT: Clear command and data buffers. Reply is sent as part of
+        update params state.
+        EVENT_PROMPTED: Write next set command to device. Validate previous
+        set command with data buffer. Switch to STATE_UPDATE_PARAMS if done.
+        EVENT_DATA_RECEIVED: Pass.
+        """
+        
+        success = InstErrorCode.OK
+        next_state = None
+        self._debug_print(event)
+
+        if event == SBE37Event.ENTER:
+            
+            # Announce the state change to agent.            
+            content = {'type':DriverAnnouncement.STATE_CHANGE,
+                       'transducer':SBE37Channel.INSTRUMENT,
+                       'value':SBE37State.SET}
+            self.send(self.proc_supid,'driver_event_occurred',content)                                                
+            
+            # Clear the data buffer and copy the device command buffer over
+            # from the command spec.
+            command_spec = self._driver_command_buffer[0]
+            self._data_lines = []
+            self._device_command_buffer = command_spec.device_command_buffer
+                            
+            # Start the looping wakeup.
+            self._start_wakeup(2.0)
+
+        elif event == SBE37Event.EXIT:
+            
+            # Clear the data buffer.
+            self._data_lines = []
+                    
+        elif event == SBE37Event.PROMPTED:
+            
+            #print 'line buf: '+self._line_buffer+'xx'
+            # Cancel the looping wakeup if active.
+            self._stop_wakeup()
+            
+            # Validate previous response.
+            command_spec = self._driver_command_buffer[0]
+            if self._line_buffer == SBE37Prompt.PROMPT:
+                prev_result = InstErrorCode.OK
+            else:
+                prev_result = InstErrorCode.BAD_DRIVER_COMMAND
+            command_spec.set_previous_result(prev_result)
+            
+            # Pop the pending device set command.
+            try:
+                
+                (set_key,set_val,set_cmd) = self._device_command_buffer.pop(0)
+
+            # If no remainind device set commands, set success and switch
+            # state.
+            except IndexError:
+                
+                command_spec.set_success(InstErrorCode.OK,
+                                         InstErrorCode.SET_DEVICE_ERR)
+                next_state = SBE37State.UPDATE_PARAMS
+
+            # Write the device set command.                
+            else:
+                
+                command_spec.previous_key = set_key
+                #print 'writing command '+set_cmd
+                self._write_command(set_cmd+SBE37Prompt.NEWLINE)
+
+        elif event == SBE37Event.DATA_RECEIVED:
+            pass                
+                        
+        else:
+            success = InstErrorCode.INCORRECT_STATE
+            
+        return (success,next_state)
 
 
     ###########################################################################
@@ -1067,21 +1395,39 @@ class SBE37Driver(InstrumentDriver):
 
 
     @defer.inlineCallbacks
+    def getConnected(self):
+        """
+        Called by this class to establish connection with the device.
+        Send EVENT_CONNECTION_COMPLETE if successful or
+        EVENT_CONNECTION_FAILED if not successful.
+        """
+        
+        cc = ClientCreator(reactor, InstrumentConnection, self)
+        self._instrument_connection = yield cc.connectTCP(self._ipaddr,
+                                                          int(self._ipport))        
+        
+        
+        if self._instrument_connection:
+            self._instrument_connection.transport.setTcpNoDelay(1)
+            self._fsm.on_event(SBE37Event.CONNECTION_COMPLETE)
+        else:
+            self._fsm.on_event(SBE37Event.CONNECTION_FAILED)
+
+
     def gotConnected(self, instrument):
         """
         Called from twisted framework when connection is established.
         """
-        
-        yield        
-        """        
-        if self._instrument_connection:
-            self._instrument_connection.transport.setTcpNoDelay(1)
-            yield self._fsm.on_event_async(SBE37Event.CONNECTION_COMPLETE)
-        else:
-            yield self._fsm.on_event_async(SBE37Event.CONNECTION_FAILED)
+        pass
+
+    def getDisconnected(self):
         """
+        Called by this class to close the connection to the device.
+        """
+        if self._instrument_connection:
+            self._instrument_connection.transport.loseConnection()
          
-    @defer.inlineCallbacks
+ 
     def gotDisconnected(self, instrument):
         """
         Called by the twisted framework when the connection is closed.
@@ -1089,10 +1435,9 @@ class SBE37Driver(InstrumentDriver):
         """
 
         self._instrument_connection = None
-        yield self._fsm.on_event_async(SBE37Event.DISCONNECT_COMPLETE)
+        self._fsm.on_event(SBE37Event.DISCONNECT_COMPLETE)
 
 
-    @defer.inlineCallbacks
     def gotData(self, dataFrag):
         """
         Called by the twisted framework when a data fragment is received.
@@ -1100,8 +1445,6 @@ class SBE37Driver(InstrumentDriver):
         EVENT_PROMPTED if a prompt is detected.
         @param dataFrag a string data fragment received.
         """
-        
-        yield
         
         # Write the fragment to the IO log if it is enabled.
         if IO_LOG:
@@ -1138,32 +1481,20 @@ class SBE37Driver(InstrumentDriver):
             new_lines = True
         
         # If new complete lines are detected, send an EVENT_DATA_RECEIVED.
-        if new_lines and self._fsm.get_current_state() == SBE37State.AUTOSAMPLE:
-            yield self._fsm.on_event_async(SBE37Event.DATA_RECEIVED)
+        if new_lines:
+            self._fsm.on_event(SBE37Event.DATA_RECEIVED)
         
         # If a normal or bad command prompt is detected, send an
         # EVENT_PROMPTED
-        if self._line_buffer == SBE37Prompt.PROMPT:
-            if self._prompt_acquired_deferred:
-                d,self._prompt_acquired_deferred = \
-                                    self._prompt_acquired_deferred, None
-                self._stop_wakeup()
-                d.callback(SBE37Prompt.PROMPT)
+        if (self._line_buffer == SBE37Prompt.PROMPT or
+            self._line_buffer == SBE37Prompt.BAD_COMMAND):
+            self._fsm.on_event(SBE37Event.PROMPTED)
             
-        elif self._line_buffer == SBE37Prompt.BAD_COMMAND:
-            if self._prompt_acquired_deferred:
-                d,self._prompt_acquired_deferred = \
-                                    self._prompt_acquired_deferred, None
-                self._stop_wakeup()
-                d.callback(SBE37Prompt.BAD_COMMAND)
-        
-        elif self._line_buffer == '' and len(self._data_lines)>0 and \
-            self._data_lines[-1] == SBE37Prompt.PROMPT:
-            if self._autosample_prompt_acquired_deferred:
-                d,self._autosample_prompt_acquired_deferred = \
-                                    self._autosample_prompt_acquired_deferred, None
-                self._stop_wakeup()
-                d.callback(SBE37Prompt.STOP_AUTOSAMPLE)
+        # If a stop autosample type prompt is detected, send an
+        # EVENT_PROMPTED.
+        elif (self._line_buffer == '' and
+              (len(self._data_lines)>0 and self._data_lines[-1] == SBE37Prompt.PROMPT)):
+            self._fsm.on_event(SBE37Event.PROMPTED)
 
 
     ###########################################################################
@@ -1232,6 +1563,10 @@ class SBE37Driver(InstrumentDriver):
         # Process acquire sample command.
         if drv_cmd == SBE37Command.ACQUIRE_SAMPLE:
 
+            # Create command spec and set event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.ACQUIRE_SAMPLE
+            
             # The acquire command only applies to the instrument as a whole.
             # Fail if the channel is not set properly.
             if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
@@ -1239,42 +1574,99 @@ class SBE37Driver(InstrumentDriver):
                 yield self.reply_ok(msg,reply)
                 return
 
-            # Send an acquire sample event and setup reply
-            (success,result) = yield self._fsm.on_event_async(SBE37Event.ACQUIRE_SAMPLE)
-            reply['success'] = success
-            reply['result'] = result
-                        
+            # The default device command is TS, append this to device
+            # command buffer if no optional argument is present.
+            if len(command)==1:
+                command_spec.device_command_buffer = ['TS']
+                
+            # If the optional argument is present, check that it is valid
+            # for sbe37. If so append it to device command buffer.
+            elif len(command)==2:                
+                if command[1] not in sbe37_cmd_acquire_sample_args:
+                    reply['success'] = InstErrorCode.INVALID_COMMAND
+                    yield self.reply_ok(msg,reply)
+                    return
+                else:
+                    command_spec.device_command_buffer = command[1]
+            
+            # If the command has a length greater than 2, fail.      
+            else:
+                reply['success'] = InstErrorCode.INVALID_COMMAND
+                yield self.reply_ok(msg,reply)
+                return
+
+            # Set up the reply deferred and fire the command event.  
+            reply = yield self._process_command(command_spec,event,timeout)
+
         # Process start autosampling command.
         elif drv_cmd == SBE37Command.START_AUTO_SAMPLING:
-            
-            # Send an start autosample event and setup reply
-            (success,result) = yield self._fsm.on_event_async(SBE37Event.START_AUTOSAMPLE)
-            reply['success'] = success
-            reply['result'] = result
-                        
+
+            # Create command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.START_AUTOSAMPLE
+
+            # The acquire command only applies to the instrument as a whole.
+            # Fail if channel not set properly.
+            if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
+                yield self.reply_ok(msg,reply)
+                return
+
+            # Append the sbe37 start command to the device command buffer.                                
+            command_spec.device_command_buffer = ['STARTNOW']                
+
+            # Set up the reply deferred and fire the command event.  
+            reply = yield self._process_command(command_spec,event,timeout)
+
         # Process stop autosampling command.
         elif drv_cmd == SBE37Command.STOP_AUTO_SAMPLING:
             
-            # Get optional stop parameters.
-            if len(command)>1:
-                params = command[1:]
-            else:
-                params = None
-                
-            # Send stop autosample event and setup reply.
-            (success,result) = yield self._fsm.on_event_async(SBE37Event.STOP_AUTOSAMPLE,params)
-            reply['success'] = success
-            reply['result'] = result
+            # Create a command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.STOP_AUTOSAMPLE
+
+            # The acquire command only applies to the instrument as a whole.
+            # Fail if channel not set properly.
+            if len(channels)>1 or channels[0] != SBE37Channel.INSTRUMENT:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
+                yield self.reply_ok(msg,reply)
+                return
             
+            # The command has one optional argument,
+            # that retrieves the autosampled data in the stop reply.
+            if len(command)>2:
+                reply['success'] = InstErrorCode.INVALID_COMMAND
+                yield self.reply_ok(msg,reply)
+                return
+
+            if len(command)==2 and command[1]!='GETDATA':
+                reply['success'] = InstErrorCode.INVALID_COMMAND
+                yield self.reply_ok(msg,reply)
+                return
+
+            # Append the sbe37 command to the device command buffer.                                
+            command_spec.device_command_buffer = ['STOP']                
+
+            # Set up the reply deferred and fire the command event.  
+            reply = yield self._process_command(command_spec,event,timeout)
+
         # Process test command.
         elif drv_cmd == SBE37Command.TEST:
-                        
+            
+            # Create a command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.TEST  
+            
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
         elif drv_cmd == SBE37Command.CALIBRATE:
+            
+            # Create a command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.CALIBRATE
             
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
@@ -1283,10 +1675,35 @@ class SBE37Driver(InstrumentDriver):
 
         elif drv_cmd == SBE37Command.RESET:
                        
+            # Create a command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            event = SBE37Event.RESET
+
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
+
+        elif drv_cmd == SBE37Command.TEST_ERRORS:
+                       
+            # Create a command spec and set the event to fire.
+            command_spec = DeviceCommandSpecification(command)
+            
+            #reply = {'success':InstErrorCode.OK,'result':{}}
+            
+            # This raises an internal server error on the client side with
+            # the reply contained in the exception content.
+            #yield self.reply_err(msg,reply)
+            
+            # These raise internal server errors on the client side, but
+            # the exception type or error message content is unknown.
+            #raise DriverException('Error!')
+            #raise defer.TimeoutError()
+            
+            # These don't serialize.
+            #yield self.reply_err(msg,DriverException('Error!'))
+            #yield self.reply_err(msg,defer.TimeoutError())
+            #return
 
         else:
             
@@ -1322,12 +1739,9 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
         
-        reply = {'success':None,'result':None}
-        
-        # Send get event and setup reply.
-        (success,result) = yield self._fsm.on_event_async(SBE37Event.GET,params)
-        reply['success'] = success
-        reply['result'] = result
+        # Retrieve the requested parameters from the driver parameter
+        # variables and send the reply. 
+        reply = self._get_parameters(params)
         
         yield self.reply_ok(msg,reply)
 
@@ -1360,14 +1774,50 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
         
-        reply = {'success':None,'result':None}
+        # Create the command spec and set the event to fire.
+        command_spec = DeviceCommandSpecification([SBE37Command.SET])        
+        event = SBE37Event.SET
         
-        # Send set event and setup reply. Set handler announces config
-        # changes to agent.
-        (success,result) = yield self._fsm.on_event_async(SBE37Event.SET,params)
-        reply['success'] = success
-        reply['result'] = result
-        
+        # Populate the device command buffer with the equivalent
+        # sbe37 set commands.
+        device_command_buffer = []
+        sample_num_command = None
+        for (chan,param) in params.keys():
+            val = params[(chan,param)]
+            if self.parameters.get((chan,param),None):
+                str_val = self.parameters[(chan,param)]['parser'].tostring(val)
+                if str_val:
+                    if (chan,param) == (SBE37Channel.INSTRUMENT,'SAMPLENUM'):
+                        sample_num_command = ((SBE37Channel.INSTRUMENT,
+                                              'SAMPLENUM'),val,param+'='+str_val)
+                    else:
+                        device_command_buffer.append(((chan,param),val,
+                            param+'='+str_val))
+                else:
+                    # Parser error creating value string.
+                    pass
+            else:
+                command_spec.reply['result'][(chan,param)] = \
+                    InstErrorCode.INVALID_PARAMETER
+                command_spec.errors = True
+
+        # Move set sample number, if it exists to the end as other commands
+        # can reset this to zero.
+        if sample_num_command != None:
+            device_command_buffer.append(sample_num_command)
+
+        # If no valid commands, reply error.
+        if len(device_command_buffer)==0:
+            reply = command_spec.reply
+            reply['success'] = InstErrorCode.SET_DEVICE_ERR
+            yield self.reply_ok(msg,reply)
+            return
+            
+        # Otherwise, set device command buffer and process command.
+        else:
+            command_spec.device_command_buffer = device_command_buffer
+            reply = yield self._process_command(command_spec,event)
+
         yield self.reply_ok(msg,reply)
 
 
@@ -1394,7 +1844,6 @@ class SBE37Driver(InstrumentDriver):
         
         # The method is not implemented.
         reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
-        
         yield self.reply_ok(msg, reply)
 
 
@@ -1426,7 +1875,6 @@ class SBE37Driver(InstrumentDriver):
         
         # The method is not implemented.
         reply = {'success':InstErrorCode.NOT_IMPLEMENTED,'result':None}
-        
         yield self.reply_ok(msg, reply)
 
 
@@ -1457,7 +1905,6 @@ class SBE37Driver(InstrumentDriver):
             pass
 
         reply = self._get_status(params)
-        
         yield self.reply_ok(msg, reply)
 
 
@@ -1506,7 +1953,7 @@ class SBE37Driver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success':None,'result':None}         
-        success = yield self._fsm.on_event_async(SBE37Event.INITIALIZE)
+        success = self._fsm.on_event(SBE37Event.INITIALIZE)
         
         # Set success and send reply. Unsuccessful initialize means the
         # event is not handled in the current state.
@@ -1543,18 +1990,16 @@ class SBE37Driver(InstrumentDriver):
         # Set up the reply message and validate the configuration parameters.
         # Reply with the error message if the parameters not valid.
         reply = {'success':None,'result':params}
-        """
         reply['success'] = self._validate_configuration(params)
 
         if InstErrorCode.is_error(reply['success']):
             yield self.reply_ok(msg,reply)
             return
-        """
+        
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if the event is not handled in the current
         # state.
-        (success,result) = yield self._fsm.on_event_async(SBE37Event.CONFIGURE,params)
-        reply['success'] = success
+        reply['success'] = self._fsm.on_event(SBE37Event.CONFIGURE,params)
 
         yield self.reply_ok(msg, reply)
 
@@ -1567,7 +2012,7 @@ class SBE37Driver(InstrumentDriver):
         @retval A dict {'success':success,'result':None} giving the success
             status of the connect operation.
         """
-        
+
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
         if timeout != None:
@@ -1579,20 +2024,8 @@ class SBE37Driver(InstrumentDriver):
         if IO_LOG:
             self._logfile = open(self._logfile_path,'w',0)
 
-        reply = {'success':None,'result':None}
-
-        # Attempt connection to instrument hardware in two events.
-        
-        # Initialize connection: switch to connecting and try open the tcp port.
-        (success,result) = yield self._fsm.on_event_async(\
-                                                SBE37Event.CONNECT)
-        
-        # Finialze connection, update driver parameters or return
-        # to disconnected if connection failed.
-        (success,result) = yield self._fsm.on_event_async(\
-                                                SBE37Event.CONNECTION_COMPLETE)
-        reply['success'] = success
-        
+        # Create the connection complete deferred and fire EVENT_CONNECT.
+        reply = yield self._process_connect() 
         yield self.reply_ok(msg, reply)
 
 
@@ -1612,12 +2045,8 @@ class SBE37Driver(InstrumentDriver):
             assert(timeout>0), 'Expected positive timeout'
             pass
 
-        reply = {'success':None,'result':None}
-
-        # Send a disconnect event and setup the reply.
-        (success,result) = yield self._fsm.on_event_async(SBE37Event.DISCONNECT)
-        reply['success'] = success
-        
+        # Create the connection complete deferred and fire EVENT_DISCONNECT.
+        reply = yield self._process_disconnect()
         yield self.reply_ok(msg,reply)
 
 
@@ -1637,12 +2066,11 @@ class SBE37Driver(InstrumentDriver):
         
         # Get current state from the state machine and reply.
         cur_state = self._fsm.current_state
-        
         yield self.reply_ok(msg, cur_state)
 
 
     ###########################################################################
-    # Nonpublic op function helpers.
+    # Nonpublic methods.
     ###########################################################################        
 
 
@@ -1658,13 +2086,13 @@ class SBE37Driver(InstrumentDriver):
         # Validate configuration.
         success = self._validate_configuration(params)
         if InstErrorCode.is_error(success):
-            return success
+            return False
 
         # Set configuration parameters.
         self._ipport = params['ipport']
         self._ipaddr = params['ipaddr']
 
-        return success
+        return True
 
 
     def _validate_configuration(self,params):
@@ -1702,7 +2130,111 @@ class SBE37Driver(InstrumentDriver):
         
         self._ipport = None
         self._ipaddr = None
+        
 
+    def _process_connect(self):
+        """
+        Process a connect command.
+        @retval A deferred that will fire with a reply message on completion
+        of the connect processing. The reply message is a dict
+        {'success':success,'result':None}
+        """
+        
+        # Create the connection complete deferred to be fired with a reply
+        # at the conclusion of the command.
+        d = defer.Deferred()        
+        self._connection_complete_deferred = d
+        
+        # Fire EVENT_CONNECT. If the event fails the state is wrong.
+        success = self._fsm.on_event(SBE37Event.CONNECT)
+        if InstErrorCode.is_error(success):
+            reply = {'success':success,'result':None}
+            d,self._connection_complete_deferred = self._connection_complete_deferred,None
+            d.callback(reply)            
+
+        return d
+
+
+    def _process_disconnect(self):
+        """
+        Process a disconnect command.
+        @retval A deferred that will fire with a reply message on completion
+        of the disconnect command. The reply message is a dict
+        {'success':success,'result':None}
+        """
+        
+        # Create the connection complete deferred to be fired with a reply
+        # at the conclusion of the command.
+        d = defer.Deferred()        
+        self._connection_complete_deferred = d
+        
+        # Fire EVENT_DISCONNECT. If the event fails the state is wrong.
+        success = self._fsm.on_event(SBE37Event.DISCONNECT)
+        #if not success:
+        if InstErrorCode.is_error(success):
+            reply = {'success':success,'result':None}
+            d,self._connection_complete_deferred = self._connection_complete_deferred,None
+            d.callback(reply)            
+
+        return d
+        
+        
+    def _process_command(self,command_spec,event,timeout=0):
+        """
+        Process a device command.
+        Append the command to the driver command buffer and fire the
+        event associated with the arrival of the command.
+        @param command_spec a DeviceCommandSpecification that describes
+            the command to execute.
+        @param event the event to handle the command.
+        @param timeout the driver timeout after which the driver will
+            cancel the command and return a timeout error.
+        @retval A deferred that will be fired upon conclusion of the
+        command processing with a command specific reply message.
+        """
+        
+        
+        # Create the command deferred to be returned.
+        d = defer.Deferred()        
+        command_spec.deferred = d
+                            
+        # Add the command specification to the driver command buffer.
+        self._driver_command_buffer.append(command_spec)                
+        
+        # If a timeout is specified, define and position it for callback.
+        if timeout > 0:
+
+            def _timeoutf(cs,driver):
+                driver._debug_print('in timeout func for command '+ str(cs.command))
+    
+                # If this command is still active apply timeout ops.
+                # If this doesn't match, then the operation completed normally
+                # and was already popped from the buffer.
+                if len(self._driver_command_buffer) > 0:
+                    if cs == self._driver_command_buffer[0]:
+        
+                        # Pop the timed out command from the buffer.
+                        driver._debug_print('popping command')
+                        self._driver_command_buffer.pop(0)
+        
+                        # Cancel any looping wakeup.
+                        self._stop_wakeup()
+                        
+                        # Fire the reply deferred with timeout error.
+                        driver._debug_print('firing timeout')
+                        cs.do_timeout()
+        
+            command_spec.timeoutf = reactor.callLater(timeout,_timeoutf,
+                                                     command_spec,self)                    
+        
+        # Fire the command received event and return deferred.
+        if self._fsm.on_event(event):
+            return d
+        else:
+            reply = {'success':InstErrorCode.INCORRECT_STATE,'result':None}
+            del self._driver_command_buffer[-1]
+            return reply            
+        
 
     def _get_status(self,params):
         """
@@ -1722,40 +2254,30 @@ class SBE37Driver(InstrumentDriver):
             if SBE37Channel.has(chan) and SBE37Status.has(arg):
                 # If instrument channel or all.
                 if chan == SBE37Channel.INSTRUMENT or chan == SBE37Channel.ALL:
-                    if arg == SBE37Status.DRIVER_STATE or \
-                            arg == SBE37Status.ALL:
-                        result[(SBE37Channel.INSTRUMENT,
-                                SBE37Status.DRIVER_STATE)] = \
+                    if arg == SBE37Status.DRIVER_STATE or arg == SBE37Status.ALL:
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_STATE)] = \
                             (InstErrorCode.OK,self._fsm.get_current_state())
                     
-                    if arg == SBE37Status.OBSERVATORY_STATE or \
-                            arg == SBE37Status.ALL:
-                        result[(SBE37Channel.INSTRUMENT,
-                                SBE37Status.OBSERVATORY_STATE)] = \
+                    if arg == SBE37Status.OBSERVATORY_STATE or arg == SBE37Status.ALL:
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.OBSERVATORY_STATE)] = \
                             (InstErrorCode.OK,self._get_observatory_state())
                     
-                    if arg == SBE37Status.DRIVER_ALARMS or \
-                            arg == SBE37Status.ALL:
-                        result[(SBE37Channel.INSTRUMENT,
-                                SBE37Status.DRIVER_ALARMS)] = \
+                    if arg == SBE37Status.DRIVER_ALARMS or arg == SBE37Status.ALL:
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_ALARMS)] = \
                             (InstErrorCode.OK,self._alarms)
                     
-                    if arg == SBE37Status.DRIVER_VERSION or \
-                            arg == SBE37Status.ALL:
-                        result[(SBE37Channel.INSTRUMENT,
-                                SBE37Status.DRIVER_VERSION)] = \
+                    if arg == SBE37Status.DRIVER_VERSION or arg == SBE37Status.ALL:
+                        result[(SBE37Channel.INSTRUMENT,SBE37Status.DRIVER_VERSION)] = \
                             (InstErrorCode.OK,self.get_version())
     
                 # If conductivity channel or all.            
-                if chan == SBE37Channel.CONDUCTIVITY or\
-                         chan == SBE37Channel.ALL:
+                if chan == SBE37Channel.CONDUCTIVITY or chan == SBE37Channel.ALL:
                     if arg == SBE37Status.ALL:
                         pass
                         
                     # Conductivity channel does not support this status.
                     else:
-                        result[(chan,arg)] = \
-                            (InstErrorCode.INVALID_STATUS,None)
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
                         get_errors = True
                         
                 if chan == SBE37Channel.PRESSURE or chan == SBE37Channel.ALL:
@@ -1764,20 +2286,17 @@ class SBE37Driver(InstrumentDriver):
 
                     # Pressure channel does not support this status.                        
                     else:
-                        result[(chan,arg)] = \
-                            (InstErrorCode.INVALID_STATUS,None)
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
                         get_errors = True
     
                 # If pressure channel or all.
-                if chan == SBE37Channel.TEMPERATURE or \
-                         chan == SBE37Channel.ALL:
+                if chan == SBE37Channel.TEMPERATURE or chan == SBE37Channel.ALL:
                     if arg == SBE37Status.ALL:
                         pass
                         
                     # Temp channel does not support this status.
                     else:
-                        result[(chan,arg)] = \
-                            (InstErrorCode.INVALID_STATUS,None)
+                        result[(chan,arg)] = (InstErrorCode.INVALID_STATUS,None)
                         get_errors = True
                  
             # Status or channel key or both invalid.       
@@ -1851,6 +2370,7 @@ class SBE37Driver(InstrumentDriver):
         return reply
 
 
+
     def _get_observatory_state(self):
         """
         Return the observatory state of the instrument.
@@ -1893,6 +2413,98 @@ class SBE37Driver(InstrumentDriver):
         else:
             return ObservatoryState.UNKNOWN
 
+
+    def get_parameter_dict(self):
+        """
+        Return a dict with all driver paramters.
+        """
+        paramdict = dict(map(lambda x: (x[0],x[1]['value']),self.parameters.items()))
+        return paramdict
+
+
+    def _wakeup(self,wakeup_string=SBE37Prompt.NEWLINE,reps=1):
+        """
+        Send a wakeup attempt to the device.
+        """
+        
+        self._debug_print('sending wakeup')
+        if self._instrument_connection:
+            self._instrument_connection.transport.write(wakeup_string*reps)
+            self._instrument_connection.transport.doWrite()        
+            
+
+    def _start_wakeup(self,period):
+        """
+        Start the looping wakeup.
+        """
+        if self._wakeup_scheduler:
+            self._stop_wakeup()
+        self._wakeup_scheduler = task.LoopingCall(self._wakeup)
+        self._wakeup_scheduler.start(period)
+
+        
+    def _stop_wakeup(self):
+        """
+        Cancel the looping wakeup.
+        """
+        if self._wakeup_scheduler:
+            self._wakeup_scheduler.stop()
+            self._wakeup_scheduler = None
+
+        
+    def _write_command(self,cmd):
+        """
+        Write a command to the device.
+        """
+        # Write the fragment to the IO log if it is enabled.
+        if IO_LOG:
+            self._logfile.write('***'+cmd+'***')
+
+        if self._instrument_connection:
+            self._instrument_connection.transport.write(cmd)
+            self._instrument_connection.transport.doWrite()                
+
+        
+    def _parse_sample_output(self):
+        """
+        Parse data buffer and extract all sample output lines. Remove
+        sample output lines from the data buffer, and return a list of
+        samples.
+        @retval A list of data sample dictionaries.
+        """
+        samples = []
+        new_data_lines = []
+        for line in self._data_lines:
+            sample_data = self._sample_parser.parse(line)
+            if sample_data != None:
+                samples.append(sample_data)
+            else:
+                new_data_lines.append(line)
+        self._data_lines = new_data_lines
+        
+        return samples
+
+
+    def _read_param_values(self,lines):
+        """
+        Extract all parameter values from device status update output.
+        Use the parameter parser objects to match and extract data line by
+        line.
+        """
+
+        for (key,val) in self.parameters.iteritems():
+            parser = val['parser']
+            new_val = None
+            for line in lines:
+                new_val = parser.parse(line)
+                if new_val != None:
+                    break
+            if new_val != None:
+                val['value'] = new_val
+            else:
+                self._debug_print('could not update '+key[1])
+
+    
     def _get_parameters(self,params):
         """
         Get named parameter values.
@@ -1972,314 +2584,6 @@ class SBE37Driver(InstrumentDriver):
         reply['result'] = result
         return reply
 
-    @defer.inlineCallbacks
-    def _set_parameters(self,params):
-        """
-        Set named parameters to device hardware.
-        @param params A dict containing (InsturmentChannel,InstrumentParameter)
-            tuples as keys.
-        @retval reply dict {'success':InstErrorCode,
-            'result':{(chan,param):InstErrorCode,...,(chan,param):InstErrorCode}
-        """
-        
-        set_errors = False
-        reply = {'success':None,'result':None}
-        result = {}
-        
-        prompt = yield self._get_prompt()
-        sample_num_command = None
-        for (chan,param) in params.keys():
-            val = params[(chan,param)]
-            if self.parameters.get((chan,param),None):
-                #self._debug_print('creating command for '+chan+'.'+param)
-                str_val = self.parameters[(chan,param)]['parser'].tostring(val)
-                if str_val:
-                    if (chan,param) == (SBE37Channel.INSTRUMENT,'SAMPLENUM'):
-                        sample_num_command = param+'='+str_val
-                    else:
-                        command = param+'='+str_val
-                        prompt = yield self._do_cmd(command)
-                        #yield pu.asleep(1)
-                        if prompt == SBE37Prompt.PROMPT:
-                            result[(chan,param)] = InstErrorCode.OK
-
-                        elif prompt == SBE37Prompt.BAD_COMMAND:
-                            result[(chan,param)] = InstErrorCode.BAD_DRIVER_COMMAND
-                            set_errors = True
-                            self._debug_print('Bad device command.')
-
-                        else:
-                            result[(chan,param)] = InstErrorCode.BAD_DRIVER_COMMAND
-                            set_errors = True
-                            self._debug_print('unexpected prompt \
-                                              in set_parameters:'+prompt+'xxx')
-                            self._debug_print('sbe prompt:'+\
-                                              SBE37Prompt.PROMPT+'xxx')
-                            yield self._get_prompt()
-
-                else:
-                    # Parser error creating value string.
-                    self._debug_print('Error creating parameter string.')
-                    pass
-            else:
-                result[(chan,param)] = InstErrorCode.INVALID_PARAMETER
-                set_errors = True
-
-        if sample_num_command:
-            prompt = yield self._do_cmd(sample_num_command)
-            yield pu.asleep(1)
-            if prompt == SBE37Prompt.PROMPT:
-                result[(chan,param)] = InstErrorCode.OK
-
-            elif prompt == SBE37Prompt.BAD_COMMAND:
-                result[(chan,param)] = InstErrorCode.BAD_DRIVER_COMMAND
-                set_errors = True
-                self._debug_print('Bad device command.')
-
-            else:
-                result[(chan,param)] = InstErrorCode.BAD_DRIVER_COMMAND
-                set_errors = True
-                self._debug_print('unexpected prompt \
-                                  in set_parameters:'+prompt+'xxx')
-                self._debug_print('sbe prompt:'+SBE37Prompt.PROMPT+'xxx')
-                yield self._get_prompt()
-            
-        if set_errors:
-            reply['success'] = InstErrorCode.SET_DEVICE_ERR
-        
-        else:
-            reply['success'] = InstErrorCode.OK
-        
-        reply['result'] = result
-        
-        defer.returnValue(reply)
-        
-    
-    @defer.inlineCallbacks
-    def _acquire_sample(self):
-        """
-        Acquire a data sample in polled mode.
-        @retval reply dict {'success':InstErrorCode,
-            'result':data sample dictionary}
-        """
-        
-        self._debug_print('acquiring sample')
-        reply = {'success':None,'result':None}        
-
-        # Clear data lines.
-        self._data_lines = []
-        
-        # Acquire prompt.
-        prompt = yield self._get_prompt()
-        
-        # Write sample command waiting for prompt return.
-        prompt = yield self._do_cmd('ts')
-                    
-        # Parse datalines for sample output.
-        samples = self._parse_sample_output()
-        
-        # Setup the reply.
-        if len(samples)==0:
-            reply['success'] = InstErrorCode.ACQUIRE_SAMPLE_ERR
-        else:
-            reply['success'] = InstErrorCode.OK
-            reply['result'] = samples
-        
-        # Clear data lines.    
-        self._data_lines = []
-        
-        defer.returnValue(reply)
-        
-    
-    @defer.inlineCallbacks    
-    def _update_params(self):
-        """
-        Update all driver parameters with current hardware configuration.
-        """
-
-        self._debug_print('updating parameters')
-        
-        # Clear data lines.
-        self._data_lines = []
-        
-        # Get prompt, issue device status command, issue device calibration
-        # status command. Await prompt for each.
-        prompt = yield self._get_prompt()
-        prompt = yield self._do_cmd('ds')
-        prompt = yield self._do_cmd('dc')
-        
-        # Parse data lines for all parameter values and update driver
-        # parameters.
-        self._read_param_values(self._data_lines)
-        
-        # Clear data lines.
-        self._data_lines = []
-        
-        defer.returnValue(None)
-
-
-    ###########################################################################
-    # Nonpublic wakeup helpers.
-    ###########################################################################        
-
-
-    def _wakeup(self,wakeup_string=SBE37Prompt.NEWLINE,reps=1):
-        """
-        Send a wakeup attempt to the device.
-        """
-        
-        self._debug_print('sending wakeup')
-        if self._instrument_connection:
-            self._instrument_connection.transport.write(wakeup_string*reps)
-            self._instrument_connection.transport.doWrite()        
-            
-
-    def _start_wakeup(self,period):
-        """
-        Start the looping wakeup.
-        """
-        if self._wakeup_scheduler:
-            self._stop_wakeup()
-        self._wakeup_scheduler = task.LoopingCall(self._wakeup)
-        self._wakeup_scheduler.start(period)
-
-        
-    def _stop_wakeup(self):
-        """
-        Cancel the looping wakeup.
-        """
-        if self._wakeup_scheduler:
-            self._wakeup_scheduler.stop()
-            self._wakeup_scheduler = None       
-
-
-    ###########################################################################
-    # Prompt and device command helpers.
-    ###########################################################################        
-
-
-    @defer.inlineCallbacks
-    def _get_prompt(self):
-        """
-        Wake device and block until a current device prompt is returned.
-        @retval the returned instrument prompt constant.
-        """
-
-        self._debug_print('getting prompt')
-        d = defer.Deferred()
-        self._prompt_acquired_deferred = d
-        self._start_wakeup(2.0)
-        prompt = yield d
-        yield pu.asleep(.5)
-        defer.returnValue(prompt)
-
-
-    @defer.inlineCallbacks
-    def _get_autosample_prompt(self):
-        """
-        Wake device in streaming mode and block until streaming prompt
-        is returned.
-        @retval the returned instrument streaming prompt constant.
-        """
-
-        self._debug_print('getting autosample prompt')
-        d = defer.Deferred()
-        self._autosample_prompt_acquired_deferred = d
-        self._start_wakeup(2.0)
-        prompt = yield d
-        yield pu.asleep(.5)
-        defer.returnValue(prompt)
-
-    
-    @defer.inlineCallbacks
-    def _do_cmd(self,cmd):
-        """
-        Write a device command to the hardware blocking until a prompt is
-        returned.
-        @retval the returned instrument prompt constant.
-        """
-        
-        self._debug_print('sending device command '+cmd)
-        d = defer.Deferred()
-        self._prompt_acquired_deferred = d
-        
-        # Write the fragment to the IO log if it is enabled.
-        if IO_LOG:
-            self._logfile.write('***'+cmd+'***')
-
-        if self._instrument_connection:
-            self._instrument_connection.transport.write(cmd+SBE37Prompt.NEWLINE)
-            self._instrument_connection.transport.doWrite()                
-        
-        prompt = yield d
-        yield pu.asleep(.5)
-        defer.returnValue(prompt)
-
-    @defer.inlineCallbacks
-    def _do_cmd_no_prompt(self,cmd):
-        """
-        Write a device command and do not await a prompt return.
-        """
-        
-        self._debug_print('sending device command '+cmd)
-       
-        # Write the fragment to the IO log if it is enabled.
-        if IO_LOG:
-            self._logfile.write('***'+cmd+'***')
-
-        if self._instrument_connection:
-            self._instrument_connection.transport.write(cmd+SBE37Prompt.NEWLINE)
-            self._instrument_connection.transport.doWrite()                
-        
-        yield pu.asleep(.5)
-
-
-    ###########################################################################
-    # Nonpublic IO helpers.
-    ###########################################################################        
-
-        
-    def _parse_sample_output(self):
-        """
-        Parse data buffer and extract all sample output lines. Remove
-        sample output lines from the data buffer, and return a list of
-        samples.
-        @retval A list of data sample dictionaries.
-        """
-        samples = []
-        new_data_lines = []
-        for line in self._data_lines:
-            sample_data = self._sample_parser.parse(line)
-            if sample_data != None:
-                samples.append(sample_data)
-            else:
-                new_data_lines.append(line)
-        self._data_lines = new_data_lines
-        
-        return samples
-
-
-    def _read_param_values(self,lines):
-        """
-        Extract all parameter values from device status update output.
-        Use the parameter parser objects to match and extract data line by
-        line.
-        """
-        
-        self._debug_print('reading parameter values')
-
-        for (key,val) in self.parameters.iteritems():
-            parser = val['parser']
-            new_val = None
-            for line in lines:
-                new_val = parser.parse(line)
-                if new_val != None:
-                    break
-            if new_val != None:
-                val['value'] = new_val
-            else:
-                self._debug_print('could not update '+key[1])
-
     
     def _get_sample(self,match):
         """
@@ -2327,8 +2631,6 @@ class SBE37Driver(InstrumentDriver):
         
         return sample_data
     
-        
-
     
     @staticmethod
     def _date_to_string(v):
@@ -2338,7 +2640,7 @@ class SBE37Driver(InstrumentDriver):
         @retval A date string formatted for sbe37 set operations,
             or None if the input is not a valid date tuple.
         """
-
+        
         if not isinstance(v,(list,tuple)):
             return None
         
@@ -2351,9 +2653,6 @@ class SBE37Driver(InstrumentDriver):
         month = v[1]
         year = v[2]
         
-        if len(str(year)) > 2:
-            year = int(str(year)[-2:])
-        
         if not isinstance(day,int) or day < 1 or day > 31:
             return None
         
@@ -2363,7 +2662,7 @@ class SBE37Driver(InstrumentDriver):
         if not isinstance(year,int) or year < 0 or year > 99:
             return None
         
-        return '%02i-%s-%02i' % (day,months[month-1],year)
+        return '%02i-%s-%02i' % (day,cls.months[month],year)
 
         
     @staticmethod
