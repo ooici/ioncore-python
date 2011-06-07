@@ -9,6 +9,7 @@ from time import time
 
 from twisted.internet import defer
 from twisted.internet import protocol
+from twisted.python import failure
 
 from txamqp import spec
 from txamqp.content import Content
@@ -16,9 +17,14 @@ from txamqp.client import TwistedDelegate
 from txamqp.protocol import AMQClient, AMQChannel, Frame
 from txamqp.queue import TimeoutDeferredQueue
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.core import messaging
 SPEC_PATH = os.path.join(messaging.__path__[0], 'amqp0-8.xml')
 
+class HeartbeatExpired(Exception):
+    """
+    """
 
 class ChannelWithCallback(AMQChannel):
 
@@ -82,6 +88,12 @@ class AMQPProtocol(AMQClient):
     def frameLengthExceeded(self):
         """
         """
+
+    def checkHeartbeat(self):
+        if self.checkHB.active():
+            self.checkHB.cancel()
+        log.critical('AMQP Heartbeat expired on client side')
+        self.transport.loseConnection(failure.Failure(HeartbeatExpired('Heartbeat expired.')))
 
  
 class ConnectionCreator(object):

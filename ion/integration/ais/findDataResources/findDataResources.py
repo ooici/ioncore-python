@@ -9,6 +9,7 @@ spacial and temporal parameters.
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from decimal import Decimal
@@ -381,8 +382,10 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if bounds.isInBounds(dSetMetadata):                
-                log.debug('dataset %s in bounds' % (dSetMetadata['title']))
+            if bounds.isInBounds(dSetMetadata):
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    if 'title' in dSetMetadata.keys():
+                        log.debug('dataset %s in bounds' % (dSetMetadata['title']))
 
                 if self.bUseMetadataCache:            
                     dSourceResID = dSetMetadata['DSourceID']
@@ -466,7 +469,9 @@ class FindDataResources(object):
     
                 j = j + 1
             else:
-                log.debug('dataset %s is OUT OF bounds <-------------' % (dSetMetadata['title']))
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    if 'title' in dSetMetadata.keys():
+                        log.debug('dataset %s is OUT OF bounds <-------------' % (dSetMetadata['title']))
             
             i = i + 1
 

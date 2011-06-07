@@ -6,6 +6,7 @@
 @brief test case for ION integration and system test cases (and some unit tests)
 """
 import os
+import subprocess
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -350,3 +351,20 @@ class ItvTestCase(IonTestCase):
 
     """
     services = []
+    def _print_memory_usage(self):
+        """
+        @brief Prints the memory usage of the container processes.
+        
+        Performs a ps command as a subprocess and retrieves the RSS and VSIZE of the 
+        twistd container processes.
+        """
+        
+        pids = os.getenv("ION_TEST_CASE_PIDS")
+        log.info("Started the containers")
+        ps_args = ["-o args,command,rss,vsize",  "-p", pids]
+        #I'd rather not execute this through the shell, but the output from the command was truncated
+        #when I did not set shell=True.
+        p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
+        std_output = p.communicate()[0]
+        #This should probably become a logging statement.
+        print std_output
