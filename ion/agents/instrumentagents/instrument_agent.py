@@ -34,7 +34,7 @@ from ion.agents.instrumentagents.instrument_constants import *
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True, False)[1]
+DEBUG_PRINT = (True, False)[0]
 
 """
 Instrument agent observatory metadata.
@@ -315,6 +315,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -329,7 +330,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_uninitialized(self, event, params):
@@ -341,6 +342,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -374,7 +376,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_inactive(self, event, params):
@@ -386,6 +388,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -448,7 +451,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_stopped(self, event, params):
@@ -460,6 +463,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -519,7 +523,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_idle(self, event, params):
@@ -531,6 +535,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -585,7 +590,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_abservatory_mode(self, event, params):
@@ -597,6 +602,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -658,7 +664,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_direct_access_mode(self, event, params):
@@ -670,6 +676,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -724,7 +731,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     ###########################################################################
     #   Transaction Management
@@ -1098,7 +1105,7 @@ class InstrumentAgent(Process):
                     success = InstErrorCode.INVALID_PARAM_VALUE
 
                 else:
-                    success = yield self._fsm.on_event_async(cmd[1])
+                    (success, result) = yield self._fsm.on_event_async(cmd[1])
 
             # TRANSMIT DATA command.
             elif cmd[0] == AgentCommand.TRANSMIT_DATA:
@@ -1899,7 +1906,7 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
-        timeout = 20
+        timeout = 60
         success = None
         result = None
 
@@ -1982,12 +1989,13 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
-            dvr_result = yield self._driver_client.get(params)
+            dvr_result = yield self._driver_client.get(params,timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
             #pass
@@ -2061,12 +2069,13 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
-            dvr_result = yield self._driver_client.set(params)
+            dvr_result = yield self._driver_client.set(params,timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 
@@ -2134,8 +2143,7 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
-        timeout = 20
-
+        timeout = 60
         success = None
         result = None
 
@@ -2218,13 +2226,15 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
             dvr_content = {'params': params}
-            dvr_result = yield self._driver_client.get_metadata(dvr_content)
+            dvr_result = yield self._driver_client.get_metadata(dvr_content,
+                                                                timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 
@@ -2300,13 +2310,15 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
             dvr_content = {'params': params}
-            dvr_result = yield self._driver_client.get_status(dvr_content)
+            dvr_result = yield self._driver_client.get_status(dvr_content,
+                                                              timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 

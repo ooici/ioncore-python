@@ -75,12 +75,13 @@ SKIP_TESTS = [
     'dummy'
 ]    
 
+
 PRINT_PUBLICATIONS = (True, False)[0]
 
 class TestSBE37Agent(IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 180
+    timeout = 300
     
 
     @defer.inlineCallbacks
@@ -181,8 +182,8 @@ class TestSBE37Agent(IonTestCase):
 
         # origin format = transducer.agent_proc_id
         # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
-        # origin_str = 'agent.' + str(self.svc_id)
-        infosub = TestInfoSubscriber(process=self.sup)
+        origin_str = 'agent.' + str(self.svc_id)
+        infosub = TestInfoSubscriber(origin=origin_str,process=self.sup)
         yield infosub.initialize()
         yield infosub.activate()
 
@@ -359,7 +360,7 @@ class TestSBE37Agent(IonTestCase):
         
         if 'test_execute_instrument' in SKIP_TESTS:
             raise unittest.SkipTest('Skipping during development.')
-
+                
         # Check agent state upon creation. No transaction needed for
         # get operation.
         params = [AgentStatus.AGENT_STATE]
@@ -489,13 +490,14 @@ class TestSBE37Agent(IonTestCase):
         #print result
 
         self.assert_(InstErrorCode.is_ok(success))
-        self.assertIsInstance(result.get('temperature',None),float)
-        self.assertIsInstance(result.get('salinity',None),float)
-        self.assertIsInstance(result.get('sound_velocity',None),float)
-        self.assertIsInstance(result.get('pressure',None),float)
-        self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('device_time',None),str)
-        self.assertIsInstance(result.get('driver_time',None),str)
+        self.assert_(len(result)==1)
+        self.assertIsInstance(result[0].get('temperature',None),float)
+        self.assertIsInstance(result[0].get('salinity',None),float)
+        self.assertIsInstance(result[0].get('sound_velocity',None),float)
+        self.assertIsInstance(result[0].get('pressure',None),float)
+        self.assertIsInstance(result[0].get('conductivity',None),float)
+        self.assertIsInstance(result[0].get('device_time',None),str)
+        self.assertIsInstance(result[0].get('driver_time',None),str)
         
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
@@ -509,11 +511,27 @@ class TestSBE37Agent(IonTestCase):
         #print 'autosampling started'
         
         # Wait for a few samples to arrive.
-        yield pu.asleep(30)
+        yield pu.asleep(45)
         
         # Stop autosampling.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
+
+        reply = yield self.ia_client.execute_device(chans,cmd,tid)
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        for sample in result:
+            self.assertIsInstance(sample.get('temperature'),float)
+            self.assertIsInstance(sample.get('salinity'),float)
+            self.assertIsInstance(sample.get('pressure',None),float)
+            self.assertIsInstance(sample.get('sound_velocity',None),float)
+            self.assertIsInstance(sample.get('conductivity',None),float)
+            self.assertIsInstance(sample.get('device_time',None),str)
+            self.assertIsInstance(sample.get('driver_time',None),str)
+       
+        """
         while True:
             reply = yield self.ia_client.execute_device(chans,cmd,tid)
             success = reply['success']
@@ -541,6 +559,7 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('conductivity',None),float)
             self.assertIsInstance(sample.get('device_time',None),str)
             self.assertIsInstance(sample.get('driver_time',None),str)
+        """
         
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,tid)
