@@ -22,7 +22,6 @@ from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, 
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
 from ion.services.dm.distribution.events import ScheduleEventPublisher
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber
 
 from ion.util.iontime import IonTime
 
@@ -196,35 +195,6 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
         Response.message_parameters_reference[0].success = True
         defer.returnValue(Response)
-
-
-    @defer.inlineCallbacks
-    def _onFirstIngestEvent(self, msgcontent):
-        """
-        Not currently being used - life cycle state setting has been moved to the ingestion service.
-        """
-
-        datasrc_id = msgcontent.additional_data.datasource_id
-        dataset_id = msgcontent.additional_data.dataset_id
-
-        #look up resources
-        log.info("_onFirstIngestEvent getting instance of data source resource")
-        datasrc_resource = yield self.rc.get_instance(datasrc_id)
-        log.info("_onFirstIngestEvent getting instance of data set resource")
-        dataset_resource = yield self.rc.get_instance(dataset_id)
-
-        if not datasrc_resource.is_public:
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-            dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
-        else:
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-            dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
-
-        yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
-
-        # all done, cleanup
-        yield self._subscriber.terminate()
-        self._subscriber = None
 
 
     @defer.inlineCallbacks
@@ -432,21 +402,6 @@ class ManageDataResource(object):
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
 
-
-            """
-            Moved this functionality to the ingestion services where it simplifies the interactions.
-
-            #event to subscribe to
-            log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
-            self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
-
-            #what to do when 
-            self._subscriber.ondata = self._onFirstIngestEvent
-
-            yield self._subscriber.register()
-            yield self._subscriber.initialize()
-            yield self._subscriber.activate()
-            """
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
