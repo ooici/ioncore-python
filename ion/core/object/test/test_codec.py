@@ -10,15 +10,8 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.util.itv_decorator import itv
-import tarfile
 
 from twisted.trial import unittest
-from twisted.internet import defer
-
-from ion.util import procutils as pu
-
-from net.ooici.play import addressbook_pb2
 
 from ion.core.object import codec
 from ion.core.object import workbench
@@ -135,44 +128,3 @@ class CodecTest(unittest.TestCase):
 
 
 
-class LargeCodecTest(unittest.TestCase):
-
-    def setUp(self):
-        wb = workbench.WorkBench('No Process Test')
-        self.wb = wb
-
-    @itv(CONF)
-    def test_copy_large_structure(self):
-
-        filename = CONF.getValue('filename')
-
-        filename = pu.get_ion_path(filename)
-
-        tar = tarfile.open(filename, 'r')
-        f = tar.extractfile(tar.next())
-        #f = open(filename,'r')
-
-        obj = codec.unpack_structure(f.read())
-
-        f.close()
-        tar.close()
-
-        #print obj.PPrint()
-
-        self.wb.put_repository(obj.Repository)
-
-        # Now test copying it!
-
-        repo = self.wb.create_repository()
-
-        # Set a nonsense field to see if we can copy the datastructure!
-        repo.root_object = repo.copy_object(obj)
-
-        #print obj.PPrint()
-
-
-        self.assertNotEqual(repo.root_object._repository, obj._repository)
-
-        repo.commit('My Junk')
-
-        self.assertEqual(repo.root_object, obj)
