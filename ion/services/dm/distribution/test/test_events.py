@@ -27,7 +27,6 @@ import ion.util.procutils as pu
 
 from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
 
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)

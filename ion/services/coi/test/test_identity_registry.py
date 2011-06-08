@@ -23,7 +23,6 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RE
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
-from ion.util.itv_decorator import itv
 
 CONF = ioninit.config(__name__)
 
@@ -234,7 +233,6 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         yield self._stop_container()
 
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_identity_registry(self):
        

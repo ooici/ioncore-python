@@ -17,16 +17,12 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 from ion.util.procutils import asleep
 
-from ion.services.dm.distribution.events import ScheduleEventPublisher
 
 # Message types
 from ion.services.dm.inventory.dataset_controller import FINDDATASETREQUEST_TYPE, \
-    DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE, SCHEDULE_TYPE_DSC_RSYNC
-
-from ion.services.dm.inventory.ncml_generator import clear_ncml_files, check_for_ncml_files, rsync_ncml
+    DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
 
 
-from ion.util.itv_decorator import itv
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -82,40 +78,6 @@ class DatasetControllerTest(IonTestCase):
         yield self._stop_container()
 
 
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def test_create_and_rsync_manually(self):
-
-        dataset_controller_id = yield self.sup.get_child_id('dataset_controller')
-        log.debug('Process ID:' + str(dataset_controller_id))
-        dataset_controller= self._get_procinstance(dataset_controller_id)
-
-        clear_ncml_files(dataset_controller.ncml_path)
-        self.failIf(check_for_ncml_files(dataset_controller.ncml_path))
-
-        yield dataset_controller.do_ncml_sync()
-
-        self.failUnless(check_for_ncml_files(dataset_controller.ncml_path))
-
-
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def test_create_and_rsync_fire_message(self):
-
-        dataset_controller_id = yield self.sup.get_child_id('dataset_controller')
-        log.debug('Process ID:' + str(dataset_controller_id))
-        dataset_controller= self._get_procinstance(dataset_controller_id)
-
-        clear_ncml_files(dataset_controller.ncml_path)
-        self.failIf(check_for_ncml_files(dataset_controller.ncml_path))
-
-        pub = ScheduleEventPublisher(process=self.proc)
-        yield pub.create_and_publish_event(origin=SCHEDULE_TYPE_DSC_RSYNC,
-                                          task_id=dataset_controller.task_id)
-
-        yield asleep(5)
-
-        self.failUnless(check_for_ncml_files(dataset_controller.ncml_path))
 
 
 

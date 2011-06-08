@@ -3,10 +3,10 @@
 """
 @file ion/test/iontest.py
 @author Michael Meisinger
+@author Matt Rodriguez
 @brief test case for ION integration and system test cases (and some unit tests)
 """
 import os
-import subprocess
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -16,13 +16,11 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import bootstrap
 from ion.core import ioninit
-from ion.core.ioninit import request
 from ion.core.cc import service
-from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
-from ion.core.process.process import IProcess, Process, request
+from ion.core.process.process import Process, request
 from ion.core.data.store import Store
 import ion.util.procutils as pu
 
@@ -302,69 +300,4 @@ class FakeReceiver(object):
         # Need to be a generator
         yield fakeStore.put('fake','fake')
 
-class ItvTestCase(IonTestCase):
-    """
-    Integration testing base class for use with trial/itv_trial.
 
-    Tests a fully spawned system, either via CEI bootstrapping, or a locally spawned system via itv_trial.
-
-    Read more at:
-        https://confluence.oceanobservatories.org/display/CIDev/ITV+R1C3+Integration+Test+Framework
-
-    To use, derive your test from ion.test.ItvTestCase and fill in the services class
-    attribute with a list of apps your test needs. Apps are relative to the current working
-    directory and typically reside in the res/apps subdir of ioncore-python.
-
-    Example:
-
-        class AttributeStoreTest(ItvTestCase):
-            services = ["res/apps/attributestore.app"]  # start these apps prior to testing.
-
-            @defer.inlineCallbacks
-            def setUp(self):
-                yield self._start_container()
-
-            @defer.inlineCallbacks
-            def tearDown(self):
-                yield self._stop_container()
-
-            @defer.inlineCallbacks
-            def test_set_attr(self):
-                asc = AttributeStoreClient()
-                yield asc.put("hi", "hellothere")
-
-                res = yield asc.get("hi")
-                self.failUnless(res == "hellothere")
-
-            @defer.inlineCallbacks
-            def test_set_attr2(self):
-                # "hi" is still set here, but only if test_set_attr is run first, be careful
-                asc = AttributeStoreClient()
-                res = yield asc.get("hi")
-                self.failUnless(res == "hellothere")
-
-    Important points:
-    - The sysname parameter is required to get all the services and tests running on the same
-      system. itv_trial takes care of this for you, but if you want to deploy these tests vs
-      a CEI spawned environment, you must set the environment variable ION_TEST_CASE_SYSNAME
-      to be the same as the sysname the CEI environment was spawned with.
-
-    """
-    services = []
-    def _print_memory_usage(self):
-        """
-        @brief Prints the memory usage of the container processes.
-        
-        Performs a ps command as a subprocess and retrieves the RSS and VSIZE of the 
-        twistd container processes.
-        """
-        
-        pids = os.getenv("ION_TEST_CASE_PIDS")
-        log.info("Started the containers")
-        ps_args = ["-o args,command,rss,vsize",  "-p", pids]
-        #I'd rather not execute this through the shell, but the output from the command was truncated
-        #when I did not set shell=True.
-        p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
-        std_output = p.communicate()[0]
-        #This should probably become a logging statement.
-        print std_output

@@ -19,8 +19,6 @@ from twisted.internet import defer
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
-from ion.util.itv_decorator import itv
-
 from ion.util import procutils as pu
 from ion.test.iontest import IonTestCase
 

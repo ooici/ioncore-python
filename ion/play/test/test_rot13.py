@@ -18,7 +18,6 @@ from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.core import ioninit
 
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -62,8 +61,6 @@ class RUnit(IonTestCase):
             self.fail('Did not catch expected exception')
 
 class R13Test(IonTestCase):
-    #######################################################
-    # Integration tests, declared as such via itv decorator
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -86,14 +83,12 @@ class R13Test(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-    @itv(CONF)
     def test_start_stop(self):
         """
         Start and stop the container and service
         """
         pass
 
-    @itv(CONF)
     @defer.inlineCallbacks
     def test_full_stack(self):
         """
