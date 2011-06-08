@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/test/test_datastore.py
 @author David Stuebe
+@author David Foster
 @author Matt Rodriguez
 """
 import base64
@@ -623,70 +624,6 @@ class DataStoreTest(IonTestCase):
 
 
 
-class CassandraBackedDataStoreTest(DataStoreTest):
-
-
-    username = CONF.getValue('cassandra_username', None)
-    password = CONF.getValue('cassandra_password', None)
-
-
-    services=[]
-    services.append(
-        {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-         'spawnargs':{COMMIT_CACHE:'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap',
-                      BLOB_CACHE:'ion.core.data.cassandra_bootstrap.CassandraStoreBootstrap',
-                      PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True},
-                       }
-                })
-
-    services.append(DataStoreTest.services[1])
-
-
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def setUp(self):
-
-        yield self._start_container()
-
-        storage_conf = storage_configuration_utility.get_cassandra_configuration()
-
-        self.keyspace = storage_conf[PERSISTENT_ARCHIVE]["name"]
-
-        # Use a test harness cassandra client to set it up the way we want it for the test and tear it down
-        test_harness = cassandra_bootstrap.CassandraSchemaProvider(self.username, self.password, storage_conf, error_if_existing=False)
-
-        test_harness.connect()
-
-        self.test_harness = test_harness
-
-
-        try:
-            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
-        except InvalidRequestException, ire:
-            log.info('No Keyspace to remove in setup: ' + str(ire))
-
-        yield test_harness.run_cassandra_config()
-
-
-        yield DataStoreTest.setup_services(self)
-
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-
-        try:
-            yield self.test_harness.client.system_drop_keyspace(self.keyspace)
-        except InvalidRequestException, ire:
-            log.info('No Keyspace to remove in teardown: ' + str(ire))
-
-
-        self.test_harness.disconnect()
-
-        yield DataStoreTest.tearDown(self)
-
-
-    def test_put_blobs(self):
-        raise unittest.SkipTest("This test does not work with the cassandra backend.")
 
 
 class DataStoreExtractDataTest(IonTestCase):
