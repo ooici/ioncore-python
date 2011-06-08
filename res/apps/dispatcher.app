@@ -1,17 +1,18 @@
-# Example Python Capability Container application
+# ION R1 Dispatcher application
 {
     "type":"application",
-    "name":"dispatcher_dependencies_bundle",
-    "description": "ION dispatcher dependencies application bundle",
+    "name":"Dispatcher",
+    "description": "Dispatcher App",
     "version": "0.1",
-    "mod": ("ion.zapps.dispatcher", []),
-    "modules": [
-        "ion.zapps.dispatcher",
-    ],
+    "mod": ("ion.core.pack.processapp", [
+        'dispatcher',
+        'ion.integration.eoi.dispatcher.dispatcher',
+        'DispatcherProcess'], {}
+    ),
     "registered": [
         "dispatcher"
     ],
     "applications": [
-        "ioncore","ccagent"
+        "ioncore",
     ]
 }
