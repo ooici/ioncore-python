@@ -217,17 +217,16 @@ class Container(BasicLifecycleObject):
         which, in turn, will terminate this container lifecycleobject,
         which then terminates its lifecycle objects.
         """
-        log.warning('fatalError event')
-        log.warning(str(ex))
+        log.error('fatalError event')
+        log.error(str(ex))
         try:
             f = failure.Failure()
             log.info("The container suffered a fatal error event and is crashing.")
-            log.info("The last traceback, in full detail, was written to stdout.")
-            log.warning(str(f.getTraceback()))
+            log.debug(str(f.getTraceback()))
             f.printDetailedTraceback()
-            log.info("The last traceback, in full detail, was written to stdout.")
+            log.info("The last traceback, in full detail, was written to stdout and the debug loglevel.")
         except failure.NoCurrentExceptionError:
-            log.info("No Exception to be logged")
+            log.info("No Exception to be logged for fatalError")
 
         if not self._fatal_error_encountered:
             self._fatal_error_encountered = True
