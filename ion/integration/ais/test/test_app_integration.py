@@ -13,7 +13,8 @@ log = ion.util.ionlog.getLogger(__name__)
 import ion.util.procutils as pu
 
 from twisted.internet import defer
-
+import time
+    
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
@@ -106,7 +107,25 @@ class AppIntegrationTest(IonTestCase):
 
     # Set timeout for Trial tests
     timeout = 40
-
+    
+    # set to None to turn off timing logging, set to anything else to turn on timing logging
+    AnalyzeTiming = None
+    
+    class TimeStampsClass (object):
+        pass
+    
+    TimeStamps = TimeStampsClass()
+    
+    def TimeStamp (self):
+        TimeNow = time.time()
+        TimeStampStr = "(wall time = " + str (TimeNow) + \
+                       ", elapse time = " + str(TimeNow - self.TimeStamps.StartTime) + \
+                       ", delta time = " + str(TimeNow - self.TimeStamps.LastTime) + \
+                       ")"
+        self.TimeStamps.LastTime = TimeNow
+        return TimeStampStr
+    
+        
     @defer.inlineCallbacks
     def setUp(self):
         log.debug('AppIntegrationTest.setUp():')
@@ -199,6 +218,11 @@ class AppIntegrationTest(IonTestCase):
         self.rc = ResourceClient(proc=sup)
         self.ac  = AssociationClient(proc=sup)
         self._proc = Process()
+        
+        if self.AnalyzeTiming != None:
+            self.TimeStamps.StartTime = time.time()
+            self.TimeStamps.LastTime = self.TimeStamps.StartTime
+    
 
 
     @defer.inlineCallbacks
@@ -1382,25 +1406,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
-        import time
-        
-        def TimeStamp ():
-            TimeNow = time.time()
-            TimeStampStr = "(wall time = " + str (TimeNow) + \
-                           ", elapse time = " + str(TimeNow - self.StartTime) + \
-                           ", delta time = " + str(TimeNow - self.LastTime) + \
-                           ")"
-            self.LastTime = TimeNow
-            return TimeStampStr
-           
-        self.StartTime = time.time()
-        self.LastTime = self.StartTime
-        log.warning('test_updateDataResourceSubscription: started at ' + str(self.StartTime))
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: started at ' + str(self.TimeStamps.StartTime))
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
-        log.warning('test_updateDataResourceSubscription: created user ' + TimeStamp())
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created user ' + self.TimeStamp())
         
         #
         # Create dispatchers and associations
@@ -1411,7 +1424,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
         self.dispatcherID = self.dispatcherRes.ResourceIdentity
         log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
-        log.warning('test_updateDataResourceSubscription: created dispatchers ' + TimeStamp())
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created dispatchers ' + self.TimeStamp())
             
         #
         # Now make an association between the user and this dispatcher
@@ -1437,14 +1451,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
-        log.warning('test_updateDataResourceSubscription: created associations ' + TimeStamp())
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created associations ' + self.TimeStamp())
  
         # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1461,9 +1476,35 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
-        log.warning('test_updateDataResourceSubscription: created subscription ' + TimeStamp())
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created subscription ' + self.TimeStamp())
             
         # now update the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling updateDataResourceSubscription.')
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: updated subscription ' + self.TimeStamp())
+
+        # now update the subscription updated above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1485,36 +1526,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
-        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
-
-        # now update the subscription updated above
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
-        
-        log.debug('Calling updateDataResourceSubscription.')
-        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
-        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
-        else:
-            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
-        log.warning('test_updateDataResourceSubscription: updated subscription ' + TimeStamp())
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: updated subscription ' + self.TimeStamp())
 
     @defer.inlineCallbacks
     def test_deleteDataResourceSubscription(self):
         log.debug('Testing deleteDataResourceSubscriptions.')
-
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
