@@ -16,7 +16,6 @@ import re, urllib
 
 # Imports: Twisted
 from twisted.internet import defer
-from twisted.python.failure import Failure
 
 
 # Imports: ION core
@@ -24,19 +23,14 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.process.process import ProcessFactory
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
-#from ion.services.coi.resource_registry.resource_client import \
-#    ResourceClient
 
 
-# Imports: ION services
-#from ion.services.dm.ingestion.ingestion import IngestionClient
-#from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
-
-
-# Imports: ION utils and configuration
-from ion.util.os_process import OSProcess, OSProcessError
-from ion.util import ionlog, procutils as pu
+# Imports: ION utils, configuration and logging
+import logging
 from ion.core import ioninit
+from ion.util import ionlog
+from ion.util.os_process import OSProcess, OSProcessError
+import os
 
 log = ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -50,6 +44,7 @@ VALIDATION_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=7102, v
 
 class CdmValidationService(ServiceProcess):
     """
+    @brief: ServiceProcess used in validating user-provided datasets against OOICI Common Data Model requirements and Climate and Forecast conventions.
     """
     
     
@@ -60,7 +55,7 @@ class CdmValidationService(ServiceProcess):
         
     def __init__(self, *args, **kwargs):
         '''
-        Initialize the CdmValidationService instance, init instance fields, etc.
+        @brief: Initialize the CdmValidationService instance, init instance fields, etc.
         '''
         # Step 1: Delegate initialization to parent "ServiceProcess"
         log.info('')
@@ -72,29 +67,42 @@ class CdmValidationService(ServiceProcess):
         self._cfchecks_args = None
 
 
-    @defer.inlineCallbacks
     def slc_init(self):
         '''
-        Initialization upon Service spawning.
+        @brief: Initialization upon Service spawning.  Sets up clients, etc.
+        
+        @attention Nothing to yield -- this is NOT an inlineCallback
         '''
-        log.debug(" -[]- Entered slc_init(); state=%s" % (str(self._get_state())))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug(" -[]- Entered slc_init(); state=%s" % (str(self._get_state())))
         
-        # Step 1: Delegate initialization to parent class
-        yield defer.maybeDeferred(ServiceProcess.slc_init, self)
-        
-        # Step 2: Perform Initialization
+        # Step 1: Perform Initialization
         self.mc = MessageClient(proc=self)
-#        self.rc = ResourceClient(proc=self)
-        
-        # Step 3:  @todo: Check the location of the cfchecker script
         
     
     @defer.inlineCallbacks
     def op_validate(self, content, headers, msg):
         """
-        @todo: doc
+        @brief: Validate the given cdm_validation_request (GPB{7101}) against the common data model (CDM) and then
+                against Climate and Forecast (CF) conventions.  CDM validation is inacted against the CDM Validation
+                Web Service provided by the config as 'cdmvalidator_base_url' using the command provided by
+                'cdmvalidator_command' (usu. 'validate').  CF validation is inacted against the CfChecks python
+                script provided by the config as 'cfchecks_binary'.
+                
+                Here is an example setup of the CdmValidationService's configuration:
+                
+                        'ion.integration.eoi.validation.cdm_validation_service':{
+                            'validation_timeout' : 60,
+                            'cfchecks_binary' : '/Users/tlarocque/Development/OOI/code/ioncore-python/run_cf_checks',
+                            'cdmvalidator_base_url' : 'http://motherlode.ucar.edu:8080/cdmvalidator',
+                            'cdmvalidator_command' : 'validate',
+                        }
+                
+        @note:  If CDM validation fails, CF Checking will be skipped.
+        
+        @return: Sends an instance of a cdm_validation_response (GPB{7102}) resource to the remote caller.
         """
-        yield
+        yield # some paths do not yield in this method -- when these are traversed, generator unwinding will fail
         log.info('<<<---@@@ (service) Received operation "validate".  Extracting data_url to perform validation')
         if not hasattr(content, 'MessageType') or content.MessageType != VALIDATION_REQUEST_TYPE:
             raise TypeError('The given content must be an instance or a wrapped instance of %s.  Given: %s' % (repr(VALIDATION_REQUEST_TYPE), type(content)))
@@ -109,7 +117,7 @@ class CdmValidationService(ServiceProcess):
             cdm_output = self.validate_cdm(data_url)
             cdm_resp = yield self.process_cdm_validation_output(cdm_output)
         except Exception, ex:
-            log.warn(ex)
+            log.warn('CDM Validation or validation output processing failed:  Cause: %s' % str(ex))
             cdm_resp = {'cdm_result':False, 'exception':'Could not perform CDM Validation.  Please check the CDM Validator configuration.  Inner exception: %s' % ex}
         
         # Step 3: Validate the URL against the CF Checks Script
@@ -119,7 +127,7 @@ class CdmValidationService(ServiceProcess):
                 cf_result = yield self.validate_cf(data_url)
                 cf_resp   = self.process_cf_validation_output(cf_result)
             except Exception, ex:
-                log.warn(ex)
+                log.warn('CF Validation or validation output procssing failed.  Cause: %s' % str(ex))
                 cf_resp = {'exception':'Could not perform CF Validation.  Please check the CF Checker configuration.  Inner exception: %s' % ex}
             
             
@@ -135,6 +143,11 @@ class CdmValidationService(ServiceProcess):
     
     def validate_cdm(self, data_url):
         """
+        @brief: Validates the given data_url against the CDM Validation Webservice
+        @param data_url: The url to validate
+        
+        @return: The resultant XML from the CDM Validation Service
+        @see:    CdmValidationService.op_validate()
         """
         base_url = self.cdmvalidator_base_url
         command = self.cdmvalidator_command
@@ -158,6 +171,11 @@ class CdmValidationService(ServiceProcess):
     @defer.inlineCallbacks
     def validate_cf(self, data_url):
         """
+        @brief: Validates the given data_url against the CfChecks python script
+        @param data_url: The url to validate
+        
+        @return: The resultant string data from the CfChecks Python script
+        @see:    CdmValidationService.op_validate()
         """
         log.debug('')
         try:
@@ -167,22 +185,26 @@ class CdmValidationService(ServiceProcess):
             args.append(data_url)
 
             # @todo:  Error if binary is None
+            if None == binary or not os.path.exists(binary):
+                raise OSError("CfChecks binary (given by configuration as 'cfchecks_binary' does not specify a valid filepath: '%s'" % binary)
             proc = OSProcess(binary, args)
             
             # Start the process
-            log.debug('validate_cf(): Requesting validation from CFChecks validation script: \n\n"%s %s"\n\n' % (binary, " ".join([str(item) for item in args])))
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                log.debug('validate_cf(): Requesting validation from CFChecks validation script: \n\n"%s %s"\n\n' % (binary, " ".join([str(item) for item in args])))
             res = yield proc.spawn()
             
         except (AttributeError, ValueError), ex:
-            raise RuntimeError("validate_cf(): Received invalid spawn arguments from ionconfig" + str(ex))
+            raise RuntimeError("validate_cf(): Received invalid spawn arguments from ionconfig.  Inner Exception: %s"  % str(ex))
 
         except OSError, ex:
-            raise OSError("validate_cf(): Failed to spawn the cfchecks script.  Error: %s" % (str(ex)))
+            raise OSError("validate_cf(): Failed to spawn the cfchecks script.  Cause: %s" % (str(ex)))
         
         except OSProcessError, ex:
-            # This is the same result as would be acquired through normal processing via OSProcess
-            # ..  a StandardError is thrown when the process terminates with an exit code other than
-            #     0. In this case, we still are only concerned with the results (inside ex.message)
+            # This exception is thrown by OSProcess when the underlying binary terminates with an
+            #     exit code other than 0. In this case, we are only concerned with the results
+            #     (inside ex.message) and will later return the error condition to higher application
+            #     levels 
             res = ex.message
             
             
@@ -191,6 +213,9 @@ class CdmValidationService(ServiceProcess):
 
     @property
     def cdmvalidator_base_url(self):
+        """
+        @return: The value of the field 'cdmvalidator_base_url' from the CdmValidationService configuration
+        """ 
         url = CONF.getValue('cdmvalidator_base_url', None)
         log.info('Retrieved cdmvalidator base url: "%s"' % url)
         return url
@@ -198,6 +223,9 @@ class CdmValidationService(ServiceProcess):
 
     @property
     def cdmvalidator_command(self):
+        """
+        @return: The value of the field 'cdmvalidator_command' from the CdmValidationService configuration
+        """ 
         cmd = CONF.getValue('cdmvalidator_command', None)
         log.info('Retrieved cdmvalidator command: "%s"' % cmd)
         return cmd
@@ -205,6 +233,9 @@ class CdmValidationService(ServiceProcess):
         
     @property
     def cfchecks_binary(self):
+        """
+        @return: The value of the field 'cfchecks_binary' from the CdmValidationService configuration
+        """ 
         binary = CONF.getValue('cfchecks_binary', None)
         log.info('Retrieved cfchecks binary: "%s"' % binary)
         return binary
@@ -212,13 +243,26 @@ class CdmValidationService(ServiceProcess):
     
     @property
     def cfchecks_args(self):
+        """
+        @return: The value of the field 'cfchecks_args' from the CdmValidationService configuration
+        """ 
         args = CONF.getValue('cfchecks_args', [])
-        log.info('Retrieved cfchecks args:   "%s"' % str(args))
+        if log.getEffectiveLevel() <= logging.INFO:
+            log.info('Retrieved cfchecks args:   "%s"' % str(args))
         return args
     
     
     def process_cdm_validation_output(self, cdm_output):
         """
+        @brief: Parses the output from the CDM Validation WebService to determine passage/failure
+        @param cdm_output: The XML response from the CDM Validation WebService as returned from
+                           CdmValidationService.validate_cdm()
+        @note:  Currently this mechanism simply ensures that the dataset being validated contains
+                time axis information -- if it does not, it cannot be handled by the system
+
+        @return: A dictionary containing values for the keys:
+                   'cdm_output'
+                   'cdm_result'
         """
         #---------------------------------------#
         # Process CdmValidator output...
@@ -249,7 +293,8 @@ class CdmValidationService(ServiceProcess):
             cdm_axis_list = []
             for m in re.finditer(r'<axis.*?type=\"(?P<axis_type>.*?)\"', cdm_output):
                 cdm_axis_list.append(m.groupdict()['axis_type'])
-            log.debug('Available CDM axis:  %s' % cdm_axis_list)
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                log.debug('Available CDM axis:  %s' % cdm_axis_list)
             result = 'Time' in cdm_axis_list
         
         
@@ -262,6 +307,18 @@ class CdmValidationService(ServiceProcess):
     
     def process_cf_validation_output(self, cf_output):
         """
+        @brief: Parses the output from the CfChecks Python script to determine the number of
+                errors, warnings, and info messages associated with the dataset being validated.
+        
+        @param cf_output: The string response from the CfChecks Python script as returned from
+                          CdmValidationService.validate_cf()
+        
+        @return: A dictionary containing values for the keys:
+                   'cf_errors'
+                   'cf_warnings'
+                   'cf_infomation'
+                   'cf_exitcode'
+                   'cf_output'
         """
         #---------------------------------------#
         # Process CFChecks output...
@@ -285,18 +342,20 @@ class CdmValidationService(ServiceProcess):
         cf_result_dict['cf_output'] = cf_output_string
         
         #--------------------------------------------------------------------------------
-        # IMPORTANT NOTE!!
-        # exitcode 0 means success
-        # exitcode 255 is returned from shell when cfchecks returns an invalid exit code.
-        # .. this is expected behavior because when there are no errors but warnings are
-        #    present, cfchecks will return a negative exit code -- negative exit codes
-        #    are considered invalid by shell -- ergo exitcode 255 means warnings ONLY
         #
-        #    There was concern that cfchecks may produce a response of 255 when it
-        #    in fact has failed, and the CdmValidationService may incorrectly report
-        #    success.  This WILL NOT happen, however, because in this case, the analysis
-        #    of the cfchecks output will reveal the actual number of errors, allowing an
-        #    accurate pass/fail response
+        # @attention:      IMPORTANT NOTE!!
+        #
+        #     exitcode 0 means success
+        #     exitcode 255 is returned from shell when cfchecks returns an invalid exit code.
+        #     .. this is expected behavior because when there are no errors but warnings are
+        #        present, cfchecks will return a negative exit code -- negative exit codes
+        #        are considered invalid by shell -- ergo exitcode 255 means warnings ONLY
+        #
+        #        There was concern that cfchecks may produce a response of 255 when it
+        #        in fact has failed, and the CdmValidationService may incorrectly report
+        #        success.  This WILL NOT happen, however, because in this case, the analysis
+        #        of the cfchecks output will reveal the actual number of errors, allowing an
+        #        accurate pass/fail response
         #--------------------------------------------------------------------------------
         #
         if exitcode == 255: exitcode = 0
@@ -313,6 +372,30 @@ class CdmValidationService(ServiceProcess):
     @defer.inlineCallbacks
     def build_response_msg(self, msg, **kwargs):
         """
+        @brief: Constructs a cdm_validation_response (GPB{7102}) resource from the parameters passed through kwargs.
+        @param kwargs: Parameters used in building the cdm_validation_response object.  These are the results from
+                       the methods process_cdm_validation_output() and process_cf_validation_output()
+                       
+                       Accepted parameters are the following:
+                           exception
+                           cdm_output
+                           cdm_result
+                           cf_output
+                           cf_exitcode
+                           cf_errors
+                           cf_warnings
+                           cf_information
+                           cf_exitcode
+                       
+        @note: Example Use:
+        
+                       cdm_res = self.process_cdm_validation_output(cdm_output)
+                       cf_res  = self.process_cf_validation_output(cf_output)
+                       cdm_res.update(cf_res)
+                       
+                       response_resource = yield self.build_response_msg(**cdm_res)
+                       
+        @return: a deferred containing the cdm_validation_response resource
         """
         log.debug('build_response_msg(): Replying to caller...')
         #---------------------------------------#
@@ -361,7 +444,6 @@ class CdmValidationClient(ServiceClient):
         
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self.proc)
-#        self.rc = ResourceClient(proc=self.proc)
         
     
     @defer.inlineCallbacks
@@ -391,19 +473,23 @@ class CdmValidationClient(ServiceClient):
                        self.ResponseType.CF_FAILURE:         'CF compliance failed',
                        self.ResponseType.ERROR:              'ERROR.  View err_msg field for more'}
             return reasons[self.response_type]
-        
-        log.debug('')
-        log.debug('')
-        log.info('%-25s %s' % ('Passes Validation:', content.response_type == content.ResponseType.PASS))
-        log.info('%-25s %s' % ('Response:', response_type_pretty(content)))
-#        log.debug('%-25s \n\n%s\n' % ('CF Output:', content.cf_output))
-#        log.debug('%-25s \n\n%s\n' % ('CDM Output:', content.cdm_output))
-        log.debug('%-25s %i' % ('CF Error count:',   content.cf_error_count))
-        log.debug('%-25s %i' % ('CF Warning count:', content.cf_warning_count))
-        log.debug('%-25s %i' % ('CF Info count:',    content.cf_info_count))
-        log.info('%-25s %s' % ('Error Message:',     content.err_msg))
-        log.debug('')
-        log.debug('')
+
+
+        if log.getEffectiveLevel() == logging.INFO:        
+            log.info('%-25s %s' % ('Passes Validation:', content.response_type == content.ResponseType.PASS))
+            log.info('%-25s %s' % ('Response:',          response_type_pretty(content)))
+            log.info('%-25s %s' % ('Error Message:',     content.err_msg))
+        elif log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('')
+            log.debug('')
+            log.debug('%-25s %s' % ('Passes Validation:', content.response_type == content.ResponseType.PASS))
+            log.debug('%-25s %s' % ('Response:',          response_type_pretty(content)))
+            log.debug('%-25s %i' % ('CF Error count:',    content.cf_error_count))
+            log.debug('%-25s %i' % ('CF Warning count:',  content.cf_warning_count))
+            log.debug('%-25s %i' % ('CF Info count:',     content.cf_info_count))
+            log.debug('%-25s %s' % ('Error Message:',     content.err_msg))
+            log.debug('')
+            log.debug('')
 
         
         defer.returnValue(content)

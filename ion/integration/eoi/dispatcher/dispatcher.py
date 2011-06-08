@@ -5,9 +5,12 @@ Created on Apr 5, 2011
 @file:   ion/integration/eoi/dispatcher/dispatcher_service.py
 @author: Timothy LaRocque
 @brief:  Dispatching service for starting external scripts for data assimilation/processing upon changes to availability/content of data
+
+@see:    Dispatcher Diagram - https://docs.google.com/drawings/d/1x1Vhs_VjJ2uN6LZ53QwYmSVZMRTS4mZmguR6-Z7BQRM/edit?hl=en_US&authkey=CIO93YUO
 """
 
 # Imports: logging
+import logging
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -29,9 +32,9 @@ from ion.services.dm.distribution.events import NewSubscriptionEventPublisher,  
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
-from ion.services.dm.inventory.association_service import AssociationServiceClient#, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
+from ion.services.dm.inventory.association_service import IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 from ion.core.exception import ReceivedApplicationError, ApplicationError
 
@@ -39,25 +42,24 @@ from ion.core.exception import ReceivedApplicationError, ApplicationError
 DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 DISPATCHER_WORKFLOW_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7003, version=1)
 CHANGE_EVENT_MESSAGE = object_utils.create_type_identifier(object_id=7001, version=1)
-ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 
 class DispatcherProcess(Process):
     """
-    Dispatching service for starting external scripts
+    @brief: Dispatching service for starting external scripts upon reciept of Dataset Change Notifications (according to subscriptions)
     """
-
     
     def __init__(self, *args, **kwargs):
         """
-        Initializes the DispatcherService class
-        Checks for the existance of the dispatcher.id file to procure a system ID for
-        this service's Dispatcher Resource.  If one does not exist, it is created
+        @brief: Initializes the DispatcherService class
+                Checks for the existance of the dispatcher.id file to procure a OOI Resource ID
+                for this service's Dispatcher Resource.  If one does not exist, it is created
         """
         # Step 1: Delegate initialization to parent
-        log.debug('__init__(): Starting initialization...')
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('__init__(): Starting initialization...')
         Process.__init__(self, *args, **kwargs)
         
         self.dues_dict = {}
@@ -76,10 +78,9 @@ class DispatcherProcess(Process):
         
     @property
     def mc(self):
-        # @todo: Check into why I can initialize mc here (called during process spawning)
-        #        But I cannot do the same with the ResourceClient.  I would assume both
-        #        would fail because of a race condition in spawning..  but this one works
-        #        somehow
+        """
+        @return: The MessageClient
+        """
         if self._mc is None:
             self._mc = MessageClient(proc=self)
         return self._mc
@@ -87,10 +88,9 @@ class DispatcherProcess(Process):
 
     @property
     def rc(self):
-        # @todo: Check into why I can initialize mc here (called during process spawning)
-        #        But I cannot do the same with the ResourceClient.  I would assume both
-        #        would fail because of a race condition in spawning..  but this one works
-        #        somehow
+        """
+        @return: The ResourceClient
+        """
         if self._rc is None:
             self._rc = ResourceClient(proc=self)
         return self._rc
@@ -98,6 +98,9 @@ class DispatcherProcess(Process):
     
     @property
     def asc(self):
+        """
+        @return: The AssociationServiceClient
+        """
         if self._asc is None:
             self._asc = AssociationServiceClient(proc=self)
         return self._asc
@@ -105,6 +108,9 @@ class DispatcherProcess(Process):
     
     @property
     def ac(self):
+        """
+        @return: The AssociationClient
+        """
         if self._ac is None:
             self._ac = AssociationClient(proc=self)
         return self._ac
@@ -112,6 +118,9 @@ class DispatcherProcess(Process):
     
     @property
     def irc(self):
+        """
+        @return: The IdentityRegistryClient
+        """
         if self._irc is None:
             self._irc = IdentityRegistryClient(proc=self)
         return self._irc
@@ -120,8 +129,7 @@ class DispatcherProcess(Process):
     @defer.inlineCallbacks
     def plc_activate(self):
         """
-        Initializes the Dispatching Service when spawned
-        (Yields ALLOWED)
+        @brief: Initializes the Dispatching Service when spawned
         """
         log.info('plc_activate(): LCO (process) initializing...')
         
@@ -150,8 +158,8 @@ class DispatcherProcess(Process):
             f = open('dispatcher.id', 'r')
             id = f.read().strip()
             # @todo: ensure this resource exists in the ResourceRepo
-        except IOError:
-             log.warn('plc_activate(): Dispatcher ID could not be found.  One will be created instead')
+        except IOError, ex:
+             log.warn('plc_activate(): Dispatcher ID could not be found.  One will be created instead.  Actual Cause: %s' % str(ex))
         finally:
             if f is not None:
                 f.close()
@@ -199,11 +207,18 @@ class DispatcherProcess(Process):
         self._ac = None
         self._irc = None
 
+
         log.debug('plc_activate(): ******** COMPLETE ********')
         
     
     @defer.inlineCallbacks
     def _make_user_associations(self, DispatcherID):
+        """
+        @brief: Utilizes User Definitions in the local file "dispatcher_users.id" to request the OOI Resource ID
+                of each user and create a HAS_A association between it and the given DispatcherID
+        
+        @param DispatcherID: The OOI Resource ID of the Dispatcher Resource linked to this Dispatcher Process
+        """
         # TODO:  Make this routine more intelligent by checking each user's associations for an already existing
         # dispatcher, and only creating a dispatcher association for users w/o a dispatcher
         
@@ -215,8 +230,8 @@ class DispatcherProcess(Process):
         try:
             f = open('dispatcher_users.id', 'r')
             Users = f.readlines()
-        except IOError:
-            log.warn("_make_user_associations: Dispatcher's users file could not be read, no associations will be made")
+        except IOError, ex:
+            log.warn("_make_user_associations: Dispatcher's users file could not be read, no associations will be made.  Cause: %s" % str(ex))
             defer.returnValue(None)
         finally:
             if f is not None:
@@ -226,35 +241,28 @@ class DispatcherProcess(Process):
         IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
         for User in Users:
             User = User.strip(" \n\r")
-            log.info('_make_user_associations: making assosiation for user <%s>'%User)
+            log.info('_make_user_associations: making association for user <%s>' % User)
             
             # get User's resource ID
             IdentityRequest.configuration.subject = User
             try:
                 UserID = yield self.irc.get_ooiid_for_user(IdentityRequest)
             except ReceivedApplicationError, ex:
-                log.warn('_make_user_associations: can not get ID for user '+User)
+                log.warn('_make_user_associations: can not get ID for user "%s".  Cause: %s' % (User, str(ex)))
                 continue
-            log.info('_make_user_associations: got id %s for user %s'%(UserID.resource_reference.ooi_id, User))
+            if log.getEffectiveLevel() <= logging.INFO:
+                log.info('_make_user_associations: got id %s for user %s'%(UserID.resource_reference.ooi_id, User))
             
             # get User instance
             try:
                 UserRes = yield self.rc.get_instance(UserID.resource_reference.ooi_id)
             except ApplicationError, ex:
-                log.warn('_make_user_associations: can not get instance for UserID '+UserID.resource_reference.ooi_id)
+                log.warn('_make_user_associations: can not get instance for UserID "%s".  Cause: %s' % (UserID.resource_reference.ooi_id, str(ex)))
             
             # Create an association between the user and the dispatcher
             try:
                 association = yield self.ac.create_association(UserRes, HAS_A_ID, DispatcherRes)
-                """
-                log.debug('UserRes.ResourceAssociationsAsSubject:'+str(UserRes.ResourceAssociationsAsSubject))
-                if association not in UserRes.ResourceAssociationsAsSubject:
-                    log.error('Error: subject not in association!')
-                    continue
-                if association not in DispatcherRes.ResourceAssociationsAsObject:
-                    log.error('Error: object not in association')
-                    continue
-                """
+                
                 # Put the association in datastore
                 log.debug('_make_user_associations: Storing association: ' + str(association))
                 yield self.rc.put_instance(association)
@@ -265,7 +273,17 @@ class DispatcherProcess(Process):
 
     @defer.inlineCallbacks
     def _register_dispatcher(self, name):
+        """
+        @brief: Registers this dispatcher process with ION simply by creating a OOI Dispatcher Resource object and
+                committing that resource in the Resource Repository.
+        @note:  This method is called during plc_activate of this service
+        @note:  The Initialization process (plc_activate) is responsible for locally persisting the returned ID in
+                the event that the Dispatcher Process needs to be restarted.
 
+        @param name: An arbitrary name to assign to the Dispatcher Resource Instance
+        
+        @return: The OOI Resource ID of the newly created Dispatcher Resource
+        """
         # Explicitly create a resource client with an anonymous process so that we can push during plc init of the dispatcher process!
         rc = self.rc
         disp_res = yield rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
@@ -280,6 +298,11 @@ class DispatcherProcess(Process):
     @defer.inlineCallbacks
     def _preload_associated_workflows(self, dispatcher_id):
         """
+        @brief: Loads all DispatcherWorkflowResources (GPB{7003}) which are associated with the given dispatcher_id
+                and creates an Update Event Subscriber for each.  The Update Event Subscriber will later invoke the
+                workflow in the DispatcherWorkflowResource whenever it is notified of an update to associated dataset.
+        
+        @param dispatcher_id: The OOI Resource ID for a dispatcher resource
         """
         # Step 1: Request all associated Dispatcher Workflows
         request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
@@ -316,7 +339,20 @@ class DispatcherProcess(Process):
     
     @defer.inlineCallbacks
     def _create_subscription_subscriber(self, subscriber_type, callback):
-        log.info('_create_subscription_subscriber(): Creating a Subscription Change Events Subscriber as "%s"' % subscriber_type.__name__)
+        """
+        @brief: Creates a SubscriptionChangeEventsSubscriber which listens to notifications of changes to this Dispatcher's
+                subscriptions (NEW and DELETE).  When subscription change notifications occur, this subscriber will call back
+                and either delete or create a new Dataset Update Subscriber (used for listening to changes to datasets)
+        
+        @param subscriber_type: The type of subscriber to create.  Either a NewSubscriptionEventSubscriber or
+                                DelSubscriptionEventSubscriber
+        @param callback: The function to callback to when the subscriber created here receives notification of subscription
+                         change
+        
+        @return: A deferred containing the newly created subscriber object
+        """
+        if log.getEffectiveLevel() <= logging.INFO:
+            log.info('_create_subscription_subscriber(): Creating a Subscription Change Events Subscriber as "%s"' % subscriber_type.__name__)
         
         # Step 1: Generate the subscriber
         log.debug('_create_subscription_subscriber(): Building Subscriber from a SubscriberFactory')
@@ -328,20 +364,24 @@ class DispatcherProcess(Process):
         def cb(data):
             log.info('cb(): <<<---@@@ Subscription Change Subscriber received data')
             subscription = DispatcherProcess.unpack_subscription_data(data)
-            log.info('cb(): Invoking subscription event callback using dataset_id "%s" and script "%s"' % subscription)
+            if log.getEffectiveLevel() <= logging.INFO:
+                log.info('cb(): Invoking subscription event callback using dataset_id "%s" and script "%s"' % subscription)
             return callback(*subscription)
         subscriber.ondata = cb
         
-        log.debug('_create_subscription_subscriber(): Subscription Subscriber bound to topic "%s"' % subscriber.topic(self.dispatcher_id))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('_create_subscription_subscriber(): Subscription Subscriber bound to topic "%s"' % subscriber.topic(self.dispatcher_id))
         defer.returnValue(subscriber)
         
     
     @staticmethod
     def unpack_subscription_data(data):
         """
-        Unpacks the subscription change event from message content in the given
-        dictionary and retrieves the dataset_id and workflow_path fields.
-        This subscription data is returned in a tuple.
+        @brief: Unpacks the subscription change event from message content in the given
+                dictionary and retrieves the dataset_id and workflow_path fields.
+        @param data: An instance of an EventMessage (GPB{2322}) resource containing subscription data
+        
+        @return: The subscription data as a tuple.
         """
         # Dig through the message wrappers...
         content = data and data.get('content', None)
@@ -357,9 +397,11 @@ class DispatcherProcess(Process):
     @staticmethod
     def unpack_dataset_update_data(data):
         """
-        Unpacks the Dataset Update Event from message content in the given
-        dictionary and retrieves the dataset_id and data_source_id fields.
-        This dataset update data is returned in a tuple.
+        @brief: Unpacks the Dataset Update Event from message content in the given
+                dictionary and retrieves the dataset_id and data_source_id fields.
+        @param data: An instance of an EventMessage (GPB{2322}) resource containing subscription data
+                
+        @return: This dataset's update data returned as a tuple.
         """
         # Dig through the message wrappers...
         content = data and data.get('content', None)
@@ -375,14 +417,29 @@ class DispatcherProcess(Process):
     @defer.inlineCallbacks
     def create_dataset_update_subscriber(self, dataset_id, script_path):
         """
-        A dataset update subscriber listens for update event notifications which are triggered when
-        a dataset has changed.  When this occurs, the subscriber kicks-off the given script via the
-        subprocess module
+        @brief: Creates a Dataset Update Subscriber.
+                A dataset update subscriber listens for update event notifications which are triggered when
+                a dataset has changed.  When this occurs, the subscriber kicks-off the given script via the
+                subprocess module
+        @param dataset_id: The OOI Resource ID for a dataset resource
+        @param script_path: The pathname of a local script to be run upon notification of dataset changes
+        
+        @return: Nothing - see the following note...
+        
+        @note:   The subscriber here will be stored in the Dispatcher Process's dictionary of
+                 Dataset Update Event Subscribers (self.dues_dict) and is mapped to a key which is a tuple
+                 in the form of: (dataset_id, script_path).  This key is later used to remove the subscriber
+                 if/when the Delete Subscription Events Subscriber receives a notification to remove this
+                 item from the dictionary. 
         """
-        yield
-        log.info('')
-        log.info('create_dataset_update_subscriber(): Creating Dataset Update Event Subscriber (DUES) for ID "%s" and script "%s' % (str(dataset_id), str(script_path)))
+        yield # some paths do not yield in this method -- when these are traversed, generator unwinding will fail
+        
+        if log.getEffectiveLevel() <= logging.INFO:
+            log.info('')
+            log.info('create_dataset_update_subscriber(): Creating Dataset Update Event Subscriber (DUES) for ID "%s" and script "%s' % (str(dataset_id), str(script_path)))
+        
         key = (dataset_id, script_path)
+        
         
         # Step 1: If the dictionary has this key dispose of the corresponding subscriber first
         subscriber = self.dues_dict.has_key(key) and self.dues_dict.pop(key)
@@ -409,10 +466,11 @@ class DispatcherProcess(Process):
     
     def delete_dataset_update_subscriber(self, dataset_id, script_path):
         """
-        Removes the dataset update event subscriber from the DUES dict which is keyed off the
-        same dataset_id and script_path
+        @brief: Removes the dataset update event subscriber from the DUES dict which is keyed off the
+                same dataset_id and script_path
         """
-        log.info('delete_dataset_update_subscriber(): Unregistering Dataset Update Event Subscriber for ID "%s" and script "%s"...' % (str(dataset_id), str(script_path)))
+        if log.getEffectiveLevel() <= logging.INFO:
+            log.info('delete_dataset_update_subscriber(): Unregistering Dataset Update Event Subscriber for ID "%s" and script "%s"...' % (str(dataset_id), str(script_path)))
         key = (dataset_id, script_path)
         
         subscriber = self.dues_dict.has_key(key) and self.dues_dict.pop(key)
@@ -425,34 +483,34 @@ class DispatcherProcess(Process):
     
     def _delete_subscriber_resource(self, subscriber):
         """
+        @brief: Terminates the given subscriber
         """
-        log.debug('_delete_subscriber_resource(): Deleting subscriber %s' % str(subscriber))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('_delete_subscriber_resource(): Deleting subscriber %s' % str(subscriber))
         subscriber.terminate()
         
     
     def run_script(self, data, script_path, dataset_id):
         """
-        Reads and Runs the given script
-        (data is currently unused) 
+        @brief: Reads and Runs the given script passing it the given dataset_id
+        @note:  (data is currently unused) 
         """
-        log.info('run_script(): Running script "%s" for dataset "%s"' % (script_path, dataset_id))
+        if log.getEffectiveLevel() <= logging.INFO:
+            log.info('run_script(): Running script "%s" for dataset "%s"' % (script_path, dataset_id))
         
         # Use subprocess to run the script
         try:
             proc = subprocess.Popen([script_path, dataset_id])
         except Exception, ex:
-            log.error("Could not start workflow: %s" % (str(ex)))
+            log.error("Could not start workflow for script '%s'.  Cause: %s" % (str(script_path), str(ex)))
             # @todo: Publish failure notification to the email service
             #        -- nothing will be listening but do it anyway
     
-    @defer.inlineCallbacks
-    def op_test(self, content, headers, msg):
-        log.info('op_test(): <<<---@@@ Incoming call to op')
-        
-        log.info('op_test(): @@@--->>> Sending reply_ok')
-        yield self.reply_ok(msg, 'testing, testing, 1.. 2.. 3..')
+
     
 # ===================================================================================================================
+
+
     
 class DispatcherProcessClient(ProcessClient):
     """
@@ -471,16 +529,6 @@ class DispatcherProcessClient(ProcessClient):
         self.mc = MessageClient(proc=self.proc)
         self.ac = AssociationClient(proc=self.proc)
         self.dispatcher_resource = None
-    
-    
-    @defer.inlineCallbacks
-    def test(self):
-        yield self._check_init()
-        log.info('test() @@@--->>> Sending rpc call to op_test')
-        (content, headers, msg) = yield self.rpc_send('test', "")
-        log.info('test() <<<---@@@ Recieved response')
-        log.debug(str(content))
-        defer.returnValue(str(content))
     
     
     @defer.inlineCallbacks
