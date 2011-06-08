@@ -324,7 +324,7 @@ class IngestionService(ServiceProcess):
             ingest_res={EM_ERROR:'Ingestion Failed!'}
             ingest_res.update(data_details)
             
-        datasource = None
+        data_source = None
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed!")
 
@@ -338,6 +338,7 @@ class IngestionService(ServiceProcess):
             # If the dataset / source is new 
             if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
 
+                log.info('Fetching datasource id - %s - to set life cycle state' % content.datasource_id)
                 data_source = yield self.rc.get_instance(content.datasource_id)
 
                 if data_source.is_public == True:
@@ -351,10 +352,12 @@ class IngestionService(ServiceProcess):
                     self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
-
         resources=[self.dataset]
-        if datasource is not None:
-            resources.append(datasource)
+        if data_source is not None:
+            resources.append(data_source)
+
+        for res in resources:
+            log.info('Resource %s life cycle state is %s' % (res.ResourceName, res.ResourceLifeCycleState))
 
         yield self.rc.put_resource_transaction(resources)
 
@@ -589,9 +592,7 @@ class IngestionService(ServiceProcess):
         if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
 
-        log.critical(self.dataset.root_group.PPrint())
 
-        log.critical('Starting commit')
         # Commit the current state of the supplement - ingest of new content is complete
         self.dataset.Repository.commit('Ingest received complete notification.')
 
@@ -611,7 +612,7 @@ class IngestionService(ServiceProcess):
         # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
 
-        log.critical('Starting Dimension LooP')
+        log.info('Starting Find Dimension LooP')
 
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []
