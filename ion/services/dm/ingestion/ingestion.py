@@ -629,10 +629,12 @@ class IngestionService(ServiceProcess):
         # This is the inner most!
         merge_agg_dim = dimension_order[0]
 
+        log.info('Merge aggregation dimension name is: %s' % merge_agg_dim.name)
+
+
         supplement_length = merge_agg_dim.length
 
         result = {EM_TIMESTEPS:supplement_length}
-
 
         agg_offset = 0
         try:
@@ -704,7 +706,7 @@ class IngestionService(ServiceProcess):
         else:
             # We are appending an existing dataset - adjust the length of the aggregation dimension
             agg_dim = dims[merge_agg_dim.name]
-            agg_dim.length += agg_offset
+            agg_dim.length = agg_offset + supplement_length
             log.info('Setting the aggregation dimension %s to %d' % (agg_dim.name, agg_dim.length))
 
 
