@@ -13,6 +13,9 @@ import re
 import time
 import uuid
 
+import pprint
+import StringIO
+
 import os
 from twisted.internet import defer, reactor
 
@@ -256,3 +259,14 @@ def get_last_or_default(alist, default=None):
         log.debug('get_last_or_default: using default!')
         res=default
     return res
+
+
+def pprint_to_string(obj):
+
+    fstream = StringIO.StringIO()
+
+    pprint.pprint(obj, stream=fstream)
+
+    result = fstream.getvalue()
+    fstream.close()
+    return result

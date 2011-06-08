@@ -18,7 +18,8 @@ from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicat
 from ion.core.messaging.message_client import MessageInstance
 from ion.interact.conversation import ConversationType, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
 from ion.util.state_object import BasicStates
-import pprint
+from ion.util import procutils as pu
+
 
 class RpcFSMFactory(ConversationTypeFSMFactory):
     """
@@ -199,12 +200,10 @@ class RpcParticipant(ConversationRole):
         except Exception, ex:
             # *** PROBLEM. Here the conversation is in ERROR state
             log.exception("*****RPC Request Container error in message processing*****")
-            log.error('*** Message payload received:')
-            log.error(pprint.pprint(headers))
+            log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
 
             if log.getEffectiveLevel() <= logging.WARN:
-                log.error('*** Message Content: \n')
-                log.error(str(headers.get('content', '## No Content! ##')))
+                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
 
             log.error("*****End RPC Request Container error in message processing*****")
             # @todo Should we send an err or rather reject the msg?

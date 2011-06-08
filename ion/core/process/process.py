@@ -675,13 +675,12 @@ class Process(BasicLifecycleObject):
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
             log.exception("*****Non Conversation Application error in message processing*****")
-            log.error('*** Message payload received:')
-            log.error(pprint.pprint(payload))
+
+            log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
 
             if log.getEffectiveLevel() <= logging.INFO:
-                log.info('*** Message Content: \n \n')
-                log.info(str(payload.get('content', '## No Content! ##')))
-
+                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
+                
             log.error("*****End Non Conversation Application error in message processing*****")
 
 
