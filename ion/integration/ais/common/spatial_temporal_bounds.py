@@ -14,6 +14,18 @@ from twisted.internet import defer
 import time, datetime
 from decimal import Decimal
 
+#
+# Constants for bounds dict keys
+#
+MIN_LATITUDE  = 'minLatitude'
+MAX_LATITUDE  = 'maxLatitude'
+MIN_LONGITUDE = 'minLongitude'
+MAX_LONGITUDE = 'maxLongitude'
+MIN_VERTICAL  = 'minVertical'
+MAX_VERTICAL  = 'maxVertical'
+POS_VERTICAL  = 'posVertical'
+MIN_TIME      = 'minTime'
+MIN_TIME      = 'maxTime'
 
 class SpatialTemporalBounds(object):
 
@@ -48,25 +60,25 @@ class SpatialTemporalBounds(object):
         #
         # Set these flags; they're used for further tests
         #
-        self.bIsMinLatitudeSet =  bounds.IsFieldSet('minLatitude')
-        self.bIsMaxLatitudeSet =  bounds.IsFieldSet('maxLatitude')
-        self.bIsMinLongitudeSet =  bounds.IsFieldSet('minLongitude')
-        self.bIsMaxLongitudeSet =  bounds.IsFieldSet('maxLongitude')
-        self.bIsMinVerticalSet  =   bounds.IsFieldSet('minVertical')
-        self.bIsMaxVerticalSet  =   bounds.IsFieldSet('maxVertical')
-        self.bIsVerticalPositiveSet = bounds.IsFieldSet('posVertical')        
+        self.bIsMinLatitudeSet =  bounds.IsFieldSet(MIN_LATITUDE)
+        self.bIsMaxLatitudeSet =  bounds.IsFieldSet(MAX_LATITUDE)
+        self.bIsMinLongitudeSet =  bounds.IsFieldSet(MIN_LONGITUDE)
+        self.bIsMaxLongitudeSet =  bounds.IsFieldSet(MAX_LONGITUDE)
+        self.bIsMinVerticalSet  =   bounds.IsFieldSet(MIN_VERTICAL)
+        self.bIsMaxVerticalSet  =   bounds.IsFieldSet(MAX_VERTICAL)
+        self.bIsVerticalPositiveSet = bounds.IsFieldSet(POS_VERTICAL)        
 
         if self.bIsMinLatitudeSet:
-            self.bounds['minLat'] = Decimal(str(bounds.minLatitude))
+            self.bounds[MIN_LATITUDE] = Decimal(str(bounds.minLatitude))
         if self.bIsMaxLatitudeSet:
-            self.bounds['maxLat'] = Decimal(str(bounds.maxLatitude))
+            self.bounds[MAX_LATITUDE] = Decimal(str(bounds.maxLatitude))
         if self.bIsMinLongitudeSet:
-            self.bounds['minLon'] = Decimal(str(bounds.minLongitude))
+            self.bounds[MIN_LONGITUDE] = Decimal(str(bounds.minLongitude))
         if self.bIsMaxLongitudeSet:
-            self.bounds['maxLon'] = Decimal(str(bounds.maxLongitude))
+            self.bounds[MAX_LONGITUDE] = Decimal(str(bounds.maxLongitude))
         
         #
-        # If both minLat and maxLat are NOT set, we need to set the default.
+        # If both MIN_LATITUDE and MAX_LATITUDE are NOT set, we need to set the default.
         # If none are set we won't filter by area.
         #
         if not (self.bIsMinLatitudeSet and self.bIsMaxLatitudeSet): 
@@ -74,12 +86,12 @@ class SpatialTemporalBounds(object):
                 # 
                 # maximum latitude possible
                 #
-                self.bounds['maxLat'] = Decimal('90')
+                self.bounds[MAX_LATITUDE] = Decimal('90')
             elif self.bIsMaxLatitudeSet:
                 # 
                 # minimum latitude possible
                 #
-                self.bounds['minLat'] = Decimal('-90')
+                self.bounds[MIN_LATITUDE] = Decimal('-90')
             else:
                 self.filterByLatitude = False
 
@@ -92,14 +104,14 @@ class SpatialTemporalBounds(object):
                 # 
                 # maximum longitude possible
                 #
-                if self.bounds['minLon'] >= 0:
-                    self.bounds['maxLon'] = Decimal('180')
+                if self.bounds[MIN_LONGITUDE] >= 0:
+                    self.bounds[MAX_LONGITUDE] = Decimal('180')
             elif self.bIsMaxLongitudeSet:
                 # 
                 # minimum longitude possible
                 #
-                if self.bounds['maxLon'] >= 0:
-                    self.bounds['minLon'] = Decimal('-180')
+                if self.bounds[MAX_LONGITUDE] >= 0:
+                    self.bounds[MIN_LONGITUDE] = Decimal('-180')
             else:
                 self.filterByLongitude = False
 
@@ -108,15 +120,15 @@ class SpatialTemporalBounds(object):
         # by vertical
         #
         if self.bIsVerticalPositiveSet and self.bIsMinVerticalSet and self.bIsMaxVerticalSet:
-            self.bounds['minVert'] = Decimal(str(bounds.minVertical))
-            self.bounds['maxVert'] = Decimal(str(bounds.maxVertical))
+            self.bounds[MIN_VERTICAL] = Decimal(str(bounds.minVertical))
+            self.bounds[MAX_VERTICAL] = Decimal(str(bounds.maxVertical))
             #
             # If posVertical has not been set correctly, don't filter vertically
             #
             if "up" == bounds.posVertical:
-                self.bounds['posVert'] = self.UP
+                self.bounds[POS_VERTICAL] = self.UP
             elif "down" == bounds.posVertical:
-                self.bounds['posVert'] = self.DOWN
+                self.bounds[POS_VERTICAL] = self.DOWN
             else:
                 self.filterByVertical = False
         else:
@@ -191,12 +203,12 @@ class SpatialTemporalBounds(object):
             # If bounds max is less that metadata min, bounds must be completely
             # less than data; return False
             #
-            if  bounds['maxLat'] < minMetaData['ion_geospatial_lat_min']:
-                log.debug(' bounds max %f is < metadata min %f' % (bounds['minLat'], minMetaData['ion_geospatial_lat_min']))
+            if  bounds[MAX_LATITUDE] < minMetaData['ion_geospatial_lat_min']:
+                log.debug(' bounds max %f is < metadata min %f' % (bounds[MIN_LATITUDE], minMetaData['ion_geospatial_lat_min']))
                 return False
 
-            #if minMetaData['ion_geospatial_lat_min'] < bounds['minLat']:
-            #    log.error(' metadata min %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds['minLat']))
+            #if minMetaData['ion_geospatial_lat_min'] < bounds[MIN_LATITUDE]:
+            #    log.error(' metadata min %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds[MIN_LATITUDE]))
             #    return False
             
         if self.bIsMaxLatitudeSet:
@@ -204,12 +216,12 @@ class SpatialTemporalBounds(object):
             # If bounds min is greater that metadata max, bounds must be completely
             # above the data; return False
             #
-            if  bounds['minLat'] > minMetaData['ion_geospatial_lat_max']:
-                log.debug('bounds min %s is > metadata max %s' % (bounds['maxLat'], minMetaData['ion_geospatial_lat_max']))
+            if  bounds[MIN_LATITUDE] > minMetaData['ion_geospatial_lat_max']:
+                log.debug('bounds min %s is > metadata max %s' % (bounds[MAX_LATITUDE], minMetaData['ion_geospatial_lat_max']))
                 return False
             
-            #if minMetaData['ion_geospatial_lat_max'] > bounds['maxLat']:
-            #    log.error('metadata max %s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds['maxLat']))
+            #if minMetaData['ion_geospatial_lat_max'] > bounds[MAX_LATITUDE]:
+            #    log.error('metadata max %s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds[MAX_LATITUDE]))
             #    return False
             
         return True
@@ -229,8 +241,8 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMinLongitudeSet:
-            if  bounds['minLon'] > minMetaData['ion_geospatial_lon_max']:
-                log.debug('bounds min %s is > metadata max %s' % (bounds['minLon'], minMetaData['ion_geospatial_lon_max']))
+            if  bounds[MIN_LONGITUDE] > minMetaData['ion_geospatial_lon_max']:
+                log.debug('bounds min %s is > metadata max %s' % (bounds[MIN_LONGITUDE], minMetaData['ion_geospatial_lon_max']))
                 return False
         
         #
@@ -238,8 +250,8 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMaxLongitudeSet:
-            if  bounds['maxLon'] < minMetaData['ion_geospatial_lon_min']:
-                log.debug('bounds max %s is < metadata min %s' % (bounds['maxLon'], minMetaData['ion_geospatial_lon_min']))
+            if  bounds[MAX_LONGITUDE] < minMetaData['ion_geospatial_lon_min']:
+                log.debug('bounds max %s is < metadata min %s' % (bounds[MAX_LONGITUDE], minMetaData['ion_geospatial_lon_min']))
                 return False
         
         return True
@@ -253,35 +265,55 @@ class SpatialTemporalBounds(object):
           - dSet
         """
         log.debug('__isInVerticalBounds()')
+        log.debug('bounds: posvert: %s, minVert: %d, maxVert: %d' %(bounds[POS_VERTICAL], bounds[MIN_VERTICAL], bounds[MAX_VERTICAL]))
 
         #
         # This needs to adjust for the verical positive parameter
         #
-        if self.DOWN == self.bounds['posVert']:
+        if self.DOWN == self.bounds[POS_VERTICAL]:
             log.debug('testing bounds by depth')
             #
             # If the minDepth for the data is greater than the max of the bounds,
             # return false
             #
             if self.bIsMinVerticalSet:
-                if minMetaData['ion_geospatial_vertical_min'] > bounds['maxVert']:
-                    log.debug('min depth for data: %s is > bounds max depth: %s' % (minMetaData['ion_geospatial_vertical_min'], bounds['maxVert']))
+                if minMetaData['ion_geospatial_vertical_min'] > bounds[MAX_VERTICAL]:
+                    log.debug('min depth for data: %s is > bounds max depth: %s' % \
+                              (minMetaData['ion_geospatial_vertical_min'], bounds[MAX_VERTICAL]))
                     return False
             #
             # If the maxDepth for the data is less than the min of the bounds,
             # return false
+            #
             if self.bIsMaxVerticalSet:
-                if minMetaData['ion_geospatial_vertical_max'] < bounds['minVert']:
-                    log.debug('max depth for data: %s is < bounds min depth: %s' % (minMetaData['ion_geospatial_vertical_max'], bounds['minVert']))
+                if minMetaData['ion_geospatial_vertical_max'] < bounds[MIN_VERTICAL]:
+                    log.debug('max depth for data: %s is < bounds min depth: %s' % \
+                              (minMetaData['ion_geospatial_vertical_max'], bounds[MIN_VERTICAL]))
                     return False
                 
-            #
-            # If the data covers the bounds (bounds depth is contained by the
-            # data depth)
-            #
-
-        elif self.UP == self.bounds['posVert']:
+        elif self.UP == self.bounds[POS_VERTICAL]:
             log.debug('testing bounds by altitude')
+
+            #
+            # If the maxAltitude for the data is less than the min of the bounds,
+            # return false
+            #
+            if self.bIsMaxVerticalSet:
+                if minMetaData['ion_geospatial_vertical_max'] < bounds[MIN_VERTICAL]:
+                    log.debug('max altitude for data: %s is < bounds min altitude: %s' % \
+                              (minMetaData['ion_geospatial_vertical_max'], bounds[MIN_VERTICAL]))
+                    return False
+                
+
+            #
+            # If the minAltitude for the data is greater than the max of the bounds,
+            # return false
+            #
+            if self.bIsMinVerticalSet:
+                if minMetaData['ion_geospatial_vertical_min'] > bounds[MAX_VERTICAL]:
+                    log.debug('min altitude for data: %s is > bounds max altitude: %s' % \
+                              (minMetaData['ion_geospatial_vertical_min'], bounds[MAX_VERTICAL]))
+                    return False
         
         return True
 
