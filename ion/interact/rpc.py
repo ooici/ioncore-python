@@ -188,10 +188,8 @@ class RpcParticipant(ConversationRole):
             # In case of an application error - do not terminate the process!
             if log.getEffectiveLevel() <= logging.INFO:    # only output all this stuff when debugging
                 log.exception("*****RPC Request Application error in message processing*****")
-                log.error('*** Message payload received:')
-                log.error(pprint.pprint(headers))
-                log.error('*** Message Content: \n')
-                log.error(str(headers.get('content', '## No Content! ##')))
+                log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
+                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
                 log.error("*****End RPC Request Application error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC

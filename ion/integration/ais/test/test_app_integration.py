@@ -6,8 +6,6 @@
 @author David Everett
 """
 
-from twisted.trial import unittest
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import ion.util.procutils as pu
@@ -19,16 +17,13 @@ from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
                                                                     HAS_A_ID, \
-                                                                    ROOT_USER_ID, \
-                                                                    ANONYMOUS_USER_ID, \
-                                                                    MYOOICI_USER_ID, \
-                                                                    DISPATCHER_RESOURCE_TYPE_ID
+                                                                    ANONYMOUS_USER_ID
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, \
     DatasetSupplementAddedEventSubscriber
 from ion.core.data import store
@@ -47,7 +42,6 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        UPDATE_USER_PROFILE_REQUEST_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        GET_USER_PROFILE_REQUEST_TYPE, \
-                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
                                                        CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
@@ -57,9 +51,7 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCE_REQUEST_TYPE, \
                                                        GET_RESOURCE_RESPONSE_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE
 
 # Create CDM Type Objects
@@ -135,8 +127,6 @@ class AppIntegrationTest(IonTestCase):
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
         
-        self.dispatcher_id = None
-
         services = [
             {
                 'name':'pubsub_service',
@@ -1178,7 +1168,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     def __register_dispatcher(self, name):
         dispatcher_res = yield self.rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         dispatcher_res.dispatcher_name = name
-        dispatcher_id = dispatcher_res.ResourceIdentity
         yield self.rc.put_instance(dispatcher_res, 'Committing new dispatcher resource for registration')
         defer.returnValue(dispatcher_res)
 
