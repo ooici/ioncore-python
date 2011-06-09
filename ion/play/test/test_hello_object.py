@@ -117,7 +117,7 @@ class HelloObjectTest(IonTestCase):
         
         log.info('Calling hello person...')
         # You can send the root of the object or any linked composite part of it.
-        new_person = yield hc1.hello_person(ab.person[0])
+        new_person = yield hc1.hello_person(person)
         
         # This is a different repository from the one we started with!
         log.info('Nome of the command object:' + person.Repository.repository_key)

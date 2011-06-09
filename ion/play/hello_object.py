@@ -92,8 +92,7 @@ class HelloObject(ServiceProcess):
         #strongly typed in google protocol buffers!
         if person.ObjectType != PERSON_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)),
-                                   person.ResponseCodes.BAD_REQUEST)
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)),400)
             
                 
         # Creepy hello person object log statements...
@@ -121,8 +120,7 @@ class HelloObject(ServiceProcess):
 
         if addresslink.ObjectType != ADDRESSLINK_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(addresslink), str(addresslink.ObjectType)),
-                                   addresslink.ResponseCodes.BAD_REQUEST)
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(addresslink), str(addresslink.ObjectType)),400)
             
         log.info('Received addresslink; Title: ' + addresslink.title)
         for person in addresslink.person:
@@ -152,7 +150,11 @@ class HelloObjectClient(ServiceClient):
         @retval response, GPB 20001/1, a person message if successful.
         """
         yield self._check_init()
-        
+
+        print 'KSNSLDSNDLSNDSLKSDNLKDSLKSDNLK'
+        print msg
+        print 'KSNSLDSNDLSNDSLKSDNLKDSLKSDNLK'
+
         (content, headers, msg) = yield self.rpc_send('hello_person', msg)
         
         defer.returnValue(content)
