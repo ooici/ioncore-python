@@ -86,14 +86,13 @@ class HelloObject(ServiceProcess):
         @param params person GPB, 20001/1, a person object from net.ooici.play.
         @retval response, GPB 20001/1, a person message if successful.
         """
-        log.info('op_hello_person: ')
+        log.info('op_hello_person: %s' % person)
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
         if person.ObjectType != PERSON_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)),
-                                   person.ResponseCodes.BAD_REQUEST)
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)), 400)
             
                 
         # Creepy hello person object log statements...
@@ -121,8 +120,7 @@ class HelloObject(ServiceProcess):
 
         if addresslink.ObjectType != ADDRESSLINK_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(addresslink), str(addresslink.ObjectType)),
-                                   addresslink.ResponseCodes.BAD_REQUEST)
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(addresslink), str(addresslink.ObjectType)),400)
             
         log.info('Received addresslink; Title: ' + addresslink.title)
         for person in addresslink.person:
