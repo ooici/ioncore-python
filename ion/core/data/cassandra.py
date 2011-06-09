@@ -13,7 +13,7 @@
 """
 import os
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from zope.interface import implements
 
@@ -32,6 +32,44 @@ from ion.util.tcp_connections import TCPConnection
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+
+class TimeoutError(Exception):
+    """Raised when time expires in timeout decorator"""
+
+def timeout(secs):
+    """
+    Decorator to add timeout to Deferred calls
+    https://gist.github.com/735556
+    Credit to theduderog
+    """
+    def wrap(func):
+        @defer.inlineCallbacks
+        def _timeout(*args, **kwargs):
+            rawD = func(*args, **kwargs)
+            if not isinstance(rawD, defer.Deferred):
+                defer.returnValue(rawD)
+
+            timeoutD = defer.Deferred()
+            timesUp = reactor.callLater(secs, timeoutD.callback, None)
+
+            try:
+                rawResult, timeoutResult = yield defer.DeferredList([rawD, timeoutD], fireOnOneCallback=True, fireOnOneErrback=True, consumeErrors=True)
+            except defer.FirstError, e:
+                #Only rawD should raise an exception
+                assert e.index == 0
+                timesUp.cancel()
+                e.subFailure.raiseException()
+            else:
+                #Timeout
+                if timeoutD.called:
+                    rawD.cancel()
+                    raise TimeoutError("%s secs have expired" % secs)
+
+            #No timeout
+            timesUp.cancel()
+            defer.returnValue(rawResult)
+        return _timeout
+    return wrap
 
 
 class CassandraError(Exception):
@@ -89,8 +127,8 @@ class CassandraStore(TCPConnection):
         self._cache = cache # Cassandra Column Family maps to an ION Cache resource
         self._cache_name = cache.name
         log.info("leaving __init__")
-        
 
+    @timeout(5)
     @defer.inlineCallbacks
     def get(self, key):
         """
@@ -108,6 +146,7 @@ class CassandraStore(TCPConnection):
             value = None
         defer.returnValue(value)
 
+    @timeout(5)
     @defer.inlineCallbacks
     def put(self, key, value):
         """
@@ -122,6 +161,7 @@ class CassandraStore(TCPConnection):
         columns = {"value": value, "has_key":"1"}
         yield self.client.batch_insert(key, self._cache_name, columns)
 
+    @timeout(5)
     @defer.inlineCallbacks
     def has_key(self, key):
         """
@@ -136,6 +176,7 @@ class CassandraStore(TCPConnection):
             ret = False
         defer.returnValue(ret)
 
+    @timeout(5)
     @defer.inlineCallbacks
     def remove(self, key):
         """
@@ -188,6 +229,7 @@ class CassandraIndexedStore(CassandraStore):
         self._query_attribute_names = None
             
         
+    @timeout(5)
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
         """
@@ -209,6 +251,7 @@ class CassandraIndexedStore(CassandraStore):
         
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
+    @timeout(5)
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
         """
@@ -223,6 +266,7 @@ class CassandraIndexedStore(CassandraStore):
         defer.succeed(None)
 
     
+    @timeout(5)
     @defer.inlineCallbacks
     def _check_index(self, index_attributes):
         """
@@ -251,7 +295,8 @@ class CassandraIndexedStore(CassandraStore):
             raise IndexStoreError("Values for the indexed columns must be of type str.")
         
 
-    @defer.inlineCallbacks    
+    @timeout(5)
+    @defer.inlineCallbacks
     def query(self, query_predicates, row_count=100):
         """
         Search for rows in the Cassandra instance.
@@ -289,6 +334,7 @@ class CassandraIndexedStore(CassandraStore):
 
         defer.returnValue(result)
         
+    @timeout(5)
     @defer.inlineCallbacks
     def get_query_attributes(self):
         """
