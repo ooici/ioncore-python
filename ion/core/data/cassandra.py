@@ -29,49 +29,16 @@ from ion.core.data.store import IndexStoreError
 
 from ion.util.tcp_connections import TCPConnection
 
+from ion.util.timeout import timeout
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
-class TimeoutError(Exception):
-    """Raised when time expires in timeout decorator"""
-
-def timeout(secs):
-    """
-    Decorator to add timeout to Deferred calls
-    https://gist.github.com/735556
-    Credit to theduderog
-    """
-    def wrap(func):
-        @defer.inlineCallbacks
-        def _timeout(*args, **kwargs):
-            rawD = func(*args, **kwargs)
-            if not isinstance(rawD, defer.Deferred):
-                defer.returnValue(rawD)
-
-            timeoutD = defer.Deferred()
-            timesUp = reactor.callLater(secs, timeoutD.callback, None)
-
-            try:
-                rawResult, timeoutResult = yield defer.DeferredList([rawD, timeoutD], fireOnOneCallback=True, fireOnOneErrback=True, consumeErrors=True)
-            except defer.FirstError, e:
-                #Only rawD should raise an exception
-                assert e.index == 0
-                timesUp.cancel()
-                e.subFailure.raiseException()
-            else:
-                #Timeout
-                if timeoutD.called:
-                    rawD.cancel()
-                    raise TimeoutError("%s secs have expired" % secs)
-
-            #No timeout
-            timesUp.cancel()
-            defer.returnValue(rawResult)
-        return _timeout
-    return wrap
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 
+cassandra_timeout = CONF.getValue('CassandraTimeout',5.0)
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
@@ -128,7 +95,7 @@ class CassandraStore(TCPConnection):
         self._cache_name = cache.name
         log.info("leaving __init__")
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get(self, key):
         """
@@ -137,7 +104,7 @@ class CassandraStore(TCPConnection):
         @retval Deferred that fires with the value of key
         """
         
-        log.debug("CassandraStore: Calling get on key %s " % key)
+        #log.debug("CassandraStore: Calling get on key %s " % key)
         try:
             result = yield self.client.get(key, self._cache_name, column='value')
             value = result.column.value
@@ -146,7 +113,7 @@ class CassandraStore(TCPConnection):
             value = None
         defer.returnValue(value)
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value):
         """
@@ -156,12 +123,12 @@ class CassandraStore(TCPConnection):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
+        #log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
         columns = {"value": value, "has_key":"1"}
         yield self.client.batch_insert(key, self._cache_name, columns)
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def has_key(self, key):
         """
@@ -176,7 +143,7 @@ class CassandraStore(TCPConnection):
             ret = False
         defer.returnValue(ret)
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove(self, key):
         """
@@ -229,7 +196,7 @@ class CassandraIndexedStore(CassandraStore):
         self._query_attribute_names = None
             
         
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
         """
@@ -245,13 +212,13 @@ class CassandraIndexedStore(CassandraStore):
             index_cols = dict(**index_attributes)
 
             
-        log.info(" index_attributes %s" % (index_cols))
+        #log.info("Put: index_attributes %s" % (index_cols))
         yield self._check_index(index_cols)
         index_cols.update({"value":value, "has_key":"1"})
         
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
         """
@@ -261,12 +228,12 @@ class CassandraIndexedStore(CassandraStore):
         can be used to query the store to return rows based on the value of the attributes.
         """
         yield self._check_index(index_attributes)
-        log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
+        #log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         defer.succeed(None)
 
     
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def _check_index(self, index_attributes):
         """
@@ -280,7 +247,8 @@ class CassandraIndexedStore(CassandraStore):
         if self._query_attribute_names is None:
             query_attributes =  yield self.get_query_attributes()
             self._query_attribute_names = set(query_attributes)
-        
+
+
         index_attribute_names = set(index_attributes.keys())
         
         if not index_attribute_names.issubset(self._query_attribute_names):
@@ -295,7 +263,7 @@ class CassandraIndexedStore(CassandraStore):
             raise IndexStoreError("Values for the indexed columns must be of type str.")
         
 
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def query(self, query_predicates, row_count=100):
         """
@@ -309,7 +277,7 @@ class CassandraIndexedStore(CassandraStore):
         
         raises a CassandraError if the query_predicate object is malformed.
         """
-        log.info(self._cache_name)
+        #log.info('Query against cache: %s' % self._cache_name)
         predicates = query_predicates.get_predicates()
         def fix_preds(query_tuple):
             if query_tuple[2] == Query.EQ:
@@ -321,10 +289,10 @@ class CassandraIndexedStore(CassandraStore):
             args = {'column_name':query_tuple[0], 'op':new_pred, 'value': query_tuple[1]}
             return IndexExpression(**args)
         selection_predicates = map(fix_preds, predicates)
-        log.info("Calling get_indexed_slices selection_predicate %s " % (selection_predicates,))
+        #log.debug("Calling get_indexed_slices selection_predicate %s " % (selection_predicates,))
         
         rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates, count=row_count)
-        log.info("Got rows back")
+        #log.info("Got rows back")
         result ={}
         for row in rows:
             row_vals = {}
@@ -334,14 +302,15 @@ class CassandraIndexedStore(CassandraStore):
 
         defer.returnValue(result)
         
-    @timeout(5)
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
         """
+        log.warn('Calling get_query_attributes - this is expensive!')
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
-        log.debug("keyspace desc %s" % (keyspace_description,))
+        #log.debug("keyspace desc %s" % (keyspace_description,))
         get_cfdef = lambda cfdef: cfdef.name == self._cache_name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
