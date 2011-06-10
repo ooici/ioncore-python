@@ -174,8 +174,15 @@ def asleep(secs):
     @param secs Time, in seconds
     @retval Deferred whose callback will fire after time has expired
     """
-    d = defer.Deferred()
-    reactor.callLater(secs, d.callback, None)
+
+    #d = defer.Deferred()
+    #reactor.callLater(secs, d.callback, None)
+
+    # This is a better implementation - the delayed call can now be cancelled by the deferred which prevents dirty reactor!
+    def deferLaterCancel(deferred):
+       delayedCall.cancel()
+    d = defer.Deferred(deferLaterCancel)
+    delayedCall = reactor.callLater(secs, d.callback, None)
     return d
 
 def currenttime():
