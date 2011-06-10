@@ -9,6 +9,7 @@ set of temporal/spatial bounds.
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+from ion.util.procutils import isnan
 from twisted.internet import defer
 
 import time, datetime
@@ -58,14 +59,15 @@ class SpatialTemporalBounds(object):
         log.debug('__loadBounds')
 
         #
-        # Set these flags; they're used for further tests
+        # Set these flags; they're used for further tests; only set if the field is NOT NaN
+        # (not a number); i.e., the field must be a number.
         #
-        self.bIsMinLatitudeSet =  bounds.IsFieldSet(MIN_LATITUDE)
-        self.bIsMaxLatitudeSet =  bounds.IsFieldSet(MAX_LATITUDE)
-        self.bIsMinLongitudeSet =  bounds.IsFieldSet(MIN_LONGITUDE)
-        self.bIsMaxLongitudeSet =  bounds.IsFieldSet(MAX_LONGITUDE)
-        self.bIsMinVerticalSet  =   bounds.IsFieldSet(MIN_VERTICAL)
-        self.bIsMaxVerticalSet  =   bounds.IsFieldSet(MAX_VERTICAL)
+        self.bIsMinLatitudeSet = (bounds.IsFieldSet(MIN_LATITUDE) and not isnan(bounds.minLatitude))
+        self.bIsMaxLatitudeSet = (bounds.IsFieldSet(MAX_LATITUDE) and not isnan(bounds.maxLatitude))
+        self.bIsMinLongitudeSet = (bounds.IsFieldSet(MIN_LONGITUDE) and not isnan(bounds.minLongitude))
+        self.bIsMaxLongitudeSet = (bounds.IsFieldSet(MAX_LONGITUDE) and not isnan(bounds.maxLongitude))
+        self.bIsMinVerticalSet = (bounds.IsFieldSet(MIN_VERTICAL) and not isnan(bounds.minVertical))
+        self.bIsMaxVerticalSet = (bounds.IsFieldSet(MAX_VERTICAL) and not isnan(bounds.maxVertical))
         self.bIsVerticalPositiveSet = bounds.IsFieldSet(POS_VERTICAL)        
 
         if self.bIsMinLatitudeSet:
