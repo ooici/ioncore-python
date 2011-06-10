@@ -8,6 +8,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from ion.core.object import object_utils
@@ -44,7 +45,8 @@ class GetDataResourceDetail(object):
         
     @defer.inlineCallbacks
     def getDataResourceDetail(self, msg):
-        log.debug('getDataResourceDetail Worker Class got GPB: \n' + str(msg))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getDataResourceDetail Worker Class got GPB: \n' + str(msg))
 
         if msg.message_parameters_reference.IsFieldSet('data_resource_id'):
             dSetResID = msg.message_parameters_reference.data_resource_id
