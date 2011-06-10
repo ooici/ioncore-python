@@ -583,10 +583,8 @@ class ManageDataResource(object):
         datasrc_resource.endtime_offset_millis            = msg.endtime_offset_millis
         datasrc_resource.aggregation_rule                 = msg.aggregation_rule
 
-        i = -1
-        for r in msg.sub_ranges:
+        for i, r in enumerate(msg.sub_ranges):
             datasrc_resource.sub_ranges.add()
-            i = i + 1
             datasrc_resource.sub_ranges[i] = msg.sub_ranges[i]
 
 
