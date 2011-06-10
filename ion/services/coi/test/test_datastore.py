@@ -757,6 +757,40 @@ class MulitDataStoreTest(IonTestCase):
 
 
     @defer.inlineCallbacks
+    def test_push_sync(self):
+        log.info('starting multi push test...')
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        n=12
+        for i in range(n):
+
+            repo.root_object.person[0].id = i
+
+            repo.commit('The %d commit!' % i)
+
+            log.info('Commit #%d and push workbench test object:\n%s' % (i, self.wb1.workbench))
+            yield self.wb1.workbench.push('datastore', repo)
+
+
+
+        repo1 = yield self.ds1.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+
+        repo2 = yield self.ds2.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+
+        repo3 = yield self.ds3.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+
+        repo4 = yield self.ds4.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+
+
+        self.assertEqual(repo, repo1)
+        self.assertEqual(repo, repo2)
+        self.assertEqual(repo, repo3)
+        self.assertEqual(repo, repo4)
+
+
+
+    @defer.inlineCallbacks
     def test_push_pull(self):
         log.info('starting multi push test...')
 
