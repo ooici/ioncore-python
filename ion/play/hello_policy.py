@@ -121,7 +121,6 @@ class HelloPolicy(ServiceProcess):
         response.configuration = response.CreateObject(PROTECTED_RESOURCE_FIND_RSP_TYPE)
 
         response.configuration.resources.add()
-
         #Field no longer exists!
         #response.configuration.resources[0].resource_id = resource_id
         response.configuration.resources[0].name = resource.name

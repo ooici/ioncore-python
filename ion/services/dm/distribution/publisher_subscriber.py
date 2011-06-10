@@ -11,6 +11,8 @@ from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from twisted.internet import defer
 
+from ion.util import procutils as pu
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -52,7 +54,7 @@ class PSCRegisterable(object):
             log.warn("Could not import MC or PSC in PSCRegisterable base, likely a circular reference")
 
     @defer.inlineCallbacks
-    def psc_setup(self, xs_name='swapmeet', xp_name='science_data', routing_key=None,
+    def psc_setup(self, xs_name=None, xp_name='science_data', routing_key=None,
                          credentials=None, **kwargs):
         '''
         Common PSC setup methods shared between pub/sub derived implementations.
@@ -70,7 +72,7 @@ class PSCRegisterable(object):
         log.debug('xs')
         msg = yield self._pscr_mc.create_instance(self._pscr_XS_TYPE)
 
-        msg.exchange_space_name = xs_name or 'swapmeet'
+        msg.exchange_space_name = xs_name or pu.get_scoped_name('swapmeet', 'system')
 
         rc = yield self._pscr_pscc.declare_exchange_space(msg)
         self._xs_id = rc.id_list[0]

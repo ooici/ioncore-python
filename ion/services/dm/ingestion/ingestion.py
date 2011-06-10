@@ -324,7 +324,7 @@ class IngestionService(ServiceProcess):
             ingest_res={EM_ERROR:'Ingestion Failed!'}
             ingest_res.update(data_details)
             
-        datasource = None
+        data_source = None
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed!")
 
@@ -338,6 +338,7 @@ class IngestionService(ServiceProcess):
             # If the dataset / source is new 
             if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
 
+                log.info('Fetching datasource id - %s - to set life cycle state' % content.datasource_id)
                 data_source = yield self.rc.get_instance(content.datasource_id)
 
                 if data_source.is_public == True:
@@ -351,10 +352,12 @@ class IngestionService(ServiceProcess):
                     self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
-
         resources=[self.dataset]
-        if datasource is not None:
-            resources.append(datasource)
+        if data_source is not None:
+            resources.append(data_source)
+
+        for res in resources:
+            log.info('Resource %s life cycle state is %s' % (res.ResourceName, res.ResourceLifeCycleState))
 
         yield self.rc.put_resource_transaction(resources)
 
@@ -589,11 +592,13 @@ class IngestionService(ServiceProcess):
         if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
 
+
         # Commit the current state of the supplement - ingest of new content is complete
         self.dataset.Repository.commit('Ingest received complete notification.')
 
         # The current branch on entering recv done is the supplement branch
         merge_branch = self.dataset.Repository.current_branch_key()
+
         # Merge it with the current state of the dataset in the datastore
         yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
 
@@ -606,6 +611,8 @@ class IngestionService(ServiceProcess):
 
         # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
+
+        log.info('Starting Find Dimension LooP')
 
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []
@@ -623,10 +630,12 @@ class IngestionService(ServiceProcess):
         # This is the inner most!
         merge_agg_dim = dimension_order[0]
 
+        log.info('Merge aggregation dimension name is: %s' % merge_agg_dim.name)
+
+
         supplement_length = merge_agg_dim.length
 
         result = {EM_TIMESTEPS:supplement_length}
-
 
         agg_offset = 0
         try:
@@ -698,7 +707,7 @@ class IngestionService(ServiceProcess):
         else:
             # We are appending an existing dataset - adjust the length of the aggregation dimension
             agg_dim = dims[merge_agg_dim.name]
-            agg_dim.length += agg_offset
+            agg_dim.length = agg_offset + supplement_length
             log.info('Setting the aggregation dimension %s to %d' % (agg_dim.name, agg_dim.length))
 
 

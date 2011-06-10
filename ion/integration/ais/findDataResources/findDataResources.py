@@ -9,6 +9,7 @@ spacial and temporal parameters.
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from decimal import Decimal
@@ -54,14 +55,31 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
                 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug("DataResourceUpdateEventSubscriber received a message:\n")
+        log.debug("DataResourceUpdateEventSubscriber received an event:\n")
+
+        dSetResID = data['content'].additional_data.dataset_id
 
         #
-        # Don't have any way to get the datasource ID (from the trial test),
-        # so for for now get the cached dataset metadata and get the source
+        # Get the associated source for the dataset (whether the dataset is
+        # cached or not).  If the dataset is cached, delete it and the
+        # associated source. In any case, add the dataset and the datasource
+        # to the cache.
         #
-        dSetResID = data['content'].additional_data.dataset_id
+        
         #dSourceResID = data['content'].additional_data.datasource_id
+        #
+        # The above line is commented out for the following reason:
+        # Do not use the dataSourceID that is passed in with the event; rather
+        # get the dataSourceID from the association client.  The reason is that
+        # the the association is the final authority, rendering the passed in
+        # parameter as superfluous. 
+        #
+        dSourceResID = yield self.metadataCache.getAssociatedSource(dSetResID)
+
+        #
+        # Now check the cache to see if there's currently metadata for this
+        # datasetID
+        #
         dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
 
         #
@@ -69,24 +87,21 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         # delete step.
         #
         if dSetMetadata is not None:
-            dSourceResID = dSetMetadata['DSourceID']
-
             #
             # Delete the dataset and datasource metadata
             #
-            log.debug('deleting %s, %s from metadataCache' %(dSetResID, dSourceResID))
+            log.debug('DataResourceUpdateEventSubscriber deleting %s, %s from metadataCache' \
+                      %(dSetResID, dSourceResID))
             yield self.metadataCache.deleteDSetMetadata(dSetResID)
             yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
-
-        else:
-            dSourceResID = data['content'].additional_data.datasource_id
 
         #
         # Now  reload the dataset and datasource metadata
         #
-        log.debug('putting new metadata in cache')
+        log.debug('DataResourceUpdateEventSubscriber putting new metadata in cache')
         yield self.metadataCache.putDSetMetadata(dSetResID)
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
+
     
 class FindDataResources(object):
 
@@ -236,39 +251,6 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def getAssociatedSource(self, dSetResID):
-        """
-        Worker class method to get the data source that associated with a given
-        data set.  This is a public method because it can be called from the
-        findDataResourceDetail worker class.
-        """
-        log.debug('getAssociatedSource() entry')
-
-        try: 
-            ds = yield self.rc.get_instance(dSetResID)
-            
-        except ResourceClientError:    
-            log.error('AssociationError')
-            defer.returnValue(None)
-
-        try:
-            results = yield self.ac.find_associations(obj=ds, predicate_or_predicates=HAS_A_ID)
-
-        except AssociationClientError:
-            log.error('AssociationError')
-            defer.returnValue(None)
-
-        for association in results:
-            log.debug('Associated Source for Dataset: ' + \
-                      association.ObjectReference.key + \
-                      ' is: ' + association.SubjectReference.key)
-
-        log.debug('getAssociatedSource() exit')
-
-        defer.returnValue(association.SubjectReference.key)
-
-                      
-    @defer.inlineCallbacks
     def getAssociatedOwner(self, dsID):
         """
         Worker class method to find the owner associated with a data set.
@@ -381,8 +363,10 @@ class FindDataResources(object):
             # If the dataset's data is within the given criteria, include it
             # in the list
             #
-            if bounds.isInBounds(dSetMetadata):                
-                log.debug('dataset %s in bounds' % (dSetMetadata['title']))
+            if bounds.isInBounds(dSetMetadata):
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    if 'title' in dSetMetadata.keys():
+                        log.debug('dataset %s in bounds' % (dSetMetadata['title']))
 
                 if self.bUseMetadataCache:            
                     dSourceResID = dSetMetadata['DSourceID']
@@ -404,7 +388,7 @@ class FindDataResources(object):
                         defer.returnValue(Response)
                     
                 else:
-                    dSourceResID = yield self.getAssociatedSource(dSetResID)
+                    dSourceResID = yield self.metadataCache.getAssociatedSource(dSetResID)
                     try:
                         dSource = yield self.rc.get_instance(dSourceResID)
                     
@@ -466,7 +450,9 @@ class FindDataResources(object):
     
                 j = j + 1
             else:
-                log.debug('dataset %s is OUT OF bounds <-------------' % (dSetMetadata['title']))
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    if 'title' in dSetMetadata.keys():
+                        log.debug('dataset %s is OUT OF bounds <-------------' % (dSetMetadata['title']))
             
             i = i + 1
 

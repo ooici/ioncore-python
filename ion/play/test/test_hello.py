@@ -15,7 +15,6 @@ from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.core import ioninit
 
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -33,7 +32,6 @@ class HelloTest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-    @itv(CONF)
     @defer.inlineCallbacks
     def test_hello_performance(self):
         self.timeout = 60
@@ -58,7 +56,7 @@ class HelloTest(IonTestCase):
         delta_t = (time.time() - tzero)
         print('%f elapsed, %f per second' % (delta_t, float(count) / delta_t) )
 
-    @itv(CONF)
+
     @defer.inlineCallbacks
     def test_hello(self):
         services = [

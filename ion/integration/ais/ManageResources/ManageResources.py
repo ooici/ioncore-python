@@ -14,7 +14,8 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
+from ion.services.cei.epu_controller_client import EPUControllerClient
+from ion.services.cei.epu_controller_list_client import EPUControllerListClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
                                                                     identity_res_type_name, \
@@ -86,8 +87,9 @@ class ManageResources(object):
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
       self.mc = ais.mc
-      self.asc = AssociationServiceClient()
-      self.rc = ResourceClient()
+      self.asc = AssociationServiceClient(proc=ais)
+      self.rc = ResourceClient(proc=ais)
+      self.eclc = EPUControllerListClient(proc=ais)
         
 
    @defer.inlineCallbacks
@@ -106,14 +108,13 @@ class ManageResources(object):
       defer.returnValue(Response)
 
 
+   @defer.inlineCallbacks
    def __findEpuControllers(self):
       log.debug('__findEpuControllers')
-      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
       d = DictObj
-      d.idrefs = ['dataservices_epu_controller',
-                  'agentservices_epu_controller',
-                  'associationservices_epu_controller']
-      return d
+      d.idrefs = yield self.eclc.list()
+      log.debug('__findEpuControllers: returning '+str(d))
+      defer.returnValue(d)
 
 
    @defer.inlineCallbacks
@@ -121,7 +122,8 @@ class ManageResources(object):
 
       if resourceType == EPU_CONTROLLER_TYPE_ID:
          # get the resources from the EPU management
-         defer.returnValue(self.__findEpuControllers())
+         result = yield self.__findEpuControllers()
+         defer.returnValue(result)
       
       # get the resources out of the Association Service
       request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)

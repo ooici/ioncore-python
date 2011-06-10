@@ -1013,8 +1013,8 @@ class WorkBench(object):
     def _merge_repo_heads(self, existing_head, new_head):
 
         log.debug('_merge_repo_heads: merging the state of repository heads!')
-        log.debug('existing repository head:\n'+str(existing_head))
-        log.debug('new head:\n'+str(new_head))
+        log.debug('existing repository head:\n' + existing_head.Debug())
+        log.debug('new head:\n' + new_head.Debug())
 
         # examine all the branches in new and merge them into existing
         for new_branch in new_head.branches:

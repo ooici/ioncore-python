@@ -6,28 +6,24 @@
 @author David Everett
 """
 
-from twisted.trial import unittest
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import ion.util.procutils as pu
 
 from twisted.internet import defer
-
+import time
+    
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
                                                                     HAS_A_ID, \
-                                                                    ROOT_USER_ID, \
-                                                                    ANONYMOUS_USER_ID, \
-                                                                    MYOOICI_USER_ID, \
-                                                                    DISPATCHER_RESOURCE_TYPE_ID
+                                                                    ANONYMOUS_USER_ID
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
+from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, \
     DatasetSupplementAddedEventSubscriber
 from ion.core.data import store
@@ -46,7 +42,6 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        UPDATE_USER_PROFILE_REQUEST_TYPE, \
                                                        REGISTER_USER_RESPONSE_TYPE, \
                                                        GET_USER_PROFILE_REQUEST_TYPE, \
-                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
                                                        CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
@@ -56,9 +51,7 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCE_REQUEST_TYPE, \
                                                        GET_RESOURCE_RESPONSE_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE
 
 # Create CDM Type Objects
@@ -104,16 +97,36 @@ class AppIntegrationTest(IonTestCase):
     Testing Application Integration Service.
     """
 
+    # Set timeout for Trial tests
+    timeout = 40
+    
+    # set to None to turn off timing logging, set to anything else to turn on timing logging
+    AnalyzeTiming = None
+    
+    class TimeStampsClass (object):
+        pass
+    
+    TimeStamps = TimeStampsClass()
+    
+    def TimeStamp (self):
+        TimeNow = time.time()
+        TimeStampStr = "(wall time = " + str (TimeNow) + \
+                       ", elapse time = " + str(TimeNow - self.TimeStamps.StartTime) + \
+                       ", delta time = " + str(TimeNow - self.TimeStamps.LastTime) + \
+                       ")"
+        self.TimeStamps.LastTime = TimeNow
+        return TimeStampStr
+    
+        
     @defer.inlineCallbacks
     def setUp(self):
+        log.debug('AppIntegrationTest.setUp():')
         yield self._start_container()
 
         store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
         
-        self.dispatcher_id = None
-
         services = [
             {
                 'name':'pubsub_service',
@@ -195,22 +208,12 @@ class AppIntegrationTest(IonTestCase):
         self.rc = ResourceClient(proc=sup)
         self.ac  = AssociationClient(proc=sup)
         self._proc = Process()
+        
+        if self.AnalyzeTiming != None:
+            self.TimeStamps.StartTime = time.time()
+            self.TimeStamps.LastTime = self.TimeStamps.StartTime
+    
 
-        # Step 1: Get this dispatcher's ID from the local dispatcher.id file
-        f = None
-        id = None
-
-        """        
-        try:
-            f = open('dispatcher.id', 'r')
-            id = f.read().strip()
-            # @todo: ensure this resource exists in the ResourceRepo
-        except IOError:
-             log.warn('__init__(): Dispatcher ID could not be found.  One will be created instead')
-        finally:
-            if f is not None:
-                f.close()
-        """
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -1019,56 +1022,72 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCES_OF_TYPE_REQUEST_TYPE)
         
         msg.message_parameters_reference.resource_type = "datasets"
+        log.debug('getResourcesOfType: calling AIS to get datasets')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "identities"
+        log.debug('getResourcesOfType: calling AIS to get identities')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "datasources"
+        log.debug('getResourcesOfType: calling AIS to get datasources')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
         
         msg.message_parameters_reference.resource_type = "epucontrollers"
+        log.debug('getResourcesOfType: calling AIS to get epucontrollers')
         reply = yield self.aisc.getResourcesOfType(msg)
         log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        log.debug('getResourcesOfType returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
             self.fail('response to getResourcesOfType is not a GET_RESOURCES_OF_TYPE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('column_names'):
             self.fail('response to getResourcesOfType has no column_names field')
         if not reply.message_parameters_reference[0].IsFieldSet('resources'):
             self.fail('response to getResourcesOfType has no resources field')
+        log.debug('getResourcesOfType returned column_names:\n'+str(reply.message_parameters_reference[0].column_names))
+        log.debug('getResourcesOfType returned resources:\n')
+        for resource in reply.message_parameters_reference[0].resources:
+           log.debug(str(resource))
 
     @defer.inlineCallbacks
     def test_getResource(self):
@@ -1149,7 +1168,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     def __register_dispatcher(self, name):
         dispatcher_res = yield self.rc.create_instance(DISPATCHER_RESOURCE_TYPE, ResourceName=name)
         dispatcher_res.dispatcher_name = name
-        dispatcher_id = dispatcher_res.ResourceIdentity
         yield self.rc.put_instance(dispatcher_res, 'Committing new dispatcher resource for registration')
         defer.returnValue(dispatcher_res)
 
@@ -1377,11 +1395,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
     @defer.inlineCallbacks
     def test_updateDataResourceSubscription(self):
-        log.debug('Testing updateDataResourceSubscription.')
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: started at ' + str(self.TimeStamps.StartTime))
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
         yield self.createUser()
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created user ' + self.TimeStamp())
         
         #
         # Create dispatchers and associations
@@ -1392,6 +1413,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.dispatcherRes = yield self.__register_dispatcher('DispatcherResource2')
         self.dispatcherID = self.dispatcherRes.ResourceIdentity
         log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created dispatchers ' + self.TimeStamp())
             
         #
         # Now make an association between the user and this dispatcher
@@ -1417,13 +1440,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
-
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created associations ' + self.TimeStamp())
+ 
         # first create a subscription to be updated
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
@@ -1440,8 +1465,35 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: created subscription ' + self.TimeStamp())
             
         # now update the subscription created above
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
+        
+        log.debug('Calling updateDataResourceSubscription.')
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
+        else:
+            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: updated subscription ' + self.TimeStamp())
+
+        # now update the subscription updated above
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
@@ -1463,34 +1515,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
             log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
-
-        # now update the subscription updated above
-        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id  = self.user_id
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id  = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter  = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
-        
-        log.debug('Calling updateDataResourceSubscription.')
-        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
-        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
-        else:
-            log.debug('POSITIVE rspMsg to updateDataResourceSubscription')
+        if self.AnalyzeTiming != None:
+            log.warning('test_updateDataResourceSubscription: updated subscription ' + self.TimeStamp())
 
     @defer.inlineCallbacks
     def test_deleteDataResourceSubscription(self):
         log.debug('Testing deleteDataResourceSubscriptions.')
-
 
         # Create a message client and user
         mc = MessageClient(proc=self.test_sup)
@@ -1622,10 +1652,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
     @defer.inlineCallbacks
     def test_updateDataResourceCache(self):
-        """
-        Test to see if wildcards match for subscribers
-        """
-
         log.debug('Testing updateDataResourceCache.')
 
 
@@ -1640,7 +1666,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         #
         # Send a message with no bounds to get a list of dataset ID's; then
-        # take one of those IDs and create a subscription on it.
+        # take one of those IDs and publish a SupplementAdded event for it
         #
         
         # Create a message client
@@ -1654,15 +1680,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail("findDataResources failed: " + rspMsg.error_str)
+            self.fail("test_updateDataResourceCache failed: " + rspMsg.error_str)
 
         numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
-        log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+        log.debug('test_updateDataResourceCache returned: ' + str(numResReturned) + ' resources.')
 
         self.__validateDataResourceSummary(rspMsg.message_parameters_reference[0].dataResourceSummary)
 
         if numResReturned > 0:
-            log.debug('test_notificationSet: %s datasets returned!' % (numResReturned))
+            log.debug('test_updateDataResourceCache: %s datasets returned!' % (numResReturned))
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
             # Setup the publisher
@@ -1690,7 +1716,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             #self.assertEqual(testsub.msgs[0]['content'].name, u"TestUpdateEvent")
 
         else:
-            log.error('test_notificationSet: No datasets returned!')
+            log.error('test_updateDataResourceCache: No datasets returned!')
         
 
     def __validateDatasetByOwnerMetadata(self, metadata):

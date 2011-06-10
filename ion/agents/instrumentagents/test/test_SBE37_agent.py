@@ -17,7 +17,12 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 import ion.util.procutils as pu
+from ion.core.process.process import Process
 from ion.core.exception import ReceivedError
+from ion.services.dm.distribution.events import DataBlockEventSubscriber
+from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+from ion.services.dm.distribution.events \
+    import BusinessStateChangeSubscriber
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -28,7 +33,8 @@ from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
-from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
+from ion.agents.instrumentagents.instrument_constants \
+    import InstrumentCapability
 from ion.agents.instrumentagents.instrument_constants import MetadataParameter
 from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
@@ -69,10 +75,13 @@ SKIP_TESTS = [
     'dummy'
 ]    
 
+
+PRINT_PUBLICATIONS = (True, False)[0]
+
 class TestSBE37Agent(IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
-    timeout = 180
+    timeout = 300
     
 
     @defer.inlineCallbacks
@@ -80,6 +89,7 @@ class TestSBE37Agent(IonTestCase):
         
         
         yield self._start_container()
+
 
         # Driver and agent configuration. Configuration data will ultimatly be
         # accessed via some persistance mechanism: platform filesystem
@@ -92,7 +102,7 @@ class TestSBE37Agent(IonTestCase):
             'ipaddr':sbe_host
         }
         agent_config = {}
-        
+
         # Process description for the SBE37 driver.
         driver_desc = {
             'name':'SBE37_driver',
@@ -129,13 +139,75 @@ class TestSBE37Agent(IonTestCase):
         processes = [
             agent_desc
         ]
-        
+
         # Spawn agent and driver, create agent client.
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('instrument_agent')
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self.sup,
-                                                                target=self.svc_id)        
-        
+                                                            target=self.svc_id)        
+
+        # Setup a subscriber to a data event topic
+        class TestDataSubscriber(DataBlockEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                DataBlockEventSubscriber.__init__(self, *args, **kwargs)
+                print 'listening for data at ' + kwargs.get('origin','none') 
+
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'data subscriber ondata:'
+                    print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        origin_str = DriverChannel.INSTRUMENT + '.' + str(self.svc_id)
+        datasub = TestDataSubscriber(origin=origin_str,process=self.sup)
+        yield datasub.initialize()
+        yield datasub.activate()
+
+        # Setup a subscriber to agent errors, transactions, config changes.
+        class TestInfoSubscriber(InfoLoggingEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)                
+                print 'listening for info at ' + kwargs.get('origin','none')          
+                
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'logging subscriber ondata:'
+                    print content.description
+                    #print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        origin_str = 'agent.' + str(self.svc_id)
+        infosub = TestInfoSubscriber(origin=origin_str,process=self.sup)
+        yield infosub.initialize()
+        yield infosub.activate()
+
+        # Setup a subscriber to agent state changes.
+        class TestStateSubscriber(BusinessStateChangeSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                BusinessStateChangeSubscriber.__init__(self, *args, **kwargs)
+                print 'listening for state at ' + kwargs.get('origin','none') 
+
+            def ondata(self, data):
+                content = data['content'];
+                if PRINT_PUBLICATIONS:
+                    print 'state subscriber ondata:'
+                    print content.description
+                    #print content.additional_data.data_block
+
+        # origin format = transducer.agent_proc_id
+        # CHANNEL_INSTRUMENT.dyn137-110-115-127_ucsd_edu_913.5
+        origin_str = 'agent.' + str(self.svc_id)
+        statesub = TestStateSubscriber(origin=origin_str,process=self.sup)
+        yield statesub.initialize()
+        yield statesub.activate()
+
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -288,7 +360,7 @@ class TestSBE37Agent(IonTestCase):
         
         if 'test_execute_instrument' in SKIP_TESTS:
             raise unittest.SkipTest('Skipping during development.')
-
+                
         # Check agent state upon creation. No transaction needed for
         # get operation.
         params = [AgentStatus.AGENT_STATE]
@@ -418,13 +490,14 @@ class TestSBE37Agent(IonTestCase):
         #print result
 
         self.assert_(InstErrorCode.is_ok(success))
-        self.assertIsInstance(result.get('temperature',None),float)
-        self.assertIsInstance(result.get('salinity',None),float)
-        self.assertIsInstance(result.get('sound_velocity',None),float)
-        self.assertIsInstance(result.get('pressure',None),float)
-        self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('device_time',None),str)
-        self.assertIsInstance(result.get('driver_time',None),str)
+        self.assert_(len(result)==1)
+        self.assertIsInstance(result[0].get('temperature',None),float)
+        self.assertIsInstance(result[0].get('salinity',None),float)
+        self.assertIsInstance(result[0].get('sound_velocity',None),float)
+        self.assertIsInstance(result[0].get('pressure',None),float)
+        self.assertIsInstance(result[0].get('conductivity',None),float)
+        self.assertIsInstance(result[0].get('device_time',None),str)
+        self.assertIsInstance(result[0].get('driver_time',None),str)
         
         # Start autosampling.
         chans = [DriverChannel.INSTRUMENT]
@@ -438,11 +511,27 @@ class TestSBE37Agent(IonTestCase):
         #print 'autosampling started'
         
         # Wait for a few samples to arrive.
-        yield pu.asleep(30)
+        yield pu.asleep(45)
         
         # Stop autosampling.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
+
+        reply = yield self.ia_client.execute_device(chans,cmd,tid)
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        for sample in result:
+            self.assertIsInstance(sample.get('temperature'),float)
+            self.assertIsInstance(sample.get('salinity'),float)
+            self.assertIsInstance(sample.get('pressure',None),float)
+            self.assertIsInstance(sample.get('sound_velocity',None),float)
+            self.assertIsInstance(sample.get('conductivity',None),float)
+            self.assertIsInstance(sample.get('device_time',None),str)
+            self.assertIsInstance(sample.get('driver_time',None),str)
+       
+        """
         while True:
             reply = yield self.ia_client.execute_device(chans,cmd,tid)
             success = reply['success']
@@ -470,6 +559,7 @@ class TestSBE37Agent(IonTestCase):
             self.assertIsInstance(sample.get('conductivity',None),float)
             self.assertIsInstance(sample.get('device_time',None),str)
             self.assertIsInstance(sample.get('driver_time',None),str)
+        """
         
         # Restore original configuration.
         reply = yield self.ia_client.set_device(orig_config,tid)

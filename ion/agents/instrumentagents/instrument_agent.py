@@ -34,7 +34,7 @@ from ion.agents.instrumentagents.instrument_constants import *
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True, False)[1]
+DEBUG_PRINT = (True, False)[0]
 
 """
 Instrument agent observatory metadata.
@@ -151,7 +151,9 @@ class InstrumentAgent(Process):
         self.event_publisher_origin = str(self.id)
 
         """
-        The PubSub publisher for informational/log events
+        The PubSub publisher for informational/log events. These include
+        agent op errors, transaction events, driver state changes, driver
+        and agent config changes.
         """
         self._log_publisher = \
             InfoLoggingEventPublisher(process=self,
@@ -165,7 +167,7 @@ class InstrumentAgent(Process):
                                     origin=self.event_publisher_origin)
 
         """
-        The PubSub publisher for state change events
+        The PubSub publisher for agent state change events.
         """
         self._state_publisher = \
             BusinessStateModificationEventPublisher(process=self,
@@ -313,6 +315,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -327,7 +330,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_uninitialized(self, event, params):
@@ -339,6 +342,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -372,7 +376,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_inactive(self, event, params):
@@ -384,6 +388,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -446,7 +451,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_stopped(self, event, params):
@@ -458,6 +463,7 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
@@ -517,7 +523,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_idle(self, event, params):
@@ -529,11 +535,12 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
             # Clear agent and driver running state.
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                                         description=AgentState.IDLE)
 
@@ -583,7 +590,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_abservatory_mode(self, event, params):
@@ -595,10 +602,11 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                     description=AgentState.OBSERVATORY_MODE)
             pass
@@ -656,7 +664,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
     def state_handler_direct_access_mode(self, event, params):
@@ -668,10 +676,11 @@ class InstrumentAgent(Process):
         yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(self._fsm.get_current_state(), event)
 
         if event == AgentEvent.ENTER:
-            origin = 'agents.%s' % self.event_publisher_origin
+            origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                             description=AgentState.DIRECT_ACCESS_MODE)
             pass
@@ -722,7 +731,7 @@ class InstrumentAgent(Process):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        defer.returnValue((success, next_state))
+        defer.returnValue((success, next_state, result))
 
     ###########################################################################
     #   Transaction Management
@@ -760,9 +769,18 @@ class InstrumentAgent(Process):
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_start_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin = "agent.%s" % self.event_publisher_origin
-            yield self._log_publisher.create_and_publish_event(origin=origin,
-                description=desc_str)
+            #origin = "agent.%s" % self.event_publisher_origin
+            #yield self._log_publisher.create_and_publish_event(origin=origin,
+            #    description=desc_str)
+        
+        else:
+            desc_str = 'opened transaction %s' % tid
+            
+        origin = "agent.%s" % self.event_publisher_origin
+        yield self._log_publisher.create_and_publish_event(origin=origin,
+            description=desc_str)
+            
+
 
         yield self.reply_ok(msg, result)
 
@@ -898,22 +916,31 @@ class InstrumentAgent(Process):
         @param content A uuid specifying the current transaction to end.
         @retval success/fail message.
         """
-
+        
+        tid = self.transaction_id
+        
         result = self._end_transaction(content)
 
         # Publish an end transaction message...mainly as a test for now
-        yield self._log_publisher.create_and_publish_event(\
-                                            name="Transaction ended!")
+        # yield self._log_publisher.create_and_publish_event(\
+        #                                    name="Transaction ended!")
 
         # Publish any errors.
         success = result['success']
         if InstErrorCode.is_error(success):
             desc_str = 'Error in op_end_transaction: ' + \
                        InstErrorCode.get_string(success)
-            origin = "agent.%s" % self.event_publisher_origin
-            yield self._log_publisher.create_and_publish_event(origin=origin,
-                description=desc_str)
+            #origin = "agent.%s" % self.event_publisher_origin
+            #yield self._log_publisher.create_and_publish_event(origin=origin,
+            #    description=desc_str)
+            
+        else:
+            desc_str = 'closed transaction %s' % tid
 
+        origin = "agent.%s" % self.event_publisher_origin
+        yield self._log_publisher.create_and_publish_event(origin=origin,
+            description=desc_str)
+            
         yield self.reply_ok(msg, result)
 
     def _end_transaction(self, tid):
@@ -1078,7 +1105,7 @@ class InstrumentAgent(Process):
                     success = InstErrorCode.INVALID_PARAM_VALUE
 
                 else:
-                    success = yield self._fsm.on_event_async(cmd[1])
+                    (success, result) = yield self._fsm.on_event_async(cmd[1])
 
             # TRANSMIT DATA command.
             elif cmd[0] == AgentCommand.TRANSMIT_DATA:
@@ -1812,7 +1839,7 @@ class InstrumentAgent(Process):
 
             # Publish any errors.
             if InstErrorCode.is_error(success):
-                desc_str = 'Error in op_get_observatory_status: ' + \
+                desc_str = 'Error in op_get_observatory_capabilities: ' + \
                            InstErrorCode.get_string(success)
                 origin = "agent.%s" % self.event_publisher_origin
                 yield self._log_publisher.create_and_publish_event(origin=\
@@ -1879,7 +1906,7 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
-        timeout = 20
+        timeout = 60
         success = None
         result = None
 
@@ -1962,12 +1989,13 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
-            dvr_result = yield self._driver_client.get(params)
+            dvr_result = yield self._driver_client.get(params,timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
             #pass
@@ -2041,12 +2069,13 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
-            dvr_result = yield self._driver_client.set(params)
+            dvr_result = yield self._driver_client.set(params,timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 
@@ -2114,8 +2143,7 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
-        timeout = 20
-
+        timeout = 60
         success = None
         result = None
 
@@ -2198,13 +2226,15 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
             dvr_content = {'params': params}
-            dvr_result = yield self._driver_client.get_metadata(dvr_content)
+            dvr_result = yield self._driver_client.get_metadata(dvr_content,
+                                                                timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 
@@ -2280,13 +2310,15 @@ class InstrumentAgent(Process):
             yield self.reply_ok(msg, reply)
             return
 
+        timeout = 60
         success = None
         result = None
 
         try:
 
             dvr_content = {'params': params}
-            dvr_result = yield self._driver_client.get_status(dvr_content)
+            dvr_result = yield self._driver_client.get_status(dvr_content,
+                                                              timeout)
             success = dvr_result.get('success', None)
             result = dvr_result.get('result', None)
 
@@ -2371,10 +2403,10 @@ class InstrumentAgent(Process):
                         json_val = json.dumps(self._data_buffer)
                         self._data_buffer = []
 
-            # If not in streaming mode, always publish data upon receipt.
-            else:
-                #strval = self._get_data_string(value)
-                json_val = json.dumps([value])
+                # If not in streaming mode, always publish data upon receipt.
+                else:
+                    #strval = self._get_data_string(value)
+                    json_val = json.dumps([value])
 
             #if len(strval) > 0:
             if json_val != None:

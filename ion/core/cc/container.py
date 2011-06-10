@@ -114,17 +114,19 @@ class Container(BasicLifecycleObject):
 
         yield self.app_manager.activate()
 
+
+        ## Lifecycle event publishing disabled for now 
         # now that we've activated, can publish ContainerLifecycleEvents as we need the exchange_manager in place.
         # this is the first chance we have to construct this publisher though.
-        p = Process(spawnargs={'proc-name': 'ContainerLCEPubProcess'})
-        yield p.spawn()
+        #p = Process(spawnargs={'proc-name': 'ContainerLCEPubProcess'})
+        #yield p.spawn()
 
-        self._lc_pub = ContainerLifecycleEventPublisher(origin=self.id, process=p)
-        yield self._lc_pub.initialize()
-        yield self._lc_pub.activate()
+        #self._lc_pub = ContainerLifecycleEventPublisher(origin=self.id, process=p)
+        #yield self._lc_pub.initialize()
+        #yield self._lc_pub.activate()
 
         # now publish the event
-        yield self._lc_pub.create_and_publish_event(state=ContainerLifecycleEventPublisher.State.ACTIVE)
+        #yield self._lc_pub.create_and_publish_event(state=ContainerLifecycleEventPublisher.State.ACTIVE)
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
@@ -140,17 +142,30 @@ class Container(BasicLifecycleObject):
 
         # technically this is not correct as we're still not quite TERMINATED, but for all intents and purposes..
         # we have to publish before we tear down the messaging framework
-        yield self._lc_pub.create_and_publish_event(state=self._lc_pub.State.TERMINATED)
-        yield self._lc_pub.terminate()
-        yield self._lc_pub._process.terminate()
+        #yield self._lc_pub.create_and_publish_event(state=self._lc_pub.State.TERMINATED)
+        #yield self._lc_pub.terminate()
+        #yield self._lc_pub._process.terminate()
 
+        if self._fatal_error_encountered:
+            log.info("Container terminating hard due to fatal error!")
+            yield defer.succeed(None)
+            defer.returnValue(None)
+
+        log.info("Terminating app_manager.")
         yield self.app_manager.terminate()
+        log.info("app_manager Terminated.")
 
+        log.info("Terminating proc_manager.")
         yield self.proc_manager.terminate()
+        log.info("proc_manager Terminated.")
 
+        log.info("Terminating interceptor_system.")
         yield self.interceptor_system.terminate()
+        log.info("interceptor_system Terminated.")
 
+        log.info("Terminating exchange_manager.")
         yield self.exchange_manager.terminate()
+        log.info("exchange_manager Terminated.")
 
         log.info("Container closed")
         Container._started = False
@@ -202,17 +217,16 @@ class Container(BasicLifecycleObject):
         which, in turn, will terminate this container lifecycleobject,
         which then terminates its lifecycle objects.
         """
-        log.warning('fatalError event')
-        log.warning(str(ex))
-        f = failure.Failure()
-        log.info("The container suffered a fatal error event and is crashing.")
-        log.info("The last traceback, in full detail, was written to stdout.")
+        log.error('fatalError event')
+        log.error(str(ex))
         try:
-            log.warning(str(f.getTraceback()))
+            f = failure.Failure()
+            log.info("The container suffered a fatal error event and is crashing.")
+            log.debug(str(f.getTraceback()))
             f.printDetailedTraceback()
-            log.info("The last traceback, in full detail, was written to stdout.")
+            log.info("The last traceback, in full detail, was written to stdout and the debug loglevel.")
         except failure.NoCurrentExceptionError:
-            log.info("No Exception to be logged")
+            log.info("No Exception to be logged for fatalError")
 
         if not self._fatal_error_encountered:
             self._fatal_error_encountered = True

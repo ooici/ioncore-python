@@ -12,6 +12,7 @@ resourceID.
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from decimal import Decimal
@@ -234,14 +235,14 @@ class MetadataCache(object):
 
         yield self.__lockCache()
 
-        #
-        # Set the persistent flag to False
-        #
-        dSetMetadata = self.__metadata[dSetID]
-        dSet = dSetMetadata[DSET]
-        dSet.Repository.persistent = False
-
         try:
+            #
+            # Set the persistent flag to False
+            #
+            dSetMetadata = self.__metadata[dSetID]
+            dSet = dSetMetadata[DSET]
+            dSet.Repository.persistent = False
+
             self.__metadata.pop(dSetID)
             returnValue = True
         except KeyError:
@@ -330,14 +331,14 @@ class MetadataCache(object):
 
         yield self.__lockCache()
         
-        #
-        # Set the persistent flag to False
-        #
-        dSourceMetadata = self.__metadata[dSourceID]
-        dSource = dSourceMetadata[DSOURCE]
-        dSource.Repository.persistent = False
-
         try:
+            #
+            # Set the persistent flag to False
+            #
+            dSourceMetadata = self.__metadata[dSourceID]
+            dSource = dSourceMetadata[DSOURCE]
+            dSource.Repository.persistent = False
+
             self.__metadata.pop(dSourceID)
             returnValue = True
         except KeyError:
@@ -347,6 +348,47 @@ class MetadataCache(object):
         self.__unlockCache()
         
         defer.returnValue(returnValue)
+
+
+    @defer.inlineCallbacks
+    def getAssociatedSource(self, dSetID):
+        """
+        Worker class private method to get the data source that associated
+        with a given data set.  
+        """
+        log.debug('getAssociatedSource() entry')
+
+        try:
+            dSet = yield self.rc.get_instance(dSetID)
+            
+        except ResourceClientError:    
+            log.error('Error getting dataset instance for datasetID: %s!' %(dSetID))
+            defer.returnValue(None)
+            
+        try:
+            results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('Error getting associated data source for Dataset: ' + \
+                      dSet.ResourceIdentity)
+            defer.returnValue(None)
+
+        #
+        # If there is not exactly 1 associated data source, log an error and
+        # return None.  
+        #
+        if len(results) != 1:
+            log.error('Dataset %s has %d associated sources.' %(len(results)))
+            defer.returnValue(None)
+        else:
+            for association in results:
+                log.debug('Associated Source for Dataset: ' + \
+                          association.ObjectReference.key + \
+                          ' is: ' + association.SubjectReference.key)
+
+        log.debug('getAssociatedSource() exit: returning: %s' %(association.SubjectReference.key))
+
+        defer.returnValue(association.SubjectReference.key)
 
 
     @defer.inlineCallbacks
@@ -378,8 +420,11 @@ class MetadataCache(object):
         
         log.debug('__putDSetMetadata')
 
-        dSet = yield self.rc.get_instance(dSetID)
-        yield self.__loadDSetMetadata(dSet)
+        try:
+            dSet = yield self.rc.get_instance(dSetID)
+            yield self.__loadDSetMetadata(dSet)
+        except ResourceClientError:    
+            log.error('Data set %s (LCS: %s) being updated but was never cached!' %(dSetID, dSet.LifeCycleState))
 
     
     @defer.inlineCallbacks
@@ -392,8 +437,11 @@ class MetadataCache(object):
         
         log.debug('__putDSourceMetadata')
 
-        dSource = yield self.rc.get_instance(dSourceID)
-        self.__loadDSourceMetadata(dSource)
+        try:
+            dSource = yield self.rc.get_instance(dSourceID)
+            self.__loadDSourceMetadata(dSource)
+        except ResourceClientError:    
+            log.error('Data source %s (LCS: %s) being updated but was never cached!' %(dSetID, dSource.LifeCycleState))
 
 
     @defer.inlineCallbacks
@@ -419,7 +467,7 @@ class MetadataCache(object):
             #
             dSet.Repository.persistent = True
             dSetMetadata[DSET] = dSet
-            dSetMetadata[DSOURCE_ID] = yield self.__getAssociatedSource(dSet)
+            dSetMetadata[DSOURCE_ID] = yield self.getAssociatedSource(dSet.ResourceIdentity)
             dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
             dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
             for attrib in dSet.root_group.attributes:
@@ -465,7 +513,8 @@ class MetadataCache(object):
             #
             self.__metadata[dSet.ResourceIdentity] = dSetMetadata
     
-            self.__printMetadata(dSet)
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                self.__printMetadata(dSet)
         else:
             log.info('data set ' + dSet.ResourceIdentity + ' is not Private or Public.')
 
@@ -515,7 +564,8 @@ class MetadataCache(object):
             #
             self.__metadata[dSource.ResourceIdentity] = dSourceMetadata
     
-            self.__printMetadata(dSource)
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                self.__printMetadata(dSource)
         else:
             log.info('data source ' + dSource.ResourceIdentity + ' is not Private or Public.')
 
@@ -555,30 +605,6 @@ class MetadataCache(object):
             defer.returnValue(None)
 
         defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def __getAssociatedSource(self, dSet):
-        """
-        Worker class method to get the data source that associated with a given
-        data set.  
-        """
-        log.debug('__getAssociatedSource() entry')
-
-        try:
-            results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
-
-        except AssociationClientError:
-            log.error('AssociationError')
-            defer.returnValue(None)
-
-        for association in results:
-            log.debug('Associated Source for Dataset: ' + \
-                      association.ObjectReference.key + \
-                      ' is: ' + association.SubjectReference.key)
-
-        log.debug('__getAssociatedSource() exit')
-
-        defer.returnValue(association.SubjectReference.key)
 
 
     @defer.inlineCallbacks
