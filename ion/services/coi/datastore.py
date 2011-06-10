@@ -818,7 +818,6 @@ class DataStoreWorkbench(WorkBench):
     @defer.inlineCallbacks
     def op_extract_data(self, request, headers, message):
         """
-        @TODO daf: this is the naive approach, with one big response message. Next up: chunking and responding.
         DataRequestMessage / DataReplyMessage
         """
         log.info("op_extract_data")
@@ -834,6 +833,8 @@ class DataStoreWorkbench(WorkBench):
 
         log.debug("Extract data request bounds: %s", ["%d+%d,%d" % (x.origin, x.size, x.stride) for x in request.request_bounds])
 
+        CHUNK_FACTOR = 10000
+
         # create an anonymous repo to load things into
         repo = self.create_repository(root_type=ARRAY_STRUCTURE_TYPE)
 
@@ -846,14 +847,8 @@ class DataStoreWorkbench(WorkBench):
                       CDM_ARRAY_STRING_TYPE,
                       CDM_ARRAY_OPAQUE_TYPE]
 
-        def filtermethod(x):
-            """
-            Filter out any ndarray content types.
-            """
-            return x.type not in filterlist
-
         # get some blobs into the repo
-        blobs = yield self._get_blobs(repo, [request.structure_array_ref], filtermethod)
+        blobs = yield self._get_blobs(repo, [request.structure_array_ref], lambda x: x not in filterlist)
         repo.index_hash.update(blobs)
 
         # get element pointed to by key
@@ -875,14 +870,13 @@ class DataStoreWorkbench(WorkBench):
         # get the type of bounded array we have here
         assert len(obj.bounded_arrays) > 0
 
-        # a list of matching bounded arrays (@TODO: soon to be the intersection ranges as well)
+        # a list of matching bounded arrays
         bounded_includes_list = []
         targetshape = [x.size for x in request.request_bounds]
-        totalelems = reduce(lambda x,y: x*y, targetshape, 1) # if no dimensions (scalar), yields 1 total value
 
-        # fill the entire thing in with Nones so setting slices doesn't kill things
-        #targetndarray.value.extend([-1] * totalelems)
-        targetarray = [None] * totalelems
+        # ===================================================================
+        # STEP 1: Match bounded arrays
+        # ===================================================================
 
         # iterate bounded arrays in this object
         for ba in obj.bounded_arrays:
@@ -933,162 +927,219 @@ class DataStoreWorkbench(WorkBench):
                 # format: (bounded array, target range of data (multidim), source bounded array range (multidim))
                 bounded_includes_list.append((ba, target_range, src_range))
 
-        # retrieve and extract slices from each matching array, build data chunk messages, send them to requester
-        # before sending response to this rpc method
+        # ===================================================================
+        # STEP 2: Compress/Optimize bounded_includes_list for overlap
+        # ===================================================================
+        # @TODO: not needed for R1
 
-        log.debug("Matching Bounded Arrays: %d" % len(bounded_includes_list))
+        # ===================================================================
+        # STEP 3: Generate a list of matching strips from each BA
+        # ===================================================================
+        striplist = []
+        strides = [x.stride or 1 for x in request.request_bounds]
 
-        # get a clear set of the keys we have to get
-        ndarrayset = set([ba[0].GetLink('ndarray').key for ba in bounded_includes_list])
-
-        log.debug("Requesting %d keys from the datastore" % len(ndarrayset))
-
-        # actually get those keys from the datastore, put them in the repo
-        ndblobs = yield self._get_blobs(repo, ndarrayset, lambda x: True)
-        repo.index_hash.update(ndblobs)
-
-        # loop through matching bounded arrays, load ndarray, extract data
         for batuple in bounded_includes_list:
             ba, targetranges, srcranges = batuple
 
-            # load ndarray object
-            ndse = repo.index_hash[ba.GetLink('ndarray').key]
-            assert ndse
-            ndobj = repo._load_element(ndse)
-
             # is this a scalar? is there anything to slice?
             if len(targetshape) == 0:
-                # scalar value: shortcut this mess, just copy the one value
-                log.debug("detected scalar value, copying it")
-                targetarray[0] = ndobj.value[0]
+                striplist.append((ba, (0, 1), (0, 1), 1, 1))
             else:
-
                 # get slices out of it
                 # get dims of this bounded array
                 ba_shape = [x.size for x in ba.bounds]
 
-                log.debug("BEGIN DATA COPY")
-                for targetslice, srcslice in self._get_slices(targetshape, ba_shape, targetranges, srcranges):
-                    log.debug("copying src range %s to target range %s" % (srcslice, targetslice))
+                for targetslice, srcslice, laststridelen in self._get_slices(targetshape, ba_shape, targetranges, srcranges, strides):
+                    striplist.append((ba, targetslice, srcslice, targetslice[1]-targetslice[0], laststridelen))
 
-                    targetarray[targetslice[0]:targetslice[1]] = ndobj.value[srcslice[0]:srcslice[1]]
+        def debug_print_strip_list(lst):
+            import base64
+            for x in lst:
+                ba, targetslice, srcslice, leng, laststridelen = x
+                print "ba: %s  [%d:%d] -> [%d:%d], stride %d, len %d/%d=%d" % (base64.encodestring(ba.MyId)[0:6],
+                                                              srcslice[0],
+                                                              srcslice[1],
+                                                              targetslice[0],
+                                                              targetslice[1],
+                                                              laststridelen,
+                                                              leng,
+                                                              laststridelen,
+                                                              leng/laststridelen)
 
-            log.debug("END DATA COPY")
+        log.debug("Number of uncompressed strips: %d" % len(striplist))
 
-        # IF STRIDING SET TO ANYTHING BUT 1 IN ALL DIMENSIONS, need to transform targetarray into a smaller version
-        strides = [x.stride or 1 for x in request.request_bounds]
+        # ===================================================================
+        # STEP 4: Sort that list of matching strips by start index in target array to start index + length
+        # ===================================================================
 
-        # if we have anything but 1s in all dimensions
-        if strides != [1] * len(request.request_bounds):
-            log.debug("striding requested %s" % strides)
+        sorted_striplist = sorted(striplist, lambda x, y: x[1][1] < y[1][0])
 
-            # create ranges with strides
-            strideranges = [(0, x.size, x.stride or 1) for x in request.request_bounds]
+        # ===================================================================
+        # STEP 5: Compress any contiguous strips from the same BAs
+        # ===================================================================
+        compressed_striplist = []
+        curstrip = None
+        for stripitem in sorted_striplist:
+            ba, targetslice, srcslice, leng, laststridelen = stripitem
 
-            # dimensions of new, strided array
-            reduceddims = [int(math.ceil(float(x[1]) / x[2])) for x in strideranges]
+            # check for end condition
+            if curstrip and ba != curstrip[0]:
+                # push current strip into compressed striplist
+                compressed_striplist.append(curstrip)
+                curstrip = None
 
-            # calc new # of elems, create array to hold them @TODO: improve
-            newtotalelems = reduce(lambda x, y: x*y, reduceddims)
-            newtargetarray = [None] * newtotalelems
+            # brand new strip, either after we just pushed or starting this loop
+            if curstrip is None:
+                curstrip = stripitem[:]
+                continue
 
-            # calculate index offsets for each dimension in targetarray
-            targetidxextents = [None] * len(targetshape)
-            targetidxextents[-1] = 1
+            # see if we have a contiguous strip
+            if srcslice[0] == curstrip[2][1] and laststridelen == curstrip[4]:
+                # update curstrip
+                curstrip = (curstrip[0], (curstrip[1][0], targetslice[1]), (curstrip[2][0], srcslice[1]), srcslice[1] - curstrip[2][0], curstrip[4])
+                #log.debug("curstrip now [%d,%d] -> [%d,%d]" % (curstrip[1][0], curstrip[1][1], curstrip[2][0], curstrip[2][1]))
+            else:
+                # not contiguous?  push into list and forget it
+                compressed_striplist.append(curstrip)
+                curstrip = None
+                curstrip = stripitem[:]
 
-            for x in range(len(targetidxextents)-2, -1, -1):
-                targetidxextents[x] = reduce(lambda x,y: x*y, targetshape[x+1:])
+        # catch the last one
+        if curstrip is not None:
+            compressed_striplist.append(curstrip)
 
-            def copystrides(curstrideranges, counter=0, curidx=0, rc=0):
-                '''
-                Recursive method to copy ranges using striding between targetarray and newtargetarray.
+        log.debug("Number of compressed strips: %d" % len(compressed_striplist))
+        #debug_print_strip_list(compressed_striplist)
 
-                @param curstrideranges  Remaining ranges to iterate over.
-                @param counter          Teh current counter into the new target array to copy to.
-                @param curidx           The current calculated offset index into the old targetarray.
-                @param rc               Recursion count.
-                @returns                The current counter, which is the index into the newtargetarray to start copying to.
-                '''
-                # check for end conditions:
-                #   curstride range is empty - last dimension had striding, can only copy one value at a time
-                #   curstrideranges only has strides of 1 remaining - can copy chunks!
-                if len(curstrideranges) == 0 or [x[2] for x in curstrideranges] == [1] * len(curstrideranges):
+        # ===================================================================
+        # STEP 6: Generate a list of extractions using heuristics, an "extraction plan"
+        # ===================================================================
 
-                    # either condition was true, this means we can actually perform a copy at this point
-                    slicelen = 1
+        # list of [list of indicies into compressed_striplist]
+        extraction_plan = []
 
-                    if not len(curstrideranges) == 0:
-                        # can possibly do larger chunks - get the slicelen
-                        assert rc > 0
-                        slicelen = targetidxextents[rc - 1]
+        # NAIVE: one strip per chunk!
+        for x in xrange(len(compressed_striplist)):
+            extraction_plan.append([x])
 
-                    #log.debug("copystrides: nta[%d:%d] = ta[%d:%d]" % (counter, counter+slicelen, curidx, curidx+slicelen))
+        # testing: half and half
+        #half = len(compressed_striplist) / 2
+        #extraction_plan.append([x for x in xrange(0, half)])
+        #extraction_plan.append([x for x in xrange(half, len(compressed_striplist))])
 
-                    # perform copy
-                    newtargetarray[counter:counter+slicelen] = targetarray[curidx:curidx+slicelen]
+        log.debug("EXPLAN LENGTH: %d" % len(extraction_plan))
 
-                    # increment counter
-                    return counter + slicelen
+        '''
+        curplan = []
+        curlen = 0
+        for idx, strip in compressed_striplist:
 
+            # "length" in the strip is stored as if it is not strided
+            truelen = int(math.floor(strip[3] / float(strip[4])))
+        '''
+
+        # ===================================================================
+        # STEP 7: Perform extractions
+        # ===================================================================
+
+        loaded_ba_ndarrays = []
+        loaded_ba_ndarray_objs = {}     # key => actual ndarray object
+        for exidx, exstep in enumerate(extraction_plan):
+            curstrips = []
+            for sidx in exstep:
+                curstrips.append(compressed_striplist[sidx])
+
+            # get the start index.. should be in the first item
+            targetstartidx = curstrips[0][1][0]
+
+            # just to make sure..
+            tsi = min([x[1][0] for x in curstrips])
+            assert tsi==targetstartidx
+
+            log.debug("extraction step %d, # strips: %d" % (exidx, len(curstrips)))
+
+            # calculate number of elements we are going to output in this chunk, create temp storage for it
+            #elemcount = reduce(lambda x,y: x+y, [int(math.floor(x[3] / float(x[4]))) for x in curstrips])   # divide stored length by stride to get true number of elems
+            elemcount = reduce(lambda x, y: x+y, [x[3] for x in curstrips])
+            targetndarray = [None] * elemcount
+
+            log.debug("created target array of length %d" % elemcount)
+
+            # needed BAs
+            needed_ba_ndarrays = [x[0].GetLink('ndarray').key for x in curstrips]
+
+            # get a list of things to load
+            toload_ba_ndarrays = set([x for x in needed_ba_ndarrays if x not in loaded_ba_ndarrays])
+
+            if len(toload_ba_ndarrays) > 0:
+                import base64
+                log.debug("need to load %s" % ",".join([base64.encodestring(x)[0:6] for x in toload_ba_ndarrays]))
+    
+                # physically load them!
+                ndblobs = yield self._get_blobs(repo, toload_ba_ndarrays, lambda x: True)
+                repo.index_hash.update(ndblobs)
+
+                # keep track of what we've loaded
+                loaded_ba_ndarrays.extend(toload_ba_ndarrays)
+
+                # load them as objects now
+                for ndkey in toload_ba_ndarrays:
+                    loaded_ba_ndarray_objs[ndkey] = repo._load_element(repo.index_hash[ndkey])
+
+            # ok, now we can perform the extractions on this step
+            for csidx, curstrip in enumerate(curstrips):
+                ba, targetidxs, srcidxs, leng, stride = curstrip
+
+                # index into the current chunk data
+                striplen = leng #int(leng / float(stride))
+                targetoffset = csidx * striplen
+
+                ndobj = loaded_ba_ndarray_objs[ba.GetLink('ndarray').key]
+
+                srcslice = ndobj.value[srcidxs[0]:srcidxs[1]]
+                if stride == 1:
+                    targetslice = srcslice
                 else:
+                    targetslice = [d for i, d in enumerate(srcslice) if i % stride == 0]
 
-                    currange = curstrideranges[0]
-                    remranges = curstrideranges[1:]
+                log.debug("targetslice len: %d [%d, %d]" % (len(targetslice), targetoffset, targetoffset+striplen))
 
-                    for i in range(currange[0], currange[1], currange[2]):
-                        counter = copystrides(remranges, counter, curidx + (i * targetidxextents[rc]), rc+1)
+                targetndarray[targetoffset:targetoffset+striplen] = targetslice
 
-                # always return a counter!
-                return counter
+            # ensure we filled this chunk
+            nonelist = [i for i,d in enumerate(targetndarray) if d is None]
+            assert len(nonelist) == 0
 
-            # actually perform copy
-            log.debug("Starting to copy strided array")
-            copystrides(strideranges)
-            log.debug("Finished copying strided array")
-
-            # swap out old for new
-            oldtargetarray = targetarray
-            targetarray = newtargetarray
-            oldtotalelems = totalelems
-            totalelems = newtotalelems
-
-        # CREATE RESPONSE CHUNKS OUT OF BIG ORIGINAL RESPONSE MESSAGE
-
-        CHUNK_FACTOR = 10000
-        totalchunks = int(math.ceil(totalelems / float(CHUNK_FACTOR)))
-
-        log.debug("Chunking %d values into %d messages (factor %d)" % (totalelems, totalchunks, CHUNK_FACTOR))
-
-        for i in xrange(totalchunks):
+            # SEND THIS CHUNK
 
             # create new message to send
             chunkmsg = yield self._process.message_client.create_instance(DATA_CHUNK_MESSAGE_TYPE)
-            chunkmsg.seq_number = i+1
-            chunkmsg.seq_max = totalchunks
+            chunkmsg.seq_number = exidx
+            chunkmsg.seq_max = len(extraction_plan)
 
-            curoffset = i * CHUNK_FACTOR
-            slicelen = min(CHUNK_FACTOR, totalelems - curoffset)
-
-            log.debug("Chunk #%d: offset %d, length %d" % (i, curoffset, slicelen))
+            log.debug("Chunk #%d: starter index %d, length %d" % (exidx, targetstartidx, elemcount))
 
             # set info in this chunk
-            chunkmsg.start_index = curoffset
-            chunkmsg.done = (i==totalchunks-1)      # last chunk message?  set the done flag
+            chunkmsg.start_index = targetstartidx
+            chunkmsg.done = exidx == len(extraction_plan) - 1 #(i==totalchunks-1)      # last chunk message?  set the done flag
 
             # create the ndarray in this chunk
-            chunkndarray = chunkmsg.CreateObject(bounded_includes_list[0][0].GetLink('ndarray').type)
+            chunkndarray = chunkmsg.CreateObject(curstrips[0][0].GetLink('ndarray').type)
 
             # these lines blow up with a TypeError if we screwed up the bounds and didn't fill in the targetarray fully,
             # aka it contains Nones
-            chunkndarray.value[0:slicelen] = targetarray[curoffset:curoffset+slicelen]
+            chunkndarray.value[0:elemcount] = targetndarray[:]
             chunkmsg.ndarray = chunkndarray
 
             # send this message to the passed in routing key
             yield self._send_data_chunk(request.data_routing_key, chunkmsg)
 
+            # @TODO unload arrays we no longer need
+            #
+            
         self._process.reply_ok(message, response)
         log.info("/op_extract_data")
-
+        
     @defer.inlineCallbacks
     def _send_data_chunk(self, data_routing_key, chunkmsg):
         """
@@ -1114,7 +1165,7 @@ class DataStoreWorkbench(WorkBench):
             counter1 += 1
             counter2 += 1
 
-    def _get_slices(self, targetdimextents, srcdimextents, targetranges, srcranges, targetidx=0, srcidx=0):
+    def _get_slices(self, targetdimextents, srcdimextents, targetranges, srcranges, strides, targetidx=0, srcidx=0):
         """
         Returns a tuple of slice ranges (as tuples) that you can use to extract data from slices
         inside an ndarray. This is used by extract_data.
@@ -1127,14 +1178,22 @@ class DataStoreWorkbench(WorkBench):
                                     dimension that we are storing into.
         @param  srcranges           A list of tuples (one tuple per dimension), specifying a range in each
                                     dimension that we are pulling data out of.
+        @param  strides             A list of stride amounts for each dimension. Should be the same length
+                                    as targetranges/srcranges. The last dimension is not factored in here, but is
+                                    returned as the last member of the return tuple.
         @param  targetidx           An accumulated index value into the target bounded array which gives the
                                     current index calculated on each recursive call.
         @param  srcidx              An accumulated index value into the source bounded array which gives the
                                     current index calculated on each recursive call.
 
-        @returns                    On each yield, a tuple containing two tuples: a range to the target,
-                                    and a range to copy from the source.
+        @returns                    On each yield, a tuple containing two tuples and an integer: a range to the target WITH
+                                    striding applied to all but the last dimension, a range to copy from the source WITHOUT
+                                    striding applied, and the stride length of the last dimension. 
         """
+
+        # make sure we have sane things here
+        assert len(targetdimextents) == len(srcdimextents)
+        assert len(strides) == len(targetdimextents)
 
         # build index extent arrays
         targetidxextents = [None] * len(targetdimextents)
@@ -1143,48 +1202,61 @@ class DataStoreWorkbench(WorkBench):
         targetidxextents[-1] = 1
         srcidxextents[-1] = 1
 
-        for x in range(len(targetidxextents)-2, -1, -1):
-            targetidxextents[x] = reduce(lambda x,y: x*y, targetdimextents[x+1:])
+        # reduce target dim extents to extents after applying stride
+        striddentargetextents = [targetdimextents[i]/strides[i] for i in xrange(len(targetdimextents))]
 
+        # calculate index extents into target array, using stridden extents
+        for x in range(len(targetidxextents)-2, -1, -1):
+            targetidxextents[x] = reduce(lambda x,y: x*y, striddentargetextents[x+1:])
+
+        # calculate index extents into source array
         for x in range(len(srcidxextents)-2, -1, -1):
             srcidxextents[x] = reduce(lambda x, y: x*y, srcdimextents[x+1:])
 
-        def recslice(trs, srs, ts, ss, cts=0, css=0, rc=0):
+        def recslice(trs, srs, ts, ss, tstrides, cts=0, css=0, rc=0):
             """
             Recursive slice finder.
             @param  trs     Target ranges.
             @param  srs     Source ranges.
             @param  ts      Target slice (last dimension).
             @param  ss      Source slice (last dimension).
+            @param  tstrides List of strides in all dimensions.
             @param  cts     Current target sum, aka index into target array.
             @param  css     Current source sum, aka index into source array.
             @param  rc      Recursion count, used to index into targetidxextents/srcidxextents.
             """
             if len(trs) == 0:
                 # exit case: traversed all dimensions, we're on the last dimension, extract our slices
-                yield ((cts+ts[0], cts+ts[1]),
-                       (css+ss[0], css+ss[1]))
+                yield ((cts+ts[0]/tstrides[0], cts+ts[1]/tstrides[0]),
+                       (css+ss[0], css+ss[1]),
+                       tstrides[0])
             else:
                 # iterative case: look at current dimension, co-iterate over the ranges in target/src,
                 #                 recurse into recslice again one dimension up until we run out.
                 ctr = trs[0]
                 csr = srs[0]
+                cstride = tstrides[0]
 
                 for tv, sv in self._double_xrange(ctr[0], ctr[1], csr[0], csr[1]):
-                    for xx in recslice(trs[1:],
-                                       srs[1:],
-                                       ts,
-                                       ss,
-                                       cts+(tv * targetidxextents[rc]),     # calculate actual index offset here and pass it
-                                       css+(sv * srcidxextents[rc]),        # calculate actual index offset here and pass it
-                                       rc+1):
-                        yield xx
+                    if tv % cstride == 0:
+                        for xx in recslice(trs[1:],
+                                           srs[1:],
+                                           ts,
+                                           ss,
+                                           tstrides[1:],
+                                           cts+(tv * targetidxextents[rc]),     # calculate actual index offset here and pass it
+                                           css+(sv * srcidxextents[rc]),        # calculate actual index offset here and pass it
+                                           rc+1):
+                            yield xx
+                    else:
+                        log.debug("IGNOREING STRIDED OUT DIM tv/sv %d,%d len dims %d" % (tv, sv, len(trs)))
 
         # iterate through all recslice generated slicepairs
         for x in recslice(targetranges[:-1],
                           srcranges[:-1],
                           targetranges[-1],
-                          srcranges[-1]):
+                          srcranges[-1],
+                          strides[:]):
             yield x
 
     @defer.inlineCallbacks
