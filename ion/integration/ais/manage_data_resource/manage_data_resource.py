@@ -577,6 +577,19 @@ class ManageDataResource(object):
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
 
+        # from bug OOIION-131
+        datasrc_resource.initial_starttime_offset_millis  = msg.initial_starttime_offset_millis
+        datasrc_resource.starttime_offset_millis          = msg.starttime_offset_millis
+        datasrc_resource.endtime_offset_millis            = msg.endtime_offset_millis
+        datasrc_resource.aggregation_rule                 = msg.aggregation_rule
+
+        i = -1
+        for r in msg.sub_ranges:
+            datasrc_resource.sub_ranges.add()
+            i = i + 1
+            datasrc_resource.sub_ranges[i] = msg.sub_ranges[i]
+
+
         if msg.IsFieldSet('authentication'):
             log.info("Setting datasource: authentication")
             datasrc_resource.authentication                = msg.authentication
