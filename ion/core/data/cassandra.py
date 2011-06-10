@@ -38,7 +38,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 
-cassandra_timeout = CONF.getValue('CassandraTimeout',5.0)
+cassandra_timeout = CONF.getValue('CassandraTimeout',10.0)
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
@@ -364,7 +364,7 @@ class CassandraDataManager(TCPConnection):
         TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
-        
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def create_persistent_archive(self, persistent_archive):
         """
@@ -381,6 +381,7 @@ class CassandraDataManager(TCPConnection):
         
         log.info("Added and set keyspace")
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_persistent_archive(self, persistent_archive):
         """
@@ -393,6 +394,7 @@ class CassandraDataManager(TCPConnection):
                       strategy_class=pa.strategy_class, cf_defs=[])
         yield self.client.system_update_keyspace(ksdef)
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove_persistent_archive(self, persistent_archive):
         """
@@ -403,6 +405,7 @@ class CassandraDataManager(TCPConnection):
         log.info("Removing keyspace with name %s" % (keyspace,))
         yield self.client.system_drop_keyspace(keyspace)
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def create_cache(self, persistent_archive, cache):
         """
@@ -414,6 +417,7 @@ class CassandraDataManager(TCPConnection):
         cfdef = CfDef(keyspace=persistent_archive.name, name=cache.name)
         yield self.client.system_add_column_family(cfdef)
     
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove_cache(self, persistent_archive, cache):
         """
@@ -424,6 +428,7 @@ class CassandraDataManager(TCPConnection):
         yield self.client.set_keyspace(persistent_archive.name)
         yield self.client.system_drop_column_family(cache.name)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_cache(self, persistent_archive, cache):
         """
@@ -459,7 +464,7 @@ class CassandraDataManager(TCPConnection):
         log.info("cf_def: " + str(cf_def))      
         yield self.client.system_update_column_family(cf_def) 
     
-    @defer.inlineCallbacks    
+    @defer.inlineCallbacks
     def _describe_keyspace(self, keyspace):
         """    
         @brief internal method used to get a description of the keyspace
