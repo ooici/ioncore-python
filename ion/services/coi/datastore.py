@@ -1289,7 +1289,7 @@ class DataStoreService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         if issubclass(self._backend_classes[COMMIT_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
-            log.info("Instantiating Cassandra Index Store")
+            log.info("Instantiating Cassandra Index Store: %s" % self._backend_classes[COMMIT_CACHE])
 
             storage_provider = self._storage_conf[STORAGE_PROVIDER]
             keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
@@ -1298,6 +1298,10 @@ class DataStoreService(ServiceProcess):
 
             yield self.c_store.initialize()
             yield self.c_store.activate()
+
+            # Can not afford to lazy initialize this value - the first call is a deferred list!
+            query_attributes =  yield self.c_store.get_query_attributes()
+            self.c_store._query_attribute_names = set(query_attributes)
 
             yield self.register_life_cycle_object(self.c_store)
             
@@ -1314,12 +1318,12 @@ class DataStoreService(ServiceProcess):
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             #raise NotImplementedError('Startup for cassandra store is not yet complete')
-            log.info("Instantiating Cassandra Store")
+            log.info("Instantiating Cassandra Store: %s" % self._backend_classes[BLOB_CACHE])
 
             storage_provider = self._storage_conf[STORAGE_PROVIDER]
             keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
             
-            self.b_store = self._backend_classes[COMMIT_CACHE](self._username, self._password, storage_provider, keyspace, BLOB_CACHE)
+            self.b_store = self._backend_classes[BLOB_CACHE](self._username, self._password, storage_provider, keyspace, BLOB_CACHE)
 
             yield self.b_store.initialize()
             yield self.b_store.activate()
