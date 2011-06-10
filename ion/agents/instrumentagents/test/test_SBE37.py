@@ -68,7 +68,7 @@ SKIP_TESTS = [
     'test_get_metadata',
     'test_get_status',
     'test_get_capabilities',
-    #'test_execute',
+    'test_execute',
     'test_execute_direct',
     'dummy'
 ]
@@ -98,6 +98,11 @@ class TestSBE37(IonTestCase):
     sbe_config = {
         'ipport':sbe_port, 
         'ipaddr':sbe_host
+    }
+
+    no_device_config = {
+        'ipport':6006, 
+        'ipaddr': sbe_host
     }
 
     bogus_config = {
@@ -207,6 +212,17 @@ class TestSBE37(IonTestCase):
         current_state = yield self.driver_client.get_state()
         self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
+        # Try to connect without configuration. This should fail.
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(self.sbe_config)        
         current_state = yield self.driver_client.get_state()
@@ -217,19 +233,25 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,self.sbe_config)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
-        
         # Establish connection to device and verify.
-        try:
-            reply = yield self.driver_client.connect()
-            
-        except Exception, ex:
-            self.fail('Could not connect to the device.')
+        reply = yield self.driver_client.connect()
             
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
         self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+
+        # Try to connect again. This should fail
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
@@ -240,6 +262,28 @@ class TestSBE37(IonTestCase):
         result = reply['result']
 
         self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(self.no_device_config)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,self.no_device_config)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+        # Establish connection to device and verify.
+        # This should fail.
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
         
