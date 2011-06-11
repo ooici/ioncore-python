@@ -1028,7 +1028,7 @@ class WorkBench(object):
 
                     self._resolve_branch_state(existing_branch, new_branch)
 
-                    # We found the new branch in existing - exit the outter for loop
+                    # We found the new branch in existing - exit the inner for loop - next branch....
                     break
 
             else:
@@ -1049,6 +1049,9 @@ class WorkBench(object):
         """
         Move everything in new into an updated existing!
         """
+        # Get the repositories we are working from
+        repo = existing_branch.Repository
+
         log.debug('_resolve_branch_state: resolving branch state in repository heads!')
         for new_link in new_branch.commitrefs.GetLinks():
 
@@ -1056,8 +1059,6 @@ class WorkBench(object):
             found = False
             for existing_link in existing_branch.commitrefs.GetLinks():
 
-                # Get the repositories we are working from
-                repo = existing_branch.Repository
 
                 # test to see if we these are the same head ref!
                 if new_link == existing_link:
