@@ -773,14 +773,26 @@ class MulitDataStoreTest(IonTestCase):
             yield self.wb1.workbench.push('datastore', repo)
 
 
-
         repo1 = yield self.ds1.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+        repo1.checkout('master')
 
         repo2 = yield self.ds2.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+        repo2.checkout('master')
+
 
         repo3 = yield self.ds3.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+        repo3.checkout('master')
+
 
         repo4 = yield self.ds4.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+        repo4.checkout('master')
+
+        ### DEBUG....
+        #if repo4 != repo:
+        #    print 'REPO 4'
+        #    print repo4
+
+        #print repo1.log_commits()
 
 
         self.assertEqual(repo, repo1)
