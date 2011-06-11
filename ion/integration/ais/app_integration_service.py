@@ -8,6 +8,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 import time
 
@@ -147,25 +148,29 @@ class AppIntegrationService(ServiceProcess):
         @retval GPB containing download URL.
         """
 
-        log.info('op_createDownloadURL: '+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_createDownloadURL: '+str(content))
         returnValue = yield self.CreateDownloadURLWorker.createDownloadURL(content)
         yield self.reply_ok(msg, returnValue)   
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):
-        log.debug('op_registerUser: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_registerUser: \n'+str(content))
         response = yield self.RegisterUserWorker.registerUser(content);
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def op_updateUserProfile(self, content, headers, msg):
-        log.debug('op_updateUserProfile: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_updateUserProfile: \n'+str(content))
         response = yield self.RegisterUserWorker.updateUserProfile(content);
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def op_getUser(self, content, headers, msg):
-        log.debug('op_getUser: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_getUser: \n'+str(content))
         response = yield self.RegisterUserWorker.getUser(content);
         yield self.reply_ok(msg, response)
         
@@ -174,20 +179,23 @@ class AppIntegrationService(ServiceProcess):
                          
     @defer.inlineCallbacks
     def op_getResourceTypes(self, content, headers, msg):
-        log.debug('op_getResourceTypes: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_getResourceTypes: \n'+str(content))
         response = yield self.ManageResourcesWorker.getResourceTypes(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
     def op_getResourcesOfType(self, content, headers, msg):
-        log.debug('op_getResourcesOfType: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_getResourcesOfType: \n'+str(content))
         response = yield self.ManageResourcesWorker.getResourcesOfType(content);
         yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
     def op_getResource(self, content, headers, msg):
-        log.debug('op_getResource: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_getResource: \n'+str(content))
         response = yield self.ManageResourcesWorker.getResource(content);
         yield self.reply_ok(msg, response)
 
@@ -206,7 +214,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief create a new data resource
         """
-        log.debug('op_updateDataResource: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_updateDataResource: \n'+str(content))
         response = yield self.ManageDataResourcWworker.update(content);
         yield self.reply_ok(msg, response)
 
@@ -215,7 +224,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief create a new data resource
         """
-        log.debug('op_deleteDataResource: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_deleteDataResource: \n'+str(content))
         response = yield self.ManageDataResourcWworker.delete(content);
         yield self.reply_ok(msg, response)
 
@@ -224,7 +234,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief validate a data resource URL
         """
-        log.debug('op_validateDataResource: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_validateDataResource: \n'+str(content))
         response = yield self.ValidateDataResourceWorker.validate(content);
         yield self.reply_ok(msg, response)
 
@@ -234,7 +245,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief subscribe to a data resource
         """
-        log.debug('op_createDataResourceSubscription: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_createDataResourceSubscription: \n'+str(content))
         response = yield self.ManageDataResourceSubscriptionWorker.create(content);
         yield self.reply_ok(msg, response)
 
@@ -243,7 +255,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief find subscriptions to a data resource
         """
-        log.debug('op_findDataResourceSubscriptions: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_findDataResourceSubscriptions: \n'+str(content))
         response = yield self.ManageDataResourceSubscriptionWorker.find(content);
         yield self.reply_ok(msg, response)
 
@@ -252,7 +265,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief delete subscription to a data resource
         """
-        log.debug('op_deleteDataResourceSubscription: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_deleteDataResourceSubscription: \n'+str(content))
         response = yield self.ManageDataResourceSubscriptionWorker.delete(content);
         yield self.reply_ok(msg, response)
 
@@ -261,7 +275,8 @@ class AppIntegrationService(ServiceProcess):
         """
         @brief update subscription to a data resource
         """
-        log.debug('op_updateDataResourceSubscription: \n'+str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_updateDataResourceSubscription: \n'+str(content))
         response = yield self.ManageDataResourceSubscriptionWorker.update(content);
         yield self.reply_ok(msg, response)
 
@@ -286,7 +301,8 @@ class AppIntegrationServiceClient(ServiceClient):
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResources', message)
-        log.info('Service reply: ' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -298,7 +314,8 @@ class AppIntegrationServiceClient(ServiceClient):
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResourcesByUser(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResourcesByUser', message)
-        log.info('Service reply: ' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -310,7 +327,8 @@ class AppIntegrationServiceClient(ServiceClient):
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: getDataResourceDetail(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', message)
-        log.info('Service reply: ' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -318,6 +336,7 @@ class AppIntegrationServiceClient(ServiceClient):
         yield self._check_init()
         result = yield self.CheckRequest(message)
         if result is not None:
+            log.error('createDownloadURL: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
@@ -332,15 +351,18 @@ class AppIntegrationServiceClient(ServiceClient):
                                                                     message,
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
-        log.info('Service reply: ' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.info('Service reply: ' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
     def registerUser(self, message):
         yield self._check_init()
-        log.debug("AIS_client.registerUser: sending following message to registerUser:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.registerUser: sending following message to registerUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('registerUser', message)
-        log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -349,6 +371,7 @@ class AppIntegrationServiceClient(ServiceClient):
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
         if result is not None:
+            log.error('updateUserProfile: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
@@ -356,13 +379,16 @@ class AppIntegrationServiceClient(ServiceClient):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+            log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
-        log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('updateUserProfile',
                                                                     message,
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
-        log.debug('AIS_client.updateUserProfile: IR Service reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.updateUserProfile: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks
@@ -371,6 +397,7 @@ class AppIntegrationServiceClient(ServiceClient):
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
         if result is not None:
+            log.error('getUser: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
@@ -378,37 +405,46 @@ class AppIntegrationServiceClient(ServiceClient):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
             Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+            log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
-        log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('getUser',
                                                                     message,
                                                                     message.message_parameters_reference.user_ooi_id,
                                                                     "0")
-        log.debug('AIS_client.getUser: IR Service reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.getUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks
     def getResourceTypes(self, message):
         yield self._check_init()
-        log.debug("AIS_client.getResourceTypes: sending following message to getResourceTypes:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.getResourceTypes: sending following message to getResourceTypes:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('getResourceTypes', message)
-        log.debug('AIS_client.getResourceTypes: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.getResourceTypes: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
     def getResourcesOfType(self, message):
         yield self._check_init()
-        log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('getResourcesOfType', message)
-        log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
     def getResource(self, message):
         yield self._check_init()
-        log.debug("AIS_client.getResource: sending following message to getResource:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.getResource: sending following message to getResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('getResource', message)
-        log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
@@ -418,9 +454,11 @@ class AppIntegrationServiceClient(ServiceClient):
         if result is not None:
             log.error('createDataResource: ' + result.error_str)
             defer.returnValue(result)
-        log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResource', message)
-        log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -430,9 +468,11 @@ class AppIntegrationServiceClient(ServiceClient):
         if result is not None:
             log.error('updateDataResource: ' + result.error_str)
             defer.returnValue(result)
-        log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
-        log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -442,9 +482,11 @@ class AppIntegrationServiceClient(ServiceClient):
         if result is not None:
             log.error('deleteDataResource: ' + result.error_str)
             defer.returnValue(result)
-        log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
-        log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -454,9 +496,11 @@ class AppIntegrationServiceClient(ServiceClient):
         if result is not None:
             log.error('validateDataResource: ' + result.error_str)
             defer.returnValue(result)
-        log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('validateDataResource', message)
-        log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
 
@@ -464,33 +508,41 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def createDataResourceSubscription(self, message):
         yield self._check_init()
-        log.debug("AIS_client.createDataResourceSubscription: sending following message:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.createDataResourceSubscription: sending following message:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResourceSubscription', message)
-        log.debug('AIS_client.createDataResourceSubscription: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.createDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
     def findDataResourceSubscriptions(self, message):
         yield self._check_init()
-        log.debug("AIS_client.findDataResourceSubscriptions: sending following message:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.findDataResourceSubscriptions: sending following message:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('findDataResourceSubscriptions', message)
-        log.debug('AIS_client.findDataResourceSubscriptions: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.findDataResourceSubscriptions: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
     def deleteDataResourceSubscription(self, message):
         yield self._check_init()
-        log.debug("AIS_client.deleteDataResourceSubscription: sending following message:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.deleteDataResourceSubscription: sending following message:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('deleteDataResourceSubscription', message)
-        log.debug('AIS_client.deleteDataResourceSubscription: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.deleteDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
     def updateDataResourceSubscription(self, message):
         yield self._check_init()
-        log.debug("AIS_client.updateDataResourceSubscription: sending following message:\n%s" % str(message))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.updateDataResourceSubscription: sending following message:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('updateDataResourceSubscription', message)
-        log.debug('AIS_client.updateDataResourceSubscription: AIS reply:\n' + str(content))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.updateDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
 

@@ -2,12 +2,13 @@
 
 """
 @file ion/integration/ais/manage_data_resource_subscription/manage_data_resource_subscription.py
-@author Ian Katz
+@author Dave Everett, Bill Bollenbacher
 @brief The worker class that implements the subscribeDataResource function for the AIS  (workflow #105)
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 import time
 
@@ -567,7 +568,8 @@ class ManageDataResourceSubscription(object):
             except ResourceClientError:
                 log.error('Error getting instance of Resource: ' + Association.ObjectReference.key)
                 continue
-            log.debug('Ref = \n'+str(Ref))
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                log.debug('Ref = \n'+str(Ref))
             if Ref.ResourceObjectType != DISPATCHER_WORKFLOW_RESOURCE_TYPE:
                 continue
             if ((Ref.user_ooi_id == SubscriptionInfo.user_ooi_id) and

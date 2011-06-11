@@ -665,4 +665,5 @@ class MetadataCache(object):
             log.debug('value: ' + str(value))
 
     def __printObject(self, object):
-        log.debug('Object: ' + str(object))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('Object: ' + str(object))

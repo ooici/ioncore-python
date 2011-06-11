@@ -8,6 +8,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient
@@ -36,7 +37,8 @@ class CreateDownloadURL(object):
 
     @defer.inlineCallbacks
     def createDownloadURL(self, msg):
-        log.debug('createDownloadURL Worker Class got GPB: \n' + str(msg))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('createDownloadURL Worker Class got GPB: \n' + str(msg))
 
 
         if msg.message_parameters_reference.IsFieldSet('data_resource_id'):

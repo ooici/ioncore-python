@@ -8,6 +8,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 import ion.util.procutils as pu
 
 from twisted.internet import defer
@@ -759,7 +760,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         # try to register this user for the first time
         reply = yield self.aisc.registerUser(msg)
-        log.debug('registerUser returned:\n'+str(reply))
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -776,7 +776,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
         # try to re-register this user for a second time
         reply = yield self.aisc.registerUser(msg)
-        log.debug('registerUser returned:\n'+str(reply))
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -899,7 +898,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         # try to register this user for the first time
         reply = yield self.aisc.registerUser(msg)
-        log.debug('registerUser returned:\n'+str(reply))
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -919,7 +917,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             reply = yield self.aisc.updateUserProfile(msg)
         except ReceivedApplicationError, ex:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
-        log.debug('updateUserProfile returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
@@ -937,7 +936,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             reply = yield self.aisc.updateUserProfile(msg)
         except ReceivedApplicationError, ex:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
-        log.debug('updateUserProfile returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
             
@@ -950,7 +950,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             reply = yield self.aisc.getUser(msg)
         except ReceivedApplicationError, ex:
             self.fail('getUser incorrectly raised exception for an authenticated ooi_id')
-        log.debug('getUser returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getUser returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response from getUser is not an AIS_RESPONSE_MSG_TYPE GPB')
         self.assertEqual(reply.message_parameters_reference[0].name, "some_person")
@@ -997,7 +998,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create the empty request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourceTypes request')
         reply = yield self.aisc.getResourceTypes(msg)
-        log.debug('getResourceTypes returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResourceTypes returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         log.debug('getResourceTypes returned:\n'+str(reply.message_parameters_reference[0]))
@@ -1024,7 +1026,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.resource_type = "datasets"
         log.debug('getResourcesOfType: calling AIS to get datasets')
         reply = yield self.aisc.getResourcesOfType(msg)
-        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
@@ -1041,7 +1044,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.resource_type = "identities"
         log.debug('getResourcesOfType: calling AIS to get identities')
         reply = yield self.aisc.getResourcesOfType(msg)
-        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
@@ -1058,7 +1062,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.resource_type = "datasources"
         log.debug('getResourcesOfType: calling AIS to get datasources')
         reply = yield self.aisc.getResourcesOfType(msg)
-        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
@@ -1075,7 +1080,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.resource_type = "epucontrollers"
         log.debug('getResourcesOfType: calling AIS to get epucontrollers')
         reply = yield self.aisc.getResourcesOfType(msg)
-        log.debug('getResourcesOfType returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCES_OF_TYPE_RESPONSE_TYPE:
@@ -1101,7 +1107,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.ooi_id = "agentservices_epu_controller"  #epu controller
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
@@ -1112,7 +1119,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F1"  #data set
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
@@ -1123,7 +1131,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.ooi_id = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"   #anonymous identity
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
@@ -1134,7 +1143,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.ooi_id = "3319A67F-91F3-424F-8E69-4F28C4E047F2"  #data source
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         log.debug('getResource returned:\n'+str(reply.message_parameters_reference[0]))
@@ -1145,14 +1155,16 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.ooi_id = "bogus-ooi_id"  #non-existant item
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad ooi_id is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
         yield self.createUser()        
         msg.message_parameters_reference.ooi_id = self.user_id   #created identity
         reply = yield self.aisc.getResource(msg)
-        log.debug('getResource returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != GET_RESOURCE_RESPONSE_TYPE:
@@ -1895,7 +1907,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         # try to register this user for the first time
         reply = yield self.aisc.registerUser(msg)
-        log.debug('registerUser returned:\n'+str(reply))
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -1922,7 +1933,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             reply = yield self.aisc.updateUserProfile(msg)
         except ReceivedApplicationError, ex:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
-        log.debug('updateUserProfile returned:\n'+str(reply))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('updateUserProfile returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
