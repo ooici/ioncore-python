@@ -648,6 +648,22 @@ class Repository(ObjectContainer):
 
         return output
 
+    def __eq__(self, other):
+
+        if self is other:
+            return True
+
+        if not isinstance(other, Repository):
+            return False
+
+        #print self._dotgit
+        #print other._dotgit
+
+        if self._dotgit == other._dotgit:
+
+            return True
+
+
     @property
     def Repository(self):
         """
