@@ -186,12 +186,12 @@ class DataStoreWorkbench(WorkBench):
         rows = yield self._commit_store.query(q)
 
         if fail_if_not_found and len(rows) == 0:
+            self.clear_repository(repo)
             raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
 
         log.debug('Found %d commits in the store' % len(rows))
 
         for key, columns in rows.items():
-
 
             if key not in repo.index_hash:
                 blob = columns[VALUE]
@@ -223,12 +223,15 @@ class DataStoreWorkbench(WorkBench):
 
                     if key not in repo._commit_index:
                         cref = repo._load_element(wse)
-                        repo._commit_index[cref.MyId]=cref
+
+                        ### DO NOT ADD IT TO THE COMMIT INDEX - THE STATE OF THE COMMIT INDEX IS USED IN UPDATING TO THE HEAD!
+                        #repo._commit_index[cref.MyId]=cref
                         cref.ReadOnly = True
                     else:
                         cref = repo._commit_index.get(key)
                         
                     link.SetLink(cref)
+                    link.isleaf=False
 
                 # Check to make sure the mutable is upto date with the commits...
 
@@ -262,14 +265,6 @@ class DataStoreWorkbench(WorkBench):
         ####
         # Back to boiler plate op_pull
         ####
-
-        print 'DKNSKSNSKNSKSNDJKSBN'
-        print 'DKNSKSNSKNSKSNDJKSBN'
-        print repo
-        print 'DKNSKSNSKNSKSNDJKSBN'
-        import pprint
-        print pprint.pprint(repo.list_parent_commits(repo.branches[0].branchkey))
-        print 'DKNSKSNSKNSKSNDJKSBN'
 
         my_commits = self.list_repository_commits(repo)
 
