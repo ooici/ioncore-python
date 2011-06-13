@@ -38,14 +38,13 @@ from ion.agents.instrumentagents.instrument_constants import *
 AGENT_MODULE = 'ion.agents.instrumentagents.instrument_agent'
 IAC = None
 
-
+# The default driver configuration.
 sbe_host = '137.110.112.119'
 sbe_port = 4001    
 driver_config = {
     'ipport':sbe_port,
     'ipaddr':sbe_host
 }
-agent_config = {}
 
 # Process description for the SBE37 driver.
 driver_desc = {
@@ -78,88 +77,150 @@ params_acq = {
     (DriverChannel.INSTRUMENT,'STORETIME'):True
 }
 
+
 @defer.inlineCallbacks
 def get_obs(params=None):
+    """
+    Get agent observatory parameters.
+    """
     if not params:
         params = [AgentParameter.ALL]
     result = yield IAC.get_observatory(params)
     defer.returnValue(result)
 
 @defer.inlineCallbacks
+def set_obs(params):
+    """
+    Set agent observatory parameters. Can set driver configuration.
+    """
+    result = yield IAC.set_observatory(params,'create')
+    defer.returnValue(result)
+    
+@defer.inlineCallbacks
 def get_cap(params=None):
+    """
+    Get agent capabilities.
+    """
     if not params:
         params = [InstrumentCapability.ALL]
     result = yield IAC.get_capabilities(params)
     defer.returnValue(result)
     
 @defer.inlineCallbacks
-def set_obs_driver():
-    result = yield IAC.set_observatory(params_driver,'create')
-    defer.returnValue(result)
-
-@defer.inlineCallbacks
-def set_obs_acq():
-    result = yield IAC.set_observatory(params_acq,'create')
-    defer.returnValue(result)
-    
-@defer.inlineCallbacks
 def get_obs_status(params=None):
+    """
+    Get agent statuses.
+    """
     if not params:
         params = [AgentStatus.ALL]
     result = yield IAC.get_observatory_status(params)
     defer.returnValue(result)
 
+"""
+@defer.inlineCallbacks
+def set_obs_driver():
+    #Set driver configuation to the default value.
+    result = yield IAC.set_observatory(params_driver,'create')
+    defer.returnValue(result)
+"""
+
+"""
+@defer.inlineCallbacks
+def set_obs_acq():
+    #Set agent 
+    result = yield IAC.set_observatory(params_acq,'create')
+    defer.returnValue(result)
+"""
+
 @defer.inlineCallbacks
 def init():
+    """
+    Transition to intialized state. This creates driver process and client.
+    """
     result = yield IAC.execute_observatory([AgentCommand.TRANSITION,
                                     AgentEvent.INITIALIZE],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def go_active():
+    """
+    Transitioin to active state. This established communications
+    between driver and hardware.
+    """
     result = yield IAC.execute_observatory([AgentCommand.TRANSITION,
                                     AgentEvent.GO_ACTIVE],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def run():
+    """
+    Transition to observatory mode.
+    """
     result = yield IAC.execute_observatory([AgentCommand.TRANSITION,
                                     AgentEvent.RUN],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def reset():
+    """
+    Transition to inactive state. This closes comms with the device and
+    destroys the driver objects.
+    """
     result = yield IAC.execute_observatory([AgentCommand.TRANSITION,
                                     AgentEvent.RESET],'create')
     defer.returnValue(result)
     
 @defer.inlineCallbacks
 def get_device(params=None):
+    """
+    Get device parameters.
+    """
     if not params:
         params = [(DriverChannel.ALL,DriverParameter.ALL)]
     result = yield IAC.get_device(params)
     defer.returnValue(result)
+
+@defer.inlineCallbacks
+def set_device(params):
+    """
+    Set device parameters.
+    """
+    result = yield IAC.set_device(params,'create')
+    defer.returnValue(result)
     
 @defer.inlineCallbacks
 def acquire():
+    """
+    Poll for a sample.
+    """
     result = yield IAC.execute_device([DriverChannel.INSTRUMENT],
         [DriverCommand.ACQUIRE_SAMPLE],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def start():
+    """
+    Start autosampling.
+    """
     result = yield IAC.execute_device([DriverChannel.INSTRUMENT],
         [DriverCommand.START_AUTO_SAMPLING],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def stop():
+    """
+    Stop autosampling.
+    """
     result = yield IAC.execute_device([DriverChannel.INSTRUMENT],
-        [DriverCommand.STOP_AUTO_SAMPLING],'create')
+        [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA'],'create')
     defer.returnValue(result)
 
 @defer.inlineCallbacks
 def start_agent():
+    """
+    Create the unitialized agent process and client. Set default
+    driver parameters.
+    """
     global IAC
     sup = yield ioninit.container_instance.proc_manager.create_supervisor()
     yield sup.spawn_child(ProcessDesc(name=AGENT_MODULE, module=AGENT_MODULE))

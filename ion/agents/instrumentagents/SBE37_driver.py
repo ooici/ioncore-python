@@ -1034,7 +1034,7 @@ class SBE37Driver(InstrumentDriver):
             prompt = yield self._get_autosample_prompt()
             prompt = yield self._do_cmd_no_prompt('stop')
             prompt = yield self._get_prompt()
-            if 'GETDATA' in params:
+            if params and 'GETDATA' in params:
                 result = self._sample_buffer
             next_state = SBE37State.CONNECTED
             

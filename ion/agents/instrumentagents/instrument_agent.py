@@ -285,7 +285,7 @@ class InstrumentAgent(Process):
             AgentState.INACTIVE: self.state_handler_inactive,
             AgentState.IDLE: self.state_handler_idle,
             AgentState.STOPPED: self.state_handler_stopped,
-            AgentState.OBSERVATORY_MODE: self.state_handler_abservatory_mode,
+            AgentState.OBSERVATORY_MODE: self.state_handler_observatory_mode,
             AgentState.DIRECT_ACCESS_MODE: \
                 self.state_handler_direct_access_mode
         }
@@ -593,7 +593,7 @@ class InstrumentAgent(Process):
         defer.returnValue((success, next_state, result))
 
     @defer.inlineCallbacks
-    def state_handler_abservatory_mode(self, event, params):
+    def state_handler_observatory_mode(self, event, params):
         """
         State handler for AgentState.OBSERVATORY_MODE.
         Substate of major state AgentState.ACTIVE.RUNNING.
