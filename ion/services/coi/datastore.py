@@ -978,35 +978,39 @@ class DataStoreWorkbench(WorkBench):
         # STEP 5: Compress any contiguous strips from the same BAs
         # ===================================================================
         compressed_striplist = []
-        curstrip = None
+        accumstrip = None
         for stripitem in sorted_striplist:
             ba, targetslice, srcslice, leng, laststridelen = stripitem
 
             # check for end condition
-            if curstrip and ba != curstrip[0]:
+            if accumstrip and ba != accumstrip[0]:
                 # push current strip into compressed striplist
-                compressed_striplist.append(curstrip)
-                curstrip = None
+                compressed_striplist.append(accumstrip)
+                accumstrip = None
 
             # brand new strip, either after we just pushed or starting this loop
-            if curstrip is None:
-                curstrip = stripitem[:]
+            if accumstrip is None:
+                accumstrip = stripitem[:]
                 continue
 
             # see if we have a contiguous strip
-            if srcslice[0] == curstrip[2][1] and laststridelen == curstrip[4]:
-                # update curstrip
-                curstrip = (curstrip[0], (curstrip[1][0], targetslice[1]), (curstrip[2][0], srcslice[1]), srcslice[1] - curstrip[2][0], curstrip[4])
-                #log.debug("curstrip now [%d,%d] -> [%d,%d]" % (curstrip[1][0], curstrip[1][1], curstrip[2][0], curstrip[2][1]))
+            # - current item's source slice start index is the same as the accumulated strip's source end index
+            # - strides are the same (should always be, this is more sanity check)
+            # - the possible accumulated strip's total length is over the max size for chunking messages
+            if srcslice[0] == accumstrip[2][1] and \
+               laststridelen == accumstrip[4] and \
+               accumstrip[3] + leng < CHUNK_FACTOR:
+                # update accumstrip
+                accumstrip = (accumstrip[0], (accumstrip[1][0], targetslice[1]), (accumstrip[2][0], srcslice[1]), srcslice[1] - accumstrip[2][0], accumstrip[4])
+                #log.debug("accumstrip now [%d,%d] -> [%d,%d]" % (accumstrip[1][0], accumstrip[1][1], accumstrip[2][0], accumstrip[2][1]))
             else:
                 # not contiguous?  push into list and forget it
-                compressed_striplist.append(curstrip)
-                curstrip = None
-                curstrip = stripitem[:]
+                compressed_striplist.append(accumstrip)
+                accumstrip = stripitem[:]
 
         # catch the last one
-        if curstrip is not None:
-            compressed_striplist.append(curstrip)
+        if accumstrip is not None:
+            compressed_striplist.append(accumstrip)
 
         log.debug("Number of compressed strips: %d" % len(compressed_striplist))
         #debug_print_strip_list(compressed_striplist)
