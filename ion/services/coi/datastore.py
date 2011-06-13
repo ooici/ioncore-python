@@ -1042,7 +1042,7 @@ class DataStoreWorkbench(WorkBench):
         # STEP 7: Perform extractions
         # ===================================================================
 
-        loaded_ba_ndarrays = []
+        loaded_ba_ndarrays = set()
         loaded_ba_ndarray_objs = {}     # key => actual ndarray object
         for exidx, exstep in enumerate(extraction_plan):
             curstrips = []
@@ -1080,7 +1080,7 @@ class DataStoreWorkbench(WorkBench):
                 repo.index_hash.update(ndblobs)
 
                 # keep track of what we've loaded
-                loaded_ba_ndarrays.extend(toload_ba_ndarrays)
+                loaded_ba_ndarrays.update(toload_ba_ndarrays)
 
                 # load them as objects now
                 for ndkey in toload_ba_ndarrays:
@@ -1134,8 +1134,23 @@ class DataStoreWorkbench(WorkBench):
             # send this message to the passed in routing key
             yield self._send_data_chunk(request.data_routing_key, chunkmsg)
 
-            # @TODO unload arrays we no longer need
-            #
+            #  unload arrays we no longer need
+
+            # collect upcoming keys from extraction plan
+            # all csis
+            csis = sum(extraction_plan[exidx+1:], [])
+            upcoming_keys = set([compressed_striplist[csi][0].GetLink('ndarray').key for csi in csis])
+            unneeded_keys = loaded_ba_ndarrays.difference(upcoming_keys)
+
+            # remove everything in unneeded_keys from repo, our local cache
+            for unload_key in unneeded_keys:
+                log.debug('Removing unneeded key %s' % base64.encodestring(unload_key)[0:6])
+                # _load_element does not load into repo._workspace, so don't need to unload that ourselves
+                del repo.index_hash[unload_key]
+
+                # remove from our local as well
+                loaded_ba_ndarrays.discard(unload_key)
+                del loaded_ba_ndarray_objs[unload_key]
             
         self._process.reply_ok(message, response)
         log.info("/op_extract_data")
