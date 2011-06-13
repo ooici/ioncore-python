@@ -543,8 +543,10 @@ class ManageDataResource(object):
         datasrc_resource.aggregation_rule                 = msg.aggregation_rule
 
         for i, r in enumerate(msg.sub_ranges):
-            datasrc_resource.sub_ranges.add()
-            datasrc_resource.sub_ranges[i] = msg.sub_ranges[i]
+            s = datasrc_resource.sub_ranges.add()
+            s.dim_name    = r.dim_name
+            s.start_index = r.start_index
+            s.end_index   = r.end_index
 
 
         if msg.IsFieldSet('authentication'):
