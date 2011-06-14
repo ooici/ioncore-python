@@ -104,6 +104,7 @@ class NDArrayWrap(object):
         This method is called by an LRUDict when it is being removed (due to size constraints etc).
         Removes this ndarray from the associated repo to free memory.
         """
+        log.debug("NDArrayWrap object clearing")
         # remove from repo's index_hash if it exists
         if self._repo.index_hash.has_key(self._key):
             del self._repo.index_hash[self._key]
@@ -150,7 +151,7 @@ class NDArrayLRUDict(LRUDict):
         if not self.has_key(key):
             ndarray = NDArrayWrap(key, self._repo, bounds, itembytes, getblobs)
             self[key] = ndarray
-            log.debug("LRUDict loading, size now %d items %d bytes" % (len(self.keys()), self.total_size))
+            log.debug("LRUDict loading, item size %d, lru now %d items %d bytes total" % (ndarray._size, len(self.keys()), self.total_size))
         else:
             ndarray = self.get(key)
 
@@ -1055,20 +1056,6 @@ class DataStoreWorkbench(WorkBench):
                 for targetslice, srcslice, laststridelen in self._get_slices(targetshape, ba_shape, targetranges, srcranges, strides):
                     striplist.append((ba, targetslice, srcslice, targetslice[1]-targetslice[0], laststridelen))
 
-        def debug_print_strip_list(lst):
-            import base64
-            for x in lst:
-                ba, targetslice, srcslice, leng, laststridelen = x
-                print "ba: %s  [%d:%d] -> [%d:%d], stride %d, len %d/%d=%d" % (base64.encodestring(ba.MyId)[0:6],
-                                                              srcslice[0],
-                                                              srcslice[1],
-                                                              targetslice[0],
-                                                              targetslice[1],
-                                                              laststridelen,
-                                                              leng,
-                                                              laststridelen,
-                                                              leng/laststridelen)
-
         log.debug("Number of uncompressed strips: %d" % len(striplist))
 
         # ===================================================================
@@ -1105,7 +1092,6 @@ class DataStoreWorkbench(WorkBench):
                accumstrip[3] + leng < CHUNK_FACTOR:
                 # update accumstrip
                 accumstrip = (accumstrip[0], (accumstrip[1][0], targetslice[1]), (accumstrip[2][0], srcslice[1]), srcslice[1] - accumstrip[2][0], accumstrip[4])
-                #log.debug("accumstrip now [%d,%d] -> [%d,%d]" % (accumstrip[1][0], accumstrip[1][1], accumstrip[2][0], accumstrip[2][1]))
             else:
                 # not contiguous?  push into list and forget it
                 compressed_striplist.append(accumstrip)
@@ -1116,7 +1102,6 @@ class DataStoreWorkbench(WorkBench):
             compressed_striplist.append(accumstrip)
 
         log.debug("Number of compressed strips: %d" % len(compressed_striplist))
-        #debug_print_strip_list(compressed_striplist)
 
         # ===================================================================
         # STEP 6: Generate a list of extractions using heuristics, an "extraction plan"
@@ -1150,13 +1135,9 @@ class DataStoreWorkbench(WorkBench):
         if len(curstep) > 0:
             extraction_plan.append(curstep)
 
-        log.debug("EXPLAN LENGTH: %d" % len(extraction_plan))
-
         # ===================================================================
         # STEP 7: Perform extractions
         # ===================================================================
-
-
 
         # create a least-recently-used cache for ndarrays, using 5mb as the default max size
         ndarray_cache = NDArrayLRUDict(CHUNK_FACTOR, repo)
@@ -1169,25 +1150,18 @@ class DataStoreWorkbench(WorkBench):
             # get the start index.. should be in the first item
             targetstartidx = curstrips[0][1][0]
 
-            # just to make sure..
-            tsi = min([x[1][0] for x in curstrips])
-            assert tsi==targetstartidx
-
-            log.debug("extraction step %d, # strips: %d" % (exidx, len(curstrips)))
-
             # calculate number of elements we are going to output in this chunk, create temp storage for it
-            #elemcount = reduce(lambda x,y: x+y, [int(math.floor(x[3] / float(x[4]))) for x in curstrips])   # divide stored length by stride to get true number of elems
             elemcount = reduce(lambda x, y: x+y, [x[3] for x in curstrips])
             targetndarray = [None] * elemcount
 
-            log.debug("created target array of length %d" % elemcount)
+            log.debug("Extraction step %d, # strips: %d, element count: %d, start index: %d" % (exidx, len(curstrips), elemcount, targetstartidx))
 
             # ok, now we can perform the extractions on this step
             for csidx, curstrip in enumerate(curstrips):
                 ba, targetidxs, srcidxs, leng, stride = curstrip
 
                 # index into the current chunk data
-                striplen = leng #int(leng / float(stride))
+                striplen = leng
                 targetoffset = csidx * striplen
 
                 # get/possibly load from ndarray_cache
@@ -1199,13 +1173,12 @@ class DataStoreWorkbench(WorkBench):
                 else:
                     targetslice = [d for i, d in enumerate(srcslice) if i % stride == 0]
 
-                log.debug("targetslice len: %d [%d, %d]" % (len(targetslice), targetoffset, targetoffset+striplen))
-
                 targetndarray[targetoffset:targetoffset+striplen] = targetslice
 
             # ensure we filled this chunk
             nonelist = [i for i,d in enumerate(targetndarray) if d is None]
-            assert len(nonelist) == 0
+            if len(nonelist) > 0:
+                raise DataStoreWorkBenchError("Data extraction did not properly fill in all members of response ndarray!")
 
             # SEND THIS CHUNK
 
@@ -1214,11 +1187,9 @@ class DataStoreWorkbench(WorkBench):
             chunkmsg.seq_number = exidx
             chunkmsg.seq_max = len(extraction_plan)
 
-            log.debug("Chunk #%d: starter index %d, length %d" % (exidx, targetstartidx, elemcount))
-
             # set info in this chunk
             chunkmsg.start_index = targetstartidx
-            chunkmsg.done = exidx == len(extraction_plan) - 1 #(i==totalchunks-1)      # last chunk message?  set the done flag
+            chunkmsg.done = exidx == len(extraction_plan) - 1       # last chunk message?  set the done flag
 
             # create the ndarray in this chunk
             chunkndarray = chunkmsg.CreateObject(curstrips[0][0].GetLink('ndarray').type)
