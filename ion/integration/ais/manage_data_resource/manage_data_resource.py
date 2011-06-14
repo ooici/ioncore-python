@@ -199,6 +199,9 @@ class ManageDataResource(object):
 
     @defer.inlineCallbacks
     def _onFirstIngestEvent(self, msgcontent):
+        """
+        Not currently being used - life cycle state setting has been moved to the ingestion service.
+        """
 
         datasrc_id = msgcontent.additional_data.datasource_id
         dataset_id = msgcontent.additional_data.dataset_id
@@ -362,7 +365,7 @@ class ManageDataResource(object):
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
-            if not msg.IsFieldSet("max_ingest_millis"):
+            if not msg.IsFieldSet("max_ingest_millis") or msg.max_ingest_millis <= 0.0:
                 if msg.IsFieldSet("update_interval_seconds"):
                     msg.max_ingest_millis = (msg.update_interval_seconds - 1) * 1000
                 else:
