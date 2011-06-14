@@ -1022,25 +1022,32 @@ class DataStoreWorkbench(WorkBench):
         # list of [list of indicies into compressed_striplist]
         extraction_plan = []
 
-        # NAIVE: one strip per chunk!
-        for x in xrange(len(compressed_striplist)):
-            extraction_plan.append([x])
+        # simple: relying on the LRU cache to free up BAs when done, and that datasets will be laid out in a sane
+        # variety fastest varying dimension will never be broken up over multiple BAs unless dimensionality is one,
+        # we can just assemble each step of the plan to be the maximum chunk size we can fit.
+        curstep = []
+        curlen = 0
+        for csidx, cstrip in enumerate(compressed_striplist):
 
-        # testing: half and half
-        #half = len(compressed_striplist) / 2
-        #extraction_plan.append([x for x in xrange(0, half)])
-        #extraction_plan.append([x for x in xrange(half, len(compressed_striplist))])
+            # always need at least one strip
+            if len(curstep) == 0:
+                curstep.append(csidx)
+                curlen += cstrip[3]
+                continue
+
+            # can we fit the new strip?
+            if curlen + cstrip[3] <= CHUNK_FACTOR:
+                curstep.append(csidx)
+            else:
+                extraction_plan.append(curstep)
+                curstep = [csidx]
+                curlen = cstrip[3]
+
+        # catch any leftovers
+        if len(curstep) > 0:
+            extraction_plan.append(curstep)
 
         log.debug("EXPLAN LENGTH: %d" % len(extraction_plan))
-
-        '''
-        curplan = []
-        curlen = 0
-        for idx, strip in compressed_striplist:
-
-            # "length" in the strip is stored as if it is not strided
-            truelen = int(math.floor(strip[3] / float(strip[4])))
-        '''
 
         # ===================================================================
         # STEP 7: Perform extractions
