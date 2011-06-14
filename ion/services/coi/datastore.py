@@ -1023,13 +1023,21 @@ class DataStoreWorkbench(WorkBench):
 
         if len(bounded_includes_list) > 0:
             ndarray_type = bounded_includes_list[0][0].GetLink('ndarray').type
-            if ndarray_type in [CDM_ARRAY_INT32_TYPE, CDM_ARRAY_UINT32_TYPE, CDM_ARRAY_FLOAT32_TYPE]:
+            # @TODO: cmon, the in syntax doesn't use the correct __eq__ overload or whatever? this is silly.
+            if ndarray_type.object_id in [CDM_ARRAY_INT32_TYPE.object_id, CDM_ARRAY_UINT32_TYPE.object_id, CDM_ARRAY_FLOAT32_TYPE.object_id]:
                 ITEM_SIZE = 4
-            elif ndarray_type in [CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT64_TYPE]:
+            elif ndarray_type.object_id in [CDM_ARRAY_INT64_TYPE.object_id, CDM_ARRAY_UINT64_TYPE.object_id, CDM_ARRAY_FLOAT64_TYPE.object_id]:
                 ITEM_SIZE = 8
 
         # max size for a data chunk AND the LRU dict
-        CHUNK_FACTOR = CONF.getValue('extract_cache_size', 5 * 1024 * 1024)
+        LRU_DICT_LIMIT = int(CONF.getValue('extract_cache_size', 5 * 1024 * 1024))
+
+        # @TODO: Bug OOIION- is preventing us from setting a proper chunk limit of 5mb.
+        #                    The overflow point appears to be 16482 -> 16483, which in bytes, looks suspiciously
+        #                    like an arithmetic overflow somewhere.
+
+        CHUNK_FACTOR = 15000 #LRU_DICT_LIMIT / ITEM_SIZE       # chunk factor is expressed in # of items, not bytes
+        log.debug("LRU Cache Limit set at %d bytes, CHUNK_FACTOR is %d elements" % (LRU_DICT_LIMIT, CHUNK_FACTOR))
 
         # ===================================================================
         # STEP 2: Compress/Optimize bounded_includes_list for overlap
@@ -1089,7 +1097,7 @@ class DataStoreWorkbench(WorkBench):
             # - the possible accumulated strip's total length is over the max size for chunking messages
             if srcslice[0] == accumstrip[2][1] and \
                laststridelen == accumstrip[4] and \
-               accumstrip[3] + leng < CHUNK_FACTOR:
+               accumstrip[3] + leng <= CHUNK_FACTOR:
                 # update accumstrip
                 accumstrip = (accumstrip[0], (accumstrip[1][0], targetslice[1]), (accumstrip[2][0], srcslice[1]), srcslice[1] - accumstrip[2][0], accumstrip[4])
             else:
@@ -1140,7 +1148,7 @@ class DataStoreWorkbench(WorkBench):
         # ===================================================================
 
         # create a least-recently-used cache for ndarrays, using 5mb as the default max size
-        ndarray_cache = NDArrayLRUDict(CHUNK_FACTOR, repo)
+        ndarray_cache = NDArrayLRUDict(LRU_DICT_LIMIT, repo)
 
         for exidx, exstep in enumerate(extraction_plan):
             curstrips = []
