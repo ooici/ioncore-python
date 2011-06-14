@@ -102,7 +102,6 @@ class CdmValidationService(ServiceProcess):
         
         @return: Sends an instance of a cdm_validation_response (GPB{7102}) resource to the remote caller.
         """
-        yield # some paths do not yield in this method -- when these are traversed, generator unwinding will fail
         log.info('<<<---@@@ (service) Received operation "validate".  Extracting data_url to perform validation')
         if not hasattr(content, 'MessageType') or content.MessageType != VALIDATION_REQUEST_TYPE:
             raise TypeError('The given content must be an instance or a wrapped instance of %s.  Given: %s' % (repr(VALIDATION_REQUEST_TYPE), type(content)))

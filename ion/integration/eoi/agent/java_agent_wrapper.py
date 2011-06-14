@@ -195,7 +195,6 @@ class JavaAgentWrapper(ServiceProcess):
                 
         @see:   Dataset Agent Diagram (Termination) - https://docs.google.com/drawings/d/1zh4d4H_91jF9w9jLVHSJF7Mtm_49MN-zdUKt_TMFLo8/edit?hl=en_US&authkey=CLzOzuQB 
         '''
-        yield # some paths do not yield in this method -- when these are traversed, generator unwinding will fail
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered JavaAgentWrapper.slc_deactivate(); state=%s" % (str(self._get_state())))
         
@@ -242,9 +241,6 @@ class JavaAgentWrapper(ServiceProcess):
         # Step 1: Perform necessary cleanup
         log.info('Cleaning up resources...')
         
-        
-        return None
-
 
     def on_deactivate(self, *args, **kwargs):
         """
@@ -297,7 +293,6 @@ class JavaAgentWrapper(ServiceProcess):
                 object's exit callback.
         @return: Whatever the underlying process yields on exit.
         '''
-        yield
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
         result = None
@@ -516,7 +511,7 @@ class JavaAgentWrapper(ServiceProcess):
             log.debug("<<<---@@@ Incoming callback with binding key message\n...Content:\t%s" % str(content))
         
         # defer.callback will error if called more than once, fix that here...
-        if 'result' not in dir(self.__binding_key_deferred):
+        if not self.__binding_key_deferred.called:
             self.__agent_binding = str(content)
             self.__binding_key_deferred.callback(self.__agent_binding)
         else:

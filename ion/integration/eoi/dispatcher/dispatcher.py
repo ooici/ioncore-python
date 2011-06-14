@@ -432,8 +432,6 @@ class DispatcherProcess(Process):
                  if/when the Delete Subscription Events Subscriber receives a notification to remove this
                  item from the dictionary. 
         """
-        yield # some paths do not yield in this method -- when these are traversed, generator unwinding will fail
-        
         if log.getEffectiveLevel() <= logging.INFO:
             log.info('')
             log.info('create_dataset_update_subscriber(): Creating Dataset Update Event Subscriber (DUES) for ID "%s" and script "%s' % (str(dataset_id), str(script_path)))
