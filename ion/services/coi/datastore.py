@@ -11,6 +11,7 @@ there but resource types are not...
 """
 import math
 from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
+from ion.util.cache import LRUDict
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -68,6 +69,93 @@ RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
 CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
 
+class NDArrayWrap(object):
+    """
+    Helper object which wraps an ndarray GPB object.
+    The NDArrayWrap is designed to be stored in an LRUDict, as it exposes __sizeof__, clear, and
+    a property to load/retrieve the ndarray's value.
+    """
+    def __init__(self, key, repo, bounds, itembytes, getblobs):
+        """
+        Constructor. Needs references to several pieces of information to correctly get an ndarray
+        and calculate its size.
+
+        @param  key         The ndarray's key.
+        @param  repo        A reference to the repository to load objects into.
+        @param  bounds      The bounds of the ndarray. Used to calc size.
+        @param  itembytes   Number of bytes per item. Based on the array's data type.
+        @param  getblobs    A reference to the workbench's _get_blobs callable.
+        """
+        self._key = key
+        self._repo = repo
+        self._getblobs = getblobs
+
+        self._ndarray = None
+        self._size = reduce(lambda x,y:x*y, [x.size for x in bounds]) * itembytes
+
+    def __sizeof__(self):
+        """
+        Returns the calculated size of this ndarray.
+        """
+        return self._size
+
+    def clear(self):
+        """
+        This method is called by an LRUDict when it is being removed (due to size constraints etc).
+        Removes this ndarray from the associated repo to free memory.
+        """
+        # remove from repo's index_hash if it exists
+        if self._repo.index_hash.has_key(self._key):
+            del self._repo.index_hash[self._key]
+
+    @defer.inlineCallbacks
+    def _get_value(self):
+        """
+        Loads/retrieves an ndarray. Lazy-loads the ndarray from the datastore. Access this via
+        the value property.
+        """
+        if self._ndarray is None:
+            ndblobs = yield self._getblobs(self._repo, [self._key], lambda x: True)
+            self._repo.index_hash.update(ndblobs)
+
+            self._ndarray = self._repo._load_element(self._repo.index_hash[self._key])
+
+        defer.returnValue(self._ndarray.value)
+
+    value = property(_get_value)
+
+class NDArrayLRUDict(LRUDict):
+    """
+    Custom least-recently-used dictionary cache object for holding NDarrays.
+    This dictionary is used by DataStoreWorkbench's op_extract_data method.
+
+    Should only store NDArrayWrap objects. This derived class is mainly to provide a
+    helper method to get an ndarray whether it exists in the cache, is loaded, anything.
+    """
+    def __init__(self, limit, repo):
+        """
+        Constructor. Sets repo ref, initializes LRUDict with use_size set to true.
+        """
+        self._repo = repo
+
+        LRUDict.__init__(self, limit, use_size=True)
+
+    @defer.inlineCallbacks
+    def get_ndarray_value(self, key, bounds, itembytes, getblobs):
+        """
+        Gets an ndarray's value, whether that ndarray is loaded, in the cache, or what have you.
+        Even if the ndarray is actually too large to store in the cache, it will still give you
+        back the ndarray object to work with this one time.
+        """
+        if not self.has_key(key):
+            ndarray = NDArrayWrap(key, self._repo, bounds, itembytes, getblobs)
+            self[key] = ndarray
+            log.debug("LRUDict loading, size now %d items %d bytes" % (len(self.keys()), self.total_size))
+        else:
+            ndarray = self.get(key)
+
+        value = yield ndarray.value
+        defer.returnValue(value)
 
 class DataStoreWorkBenchError(WorkBenchError):
     """
@@ -833,8 +921,6 @@ class DataStoreWorkbench(WorkBench):
 
         log.debug("Extract data request bounds: %s", ["%d+%d,%d" % (x.origin, x.size, x.stride) for x in request.request_bounds])
 
-        CHUNK_FACTOR = 10000
-
         # create an anonymous repo to load things into
         repo = self.create_repository(root_type=ARRAY_STRUCTURE_TYPE)
 
@@ -926,6 +1012,23 @@ class DataStoreWorkbench(WorkBench):
                 # all bounds are included, this bounded array is good to go
                 # format: (bounded array, target range of data (multidim), source bounded array range (multidim))
                 bounded_includes_list.append((ba, target_range, src_range))
+
+        # sidestep: figure out size of each item in a BA, and set chunk factor to 5mb (default, configurable)
+
+        # our default, safe assumptions say to expect the biggest
+        # we don't actually know what to put for CDM_ARRAY_STRING_TYPE as that varies and CDM_ARRAY_OPAQUE_TYPE,
+        # could be many things.
+        ITEM_SIZE = 8
+
+        if len(bounded_includes_list) > 0:
+            ndarray_type = bounded_includes_list[0][0].GetLink('ndarray').type
+            if ndarray_type in [CDM_ARRAY_INT32_TYPE, CDM_ARRAY_UINT32_TYPE, CDM_ARRAY_FLOAT32_TYPE]:
+                ITEM_SIZE = 4
+            elif ndarray_type in [CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT64_TYPE]:
+                ITEM_SIZE = 8
+
+        # max size for a data chunk AND the LRU dict
+        CHUNK_FACTOR = CONF.getValue('extract_cache_size', 5 * 1024 * 1024)
 
         # ===================================================================
         # STEP 2: Compress/Optimize bounded_includes_list for overlap
@@ -1053,8 +1156,11 @@ class DataStoreWorkbench(WorkBench):
         # STEP 7: Perform extractions
         # ===================================================================
 
-        loaded_ba_ndarrays = set()
-        loaded_ba_ndarray_objs = {}     # key => actual ndarray object
+
+
+        # create a least-recently-used cache for ndarrays, using 5mb as the default max size
+        ndarray_cache = NDArrayLRUDict(CHUNK_FACTOR, repo)
+
         for exidx, exstep in enumerate(extraction_plan):
             curstrips = []
             for sidx in exstep:
@@ -1076,27 +1182,6 @@ class DataStoreWorkbench(WorkBench):
 
             log.debug("created target array of length %d" % elemcount)
 
-            # needed BAs
-            needed_ba_ndarrays = [x[0].GetLink('ndarray').key for x in curstrips]
-
-            # get a list of things to load
-            toload_ba_ndarrays = set([x for x in needed_ba_ndarrays if x not in loaded_ba_ndarrays])
-
-            if len(toload_ba_ndarrays) > 0:
-                import base64
-                log.debug("need to load %s" % ",".join([base64.encodestring(x)[0:6] for x in toload_ba_ndarrays]))
-    
-                # physically load them!
-                ndblobs = yield self._get_blobs(repo, toload_ba_ndarrays, lambda x: True)
-                repo.index_hash.update(ndblobs)
-
-                # keep track of what we've loaded
-                loaded_ba_ndarrays.update(toload_ba_ndarrays)
-
-                # load them as objects now
-                for ndkey in toload_ba_ndarrays:
-                    loaded_ba_ndarray_objs[ndkey] = repo._load_element(repo.index_hash[ndkey])
-
             # ok, now we can perform the extractions on this step
             for csidx, curstrip in enumerate(curstrips):
                 ba, targetidxs, srcidxs, leng, stride = curstrip
@@ -1105,9 +1190,10 @@ class DataStoreWorkbench(WorkBench):
                 striplen = leng #int(leng / float(stride))
                 targetoffset = csidx * striplen
 
-                ndobj = loaded_ba_ndarray_objs[ba.GetLink('ndarray').key]
+                # get/possibly load from ndarray_cache
+                ndobjval = yield ndarray_cache.get_ndarray_value(ba.GetLink('ndarray').key, ba.bounds, ITEM_SIZE, self._get_blobs)
 
-                srcslice = ndobj.value[srcidxs[0]:srcidxs[1]]
+                srcslice = ndobjval[srcidxs[0]:srcidxs[1]]
                 if stride == 1:
                     targetslice = srcslice
                 else:
@@ -1144,24 +1230,6 @@ class DataStoreWorkbench(WorkBench):
 
             # send this message to the passed in routing key
             yield self._send_data_chunk(request.data_routing_key, chunkmsg)
-
-            #  unload arrays we no longer need
-
-            # collect upcoming keys from extraction plan
-            # all csis
-            csis = sum(extraction_plan[exidx+1:], [])
-            upcoming_keys = set([compressed_striplist[csi][0].GetLink('ndarray').key for csi in csis])
-            unneeded_keys = loaded_ba_ndarrays.difference(upcoming_keys)
-
-            # remove everything in unneeded_keys from repo, our local cache
-            for unload_key in unneeded_keys:
-                log.debug('Removing unneeded key %s' % base64.encodestring(unload_key)[0:6])
-                # _load_element does not load into repo._workspace, so don't need to unload that ourselves
-                del repo.index_hash[unload_key]
-
-                # remove from our local as well
-                loaded_ba_ndarrays.discard(unload_key)
-                del loaded_ba_ndarray_objs[unload_key]
             
         self._process.reply_ok(message, response)
         log.info("/op_extract_data")
