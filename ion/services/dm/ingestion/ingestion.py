@@ -302,10 +302,9 @@ class IngestionService(ServiceProcess):
         log.info("Yielding in op_perform_ingest for receive loop to complete")
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
-        # common cleanup
-
         # we succeeded, cancel the timeout
-        timeoutcb.cancel()
+        if timeoutcb.active():
+            timeoutcb.cancel()
 
         # reset ingestion deferred so we can use it again
         self._defer_ingest = defer.Deferred()
