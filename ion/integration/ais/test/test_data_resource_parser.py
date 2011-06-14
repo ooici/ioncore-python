@@ -15,7 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.test.iontest import IonTestCase
 
-from ion.integration.ais.validate_data_resource.parse_url_tester import parseUrl
+from ion.integration.ais.validate_data_resource.parse_url_tester import validateUrl
 
 
 class AISDataResourceParserTest(IonTestCase):
@@ -35,10 +35,8 @@ class AISDataResourceParserTest(IonTestCase):
         toparse = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc" + ".das"
 
         log.info("parsing %s", toparse)
-        res = parseUrl(toparse)
+        res = validateUrl(toparse)
 
-        log.info(str(res))
-        
         self.failUnlessEqual(True, res.has_key("NC_GLOBAL"), "NC global section not found, but we know its there")
 
         self.failUnlessEqual(True, res["NC_GLOBAL"].has_key("qc_flag_values"))
