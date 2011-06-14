@@ -525,28 +525,44 @@ class JavaAgentWrapper(ServiceProcess):
         """
 
         try:
+            # Set the start time of this update to the last time in the dataset (ion_time_coverage_end)
+            # minus the start time offset provided by the datasource (starttime_offset_millis)
             string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
-            # Get the time since epoch in seconds.
             start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            start_time_seconds -= int(datasource.starttime_offset_millis * 0.001)
 
         except OOIObjectError, oe:
-            log.exception('No start time attribute found in new dataset! This is okay - expected!')
-            #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
-            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
+            # Set the start time of this update to the current time minus the initial start time offset
+            # provided by the datasource (initial_starttime_offset_millis)
+            # @note: Default to 1 day if initial_starttime_offset_millis is not provided
+            log.warn('No start time attribute found in new dataset! This is okay - expected!')
+            initial_offset = datasource.initial_starttime_offset_millis
+            if initial_offset == 0:
+                initial_offset = 86400000 # 1 day in millis
+            start_time_seconds = int(time.time() - (initial_offset * 0.001))
 
         except AttributeError, ae:
-            log.exception('No start time attribute found in empty dataset! This is bad - should not happen!')
-            start_time_seconds = calendar.timegm(time.gmtime()) - 2*86400
-            #start_time_seconds = calendar.timegm(time.gmtime()) - datasource.update_interval_seconds
+            # Set the start time of this update to the current time minus the initial start time offset
+            # provided by the datasource (initial_starttime_offset_millis)
+            # @note: Default to 1 day if initial_starttime_offset_millis is not provided
+            log.exception('No start time attribute found in empty dataset! This is bad - should not happen!  Setting start time to TODAY minus the initial starttime offset.')
+            initial_offset = datasource.initial_starttime_offset_millis
+            if initial_offset == 0:
+                initial_offset = 86400000 # 1 day in millis
+            start_time_seconds = int(time.time() - (initial_offset * 0.001))
 
 
         if testing:
-            log.debug('Using Test Detla time....')
+            log.debug('Using Test Delta time....')
             deltaTime = 3*86400 # 3 days in seconds
             end_time_seconds = start_time_seconds + deltaTime
         else:
-            # Get upto one day in the future?
-            end_time_seconds = calendar.timegm(time.gmtime()) + 86400
+            # Set the end time of this update to the current time plus the end time offset
+            # provided by the datasource (endtime_offset_millis)
+            # @note: Default to 1 day if endtime_offset_millis is not provided
+            end_time_offset = datasource.endtime_offset_millis
+            end_time_seconds = int(time.time() + (end_time_offset * 0.001))
+            
 
         stime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(start_time_seconds))
         log.info('Getting Data Start time: %s' % stime)
@@ -570,6 +586,13 @@ class JavaAgentWrapper(ServiceProcess):
         msg.ncml_mask = datasource.ncml_mask
         msg.max_ingest_millis = datasource.max_ingest_millis
 
+        # Add subranges to the context message
+        for i, r in enumerate(datasource.sub_ranges):
+            s = msg.sub_ranges.add()
+            s.dim_name    = r.dim_name
+            s.start_index = r.start_index
+            s.end_index   = r.end_index
+        
         if datasource.IsFieldSet('authentication'):
             log.info('Setting: authentication')
             msg.authentication = datasource.authentication
@@ -721,10 +744,9 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
-        jar_pathname = CONF.getValue('dataset_agent_jar_path', 'lib/eoi-agents-0.3.10.jar')
+        jar_pathname = CONF.getValue('dataset_agent_jar_path', None)
 
-        if not os.path.exists(jar_pathname):
-            log.error("JAR for dataset agent (%s) not found" % jar_pathname)
+        if jar_pathname is None or not os.path.exists(jar_pathname):
             raise IonError("JAR for dataset agent not found: (%s)" % jar_pathname)
         
         parent_host_name = self.container.exchange_manager.message_space.hostname
