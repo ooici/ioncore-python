@@ -37,8 +37,6 @@ from ion.integration.ais.notification_alert_service import NotificationAlertServ
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
 from ion.integration.ais.common.metadata_cache import  MetadataCache
 
-from ion.core.intercept.policy import get_dispatcher_id_for_user
-
 from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
