@@ -22,9 +22,9 @@ from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, 
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
 from ion.services.dm.distribution.events import ScheduleEventPublisher
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber
 
 from ion.util.iontime import IonTime
+import time
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
@@ -106,6 +106,12 @@ class ManageDataResource(object):
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
+            #OOIION-164
+            dateproblem = yield self._checkStartDatetime("ManageDataResource.update()", msg)
+            if not dateproblem is None:
+                defer.returnValue(dateproblem)
+                
+
             dataset_resource = yield self.rc.get_instance(msg.data_set_resource_id)
             datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
                                                                     HAS_A_ID, 
@@ -164,6 +170,7 @@ class ManageDataResource(object):
                 datasrc_resource.max_ingest_millis = msg.max_ingest_millis
 
             if msg.IsFieldSet("is_public"):
+                datasrc_resource.is_public = msg.is_public
                 if not msg.is_public:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
                     dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
@@ -195,32 +202,6 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0] = Response.CreateObject(UPDATE_DATA_RESOURCE_RSP_TYPE)
         Response.message_parameters_reference[0].success = True
         defer.returnValue(Response)
-
-
-    @defer.inlineCallbacks
-    def _onFirstIngestEvent(self, msgcontent):
-
-        datasrc_id = msgcontent.additional_data.datasource_id
-        dataset_id = msgcontent.additional_data.dataset_id
-
-        #look up resources
-        log.info("_onFirstIngestEvent getting instance of data source resource")
-        datasrc_resource = yield self.rc.get_instance(datasrc_id)
-        log.info("_onFirstIngestEvent getting instance of data set resource")
-        dataset_resource = yield self.rc.get_instance(dataset_id)
-
-        if not datasrc_resource.is_public:
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-            dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
-        else:
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-            dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
-
-        yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
-
-        # all done, cleanup
-        yield self._subscriber.terminate()
-        self._subscriber = None
 
 
     @defer.inlineCallbacks
@@ -362,11 +343,16 @@ class ManageDataResource(object):
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
-            if not msg.IsFieldSet("max_ingest_millis"):
-                if msg.IsFieldSet("update_interval_seconds"):
+            if not msg.IsFieldSet("max_ingest_millis") or msg.max_ingest_millis <= 0:
+                if msg.IsFieldSet("update_interval_seconds") and msg.update_interval_seconds > 1:
                     msg.max_ingest_millis = (msg.update_interval_seconds - 1) * 1000
                 else:
                     msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
+
+            #OOIION-164
+            dateproblem = yield self._checkStartDatetime("ManageDataResource.create()", msg)
+            if not dateproblem is None:
+                defer.returnValue(dateproblem)
 
 
             # get user resource so we can associate it later
@@ -428,21 +414,6 @@ class ManageDataResource(object):
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
 
-
-            """
-            Moved this functionality to the ingestion services where it simplifies the interactions.
-
-            #event to subscribe to
-            log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
-            self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
-
-            #what to do when 
-            self._subscriber.ondata = self._onFirstIngestEvent
-
-            yield self._subscriber.register()
-            yield self._subscriber.initialize()
-            yield self._subscriber.activate()
-            """
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
@@ -586,8 +557,10 @@ class ManageDataResource(object):
         datasrc_resource.aggregation_rule                 = msg.aggregation_rule
 
         for i, r in enumerate(msg.sub_ranges):
-            datasrc_resource.sub_ranges.add()
-            datasrc_resource.sub_ranges[i] = msg.sub_ranges[i]
+            s = datasrc_resource.sub_ranges.add()
+            s.dim_name    = r.dim_name
+            s.start_index = r.start_index
+            s.end_index   = r.end_index
 
 
         if msg.IsFieldSet('authentication'):
@@ -724,3 +697,19 @@ class ManageDataResource(object):
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
         return (type(test_msg) == type(some_casref))
+
+
+    #OOIION-164: check that the start date is less than a year from now
+    @defer.inlineCallbacks
+    def _checkStartDatetime(self, caller, msg):
+        if msg.IsFieldSet("update_start_datetime_millis") \
+                and msg.update_start_datetime_millis > ((time.time() + 31536000) * 1000):
+            errtext = caller + ": Got a start date in milliseconds that was more than 1 year in the future ("
+            errtext = errtext + str(msg.update_start_datetime_millis) + ")."  
+            log.info(errtext)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+            Response.error_num =  Response.ResponseCodes.BAD_REQUEST
+            Response.error_str =  errtext
+            defer.returnValue(Response)
+
+        defer.returnValue(None)

@@ -222,10 +222,22 @@ class ManageResources(object):
    def __LoadIdentityColumnData(self, To, From, Id):
       try:
          To.attribute.append(Id)
-         To.attribute.append(From.name)
-         To.attribute.append(From.email)
-         To.attribute.append(From.institution)
-         To.attribute.append(From.subject)
+         if not From.IsFieldSet('name'):            
+            To.attribute.append("")
+         else:
+            To.attribute.append(From.name)
+         if not From.IsFieldSet('email'):            
+            To.attribute.append("")
+         else:
+            To.attribute.append(From.email)
+         if not From.IsFieldSet('institution'):            
+            To.attribute.append("")
+         else:
+            To.attribute.append(From.institution)
+         if not From.IsFieldSet('subject'):            
+            To.attribute.append("")
+         else:
+            To.attribute.append(From.subject)
       
       except:
          estr = 'Object ERROR!'
@@ -236,7 +248,10 @@ class ManageResources(object):
       #log.debug("To is:\n"+To.MessageType)
       try:
          To.attribute.append(Id)
-         To.attribute.append(From.station_id[0])
+         if not From.IsFieldSet('station_id'):            
+            To.attribute.append("")
+         else:
+            To.attribute.append(From.station_id[0])
       
       except:
          estr = 'Object ERROR!'

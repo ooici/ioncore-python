@@ -37,6 +37,14 @@ GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 CONF = ioninit.config(__name__)
 
 
+class FakeDelayedCall(object):
+
+    def cancel(self):
+        pass
+
+    def delay(self, int):
+        pass
+
 class IngestionTest(IonTestCase):
     """
     Testing service operations of the ingestion service.
@@ -143,6 +151,8 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
+        self.ingest.timeoutcb = FakeDelayedCall()
+
         #print '\n\n\n Got Dataset in Ingest \n\n\n\n'
 
         # Now fake the receipt of the dataset message
@@ -177,6 +187,8 @@ class IngestionTest(IonTestCase):
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
 
         yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         self.ingest.dataset.CreateUpdateBranch()
 
@@ -271,6 +283,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
@@ -331,6 +344,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)

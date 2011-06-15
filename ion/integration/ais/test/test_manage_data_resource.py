@@ -19,6 +19,7 @@ from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 #from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 #from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, ROOT_USER_ID, ANONYMOUS_USER_ID
 
+import time
 
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
@@ -55,7 +56,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFI
 
 
 class AISManageDataResourceTest(IonTestCase):
-   
+
     """
     Testing Application Integration Service.
     """
@@ -67,7 +68,7 @@ class AISManageDataResourceTest(IonTestCase):
         store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
-        
+
         self.dispatcher_id = None
 
         services = [
@@ -194,7 +195,7 @@ class AISManageDataResourceTest(IonTestCase):
         log.info("FULL USAGE 1/3: create")
         create_resp = yield self._createDataResource()
 
-        #run the update 
+        #run the update
         log.info("FULL USAGE 2/3: update")
         yield self._updateDataResource(create_resp.data_set_id)
 
@@ -240,7 +241,7 @@ class AISManageDataResourceTest(IonTestCase):
         """
         see if the sample data sets are properly associated
         """
-        
+
         dataset_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATASET_ID)
         self.failIfEqual(None, dataset_resource, "Data set resource doesn't appear to exist")
 
@@ -248,8 +249,8 @@ class AISManageDataResourceTest(IonTestCase):
         self.failIfEqual(None, datasrc_resource, "Data source resource doesn't appear to exist")
 
 
-        a_datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
-                                                                  HAS_A_ID, 
+        a_datasrc_resource = yield self._getOneAssociationSubject(dataset_resource,
+                                                                  HAS_A_ID,
                                                                   DATASOURCE_RESOURCE_TYPE_ID)
 
         self.failIfEqual(None, a_datasrc_resource, "Data source resource doesn't appear to be associated with set")
@@ -265,25 +266,27 @@ class AISManageDataResourceTest(IonTestCase):
 
         log.info("Fetching the data resource manually to find out what's in it")
 
-        initial_resource = yield self._getOneAssociationSubject(dataset_resource, 
-                                                                HAS_A_ID, 
+        initial_resource = yield self._getOneAssociationSubject(dataset_resource,
+                                                                HAS_A_ID,
                                                                 DATASOURCE_RESOURCE_TYPE_ID)
-        
+
         log.info("Fetched data source resource %s" % initial_resource.ResourceIdentity)
- 
-        #before 
+
+        #before
         b4_max_ingest_millis            = initial_resource.max_ingest_millis
         b4_update_interval_seconds      = initial_resource.update_interval_seconds
         b4_update_start_datetime_millis = initial_resource.update_start_datetime_millis
         b4_ion_title                    = initial_resource.ion_title
         #b4_ion_institution_id           = initial_resource.ion_institution_id
         b4_ion_description              = initial_resource.ion_description
-        log.info("Original values are %d, %d, %d, %s, %s" % (b4_max_ingest_millis,
-                                                             b4_update_interval_seconds,
-                                                             b4_update_start_datetime_millis,
-                                                             #b4_ion_institution_id,
-                                                             b4_ion_title,
-                                                             b4_ion_description))
+        b4_is_public                    = initial_resource.is_public
+        log.info("Original values are %d, %d, %d, %s, %s, %s" % (b4_max_ingest_millis,
+                                                                 b4_update_interval_seconds,
+                                                                 b4_update_start_datetime_millis,
+                                                                 #b4_ion_institution_id,
+                                                                 b4_ion_title,
+                                                                 b4_ion_description,
+                                                                 b4_is_public))
 
         log.info("Updating the resource based on what we found")
         fr_max_ingest_millis            = b4_max_ingest_millis + 1
@@ -292,14 +295,16 @@ class AISManageDataResourceTest(IonTestCase):
         #fr_ion_institution_id           = b4_ion_institution_id + "_updated"
         fr_ion_title                    = b4_ion_title + "_updated"
         fr_ion_description              = b4_ion_description + "_updated"
+        fr_is_public                    = not b4_is_public
 
 
-        log.info("new values will be %d, %d, %d, %s, %s" % (fr_max_ingest_millis,
-                                                            fr_update_interval_seconds,
-                                                            fr_update_start_datetime_millis,
-                                                            #fr_ion_institution_id,
-                                                            fr_ion_title,
-                                                            fr_ion_description))
+        log.info("new values will be %d, %d, %d, %s, %s, %s" % (fr_max_ingest_millis,
+                                                                fr_update_interval_seconds,
+                                                                fr_update_start_datetime_millis,
+                                                                #fr_ion_institution_id,
+                                                                fr_ion_title,
+                                                                fr_ion_description,
+                                                                fr_is_public))
 
         log.info("Creating and wrapping update request message")
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -314,6 +319,7 @@ class AISManageDataResourceTest(IonTestCase):
         #update_req_msg.ion_institution_id           = fr_ion_institution_id
         update_req_msg.ion_title                    = fr_ion_title
         update_req_msg.ion_description              = fr_ion_description
+        update_req_msg.is_public                    = fr_is_public
 
         #actual update call
         result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
@@ -339,6 +345,13 @@ class AISManageDataResourceTest(IonTestCase):
         self.failUnlessEqual(fr_ion_title                     , updated_resource.ion_title)
         self.failUnlessEqual(fr_ion_description               , updated_resource.ion_description)
 
+        # jira bug OOIION-15
+        self.failUnlessEqual(fr_is_public                     , updated_resource.is_public)
+
+        if fr_is_public:
+            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.COMMISSIONED)
+        else:
+            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.ACTIVE)
 
 
     @defer.inlineCallbacks
@@ -470,6 +483,14 @@ class AISManageDataResourceTest(IonTestCase):
 
         create_req_msg.ClearField("base_url")
 
+        #check range on update_start_datetime_millis (OOIION-164)
+        create_req_msg.update_start_datetime_millis  = (int(time.time()) + 41536000) * 1000
+        result = yield self.aisc.createDataResource(ais_req_msg)
+        self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
+                             "createDataResource accepted a update_start_datetime_millis value more than a year in the future")
+
+        #put it back
+        create_req_msg.update_start_datetime_millis  = 30000
 
         #should be ready for actual call that we expect to succeed
         log.info("testing with the call that we expect to succeed")
@@ -525,7 +546,7 @@ class AISManageDataResourceTest(IonTestCase):
     def _checkAssociatedQuantities(self, some_data_resource, type, type_name, expected):
         log.info("checking association between data source and " + type_name)
         associations = yield self._getAssociatedObjects(some_data_resource, HAS_A_ID, DATARESOURCE_SCHEDULE_TYPE_ID)
-        self.failUnlessEqual(len(associations), expected, 
+        self.failUnlessEqual(len(associations), expected,
                              "got %d associated scheduler tasks instead of %d!" % (len(associations), expected))
         defer.returnValue(None)
 
@@ -556,7 +577,7 @@ class AISManageDataResourceTest(IonTestCase):
         for a in found:
             mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
             mystery_resource_type = mystery_resource.ResourceTypeID.key
-            if the_subject_type == mystery_resource.ResourceTypeID.key:
+            if the_subject_type == mystery_resource_type:
                 if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
                     #FIXME: if not association is None then we have data inconsistency!
                     association = a

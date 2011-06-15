@@ -245,7 +245,7 @@ class TestEventSubscriber(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        self._proc.terminate()
+        yield self._proc.terminate()
         self._proc = None
         yield self._stop_container()
 
