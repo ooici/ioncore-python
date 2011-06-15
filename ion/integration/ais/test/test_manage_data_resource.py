@@ -458,6 +458,7 @@ class AISManageDataResourceTest(IonTestCase):
         create_req_msg.ion_title                     = "some lame title"
         create_req_msg.update_interval_seconds       = 3600
         create_req_msg.is_public                     = False
+        create_req_msg.visualization_url             = "http://foo.org/bar"
         log.info("testing with the full set of fields but no URLs")
         yield self._checkCreateFieldAcceptance(ais_req_msg)
 
