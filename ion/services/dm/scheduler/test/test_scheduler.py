@@ -6,8 +6,11 @@
 @author Paul Hubbard
 @test ion.services.dm.scheduler Exercise the crontab
 """
+import sys
+import time
 
 from twisted.internet import defer
+from ion.core.exception import ReceivedApplicationError
 
 from ion.core.process.process import Process
 from ion.core.object import object_utils
@@ -289,3 +292,48 @@ class SchedulerTest(IonTestCase):
 
         yield asleep(4)
         self.failUnless(len(self._notices) > 0, "Could be an intermittent failure, waiting for message delivery")
+
+    @defer.inlineCallbacks
+    def test_invalid_input(self):
+
+        mc = MessageClient(proc=self.proc)
+        sc = SchedulerServiceClient(proc=self.proc)
+
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 30
+
+        # calc a time, multiply by 1000 again to make it woefully out of range
+        starttime = IonTime().time_ms * 1000
+        msg_a.start_time        = starttime
+
+        # send it, expect an error!
+        scdef = sc.add_task(msg_a)
+        yield self.failUnlessFailure(scdef, ReceivedApplicationError)
+        self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
+
+        # now try it with scheduling a start time that is ok, but start_time plus interval is not
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 30
+
+        # use the maximum integer, convert to ms
+        msg_a.start_time        = sys.maxint * 1000
+
+        # send it, expect an error!
+        scdef = sc.add_task(msg_a)
+        yield self.failUnlessFailure(scdef, ReceivedApplicationError)
+        self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
+
+        # now try it with scheduling a start time more than a year from today
+        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        msg_a.interval_seconds  = 30
+
+        # use the maximum integer, convert to ms
+        msg_a.start_time        = (int(time.time()) + 31536000 + 30) * 1000
+
+        # send it, expect an error!
+        scdef = sc.add_task(msg_a)
+        yield self.failUnlessFailure(scdef, ReceivedApplicationError)
+        self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
