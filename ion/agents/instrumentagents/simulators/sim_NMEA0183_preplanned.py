@@ -23,7 +23,7 @@ class NMEASimProtocol (basic.LineReceiver):
 
     def lineReceived (self, line):
         NMEA0183SimPrePlanned.SimWriteToSerial (line)
-    
+
 
 class NMEA0183SimPrePlanned (NMEA0183SimBase):
     """
