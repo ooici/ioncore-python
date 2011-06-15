@@ -315,18 +315,18 @@ class SchedulerTest(IonTestCase):
         #yield self.failUnlessFailure(scdef, ReceivedApplicationError)
         #self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
 
-        # now try it with scheduling a start time that is ok, but start_time plus interval is not
-        msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
-        msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-        msg_a.interval_seconds  = 30
+        ## now try it with scheduling a start time that is ok, but start_time plus interval is not
+        #msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
+        #msg_a.desired_origin    = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+        #msg_a.interval_seconds  = 30
 
-        # use the maximum integer, convert to ms
-        msg_a.start_time        = sys.maxint * 1000
+        ## use the maximum integer, convert to ms
+        #msg_a.start_time        = sys.maxint * 1000
 
-        # send it, expect an error!
-        scdef = sc.add_task(msg_a)
-        yield self.failUnlessFailure(scdef, ReceivedApplicationError)
-        self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
+        ## send it, expect an error!
+        #scdef = sc.add_task(msg_a)
+        #yield self.failUnlessFailure(scdef, ReceivedApplicationError)
+        #self.failUnlessEquals(scdef.result.msg_content.MessageResponseCode, scdef.result.msg_content.ResponseCodes.BAD_REQUEST)
 
         # now try it with scheduling a start time more than a year from today
         msg_a = yield mc.create_instance(ADDTASK_REQ_TYPE)
