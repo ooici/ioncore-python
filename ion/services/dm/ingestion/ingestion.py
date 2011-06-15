@@ -289,7 +289,7 @@ class IngestionService(ServiceProcess):
             self._defer_ingest.callback(result)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
-        timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
+        self.timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
         log.info(
             'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
@@ -303,8 +303,8 @@ class IngestionService(ServiceProcess):
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
         # we succeeded, cancel the timeout
-        if timeoutcb.active():
-            timeoutcb.cancel()
+        if self.timeoutcb.active():
+            self.timeoutcb.cancel()
 
         # reset ingestion deferred so we can use it again
         self._defer_ingest = defer.Deferred()
@@ -427,6 +427,9 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_dataset - Start')
 
+        log.info('Adding 30 seconds to timeout')
+        self.timeoutcb.delay(30)
+
         log.info(headers)
 
         if content.MessageType != CDM_DATASET_TYPE:
@@ -472,6 +475,8 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_chunk - Start')
 
+        log.info('Adding 30 seconds to timeout')
+        self.timeoutcb.delay(30)
         # this is NOT rpc
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
@@ -533,6 +538,9 @@ class IngestionService(ServiceProcess):
         """
 
         log.info('op_recv_done - Start')
+
+        log.info('Cancelling timeout!')
+        self.timeoutcb.cancel()
 
         log.info(headers)
         

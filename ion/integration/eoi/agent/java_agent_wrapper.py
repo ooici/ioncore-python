@@ -415,7 +415,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
         reply_to        = self.receiver.name
-        ingest_timeout  = context.max_ingest_millis
+        ingest_timeout  = context.max_ingest_millis/1000
 
         if log.getEffectiveLevel() <= logging.DEBUG:        
             log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (dataset_id, reply_to, ingest_timeout))
