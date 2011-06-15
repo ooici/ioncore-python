@@ -576,6 +576,8 @@ class ManageDataResource(object):
         datasrc_resource.ion_institution_id            = msg.ion_institution_id
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
+        log.info('msg.visualization_url: ' + msg.visualization_url)
+        datasrc_resource.visualization_url             = msg.visualization_url
 
         # from bug OOIION-131
         datasrc_resource.initial_starttime_offset_millis  = msg.initial_starttime_offset_millis
