@@ -24,6 +24,7 @@ from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, 
 from ion.services.dm.distribution.events import ScheduleEventPublisher
 
 from ion.util.iontime import IonTime
+import time
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
@@ -104,6 +105,12 @@ class ManageDataResource(object):
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
+
+            #OOIION-164
+            dateproblem = yield self._checkStartDatetime("ManageDataResource.update()", msg)
+            if not dateproblem is None:
+                defer.returnValue(dateproblem)
+                
 
             dataset_resource = yield self.rc.get_instance(msg.data_set_resource_id)
             datasrc_resource = yield self._getOneAssociationSubject(dataset_resource, 
@@ -341,6 +348,11 @@ class ManageDataResource(object):
                     msg.max_ingest_millis = (msg.update_interval_seconds - 1) * 1000
                 else:
                     msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
+
+            #OOIION-164
+            dateproblem = yield self._checkStartDatetime("ManageDataResource.create()", msg)
+            if not dateproblem is None:
+                defer.returnValue(dateproblem)
 
 
             # get user resource so we can associate it later
@@ -683,3 +695,19 @@ class ManageDataResource(object):
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
         return (type(test_msg) == type(some_casref))
+
+
+    #OOIION-164: check that the start date is less than a year from now
+    @defer.inlineCallbacks
+    def _checkStartDatetime(self, caller, msg):
+        if msg.IsFieldSet("update_start_datetime_millis") \
+                and msg.update_start_datetime_millis > ((time.time() + 31536000) * 1000):
+            errtext = caller + ": Got a start date in milliseconds that was more than 1 year in the future ("
+            errtext = errtext + str(msg.update_start_datetime_millis) + ")."  
+            log.info(errtext)
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+            Response.error_num =  Response.ResponseCodes.BAD_REQUEST
+            Response.error_str =  errtext
+            defer.returnValue(Response)
+
+        defer.returnValue(None)
