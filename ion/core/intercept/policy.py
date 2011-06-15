@@ -90,6 +90,13 @@ def construct_user_role_lists(userroledict):
         marineoperatorlist.append(role_dict);
     roledict['MARINE_OPERATOR'] = marineoperatorlist
 
+    earlyadopterlist = []
+    for role_entry in userroledict['roles']['EARLY_ADOPTER']:
+        subject = role_entry
+        role_dict = {'subject': subject, 'ooi_id': None}
+        earlyadopterlist.append(role_dict);
+    roledict['EARLY_ADOPTER'] = earlyadopterlist
+
     attriblist = []
     for attrib_entry_key in userroledict['user-attributes'].keys():
         attrib_dict = {'subject': attrib_entry_key, 'ooi_id': None, 'attributes': userroledict['user-attributes'][attrib_entry_key]}
@@ -158,6 +165,15 @@ def subject_has_marine_operator_role(subject):
 def user_has_marine_operator_role(ooi_id):
     return user_has_role(ooi_id, 'MARINE_OPERATOR')
 
+def map_ooi_id_to_subject_early_adopter_role(subject,ooi_id):
+    map_ooi_id_to_subject_role(subject,ooi_id,'EARLY_ADOPTER')
+
+def subject_has_early_adopter_role(subject):
+    return subject_has_role(subject, 'EARLY_ADOPTER')
+
+def user_has_early_adopter_role(ooi_id):
+    return user_has_role(ooi_id, 'EARLY_ADOPTER')
+
 # Attribute methods
 def get_attribute_value_for_subject(subject,attrib):
     for dict_entry in user_attrib_list:
@@ -175,12 +191,6 @@ def get_attribute_value_for_user(ooi_id,attrib):
                     return dict_entry['attributes'][attrib]
     return None
 
-def map_ooi_id_to_subject_is_early_adopter(subject,ooi_id):
-    for dict_entry in user_attrib_list:
-        if dict_entry['subject'] == subject:
-            dict_entry['ooi_id'] = ooi_id
-            return
-
 # Attribute convenience methods
 def subject_has_attribute(subject, attrib):
     if get_attribute_value_for_subject(subject, attrib) is None:
@@ -191,15 +201,6 @@ def user_has_attribute(ooi_id, attrib):
     if get_attribute_value_for_user(ooi_id, attrib) is None:
         return False
     return True
-
-def subject_is_early_adopter(subject):
-    return subject_has_attribute(subject,'dispatcher-id')
-
-def user_is_early_adopter(ooi_id):
-    return user_has_attribute(ooi_id,'dispatcher-id')
-
-def get_dispatcher_id_for_user(ooi_id):
-    return get_attribute_value_for_user(ooi_id,'dispatcher-id')
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
