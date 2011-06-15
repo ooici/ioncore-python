@@ -289,7 +289,7 @@ class IngestionService(ServiceProcess):
             self._defer_ingest.callback(result)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
-        timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
+        self.timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
         log.info(
             'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
@@ -303,8 +303,8 @@ class IngestionService(ServiceProcess):
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
         # we succeeded, cancel the timeout
-        if timeoutcb.active():
-            timeoutcb.cancel()
+        if self.timeoutcb.active():
+            self.timeoutcb.cancel()
 
         # reset ingestion deferred so we can use it again
         self._defer_ingest = defer.Deferred()
@@ -427,6 +427,9 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_dataset - Start')
 
+        log.info('Adding 30 seconds to timeout')
+        self.timeoutcb.delay(30)
+
         log.info(headers)
 
         if content.MessageType != CDM_DATASET_TYPE:
@@ -472,6 +475,8 @@ class IngestionService(ServiceProcess):
 
         log.info('op_recv_chunk - Start')
 
+        log.info('Adding 30 seconds to timeout')
+        self.timeoutcb.delay(30)
         # this is NOT rpc
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
@@ -533,6 +538,9 @@ class IngestionService(ServiceProcess):
         """
 
         log.info('op_recv_done - Start')
+
+        log.info('Cancelling timeout!')
+        self.timeoutcb.cancel()
 
         log.info(headers)
         
@@ -814,7 +822,7 @@ class IngestionService(ServiceProcess):
 
                 elif att_name == 'ion_geospatial_lat_max':
                     root.MergeAttGreater(att_name, merge_root)
-
+                
                 elif att_name == 'ion_geospatial_lon_min':
                     # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
                     root.MergeAttSrc(att_name, merge_root)
@@ -825,27 +833,78 @@ class IngestionService(ServiceProcess):
 
 
                 elif att_name == 'ion_geospatial_vertical_min':
-
-                    if vertical_positive == 'down':
-                        root.MergeAttLesser(att_name, merge_root)
-
-                    elif vertical_positive == 'up':
-                        root.MergeAttGreater(att_name, merge_root)
-
+                    
+                    # Check vert min/max for NaN, either is NaN or missing, don't merge
+                    min = False
+                    max = False
+                    if merge_root.HasAttribute('ion_geospatial_vertical_min'):
+                        val = merge_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
+                        if not pu.isnan(val):
+                            min = True
+                    
+                    # Only check for max if min is available (if either value is not available, we can't continue)
+                    if min is not None:
+                        if merge_root.HasAttribute('ion_geospatial_vertical_max'):
+                            val = merge_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
+                            if not pu.isnan(val):
+                                max = True
+                    
+                    
+                    if min and max:
+                        if vertical_positive == 'down':
+                            root.MergeAttLesser(att_name, merge_root)
+    
+                        elif vertical_positive == 'up':
+                            root.MergeAttGreater(att_name, merge_root)
+    
+                        else:
+                            raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_min is present')
                     else:
-                        raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_min is present')
+                        root_min = root.HasAttribute('ion_geospatial_vertical_min')
+                        root_max = root.HasAttribute('ion_geospatial_vertical_max')
+                        
+                        # if root doesnt have min/max, add new attributes with default values...
+                        if not root_min and not root_max:
+                            root.AddAttribute('ion_geospatial_vertical_min', root.DataType.DOUBLE, float('nan'))
+                            root.AddAttribute('ion_geospatial_vertical_max', root.DataType.DOUBLE, float('nan'))
 
 
                 elif att_name == 'ion_geospatial_vertical_max':
 
-                    if vertical_positive == 'down':
-                        root.MergeAttGreater(att_name, merge_root)
-
-                    elif vertical_positive == 'up':
-                        root.MergeAttLesser(att_name, merge_root)
-
+                    # Check vert min/max for NaN, either is NaN or missing, don't merge
+                    min = False
+                    max = False
+                    if merge_root.HasAttribute('ion_geospatial_vertical_min'):
+                        val = merge_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
+                        if not pu.isnan(val):
+                            min = True
+                    
+                    # Only check for max if min is available (if either value is not available, we can't continue)
+                    if min is not None:
+                        if merge_root.HasAttribute('ion_geospatial_vertical_max'):
+                            val = merge_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
+                            if not pu.isnan(val):
+                                max = True
+                    
+                    
+                    if min and max:
+                        if vertical_positive == 'down':
+                            root.MergeAttGreater(att_name, merge_root)
+    
+                        elif vertical_positive == 'up':
+                            root.MergeAttLesser(att_name, merge_root)
+    
+                        else:
+                            raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_max is present')
                     else:
-                        raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_max is present')
+                        root_min = root.HasAttribute('ion_geospatial_vertical_min')
+                        root_max = root.HasAttribute('ion_geospatial_vertical_max')
+                        
+                        # if root doesnt have min/max, add new attributes with default values...
+                        if not root_min and not root_max:
+                            root.AddAttribute('ion_geospatial_vertical_min', root.DataType.DOUBLE, float('nan'))
+                            root.AddAttribute('ion_geospatial_vertical_max', root.DataType.DOUBLE, float('nan'))
+                        
 
 
                 elif att_name == 'history':
@@ -859,6 +918,10 @@ class IngestionService(ServiceProcess):
 
                 log.exception('Attribute merger failed for global attribute: %s' % att_name)
                 result[EM_ERROR] = 'Error during ingestion of global attributes'
+            
+            except ValueError, ex:
+                
+                log.exception('Attribute merger failed for global attribute "%s".  Cause: %s' % (att_name, str(ex)))
 
 
         log.debug('_merge_supplement - Complete')
