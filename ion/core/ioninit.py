@@ -11,7 +11,7 @@ import logging.config
 import re
 import os, os.path
 
-from ion.util.context import StackLocal
+from ion.util.context import ContextLocal
 from ion.util.path import adjust_dir
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -62,7 +62,7 @@ testing = True
 
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
-request = StackLocal()
+request = ContextLocal()
 
 
 
