@@ -125,7 +125,7 @@ class ManageDataResource(object):
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
-                Response.error_num =  Response.ResponseCodes.RESOURCE_STATE_DIVERGED
+                Response.error_num =  Response.ResponseCodes.NOT_FOUND
                 Response.error_str =  errtext
                 defer.returnValue(Response)
                 
