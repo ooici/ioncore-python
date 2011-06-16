@@ -1032,9 +1032,9 @@ class DataStoreWorkbench(WorkBench):
         # max size for a data chunk AND the LRU dict
         LRU_DICT_LIMIT = int(CONF.getValue('extract_cache_size', 5 * 1024 * 1024))
 
-        # @TODO: Bug OOIION- is preventing us from setting a proper chunk limit of 5mb.
-        #                    The overflow point appears to be 16482 -> 16483, which in bytes, looks suspiciously
-        #                    like an arithmetic overflow somewhere.
+        # @TODO: Bug OOIION-159 is preventing us from setting a proper chunk limit of 5mb.
+        #                       The overflow point appears to be 16482 -> 16483, which in bytes, looks suspiciously
+        #                       like an arithmetic overflow somewhere.
 
         CHUNK_FACTOR = 15000 #LRU_DICT_LIMIT / ITEM_SIZE       # chunk factor is expressed in # of items, not bytes
         log.debug("LRU Cache Limit set at %d bytes, CHUNK_FACTOR is %d elements" % (LRU_DICT_LIMIT, CHUNK_FACTOR))
