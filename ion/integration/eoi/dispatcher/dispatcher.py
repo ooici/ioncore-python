@@ -498,7 +498,7 @@ class DispatcherProcess(Process):
         
         # Use subprocess to run the script
         try:
-            proc = subprocess.Popen([script_path, dataset_id])
+            proc = subprocess.Popen([script_path, dataset_id], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         except Exception, ex:
             log.error("Could not start workflow for script '%s'.  Cause: %s" % (str(script_path), str(ex)))
             # @todo: Publish failure notification to the email service
