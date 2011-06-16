@@ -754,6 +754,8 @@ class FindDataResources(object):
                 rootAttributes.ion_geospatial_vertical_max = float(dSetMetadata[attrib])
             elif attrib == 'ion_geospatial_vertical_positive':                
                 rootAttributes.ion_geospatial_vertical_positive = dSetMetadata[attrib]
+            elif attrib == 'visualization_url':
+                rootAttributes.visualization_url = dSetMetadata[attrib]
 
 
     def __createDownloadURL(self, dSetResID):

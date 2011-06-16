@@ -195,6 +195,8 @@ class GetDataResourceDetail(object):
         GPBSource.ion_name = userProfile.resource_reference.name
         GPBSource.ion_email = userProfile.resource_reference.email
         GPBSource.ion_institution = userProfile.resource_reference.institution
+
+        GPBSource.visualization_url = dSource.visualization_url
         
         
     def __printSourceMetadata(self, dSource):
