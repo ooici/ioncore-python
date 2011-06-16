@@ -281,6 +281,7 @@ is_a_name = 'is_a'
 type_of_name = 'type_of'
 owned_by_name = 'owned_by'
 has_life_cycle_state_name = 'has_life_cycle_state'
+has_role_name = 'has_roll'
 
 TERMINOLOGY_TYPE = create_type_identifier(object_id=14, version=1)
 
@@ -306,6 +307,10 @@ has_life_cycle_state_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
             TYPE_CFG:TERMINOLOGY_TYPE,
             PREDICATE_CFG:has_life_cycle_state_name},
 
+has_role_name:{ID_CFG:'eed4b68d-58b5-493b-b409-1291d97cb1d8',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:has_role_name},
+
 }
 
 
@@ -317,6 +322,7 @@ OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID_CFG]
 
 HAS_LIFE_CYCLE_STATE_ID = ION_PREDICATES[has_life_cycle_state_name][ID_CFG]
 
+HAS_ROLE_ID = ION_PREDICATES[has_role_name][ID_CFG]
 
 ##### Define Identities #####:
 
@@ -416,6 +422,61 @@ ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
 MYOOICI_USER_ID = ION_IDENTITIES[myooici_name][ID_CFG]
 
 
+###### Define Roles ##########
+
+admin_name = 'Administrator'
+data_provider_name = 'Data Provider'
+marine_operator_name = 'Marine Operator'
+early_adopter_name = 'Early Adopter'
+
+# Anonymous name is already defined
+
+roll_type = create_type_identifier(object_id=1404, version=1)
+
+ION_ROLES = {
+admin_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D0',
+                          TYPE_CFG:roll_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % admin_name,
+                          DESCRIPTION_CFG:'The Admin Role for administrator users.',
+                          CONTENT_CFG:{'role':admin_name}
+                        },
+
+data_provider_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D1',
+                          TYPE_CFG:roll_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % data_provider_name,
+                          DESCRIPTION_CFG:'The data provider role for a owner of data sources.',
+                          CONTENT_CFG:{'role':data_provider_name}
+                        },
+
+marine_operator_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D2',
+                          TYPE_CFG:roll_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % marine_operator_name,
+                          DESCRIPTION_CFG:'The marine operator role for marine IO facilities.',
+                          CONTENT_CFG:{'role':marine_operator_name}
+                        },
+
+early_adopter_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D3',
+                          TYPE_CFG:roll_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % early_adopter_name,
+                          DESCRIPTION_CFG:'The early adopter role for IOOS science beta users.',
+                          CONTENT_CFG:{'role':early_adopter_name}
+                        },
+
+anonymous_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D4',
+                          TYPE_CFG:roll_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % anonymous_name,
+                          DESCRIPTION_CFG:'The anonymous roll for unregistered users.',
+                          CONTENT_CFG:{'role':anonymous_name}
+                        },
+
+
+    }
+
+ADMIN_ROLE_ID = ION_ROLES[admin_name][ID_CFG]
+DATA_PROVIDER_ROLE_ID = ION_ROLES[data_provider_name][ID_CFG]
+MARINE_OPERATOR_ROLE_ID = ION_ROLES[marine_operator_name][ID_CFG]
+EARLY_ADOPTER_ROLE_ID = ION_ROLES[early_adopter_name][ID_CFG]
+ANONYMOUS_ROLE_ID = ION_ROLES[anonymous_name][ID_CFG]
 
 ##### Define Datasets and data sources #####:
 

@@ -46,11 +46,11 @@ from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANC
 from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, get_cassandra_configuration
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES, ION_ROLES
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, LCS_CFG, COMMISSIONED
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID, ADMIN_ROLE_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID, HAS_ROLE_ID
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -1556,17 +1556,37 @@ class DataStoreService(ServiceProcess):
 
         # Load the Root User!
         if self.preload[ION_IDENTITIES_CFG]:
-            log.info('Preloading Identities')
+
+
+            log.info('Preloading Identities and Roles')
 
             root_description = ION_IDENTITIES.get(root_name)
-            exists = yield self.workbench.test_existence(ROOT_USER_ID)
-            if not exists:
+            root_exists = yield self.workbench.test_existence(ROOT_USER_ID)
+            if not root_exists:
                 log.info('Preloading ROOT USER')
 
                 resource_instance = self._create_resource(root_description)
                 if resource_instance is None:
                     raise DataStoreError('Failed to create Identity Resource: %s' % str(root_description))
                 self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
+
+
+            log.info('Preloading Roles')
+
+            for key, value in ION_ROLES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading Role Resources:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to create AIS Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
+
+            # Root was just created - need to give it a roll
+            if not root_exists:
+                self._create_roll_association(ROOT_USER_ID, ADMIN_ROLE_ID )
+
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
             log.info('Preloading Resource Types')
@@ -1587,6 +1607,10 @@ class DataStoreService(ServiceProcess):
             log.info('Preloading Identities')
 
             for key, value in ION_IDENTITIES.items():
+                if key is root_name:
+                    # Don't load root twice...
+                    continue
+
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading Identity:' + str(value.get(NAME_CFG)))
@@ -1595,6 +1619,9 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is None:
                         raise DataStoreError('Failed to create Identity Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
+
+                    # ADD Default role associations here...
+
                     
         if self.preload[ION_DATASETS_CFG]:
             log.info('Preloading Data Sets: %d' % len(ION_DATASETS))
@@ -1806,6 +1833,43 @@ class DataStoreService(ServiceProcess):
 
 
         return association_repo
+
+    def _create_roll_association(self, user_id, role_id):
+
+       association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
+
+       # Set the subject
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       user_repo = self.workbench.get_repository(user_id)
+       if user_repo is None:
+           raise DataStoreError('User Repository not found during preload.')
+       user_repo.set_repository_reference(id_ref, current_state=True)
+       association_repo.root_object.subject = id_ref
+
+       # Set the predicate
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       has_role_repo = self.workbench.get_repository(HAS_ROLE_ID)
+       if has_role_repo is None:
+           raise DataStoreError('Has_Role predicate not found during preload.')
+       has_role_repo.set_repository_reference(id_ref, current_state=True)
+
+       association_repo.root_object.predicate = id_ref
+
+       # Set the Object
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       role_repo = self.workbench.get_repository(role_id)
+       if role_repo is None:
+           raise DataStoreError('Role resource not found during preload.')
+       role_repo.set_repository_reference(id_ref, current_state=True)
+
+       association_repo.root_object.object = id_ref
+
+       association_repo.commit('Ownership association created for preloaded object.')
+
+
+       return association_repo
+
+
 
 class DataStoreClient(ServiceClient):
     """
