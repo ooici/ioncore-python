@@ -226,6 +226,8 @@ class IonTestCase(unittest.TestCase):
         # TODO This is where we can inject user id and expiry into test case
         # stack to allow running of tests within the policy enforcement environment
         # as well as force certain policy enforcement failures, etc.
+
+        request.clear()
         #request.user_id = 'MYUSERID'
         #request.expiry = '999999999'
         request.workbench_context = ['Test runner context!']

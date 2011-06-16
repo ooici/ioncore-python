@@ -8,6 +8,7 @@
 
 import sys
 import weakref
+import threading
 
 class temp(object):
     def __init__(self, f):
@@ -15,6 +16,8 @@ class temp(object):
 
 class StackLocal(object):
     '''
+    NOTE: DO NOT USE StackLocal right now. It is not safe to use with Twisted.
+
     StackLocal provides an interface matching threading.local as close as possible for situations where thread/greenlet context is not possible.
     The intended usage is to define a global (package-level) variable to serve as a container for data that is local to a particular context.
     Once you have created a instance of StackLocal, you can assign new attributes to it:
@@ -107,6 +110,22 @@ class StackLocal(object):
         if val is None:
             return defaultVal
         return val
+
+
+class ContextLocal(threading.local):
+    """
+    Extend threading.local to have a dict-style 'get' method.
+    Eventually this class could be a generic context-local class that works in threads, deferreds, greenlets, etc.
+    """
+
+    def get(self, key, defaultVal=None):
+        try:
+            return self.__getattribute__(key)
+        except AttributeError:
+            return defaultVal
+
+    def clear(self):
+        self.__dict__.clear()
 
 if __name__ == '__main__':
     context = StackLocal()

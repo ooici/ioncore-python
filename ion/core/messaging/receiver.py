@@ -10,7 +10,7 @@ import os
 import types
 
 from zope.interface import implements, Interface
-from twisted.internet import defer
+from twisted.internet import defer, threads, reactor
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -199,18 +199,23 @@ class Receiver(BasicLifecycleObject):
     def add_error_handler(self, callback):
         self.error_handlers.append(callback)
 
-    def _receive(self, msg):
+    @defer.inlineCallbacks
+    def receive(self, msg):
         """
         @brief entry point for received messages; callback from Carrot. All
                 registered handlers will be called in sequence
         @note is called from carrot as normal method; no return expected
         @param msg instance of carrot.backends.txamqp.Message
         """
-        d = self.receive(msg)
-        return d
+
+        # Wrapping the handler in a thread to allow thread-local context during message processing.
+        def do_receive_and_wait():
+            threads.blockingCallFromThread(reactor, self._do_receive, msg)
+
+        yield threads.deferToThread(do_receive_and_wait)
 
     @defer.inlineCallbacks
-    def receive(self, msg):
+    def _do_receive(self, msg):
         """
         @brief entry point for received messages; callback from Carrot. All
                 registered handlers will be called in sequence
