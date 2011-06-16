@@ -133,7 +133,18 @@ class ManageDataResource(object):
                                                                     HAS_A_ID, 
                                                                     DATASOURCE_RESOURCE_TYPE_ID)
 
-            assert(not datasrc_resource is None)
+            #watch for data inconsistency
+            if datasrc_resource is None:
+                errtext = "ManageDataResource.update(): " + \
+                    "could not find a data source resource associated " + \
+                    "with the data set at " + msg.data_set_resource_id
+                log.info(errtext)
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
+
+                Response.error_num =  Response.ResponseCodes.NOT_FOUND
+                Response.error_str =  errtext
+                defer.returnValue(Response)
+                
             
             if msg.IsFieldSet("update_interval_seconds"):
 
