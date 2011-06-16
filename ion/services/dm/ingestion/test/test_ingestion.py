@@ -9,8 +9,6 @@ from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 import ion.util.ionlog
-from ion.util.iontime import IonTime
-
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -152,9 +150,6 @@ class IngestionTest(IonTestCase):
 
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
-        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
-
-
 
         yield self.ingest._prepare_ingest(content)
 
@@ -192,7 +187,6 @@ class IngestionTest(IonTestCase):
 
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
-        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
 
         yield self.ingest._prepare_ingest(content)
 
@@ -288,7 +282,6 @@ class IngestionTest(IonTestCase):
         # Receive a dataset to get setup...
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
-        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
 
         yield self.ingest._prepare_ingest(content)
 
@@ -334,50 +327,17 @@ class IngestionTest(IonTestCase):
 
         self.datastore._create_resource(data_set_description)
 
-        dset_res = self.datastore.workbench.get_repository(new_dataset_id)
+        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
 
-        log.info('Created Dataset Resource for test.')
+
+        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
 
         new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
-        def create_datasource(datasource, *args, **kwargs):
-            """
-            Create an empty dataset
-            """
-            datasource.source_type = datasource.SourceType.NETCDF_S
-            datasource.request_type = datasource.RequestType.DAP
+        # ============================================
+        # Don't need a real data source at this time!
+        # ============================================
 
-            datasource.base_url = "http://not_a_real_url.edu"
-
-            datasource.max_ingest_millis = 6000
-
-            datasource.registration_datetime_millis = IonTime().time_ms
-
-            datasource.ion_title = "NTAS1 Data Source"
-            datasource.ion_description = "Data NTAS1"
-
-            datasource.aggregation_rule = datasource.AggregationRule.OVERLAP
-
-            return True
-
-
-        data_source_description = {ID_CFG:new_datasource_id,
-                      TYPE_CFG:DATASOURCE_TYPE,
-                      NAME_CFG:'datasource for testing ingestion',
-                      DESCRIPTION_CFG:'An example of a station datasource',
-                      CONTENT_CFG:create_datasource,
-                      }
-
-        self.datastore._create_resource(data_source_description)
-
-        dsource_res = self.datastore.workbench.get_repository(new_datasource_id)
-
-        log.info('Created Datasource Resource for test.')
-
-        yield self.datastore.workbench.flush_repo_to_backend(dset_res)
-        yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
-
-        log.info('Data resources flushed to backend')
-
+        log.info('Created Dataset Resource for test.')
 
         # Receive a dataset to get setup...
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
@@ -480,6 +440,7 @@ class IngestionTest(IonTestCase):
         to the first sub-ingestion method.
         """
 
+        # first, create the dataset
         new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
 
         def create_dataset(dataset, *args, **kwargs):
@@ -499,51 +460,18 @@ class IngestionTest(IonTestCase):
 
         self.datastore._create_resource(data_set_description)
 
-        dset_res = self.datastore.workbench.get_repository(new_dataset_id)
+        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
 
-        log.info('Created Dataset Resource for test.')
+
+        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
 
         new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
-        def create_datasource(datasource, *args, **kwargs):
-            """
-            Create an empty dataset
-            """
-            datasource.source_type = datasource.SourceType.NETCDF_S
-            datasource.request_type = datasource.RequestType.DAP
 
-            datasource.base_url = "http://not_a_real_url.edu"
+        # ============================================
+        # Don't need a real data source at this time!
+        # ============================================
 
-            datasource.max_ingest_millis = 6000
-
-            datasource.registration_datetime_millis = IonTime().time_ms
-
-            datasource.ion_title = "NTAS1 Data Source"
-            datasource.ion_description = "Data NTAS1"
-
-            datasource.aggregation_rule = datasource.AggregationRule.OVERLAP
-
-            return True
-
-
-        data_source_description = {ID_CFG:new_datasource_id,
-                      TYPE_CFG:DATASOURCE_TYPE,
-                      NAME_CFG:'datasource for testing ingestion',
-                      DESCRIPTION_CFG:'An example of a station datasource',
-                      CONTENT_CFG:create_datasource,
-                      }
-
-        self.datastore._create_resource(data_source_description)
-
-        dsource_res = self.datastore.workbench.get_repository(new_datasource_id)
-
-        log.info('Created Datasource Resource for test.')
-
-        yield self.datastore.workbench.flush_repo_to_backend(dset_res)
-        yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
-
-        log.info('Data resources flushed to backend')
-
-
+        log.info('Created Dataset Resource for test.')
 
         # now, start ingestion on this fake dataset
         msg = yield self.proc.message_client.create_instance(PERFORM_INGEST_MSG_TYPE)
