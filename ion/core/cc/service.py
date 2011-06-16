@@ -40,7 +40,7 @@ class Options(usage.Options):
                 ["broker_host", "h", "localhost", "Message space broker hostname"],
                 ["broker_port", "p", 5672, "Message space broker port"],
                 ["broker_vhost", "v", "/", "Message space..."],
-                ["broker_heartbeat", None, 0, "Heartbeat rate [seconds]"],
+                ["broker_heartbeat", None, 30, "Heartbeat rate [seconds]"],
                 ["broker_username", None, "guest", "Username to log into virtual host as"],
                 ["broker_password", None, "guest", ""],
                 ["broker_credfile", None, None, "File containing broker username and password"],
