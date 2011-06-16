@@ -5,6 +5,8 @@
 @author David Stuebe
 @brief test for eoi ingestion demo
 """
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -98,7 +100,7 @@ class IngestionTest(IonTestCase):
 
         self.sup = yield self._spawn_processes(services)
 
-        self.proc = process.Process()
+        self.proc = process.Process(spawnargs={'proc-name':'test_ingestion_proc'})
         yield self.proc.spawn()
 
         self._ic = IngestionClient(proc=self.proc)
@@ -162,7 +164,7 @@ class IngestionTest(IonTestCase):
         #print '\n\n\n Filled out message with a dataset \n\n\n\n'
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
         # ==========
         # Can't use messaging and client because the send returns before the op is complete so the result is untestable.
@@ -216,7 +218,7 @@ class IngestionTest(IonTestCase):
         self.create_chunk(supplement_msg)
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_chunk(supplement_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_chunk(supplement_msg, '', self.fake_msg())
 
         updated_bounded_arrays = var.content.bounded_arrays[:]
 
@@ -290,13 +292,13 @@ class IngestionTest(IonTestCase):
         yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
 
         complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
 
         complete_msg.status = complete_msg.StatusCode.OK
-        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
 
 
 
@@ -353,7 +355,7 @@ class IngestionTest(IonTestCase):
         log.info('Calling Receive Dataset')
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
         log.info('Calling Receive Dataset: Complete')
 
@@ -362,7 +364,7 @@ class IngestionTest(IonTestCase):
         log.info('Calling Receive Done')
 
         complete_msg.status = complete_msg.StatusCode.OK
-        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
 
         log.info('Calling Receive Done: Complete!')
 
@@ -429,3 +431,81 @@ class IngestionTest(IonTestCase):
         nsteps = yield test_deferred
 
         self.assertEqual(nsteps, 7)
+
+    @defer.inlineCallbacks
+    def test_error_in_ingest(self):
+        """
+        Attempts to raise an error during the ingestion process to ensure they are trapped and
+        reported properly.  We are simulating JAW/DatasetAgent interaction and do a simple "incorrect message type"
+        to the first sub-ingestion method.
+        """
+
+        # first, create the dataset
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+
+        def create_dataset(dataset, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            group = dataset.CreateObject(GROUP_TYPE)
+            dataset.root_group = group
+            return True
+
+        data_set_description = {ID_CFG:new_dataset_id,
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:'Blank dataset for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:create_dataset,
+                      }
+
+        self.datastore._create_resource(data_set_description)
+
+        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
+
+
+        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
+
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+
+        # ============================================
+        # Don't need a real data source at this time!
+        # ============================================
+
+        log.info('Created Dataset Resource for test.')
+
+        # now, start ingestion on this fake dataset
+        msg = yield self.proc.message_client.create_instance(PERFORM_INGEST_MSG_TYPE)
+        msg.dataset_id = new_dataset_id
+        msg.reply_to = "fake.respond"
+        msg.ingest_service_timeout = 45
+        msg.datasource_id = new_datasource_id
+
+        # get a subscriber going for the ingestion ready message
+        def_ready = defer.Deferred()
+        def readyrecv(data):
+            def_ready.callback(True)
+
+        readysub = Subscriber(xp_name="magnet.topic",
+                              binding_key="fake.respond",
+                              process=self.proc)
+        readysub.ondata = readyrecv
+        yield readysub.initialize()
+        yield readysub.activate()
+
+        # start ingestion, hold its deferred as we need to do something with it in a bit
+        ingestdef = self._ic.ingest(msg)
+
+        # wait for ready response from ingestion
+        yield def_ready
+
+        log.info("Ready response from ingestion, proceeding to give it an incorrect message type to recv_chunk")
+
+        # now send it an incorrect message, make sure we get an error back
+        badmsg = yield self.proc.message_client.create_instance(SUPPLEMENT_MSG_TYPE)
+        yield self.proc.send(new_dataset_id, 'recv_dataset', badmsg)
+
+        yield self.failUnlessFailure(ingestdef, ReceivedApplicationError)
+
+        # check called back thing
+        self.failUnless("Expected message type" in ingestdef.result.msg_content.MessageResponseBody)
+        self.failUnless(ingestdef.result.msg_content.MessageResponseCode, msg.ResponseCodes.BAD_REQUEST)
