@@ -5,6 +5,20 @@
 @author Alon Yaari
 """
 
+"""
+    Commands accepted by the simulator
+
+    $PGRMO,,3           Enables all sentences
+    $PGRMO,,4           Enables all sentences
+    $PGRMO,,2           Disables all sentences
+    $PGRMO,GPGGA,0      Disables GPGGA sentence
+    $PGRMO,GPRMC,0      Disables GPRMC sentence
+    $PGRMO,GPGGA,1      Enables GPGGA sentence
+    $PGRMO,GPRMC,2      Enables GPRMC sentence
+
+    - No spaces allowed in a command sentence
+    - Terminate sentence with '\r'
+"""
 
 from datetime import datetime
 from twisted.internet import task, reactor
