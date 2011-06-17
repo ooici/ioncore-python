@@ -68,78 +68,41 @@ policydb_filename = ioninit.adjust_dir(CONF.getValue('policydecisionpointdb'))
 policy_dictionary = construct_policy_lists(Config(policydb_filename).getObject())
 
 def construct_user_role_lists(userroledict):
+    roles, attributes = userroledict['roles'], userroledict['user-attributes']
+
     roledict = {}
-    adminlist = []
-    for role_entry in userroledict['roles']['ADMIN']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        adminlist.append(role_dict);
-    roledict['ADMIN'] = adminlist
-
-    dataproviderlist = []
-    for role_entry in userroledict['roles']['DATA_PROVIDER']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        dataproviderlist.append(role_dict);
-    roledict['DATA_PROVIDER'] = dataproviderlist
-
-    marineoperatorlist = []
-    for role_entry in userroledict['roles']['MARINE_OPERATOR']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        marineoperatorlist.append(role_dict);
-    roledict['MARINE_OPERATOR'] = marineoperatorlist
-
-    earlyadopterlist = []
-    for role_entry in userroledict['roles']['EARLY_ADOPTER']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        earlyadopterlist.append(role_dict);
-    roledict['EARLY_ADOPTER'] = earlyadopterlist
+    for role_name in ('ADMIN', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'EARLY_ADOPTER'):
+        roledict[role_name] = {'subject': set(roles[role_name]), 'ooi_id': set()}
 
     attriblist = []
-    for attrib_entry_key in userroledict['user-attributes'].keys():
-        attrib_dict = {'subject': attrib_entry_key, 'ooi_id': None, 'attributes': userroledict['user-attributes'][attrib_entry_key]}
-        attriblist.append(attrib_dict);
-
     return roledict, attriblist
 
 userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
 user_role_dict, user_attrib_list = construct_user_role_lists(Config(userroledb_filename).getObject())
 
 def subject_has_role(subject,role):
-    for role_entry in user_role_dict[role]:
-        if role_entry['subject'] == subject:
-            return True
-    return False
+    return subject in user_role_dict[role]['subject']
 
 # Role methods
-def user_has_role(ooi_id,role):
+def user_has_role(ooi_id, role):
     if role == 'OWNER':
         # Will be special handled within the policy flow
         return False
     if role == 'ANONYMOUS':
         return True
     elif role == 'AUTHENTICATED':
-        if ooi_id != 'ANONYMOUS':
-            return True
-        else:
-            return False
+        return ooi_id != 'ANONYMOUS'
     else:
-        for role_entry in user_role_dict[role]:
-            if role_entry['ooi_id'] == ooi_id:
-                return True
-    return False
+        return ooi_id in user_role_dict[role]['ooi_id']
 
-def map_ooi_id_to_subject_role(subject,ooi_id,role):
-    for role_entry in user_role_dict[role]:
-        if role_entry['subject'] == subject:
-            role_entry['ooi_id'] = ooi_id
-            return
+def map_ooi_id_to_subject_role(subject, ooi_id, role):
+    if subject in user_role_dict[role]['subject']:
+        user_role_dict[role]['ooi_id'].add(ooi_id)
+        return
 
 # Role convenience methods
-def map_ooi_id_to_subject_admin_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'ADMIN')
+def map_ooi_id_to_subject_admin_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'ADMIN')
             
 def subject_has_admin_role(subject):
     return subject_has_role(subject, 'ADMIN')
@@ -147,8 +110,8 @@ def subject_has_admin_role(subject):
 def user_has_admin_role(ooi_id):
     return user_has_role(ooi_id, 'ADMIN')
 
-def map_ooi_id_to_subject_data_provider_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'DATA_PROVIDER')
+def map_ooi_id_to_subject_data_provider_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'DATA_PROVIDER')
 
 def subject_has_data_provider_role(subject):
     return subject_has_role(subject, 'DATA_PROVIDER')
@@ -156,8 +119,8 @@ def subject_has_data_provider_role(subject):
 def user_has_data_provider_role(ooi_id):
     return user_has_role(ooi_id, 'DATA_PROVIDER')
 
-def map_ooi_id_to_subject_marine_operator_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'MARINE_OPERATOR')
+def map_ooi_id_to_subject_marine_operator_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'MARINE_OPERATOR')
 
 def subject_has_marine_operator_role(subject):
     return subject_has_role(subject, 'MARINE_OPERATOR')
@@ -165,42 +128,14 @@ def subject_has_marine_operator_role(subject):
 def user_has_marine_operator_role(ooi_id):
     return user_has_role(ooi_id, 'MARINE_OPERATOR')
 
-def map_ooi_id_to_subject_early_adopter_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'EARLY_ADOPTER')
+def map_ooi_id_to_subject_early_adopter_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'EARLY_ADOPTER')
 
 def subject_has_early_adopter_role(subject):
     return subject_has_role(subject, 'EARLY_ADOPTER')
 
 def user_has_early_adopter_role(ooi_id):
     return user_has_role(ooi_id, 'EARLY_ADOPTER')
-
-# Attribute methods
-def get_attribute_value_for_subject(subject,attrib):
-    for dict_entry in user_attrib_list:
-        if dict_entry['subject'] == subject:
-            for attrib_entry_key in dict_entry['attributes'].keys():
-                if attrib_entry_key == attrib:
-                    return dict_entry['attributes'][attrib]
-    return None
-
-def get_attribute_value_for_user(ooi_id,attrib):
-    for dict_entry in user_attrib_list:
-        if dict_entry['ooi_id'] == ooi_id:
-            for attrib_entry_key in dict_entry['attributes'].keys():
-                if attrib_entry_key == attrib:
-                    return dict_entry['attributes'][attrib]
-    return None
-
-# Attribute convenience methods
-def subject_has_attribute(subject, attrib):
-    if get_attribute_value_for_subject(subject, attrib) is None:
-        return False
-    return True
-
-def user_has_attribute(ooi_id, attrib):
-    if get_attribute_value_for_user(ooi_id, attrib) is None:
-        return False
-    return True
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
