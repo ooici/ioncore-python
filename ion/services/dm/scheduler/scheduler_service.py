@@ -237,7 +237,8 @@ class SchedulerService(ServiceProcess):
           rm_task(task)
         """
         for k, v in self._callback_tasks.iteritems():
-            v.cancel()
+            if v.active():
+                v.cancel()
 
     def _schedule_event(self, starttime, interval, task_id):
         """
