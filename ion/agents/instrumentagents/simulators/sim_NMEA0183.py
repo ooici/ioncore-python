@@ -5,14 +5,14 @@
 @author Alon Yaari
 """
 
-
+from time import sleep
 import os
 import signal
 from twisted.internet import defer, reactor
 from datetime import datetime
 import subprocess
+from ion.util.procutils import asleep
 
-import ion.util.procutils as pu
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -25,11 +25,6 @@ NULLPORTMODE = 'w'
 
 # Open a null stream to pipe unwanted console messages to nowhere
 nullDesc = open (os.devnull, NULLPORTMODE)
-
-def TwistedSleep (secs):
-    d = defer.Deferred()
-    reactor.callLater (secs, d.callback, secs)
-    return d
 
 def DecDegToNMEAStr (dd):
     """
@@ -45,17 +40,33 @@ def DecDegToNMEAStr (dd):
     min = 60 * (dd - deg)
     return '%.6f' % (min + 100 * deg)
 
+def DateTimeToDDMMYY (dt):
+    """
+    Converts a python datetime into DDMMYY
+    """
+    m = dt.month
+    d = dt.day
+    y = dt.year
+    if m > 12 or d > 31 or y > 2100:
+        return '000000'
+    return '%02u%02u%02u' % (d, m, y)
+
 def DateTimeToHHMMSS (dt):
     """
     Converts a python datetime into HHMMSS.
     """
-
     h = dt.hour
     m = dt.minute
     s = dt.second
     if h > 24 or m > 60 or s > 60:
         return '000000'
     return '%02u%02u%02u' % (h, m, s)
+
+def CalcMagVar (lat, lon):
+    if lat > 90.0 or lat < -90.0 or lon > 180.0 or lon < -180.0:
+        return '999.9', 'X'
+    # TODO: Properly Calculate the magnetic variation
+    return '001.2', 'E'
 
 def CalcChecksum (str):
     if len (str) < 1:
@@ -158,6 +169,90 @@ def BuildGPGGA (n):
     return '$' + coreStr + '*' + cs + '\r\n'
 
 
+def BuildGPRMC (n):
+    """
+    Assemble an outgoing GPRMC sentence from the given dict info.
+    """
+
+    errFlag = False
+
+    # 0     Sentence header
+    str = ['GPRMC']
+
+    # 1     UTC time of position fix in format hhmmss
+    try:
+        dt = n['time']
+    except:
+        errFlag = True
+        dt = datetime.min
+    str.append (DateTimeToHHMMSS (dt))
+
+    # 2     Status (A = valid position, V = NAV receiver warning
+    str.append ('A')
+
+    # 3     Latitude as dd.mmmmmm
+    try:
+        lat = n['lat']
+    except:
+        errFlag = True
+        lat = 0.0
+    str.append (DecDegToNMEAStr (lat))
+
+    # 4     Latitude hemisphere (pos lat = N, neg lat = S)
+    str.append ('S' if lat < 0 else 'N')
+
+    # 5     Longitude as ddd.mmmmmm
+    try:
+        lon = n['lon']
+    except:
+        errFlag = True
+        lon = 0.0
+    str.append (DecDegToNMEAStr (lon))
+
+    # 6     Longitude hemisphere (pos lat = E, neg lat = W)
+    str.append ('W' if lon < 0 else 'E')
+
+    # 7     Speed Over Ground (000.0 to 999.9 knots with leading zeros)
+    try:
+        sogStr = n['sog']
+    except:
+        sogStr = '999.9'
+    str.append (sogStr)
+
+    # 8     Course Over Ground (000.0 to 359.9 degrees with leading zeros)
+    try:
+        cogStr = n['cog']
+    except:
+        cogStr = '999.9'
+    str.append (cogStr)
+
+    # 9     UTC date of position fix, ddmmyy
+    try:
+        dt = n['time']
+    except:
+        errFlag = True
+        dt = datetime.min
+    str.append (DateTimeToDDMMYY (dt))
+
+    # 10    Magnetic variation (000.0 to 180.0 degrees with leading zeros)
+    # 11    Magnetic variation direction (E or W west adds to true course)
+    if errFlag:
+        str.append ('999.9')
+        str.append ('X')
+    else:
+        var, varDir = CalcMagVar (lat, lon)
+        str.append (var)
+        str.append (varDir)
+
+    # 12    Mode indicator (A=Autonomous, D=Differental, E=Estimated, N=invalid)
+    str.append ('A')
+
+    coreStr = ','.join (str)
+    cs = CalcChecksum (coreStr)
+
+    return '$' + coreStr + '*' + cs + '\r\n'
+
+
 class NMEA0183SimBase:
     """
     Parent class for NMEA0183 GPS simulators
@@ -168,29 +263,32 @@ class NMEA0183SimBase:
 
     WHICHSIM = 'NMEA0183 GPS Simulator Base Class'
 
-    def __init__(self):
+    def __init__ (self):
         """
         Initializes the GPS Simulator
             - Generally best to not override this method
             - Calls SimGPSSetup() which should have an override
         """
 
+        log.info ('simBase __init__')
         self._goodComms = False
         self._workingSim = False
         log.info ('----- Configuring the serial ports')
         self.SerialPortSetup()       # Sets up the serial port
         if not self._goodComms:
+            log.error ('----- Serial ports not configured.')
             return
         log.info ('----- Serial ports configured.')
         self.SimGPSSetup()           # Inits the local simulator or launches external
 
-    def SerialPortSetup(self):
+    @defer.inlineCallbacks
+    def SerialPortSetup (self):
         """
         Creates virtual serial ports then Launches the NEMA0183 GPS simulator
         @param None
         @retval True if successfully launched, False if not
         """
-
+        log.info ('Starting serial port setup')
         self._goodComms = False
 
         # Create the virtual serial ports
@@ -204,9 +302,9 @@ class NMEA0183SimBase:
         except OSError, e:
             log.error ('----- Failure:  Could not create virtual serial port(s): %s' % e)
             return
-        log.info ('----- Before sleep 10')
-        yield pu.asleep (10)
-        log.info ('----- After sleep 10')
+        log.info ('----- Before sleep 5')
+        sleep (1)
+        log.info ('----- After sleep 5')
         #time.sleep (1)
         if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):
             log.error ('Failure:  Unknown reason.')
