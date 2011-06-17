@@ -12,6 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest
+import random
 
 from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
@@ -22,7 +23,8 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RE
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-
+from ion.core.intercept.policy import userroledb_filename, user_has_role
+from ion.util.config import Config
 
 CONF = ioninit.config(__name__)
 
@@ -403,4 +405,29 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         log.info('user2 = '+str(user2.resource_reference.profile))
         self.assertEqual(user2.resource_reference.profile.__len__(), 1)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
-        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value") 
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value")
+
+    @defer.inlineCallbacks
+    def test_broadcast(self):
+        irs = self._get_service_by_name('identity_registry')
+
+        self.irc.broadcast({'body': 'I am a broadcast.'})
+        yield irs.defer_next_op('broadcast')
+
+        self.failUnlessEqual(irs.broadcast_count, 1)
+
+    @defer.inlineCallbacks
+    def test_role_reload(self):
+        irs = self._get_service_by_name('identity_registry')
+        role_cfg = Config(userroledb_filename).getObject()
+
+        user_id = 'FAKE_TEST_USER_%d' % (random.randint(1, 1<<30))
+        log.info('test user id: %s' % (user_id))
+        role_cfg['roles']['ADMIN'].append(user_id)
+        print role_cfg
+
+        self.irc.broadcast({'op': 'role_reload', 'body': role_cfg})
+        yield irs.defer_next_op('broadcast')
+
+        self.failUnless(irs.broadcast_count, 1)
+

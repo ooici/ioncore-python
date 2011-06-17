@@ -14,6 +14,7 @@ from ion.core import ioninit, bootstrap
 
 CONF = ioninit.config(__name__)
 
+from ion.core.messaging.receiver import Receiver, FanoutReceiver
 from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ApplicationError
@@ -31,7 +32,8 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       subject_has_data_provider_role, \
                                       map_ooi_id_to_subject_data_provider_role, \
                                       subject_has_marine_operator_role, \
-                                      map_ooi_id_to_subject_marine_operator_role
+                                      map_ooi_id_to_subject_marine_operator_role, \
+                                      construct_user_role_lists
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID, \
                                                                     TYPE_OF_ID
@@ -111,6 +113,8 @@ message ResourceConfigurationResponse{
 }
 """
 
+broadcast_name = 'identity_registry_broadcast'
+
 class IdentityRegistryClient(ServiceClient):
     """
     """
@@ -170,6 +174,11 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('get_ooiid_for_user', Identity)
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def broadcast(self, message):
+        log.debug('in broadcast for identity registry client')
+        yield self._check_init()
+        yield self.send('broadcast', message)
 
 class IdentityRegistryException(ApplicationError):
     """
@@ -180,12 +189,17 @@ class IdentityRegistryService(ServiceProcess):
 
     # Declaration of service
     declare = ServiceProcess.service_declare(name='identity_service', version='0.1.0', dependencies=[])
+
+    def __init__(self, *args, **kwargs):
+        super(IdentityRegistryService, self).__init__(*args, **kwargs)
+
+        self.broadcast_count = 0
     
     def slc_init(self):
         """
         """
         # Service life cycle state. Initialize service here. Can use yields.
-        
+
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
         self.asc = AssociationServiceClient()
@@ -193,6 +207,18 @@ class IdentityRegistryService(ServiceProcess):
         
         self.instance_counter = 1
 
+    def slc_activate(self):
+        # Setup broadcast channel (for policy reloading)
+
+        self.bc_receiver = FanoutReceiver(name=broadcast_name,
+                                           label='.'.join(broadcast_name, self.receiver.label),
+                                           scope=FanoutReceiver.SCOPE_SYSTEM,
+                                           group=self.receiver.group,
+                                           handler=self.receive,
+                                           error_handler=self.receive_error)
+        self.bc_name = yield self.ann_receiver.attach()
+
+        log.info('Listening to identity registry broadcasts: %s' % (self.bc_name))
 
     @defer.inlineCallbacks
     def op_register_user_credentials(self, request, headers, msg):
@@ -477,6 +503,21 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
                                             request.ResponseCodes.NOT_FOUND)
 
+    def op_broadcast(self, content, headers, msg):
+        """
+        Service operation: announce a capability container
+        """
+        self.broadcast_count += 1
+        log.info('op_broadcast(): Received identity registry broadcast #%d: %s' % (self.broadcast_count, repr(content)))
+        body = content['body']
+
+        if 'op' in content:
+            op = content['op']
+            log.info('doing op_broadcast operation %s' % (op))
+            if op == 'role_reload':
+                construct_user_role_lists(content['body'])
+
+        #log.info("op_announce(): Know about %s containers!" % (len(self.containers)))
 
     @defer.inlineCallbacks
     def _findUser(self, Subject):
