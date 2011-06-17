@@ -16,6 +16,7 @@ from socket import *
 serverHost = '137.110.112.119'
 serverPort = 967                   
 
+
 if __name__ == '__main__':
     if len(sys.argv) > 3:
         print "Usage: %s [host [port]]" % __file__
