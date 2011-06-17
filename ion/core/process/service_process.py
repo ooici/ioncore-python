@@ -169,3 +169,10 @@ class ServiceClient(ProcessClient):
     can perform client side optimizations (such as caching and transformation
     of certain service results).
     """
+
+    def does_service_exist(self, name):
+        """The existence of a queue with the name of the service is
+        equivalent to the service existing.
+        """
+        return self.proc.container.name_exists(name, scope='system')
+        

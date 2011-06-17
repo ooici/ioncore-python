@@ -31,6 +31,7 @@ from ion.core.pack.app_manager import AppManager
 from ion.core.process.proc_manager import ProcessManager, Process
 from ion.util.state_object import BasicLifecycleObject
 from ion.util.config import Config
+from ion.util import procutils as pu
 from ion.services.dm.distribution.events import ContainerLifecycleEventPublisher
 
 CONF = ioninit.config(__name__)
@@ -195,6 +196,12 @@ class Container(BasicLifecycleObject):
         return self.exchange_manager.configure_messaging(*args, **kwargs)
     def new_consumer(self, *args, **kwargs):
         return self.exchange_manager.new_consumer(*args, **kwargs)
+
+    def name_exists(self, name, scope='system'):
+        scoped_name = pu.get_scoped_name(name, scope)
+        log.critical(scoped_name)
+        return self.exchange_manager.queue_exists(scoped_name)
+
     def send(self, *args, **kwargs):
         return self.exchange_manager.send(*args, **kwargs)
 

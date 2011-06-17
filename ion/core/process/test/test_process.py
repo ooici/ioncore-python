@@ -18,6 +18,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 
+from ion.core.process import service_process
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedContainerError, ReceivedApplicationError, ApplicationError
@@ -463,3 +464,43 @@ class EchoProcess(Process):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)
+
+class DummyClient(service_process.ServiceClient):
+
+    def __init__(self, targetname='dummy', proc=None, **kw):
+        kw['targetname'] = targetname
+        service_process.ServiceClient.__init__(self, proc, **kw)
+
+class ServiceClientTest(IonTestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        s = [
+                {
+                    'name':'logger', 
+                    'module':'ion.services.coi.logger',
+                    'class':'LoggerService'
+                    }
+                ]
+        yield self._start_container()
+        yield self._spawn_processes(s)
+
+    @defer.inlineCallbacks
+    def test_does_service_exist_true(self):
+        client = DummyClient()
+        a = yield client.does_service_exist('logger')
+        log.critical(a)
+        self.failUnless(a)
+
+    @defer.inlineCallbacks
+    def test_does_service_exist_false(self):
+        client = DummyClient()
+        a = yield client.does_service_exist('nonexistent')
+        self.failIf(a)
+        
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+

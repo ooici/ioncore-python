@@ -11,6 +11,7 @@ import uuid
 from twisted.internet import defer
 
 from txamqp.client import TwistedDelegate
+from txamqp.client import Closed
 from txamqp.content import Content
 
 from ion.core.messaging import amqp
@@ -367,6 +368,15 @@ class Message(object):
 ##
 ##############################################################
 
+@defer.inlineCallbacks
+def check_queue_exists(client, name):
+    chan = client.channel()
+    yield chan.channel_open()
+    try:
+        yield chan.queue_declare(queue=name, passive=True)
+        defer.returnValue(True)
+    except Closed:
+        defer.returnValue(False)
 
 class Consumer(object):
     """

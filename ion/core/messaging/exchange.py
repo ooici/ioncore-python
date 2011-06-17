@@ -116,6 +116,13 @@ class ExchangeManager(BasicLifecycleObject):
         consumer = yield Consumer.name(self.exchange_space, name_config)
         defer.returnValue(consumer)
 
+    def queue_exists(self, name):
+        """
+        @brief Check if a queue of the given name exists.
+        @retval A Deferred that returns True or False
+        """
+        return messaging.check_queue_exists(self.exchange_space.client, name)
+
     def send(self, to_name, message_data, exchange_space=None, **kwargs):
         """
         Sends a message
