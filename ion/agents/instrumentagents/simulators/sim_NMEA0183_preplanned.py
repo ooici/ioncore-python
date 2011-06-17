@@ -17,8 +17,6 @@ import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
-PREPLAN_MAX = 500
 OFF = 'Off'
 ON = 'On'
 
@@ -153,7 +151,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
 
         # Manage the index
         self._refSecs += 1
-        if self._refSecs > PREPLAN_MAX:
+        if self._refSecs > len (simPath):
             self._refSecs == 0
 
         lat = simPath[self._refSecs]['lat']
@@ -178,7 +176,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
                     self.SimWriteToSerial (nmeaOut)
                     written += 1
         log.info ('Wrote %d NMEA sentences' % written)
-        DebugShowSentenceStatus()
+        # DebugShowSentenceStatus()
 
     def SimWriteToSerial (self, toWrite):
         """
