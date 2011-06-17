@@ -429,6 +429,10 @@ data_provider_name = 'Data Provider'
 marine_operator_name = 'Marine Operator'
 early_adopter_name = 'Early Adopter'
 
+
+# Add Authenticated..
+
+# Remove anonymous
 # Anonymous name is already defined
 
 roll_type = create_type_identifier(object_id=1404, version=1)
