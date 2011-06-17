@@ -189,7 +189,6 @@ class AISManageDataResourceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_createUpdateDeleteDataResource(self):
-        raise unittest.SkipTest("Test fails due to a bug in or below scheduler service")
 
         #run the create
         log.info("FULL USAGE 1/3: create")
@@ -199,7 +198,7 @@ class AISManageDataResourceTest(IonTestCase):
         log.info("FULL USAGE 2/3: update")
         yield self._updateDataResource(create_resp.data_set_id)
 
-        #try the deleet
+        #try the delete
         log.info("FULL USAGE 3/3: delete")
         yield self._deleteDataResource(create_resp.data_set_id)
         log.info("Create/Update/Delete/COMPLETE")
@@ -270,7 +269,8 @@ class AISManageDataResourceTest(IonTestCase):
                                                                 HAS_A_ID,
                                                                 DATASOURCE_RESOURCE_TYPE_ID)
 
-        log.info("Fetched data source resource %s" % initial_resource.ResourceIdentity)
+        data_source_resource_id = initial_resource.ResourceIdentity
+        log.info("Fetched data source resource %s" % data_source_resource_id)
 
         #before
         b4_max_ingest_millis            = initial_resource.max_ingest_millis
@@ -337,7 +337,7 @@ class AISManageDataResourceTest(IonTestCase):
         self.failUnlessEqual(result.success, True, "updateDataResource didn't report success")
 
         #look up resource to compare with fields from original
-        updated_resource = yield self.rc.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        updated_resource = yield self.rc.get_instance(data_source_resource_id)
         self.failUnlessEqual(fr_max_ingest_millis             , updated_resource.max_ingest_millis)
         self.failUnlessEqual(fr_update_interval_seconds       , updated_resource.update_interval_seconds)
         self.failUnlessEqual(fr_update_start_datetime_millis  , updated_resource.update_start_datetime_millis)
