@@ -199,7 +199,6 @@ class Container(BasicLifecycleObject):
 
     def name_exists(self, name, scope='system'):
         scoped_name = pu.get_scoped_name(name, scope)
-        log.critical(scoped_name)
         return self.exchange_manager.queue_exists(scoped_name)
 
     def send(self, *args, **kwargs):

@@ -489,7 +489,6 @@ class ServiceClientTest(IonTestCase):
     def test_does_service_exist_true(self):
         client = DummyClient()
         a = yield client.does_service_exist('logger')
-        log.critical(a)
         self.failUnless(a)
 
     @defer.inlineCallbacks
