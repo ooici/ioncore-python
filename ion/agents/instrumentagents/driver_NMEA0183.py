@@ -601,7 +601,7 @@ class NMEADeviceDriver(InstrumentDriver):
         elif event == NMEADeviceEvent.EXIT:
             # Transitioning out this way means we didn't get a valid sample
             self.protocol._serialReadMode = "OFF"  # Read no more lines
-            command
+            # command
 
         elif event == NMEADeviceEvent.PROMPTED:
             # TODO: Implement a prompted mode for NMEA0183 devices
