@@ -726,7 +726,6 @@ class ManageDataResource(object):
 
     @defer.inlineCallbacks
     def _CheckRequest(self, request):
-       print "in _CheckRequest"
        # Check for correct request protocol buffer type
        if request.MessageType != AIS_REQUEST_MSG_TYPE:
           # build AIS error response
