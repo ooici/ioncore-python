@@ -418,7 +418,7 @@ class JavaAgentWrapper(ServiceProcess):
         ingest_timeout  = context.max_ingest_millis/1000
 
         if log.getEffectiveLevel() <= logging.DEBUG:        
-            log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (dataset_id, reply_to, ingest_timeout))
+            log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:\t%i' % (dataset_id, reply_to, ingest_timeout))
 
         # Create the PerformIngestMessage
         begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
@@ -450,8 +450,8 @@ class JavaAgentWrapper(ServiceProcess):
             Inner method used to reset the ingestion timeout everytime we receive data
             """
             if hasattr(perform_ingest_deferred, 'rpc_call'):
-                log.debug("INCREASING TIMEOUT")
-                perform_ingest_deferred.rpc_call.delay(ingest_timeout/1000)
+                log.debug("Data message intercepted, increasing timeout by %d" % ingest_timeout)
+                perform_ingest_deferred.rpc_call.delay(ingest_timeout)
 
         self._subscriber.ondata = increase_timeout
 
