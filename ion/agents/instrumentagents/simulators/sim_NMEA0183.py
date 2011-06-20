@@ -84,6 +84,99 @@ def CalcChecksum (str):
         calcLow += 7
     return chr(calcHigh) + chr(calcLow)
 
+def BuildPGRMC ():
+    """
+    Assemble an outgoing GPGGA sentence from stored configuration values.
+    """
+
+    errFlag = False
+
+    # 0     Sentence header
+    str = ['PGRMC']
+
+    # 1     Fix Mode
+    if NMEA0183SimBase.cfg_FIXMODE[0]:
+        str.append (NMEA0183SimBase.cfg_FIXMODE[0])
+    else:
+        str.append ('')
+
+    # 2     Alt above/below MSL
+    if NMEA0183SimBase.cfg_ALT:
+        fVal = float (NMEA0183SimBase.cfg_ALT)
+    else:
+        fVal = float (0.0)
+    str.append ('%.1f' % fVal)
+
+    # 3     Earth Datum Index
+    if NMEA0183SimBase.cfg_DATUMINDEX:
+        iVal = int (NMEA0183SimBase.cfg_DATUMINDEX)
+    else:
+        iVal = int (0)
+    str.append ('%d' % iVal)
+
+    # 4     User earth datum
+    str.append ('0')
+
+    # 5     User earth datum inverse flattening factor
+    str.append ('0')
+
+    # 6     User earth datum delta X
+    str.append ('0')
+
+    # 7     User earth datum delta Y
+    str.append ('0')
+
+    # 8     User earth datum delta Z
+    str.append ('0')
+
+    # 9     Differential mode
+    if NMEA0183SimBase.cfg_DIFFMODE[0]:
+        str.append (NMEA0183SimBase.cfg_DIFFMODE[0])
+    else:
+        str.append ('')
+
+    # 10     NMEA 0183 Baud rate
+    if NMEA0183SimBase.cfg_BAUD:
+        iVal = int (NMEA0183SimBase.cfg_BAUD)
+    else:
+        iVal = int (0)
+    str.append ('%d' % iVal)
+
+    # 11     Velocity Filter
+    if NMEA0183SimBase.cfg_VELFILTER:
+        iVal = int (NMEA0183SimBase.cfg_VELFILTER)
+    else:
+        iVal = int (0)
+    str.append ('%d' % iVal)
+
+    # 12     Measurement Pulse Output
+    if NMEA0183SimBase.cfg_MPO:
+        iVal = int (NMEA0183SimBase.cfg_MPO)
+    else:
+        iVal = int (0)
+    log.debug ('iVal type: %s' % type (iVal))
+    str.append ('%d' % iVal)
+
+    # 13     Measurement Pulse Output Length
+    if NMEA0183SimBase.cfg_MPOLEN:
+        iVal = int (NMEA0183SimBase.cfg_MPOLEN)
+    else:
+        iVal = int (0)
+    str.append ('%d' % iVal)
+
+    coreStr = ','.join (str)
+    cs = CalcChecksum (coreStr)
+
+    # 14    Dead reckoning valid time
+    if NMEA0183SimBase.cfg_DEDRECKON:
+        fVal = float (NMEA0183SimBase.cfg_DEDRECKON)
+    else:
+        fVal = float (0.0)
+    str.append ('%.1f' % fVal)
+
+    return '$' + coreStr + '*' + cs + '\r\n'
+
+
 def BuildGPGGA (n):
     """
     Assemble an outgoing GPGGA sentence from the given dict info.
@@ -262,6 +355,86 @@ class NMEA0183SimBase:
     #    driver_ NMEA0183 connects to SERPORTSLAVE
 
     WHICHSIM = 'NMEA0183 GPS Simulator Base Class'
+
+    # PGRMC CONFIGURATION SETTINGS
+
+    # <1> FIX MODE
+    #       A = automatic
+    #       2 = 2D (host must supply alt)
+    #       3 = 3D exclusively
+    cfg_FIXMODE = 'A'
+
+    # <2> ALT MEAN SEA LEVEL
+    #       -1500.0 to 18000.0 meters
+    cfg_ALT = 0.0
+
+    # <3> EARTH DATUM INDEX
+    #       0 to 109 (IDs of valid earth datum indices)
+    #       96 IS NOT ALLOWED, it is user specified and not supported here
+    #       100 is WGS84
+    #       NOTE        Setting to any value except 96 will work but GPS
+    #                   output will always be in WGS84
+    cfg_DATUMINDEX = 100
+
+    # <4> USER EARTH DATUM SEMI-MAJOR AXIS
+    #       Always set to 0
+
+    # <5> USER EARTH DATUM INVERSE FLATTENING FACTOR
+    #       Always set to 0
+
+    # <6> USER EARTH DATUM DELTA X
+    #       Always set to 0
+
+    # <7> USER EARTH DATUM DELTA Y
+    #       Always set to 0
+
+    # <8> USER EARTH DATUM DELTA Z
+    #       Always set to 0
+
+    # <9> DIFFERENTIAL MODE
+    #       A = automatic (DGPS when available)
+    #       D = differential exclusively (no output if not diff fix)
+    #       NOTE        Setting will store but will make no difference
+    #                   in GPS output.
+    cfg_DIFFMODE = 'A'
+
+    # <10> NMEA 0183 BAUD RATE
+    #       1 = 1200
+    #       2 = 2400
+    #       3 = 4800
+    #       4 = 9600
+    #       5 = 19200
+    #       6 = 300
+    #       7 = 600
+    #       8 = 38400
+    cfg_BAUD = 5
+
+    # <11> VELOCITY FILTER
+    #       0 = No Filter
+    #       1 = Automatic filter
+    #       2-255 = Filter time constant, in seconds
+    #       NOTE        Setting will store but will make no difference
+    #                   in GPS output.
+    cfg_VELFILTER = 0
+
+    # <12> MEASUREMENT PULSE OUTPUT
+    #       1 = Disabled
+    #       2 = Enabled
+    #       NOTE        Setting will store but will make no difference
+    #                   in GPS output.
+    cfg_MPO = 0
+
+    # <13> MEASUREMENT PULSE OUTPUT LENGTH
+    #       0 to 48
+    #       NOTE        Setting will store but will make no difference
+    #                   in GPS output.
+    cfg_MPOLEN = 0
+
+    # <14> DEAD RECKONING VALID TIME
+    #       1 to 30
+    #       NOTE        Setting will store but will make no difference
+    #                   in GPS output.
+    cfg_DEDRECKON = 0
 
     def __init__ (self):
         """
