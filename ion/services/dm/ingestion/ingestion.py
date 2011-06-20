@@ -26,7 +26,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
 from ion.core.object.cdm_methods import attribute_merge
@@ -230,15 +230,22 @@ class IngestionService(ServiceProcess):
         log.debug('_prepare_ingest - Start')
 
         # Get the current state of the dataset:
-        self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
-        if not self.dataset:
-            log.error('Could not get dataset resource!')
+        try:
+            self.dataset = yield self.rc.get_instance(content.dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+
+        except ResourceClientError, rce:
+           log.exception('Could not get dataset resource!')
+           raise IngestionError('Could not get the dataset resource from the datastore')
 
         log.info('Got dataset resource')
 
-        self.data_source = yield self.rc.get_instance(content.datasource_id)
-        if not self.data_source:
-            log.error('Could not get dataset resource!')
+        try:
+            self.data_source = yield self.rc.get_instance(content.datasource_id)
+        except ResourceClientError, rce:
+           log.exception('Could not get datasource resource!')
+           raise IngestionError('Could not get the datasource resource from the datastore')
+
+        log.info('Got datasource resource')
 
 
         # Get the bounded arrays but not the ndarrays
@@ -679,12 +686,16 @@ class IngestionService(ServiceProcess):
 
         log.debug('_merge_overlapping_supplement - Start')
 
+        raise NotImplementedError('OVERWRITE Supplement updates are not yet supported')
+
 
     @defer.inlineCallbacks
     def _merge_fmrc_supplement(self):
 
 
         log.debug('_merge_overlapping_supplement - Start')
+
+        raise NotImplementedError('FMRC Supplement updates are not yet supported')
 
 
 
