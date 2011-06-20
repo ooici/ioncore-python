@@ -503,3 +503,43 @@ class ServiceClientTest(IonTestCase):
         yield self._stop_container()
 
 
+class ProcessContextTest(IonTestCase):
+    """
+    Test the threaded context model
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_send_message_instance(self):
+        processes = [
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+        ]
+        sup = yield self._spawn_processes(processes)
+        pid = sup.get_child_id('echo1')
+
+
+        proc = Process()
+        yield proc.spawn()
+
+        mc = proc.message_client
+
+        message = yield mc.create_instance() # empty message - keep it simple
+        message.name ='David'
+
+        log.info('Request Message Repo before send: %s' % message.Repository)
+
+        (response, headers, msg) = yield proc.rpc_send(pid, 'echo', message)
+
+        log.info('Request Message Repo after send: %s' % message.Repository)
+        log.info('Response Message Repo after send: %s' % response.Repository)
+
+        self.assertEqual(response.name, 'David')
+
