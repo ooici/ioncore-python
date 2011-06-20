@@ -546,8 +546,9 @@ class IngestionService(ServiceProcess):
         if self.dataset.ResourceLifeCycleState is not self.dataset.UPDATE:
             raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch!')
 
-        if content.dataset_id != self.dataset.ResourceIdentity:
-            raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
+        # OOIION-191: sanity check field dataset_id disabled as DatasetAgent does not have the information when making these messages.
+        #if content.dataset_id != self.dataset.ResourceIdentity:
+        #    raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
 
 
         # Get the group out of the datset
