@@ -24,6 +24,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.integration.eoi.validation.cdm_validation_service import CdmValidationClient
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        VALIDATE_DATASOURCE_REQ, \
                                                        VALIDATE_DATASOURCE_RSP
