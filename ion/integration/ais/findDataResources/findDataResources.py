@@ -140,13 +140,19 @@ class FindDataResources(object):
 
         log.debug('findDataResources Worker Class Method')
 
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg)
+        if result != None:
+            result.error_str = "AIS.findDataResources: " + result.error_str
+            defer.returnValue(result)
+            
         if msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
             userID = msg.message_parameters_reference.user_ooi_id
         else:
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "AIS.findDataResources: Required field [user_ooi_id] not found in message"
             defer.returnValue(Response)
         
         self.downloadURL       = 'Uninitialized'
@@ -167,7 +173,7 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "No DatasetIDs were found."
+            Response.error_str = "AIS.findDataResources: No DatasetIDs were found."
             defer.returnValue(Response)
             
         dSetList = dSetResults.idrefs
@@ -181,7 +187,7 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "No DatasetIDs were found."
+            Response.error_str = "AIS.findDataResources: No DatasetIDs were found."
             defer.returnValue(Response)
 
         log.debug('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
@@ -199,9 +205,9 @@ class FindDataResources(object):
 
         log.debug('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
 
-        yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
+        response = yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
 
-        defer.returnValue(rspMsg)
+        defer.returnValue(response)
 
 
     @defer.inlineCallbacks
@@ -214,13 +220,19 @@ class FindDataResources(object):
 
         log.debug('findDataResourcesByUser Worker Class Method')
 
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg)
+        if result != None:
+            result.error_str = "AIS.findDataResourcesByUser: " + result.error_str
+            defer.returnValue(result)
+            
         if msg.message_parameters_reference.IsFieldSet('user_ooi_id'):
             userID = msg.message_parameters_reference.user_ooi_id
         else:
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResourcesByUser error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message"
+            Response.error_str = "AIS.findDataResourcesByUser: Required field [user_ooi_id] not found in message"
             defer.returnValue(Response)
 
         self.downloadURL       = 'Uninitialized'
@@ -240,14 +252,14 @@ class FindDataResources(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS findDataResources error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "No DatasetIDs were found."
+            Response.error_str = "AIS.findDataResourcesByUser: No DatasetIDs were found."
             defer.returnValue(Response)
         
         log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
 
-        yield self.__getDataResources(msg, dSetResults.idrefs, rspMsg, typeFlag = self.BY_USER)
+        response = yield self.__getDataResources(msg, dSetResults.idrefs, rspMsg, typeFlag = self.BY_USER)
         
-        defer.returnValue(rspMsg)
+        defer.returnValue(response)
 
 
     @defer.inlineCallbacks
@@ -308,16 +320,14 @@ class FindDataResources(object):
         if so, add it to the response GPB.
         """
 
-        log.debug('__getDataResources entry')
-        
+        log.debug('__getDataResources entry')        
         #
         # Instantiate a bounds object, and load it up with the given bounds
         # info
         #
         bounds = SpatialTemporalBounds()
         bounds.loadBounds(msg.message_parameters_reference)
-        #userID = msg.message_parameters_reference.user_ooi_id
-        
+        #userID = msg.message_parameters_reference.user_ooi_id       
         #
         # Now iterate through the list if dataset resource IDs and for each ID:
         #   - get the dataset instance
@@ -327,8 +337,7 @@ class FindDataResources(object):
         #     - continue
         #   - if so:
         #     - add the metadata to the response GPB
-        #
-        
+        #        
         i = 0
         j = 0
         while i < len(dSetList):
@@ -342,7 +351,7 @@ class FindDataResources(object):
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Metadata not found."
+                    Response.error_str = "AIS.findDataResources: Metadata not found."
                     defer.returnValue(Response)
                     
             else:                    
@@ -352,12 +361,11 @@ class FindDataResources(object):
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                           MessageName='AIS findDataResources error response')
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "Dataset not found."
+                    Response.error_str = "AIS.findDataResources: Dataset not found."
                     defer.returnValue(Response)        
     
                 dSetMetadata = {}
                 self.__loadMinMetaData(dSet, dSetMetadata)
-
 
             #
             # If the dataset's data is within the given criteria, include it
@@ -375,7 +383,7 @@ class FindDataResources(object):
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
-                        Response.error_str = "Datasource not found."
+                        Response.error_str = "AIS.findDataResources: Datasource not found."
                         defer.returnValue(Response)
 
                     dSource = yield self.metadataCache.getDSetMetadata(dSourceResID)
@@ -384,7 +392,7 @@ class FindDataResources(object):
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
-                        Response.error_str = "Metadata not found."
+                        Response.error_str = "AIS.findDataResources: Metadata not found."
                         defer.returnValue(Response)
                     
                 else:
@@ -397,9 +405,8 @@ class FindDataResources(object):
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                               MessageName='AIS findDataResources error response')
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
-                        Response.error_str = "Datasource not found."
+                        Response.error_str = "AIS.findDataResources: Datasource not found."
                         defer.returnValue(Response)        
-
                 #
                 # Added this for Tim and Tom; not sure we need it yet...
                 #
@@ -413,7 +420,6 @@ class FindDataResources(object):
                     # problem).
                     #
                     rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-
                     #
                     # Set the notificationSet flag; this is not efficient at all
                     #
@@ -438,10 +444,8 @@ class FindDataResources(object):
                         rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
                         self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], dSetMetadata, ownerID, dSet, dSource)
                     """                        
-
                     rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
                     self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], dSetMetadata, ownerID, dSource)
-
 
                 #self.__printRootAttributes(dSet)
                 #self.__printRootVariables(dSet)
@@ -456,6 +460,7 @@ class FindDataResources(object):
             
             i = i + 1
 
+        defer.returnValue(rspMsg)        
         log.debug('__getDataResources exit')
 
 
@@ -828,5 +833,25 @@ class FindDataResources(object):
             
         return False
         
-        
+ 
+    @defer.inlineCallbacks
+    def _CheckRequest(self, request):
+       # Check for correct request protocol buffer type
+       if request.MessageType != AIS_REQUEST_MSG_TYPE:
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = 'Bad message type receieved, ignoring'
+          defer.returnValue(Response)
+ 
+       # Check payload in message
+       if not request.IsFieldSet('message_parameters_reference'):
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = "Required field [message_parameters_reference] not found in message"
+          defer.returnValue(Response)
+   
+       defer.returnValue(None)
+       
 

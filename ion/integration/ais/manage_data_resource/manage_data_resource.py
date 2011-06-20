@@ -72,6 +72,7 @@ class ManageDataResource(object):
         #necessary to receive events i think
         self.pub   = ScheduleEventPublisher(process=ais)
 
+
     @defer.inlineCallbacks
     def update(self, msg_wrapped):
         """
@@ -81,12 +82,16 @@ class ManageDataResource(object):
         @GPB{Returns,9216,1}
         @retval success
         """
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.update: " + result.error_str
+            defer.returnValue(result)
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, UPDATE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.update(): " + \
+                errtext = "AIS.ManageDataResource.update: " + \
                     "Expected DataResourceUpdateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -95,12 +100,10 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
             if not (msg.IsFieldSet("data_set_resource_id")):
-
-                errtext = "ManageDataResource.update(): " + \
+                errtext = "AIS.ManageDataResource.update: " + \
                     "required fields not provided (data_set_resource_id)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -151,8 +154,6 @@ class ManageDataResource(object):
                     sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                     yield self.rc.put_instance(sched_task_rsrc)
                     
-
-
             if msg.IsFieldSet("ion_title"):
                 datasrc_resource.ion_title = msg.ion_title
 
@@ -171,23 +172,16 @@ class ManageDataResource(object):
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
                     dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
-
             # This could be cleaned up to go faster - only call put if it is modified!
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
-
         except ReceivedApplicationError, ex:
-            log.info('ManageDataResource.update(): Error: %s' %ex)
-
+            log.info('AIS.ManageDataResource.update: Error: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.update(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.update: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
-
             defer.returnValue(Response)
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -206,12 +200,16 @@ class ManageDataResource(object):
         @GPB{Returns,9214,1}
         @retval success
         """
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.delete: " + result.error_str
+            defer.returnValue(result)
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, DELETE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.delete(): " + \
+                errtext = "AIS.ManageDataResource.delete: " + \
                     "Expected DataResourceDeleteRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -220,12 +218,10 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
             if not (msg.IsFieldSet("data_set_resource_id")):
-
-                errtext = "ManageDataResource.delete(): " + \
+                errtext = "AIS.ManageDataResource.delete: " + \
                     "required fields not provided (data_set_resource_id)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -258,26 +254,20 @@ class ManageDataResource(object):
                     dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
                     delete_resources.append(dataset_resource)
 
-
                 deletions.append(data_set_resource_id)
-
 
             log.info("putting all resource changes in one big transaction, " \
                          + str(len(delete_resources)))
             yield self.rc.put_resource_transaction(delete_resources)
             log.info("Success!")
 
-
         except ReceivedApplicationError, ex:
-            log.info('ManageDataResource.delete(): Error: %s' %ex)
-
+            log.info('AIS.ManageDataResource.delete: Error: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.delete(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.delete: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -287,8 +277,6 @@ class ManageDataResource(object):
             Response.message_parameters_reference[0].successfully_deleted_id.append(d)
 
         defer.returnValue(Response)
-
-
 
     
     @defer.inlineCallbacks
@@ -308,12 +296,16 @@ class ManageDataResource(object):
         datasrc_resource      = None
         dataset_resource      = None
 
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.create: " + result.error_str
+            defer.returnValue(result)
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, CREATE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.create(): " + \
+                errtext = "AIS.ManageDataResource.create: " + \
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -325,14 +317,13 @@ class ManageDataResource(object):
             missing = self._missingResourceRequestFields(msg)
             # unless nothing is missing, error.
             if "" != missing:
-                errtext = "ManageDataResource.create(): " + \
+                errtext = "AIS.ManageDataResource.create: " + \
                     "Missing/incorrect required fields in DataResourceCreateRequest: " + missing
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
-
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
@@ -341,7 +332,6 @@ class ManageDataResource(object):
                     msg.max_ingest_millis = (msg.update_interval_seconds - 1) * 1000
                 else:
                     msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
-
 
             # get user resource so we can associate it later
             user_resource = yield self.rc.get_instance(msg.user_id)
@@ -380,7 +370,6 @@ class ManageDataResource(object):
                 datasrc_resource.update_interval_seconds       = msg.update_interval_seconds
                 datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
 
-
                 # set up the scheduled task
                 sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
                                                               msg.update_start_datetime_millis,
@@ -396,20 +385,16 @@ class ManageDataResource(object):
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
-
             #these start new, and get set on the first ingest event
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
-
-
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
             yield self._createEvent(my_dataset_id, my_datasrc_id)
 
-
         except ReceivedApplicationError, ex:
-            log.info('ManageDataResource.create(): Error from a lower-level service: %s' %ex)
+            log.info('AIS.ManageDataResource.create: Error from a lower-level service: %s' %ex)
 
             #mark lifecycle states
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
@@ -418,13 +403,10 @@ class ManageDataResource(object):
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource, sched_task_rsrc])
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.create(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.create: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -434,7 +416,6 @@ class ManageDataResource(object):
         Response.message_parameters_reference[0].data_set_id     = my_dataset_id
         Response.message_parameters_reference[0].association_id  = association_d.AssociationIdentity
         defer.returnValue(Response)
-
 
 
     @defer.inlineCallbacks
@@ -494,7 +475,6 @@ class ManageDataResource(object):
                 log.info("No scheduled ingest events found")
                 defer.returnValue(None)
             
-
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
             response = yield self.sc.rm_task(req_msg)
@@ -546,7 +526,6 @@ class ManageDataResource(object):
             datasrc_resource.sub_ranges.add()
             datasrc_resource.sub_ranges[i] = msg.sub_ranges[i]
 
-
         if msg.IsFieldSet('authentication'):
             log.info("Setting datasource: authentication")
             datasrc_resource.authentication                = msg.authentication
@@ -557,13 +536,11 @@ class ManageDataResource(object):
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
-
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
         log.info("created data source ") # + str(datasrc_resource))
 
         defer.returnValue(datasrc_resource)
-
 
 
     @defer.inlineCallbacks
@@ -593,9 +570,9 @@ class ManageDataResource(object):
         if None is association:
             defer.returnValue(None)
 
-
         the_resource = yield self.rc.get_associated_resource_object(association)
         defer.returnValue(the_resource)
+
 
     @defer.inlineCallbacks
     def _getOneAssociationSubject(self, the_object, the_predicate, the_subject_type):
@@ -626,10 +603,8 @@ class ManageDataResource(object):
         if None is association:
             defer.returnValue(None)
 
-
         the_resource = yield self.rc.get_associated_resource_subject(association)
         defer.returnValue(the_resource)
-
 
 
     def _missingResourceRequestFields(self, msg):
@@ -656,7 +631,6 @@ class ManageDataResource(object):
                       "is_public",
                       ]
 
-
         #these repeated fields don't need to be set either
         #repeated string property = 3;
         #repeated string station_id = 4;
@@ -678,6 +652,29 @@ class ManageDataResource(object):
 
         return ret
 
+
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
         return (type(test_msg) == type(some_casref))
+        
+
+    @defer.inlineCallbacks
+    def _CheckRequest(self, request):
+       # Check for correct request protocol buffer type
+       if request.MessageType != AIS_REQUEST_MSG_TYPE:
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = 'Bad message type receieved, ignoring'
+          defer.returnValue(Response)
+ 
+       # Check payload in message
+       if not request.IsFieldSet('message_parameters_reference'):
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = "Required field [message_parameters_reference] not found in message"
+          defer.returnValue(Response)
+   
+       defer.returnValue(None)
+

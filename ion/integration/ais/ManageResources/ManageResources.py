@@ -276,14 +276,15 @@ class ManageResources(object):
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
       if result != None:
+         result.error_str = "AIS.getResourcesOfType: " + result.error_str
          defer.returnValue(result)
          
       # check that resourceType is present in GPB
       if not msg.message_parameters_reference.IsFieldSet('resource_type'):
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResourcesOfType error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [resource_type] not found in message (AIS)"
+         Response.error_str = "AIS.getResourcesOfType: Required field [resource_type] not found in message"
          defer.returnValue(Response)
 
       # check for known resource type
@@ -296,15 +297,26 @@ class ManageResources(object):
       else:
          # build AIS error response
          log.debug('resource type ' + msg.message_parameters_reference.resource_type + ' is unknown')
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResourcesOfType error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Unknown resource type [%s] in message (AIS)"%msg.message_parameters_reference.resource_type
+         Response.error_str = "AIS.getResourcesOfType: Unknown resource type [%s] in message"%msg.message_parameters_reference.resource_type
          defer.returnValue(Response)
 
       # Get the list of resource IDs for this type of resource
       Result = yield self.__findResourcesOfType(ResourceType)
       log.debug('Found ' + str(len(Result.idrefs)) + ' resources.')
 
+      try:
+          # Get the list of resource IDs for this type of resource
+          Result = yield self.__findResourcesOfType(ResourceType)
+          log.debug('Found ' + str(len(Result.idrefs)) + ' resources.')
+      except ApplicationError, ex:
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResourcesOfType error response')
+          Response.error_num = Response.ResponseCodes.NOT_FOUND
+          Response.error_str = 'AIS.getResourcesOfType: Error calling __findResourcesOfType: '+str(ex)
+          defer.returnValue(Response)
+   
       # build AIS response 
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourcesOfType response')
       Response.message_parameters_reference.add()
@@ -325,7 +337,14 @@ class ManageResources(object):
             # need to get the actual resource from it's ooi_id
             ResID = Result.idrefs[i].key
             log.debug('Working on ResID: ' + ResID)        
-            Resource = yield self.rc.get_instance(ResID)
+            try:
+                Resource = yield self.rc.get_instance(ResID)
+            except ApplicationError, ex:
+                # build AIS error response
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
+                Response.error_num = Response.ResponseCodes.NOT_FOUND
+                Response.error_str = 'AIS.getResourcesOfType: Error calling get_instance: '+str(ex)
+                defer.returnValue(Response)
             # debug print for dumping the attributes of the resource
             PrintFunc(Resource)           
             LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
@@ -489,18 +508,26 @@ class ManageResources(object):
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
       if result != None:
+         result.error_str = "AIS.getResource: " + result.error_str
          defer.returnValue(result)
          
       # check that ooi_id is present in GPB
       if not msg.message_parameters_reference.IsFieldSet('ooi_id'):
          # build AIS error response
-         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [ooi_id] not found in message (AIS)"
+         Response.error_str = "AIS.getResource: Required field [ooi_id] not found in message"
          defer.returnValue(Response)
          
       if 'epu_controller' in msg.message_parameters_reference.ooi_id:
-         Result = yield self.__GetEpuControllerInfo(msg.message_parameters_reference.ooi_id)
+         try:
+            Result = yield self.__GetEpuControllerInfo(msg.message_parameters_reference.ooi_id)
+         except ApplicationError, ex:
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = 'AIS.getResource: Error calling __GetEpuControllerInfo: '+str(ex)
+            defer.returnValue(Response)
          # debug print for dumping the attributes of the resource
          if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("got back resource \n"+str(Result))
@@ -514,7 +541,7 @@ class ManageResources(object):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = 'Error calling get_instance (AIS): '+str(ex)
+            Response.error_str = 'AIS.getResource: Error calling get_instance: '+str(ex)
             defer.returnValue(Response)
    
          # debug print for dumping the attributes of the resource
@@ -545,7 +572,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = 'Bad message type receieved, ignoring (AIS)'
+         Response.error_str = 'Bad message type receieved, ignoring'
          defer.returnValue(Response)
 
       # Check payload in message
@@ -553,7 +580,7 @@ class ManageResources(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
+         Response.error_str = "Required field [message_parameters_reference] not found in message"
          defer.returnValue(Response)
   
       defer.returnValue(None)

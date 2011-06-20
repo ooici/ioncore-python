@@ -295,10 +295,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def findDataResources(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('findDataResources: ' + result.error_str)
-            defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResources', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -308,10 +304,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def findDataResourcesByUser(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('findDataResourcesByUser: ' + result.error_str)
-            defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResourcesByUser(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResourcesByUser', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -321,10 +313,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def getDataResourceDetail(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('getDataResourceDetail: ' + result.error_str)
-            defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: getDataResourceDetail(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -336,14 +324,14 @@ class AppIntegrationServiceClient(ServiceClient):
         yield self._check_init()
         result = yield self.CheckRequest(message)
         if result is not None:
-            log.error('createDownloadURL: ' + result.error_str)
+            log.error('AIS.createDownloadURL: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+            Response.error_str = "AIS.createDownloadURL: Required field [user_ooi_id] not found in message"
             log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
         log.debug("AppIntegrationServiceClient: createDownloadURL(): sending msg to AppIntegrationService.")
@@ -371,14 +359,14 @@ class AppIntegrationServiceClient(ServiceClient):
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
         if result is not None:
-            log.error('updateUserProfile: ' + result.error_str)
+            log.error('AIS.updateUserProfile: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+            Response.error_str = "AIS.updateUserProfile: Required field [user_ooi_id] not found in message (AIS)"
             log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -397,14 +385,14 @@ class AppIntegrationServiceClient(ServiceClient):
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
         if result is not None:
-            log.error('getUser: ' + result.error_str)
+            log.error('AIS.getUser: ' + result.error_str)
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+            Response.error_str = "AIS.getUser: Required field [user_ooi_id] not found in message (AIS)"
             log.error("Required field [user_ooi_id] not found in message")
             defer.returnValue(Response)
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -450,10 +438,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def createDataResource(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('createDataResource: ' + result.error_str)
-            defer.returnValue(result)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('createDataResource', message)
@@ -464,10 +448,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def updateDataResource(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('updateDataResource: ' + result.error_str)
-            defer.returnValue(result)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
@@ -478,10 +458,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def deleteDataResource(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('deleteDataResource: ' + result.error_str)
-            defer.returnValue(result)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
@@ -492,10 +468,6 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def validateDataResource(self, message):
         yield self._check_init()
-        result = yield self.CheckRequest(message)
-        if result is not None:
-            log.error('validateDataResource: ' + result.error_str)
-            defer.returnValue(result)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('validateDataResource', message)
@@ -503,8 +475,6 @@ class AppIntegrationServiceClient(ServiceClient):
             log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
-
-
     @defer.inlineCallbacks
     def createDataResourceSubscription(self, message):
         yield self._check_init()
@@ -555,7 +525,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = 'Bad message type received, ignoring (AIS)'
+            Response.error_str = 'Bad message type received, ignoring'
             defer.returnValue(Response)
 
         # Check payload in message
@@ -563,7 +533,7 @@ class AppIntegrationServiceClient(ServiceClient):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
+            Response.error_str = "Required field [message_parameters_reference] not found in message"
             defer.returnValue(Response)
   
         defer.returnValue(None)
