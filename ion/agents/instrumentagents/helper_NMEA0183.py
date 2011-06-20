@@ -8,6 +8,8 @@
 
 from string import hexdigits
 from ion.agents.instrumentagents.instrument_constants import *
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 # Constants
 CR = '\r'
@@ -78,7 +80,23 @@ class NMEADefs (BaseEnum):
     nmeaInTypes = { \
     'PGRMO': ['Output Sentence Enable/Disable', #0
               'TARGET',                         #1
-              'PGRMODE'] }                      #2
+              'PGRMODE'],                       #2
+
+    'PGRMC': ['Garmin Sensor Configuration Information', # 0
+              'FIX_MODE',        # 1
+              'ALT_MSL',         # 2
+              'E_DATUM',         # 3
+              'SM_AXIS',         # 4
+              'DATUMIFF',        # 5
+              'DATUM_DX',        # 6
+              'DATUM_DY',        # 7
+              'DATUM_DZ',        # 8
+              'DIFFMODE',        # 9
+              'BAUD_RT',         # 10
+              'VEL_FILT',         # 11
+              'MP_OUT',          # 12
+              'MP_LEN',          # 13
+              'DED_REC']}        # 14
 
     nmeaTypes = { \
     'GPGGA': {'Parsing': ['GPS Fix Data',    #0
@@ -268,6 +286,9 @@ class NMEAInString ():
 
         return NMEAErrorCode.OK
 
+    def IsValid (self):
+        return NMEAErrorCode.is_error (self._valid)
+
     def GetNMEAInData (self):
         """
         If the NMEA string was valid, returns the parsed data.
@@ -315,6 +336,55 @@ class NMEAInString ():
             # PGRMODE int      Target sentence mode
             if howTo == 'PGRMODE':
                 self._dataOut['PGRMODE'] = int (item)
+
+            # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE
+            #                A  = Automatic, 3 = 3D only
+            if howTo == 'FIX_MODE':
+                self._dataOut['FIX_MODE'] = item
+
+            # E_DATUM  int  Earth datum ID number
+            if howTo == 'E_DATUM':
+                self._dataOut['E_DATUM'] = item
+
+            # SM_AXIS   Relevant only if E_DATUM == USERDEF
+            if howTo == 'SM_AXIS':
+                pass
+
+            # DATUMIFF   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUMIFF':
+                pass
+
+            # DATUM_DX   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DX':
+                pass
+
+            # DATUM_DY   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DY':
+                pass
+
+            # DATUM_DZ   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DZ':
+                pass
+
+            # DIFFMODE  char  Differential mode
+            if howTo == 'DIFFMODE':
+                self._dataOut['DIFFMODE'] = item
+
+            # BAUD_RT  int  NMEA 0183 Baud Rate
+            if howTo == 'BAUD_RT':
+                self._dataOut['BAUD_RT'] = item
+
+            # MP_OUT  int  Measurement Pulse Output
+            if howTo == 'MP_OUT':
+                self._dataOut['MP_OUT'] = item
+
+            # MP_LEN  int  Measurement Pulse Output pulse length ((n+1)* 20ms)
+            if howTo == 'MP_LEN':
+                self._dataOut['MP_LEN'] = item
+
+            # DED_REC  float  Ded. Reckoning valid time 0.2 to 30.0 sec
+            if howTo == 'DED_REC':
+                self._dataOut['DED_REC'] = item
 
         return NMEAErrorCode.OK
 
@@ -649,7 +719,6 @@ class NMEAString ():
                     dop = int (item)
                     if dop >= 0 and dop <= 359:
                         dataOut['TDOP'] = dop
-
 
             # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE
             #                A  = Automatic, 3 = 3D only
