@@ -370,8 +370,6 @@ class ManageDataResource(object):
                 else:
                     msg.max_ingest_millis = DEFAULT_MAX_INGEST_MILLIS
 
-<<<<<<< HEAD
-=======
             #OOIION-164
             dateproblem = yield self._checkStartDatetime("ManageDataResource.create()", msg)
             if not dateproblem is None:
@@ -391,8 +389,6 @@ class ManageDataResource(object):
                     Response.error_str =  errtext
                     defer.returnValue(Response)
 
-
->>>>>>> fe6fe82bb22de2f4639c47ae287ff3e89d611535
             # get user resource so we can associate it later
             user_resource = yield self.rc.get_instance(msg.user_id)
 
@@ -449,20 +445,12 @@ class ManageDataResource(object):
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
-<<<<<<< HEAD
-=======
-
->>>>>>> fe6fe82bb22de2f4639c47ae287ff3e89d611535
             yield self.rc.put_resource_transaction(resource_transaction)
 
             yield self._createEvent(my_dataset_id, my_datasrc_id)
 
         except ReceivedApplicationError, ex:
-<<<<<<< HEAD
             log.info('AIS.ManageDataResource.create: Error from a lower-level service: %s' %ex)
-=======
-            log.error('ManageDataResource.create(): Error from a lower-level service: %s' %ex)
->>>>>>> fe6fe82bb22de2f4639c47ae287ff3e89d611535
 
             #mark lifecycle states
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
@@ -727,7 +715,6 @@ class ManageDataResource(object):
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
         return (type(test_msg) == type(some_casref))
-<<<<<<< HEAD
         
 
     @defer.inlineCallbacks
@@ -750,8 +737,6 @@ class ManageDataResource(object):
    
        defer.returnValue(None)
 
-=======
-
 
     #OOIION-164: check that the start date is less than a year from now
     @defer.inlineCallbacks
@@ -767,4 +752,3 @@ class ManageDataResource(object):
             defer.returnValue(Response)
 
         defer.returnValue(None)
->>>>>>> fe6fe82bb22de2f4639c47ae287ff3e89d611535
