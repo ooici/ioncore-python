@@ -95,10 +95,17 @@ def user_has_role(ooi_id, role):
     else:
         return ooi_id in user_role_dict[role]['ooi_id']
 
+def map_ooi_id_to_role(ooi_id, role):
+    user_role_dict[role]['ooi_id'].add(ooi_id)
+
+def unmap_ooi_id_from_role(ooi_id, role):
+    if role in user_role_dict:
+        if ooi_id in user_role_dict[role]['ooi_id']:
+            user_role_dict[role]['ooi_id'].remove(ooi_id)
+
 def map_ooi_id_to_subject_role(subject, ooi_id, role):
     if subject in user_role_dict[role]['subject']:
         user_role_dict[role]['ooi_id'].add(ooi_id)
-        return
 
 # Role convenience methods
 def map_ooi_id_to_subject_admin_role(subject, ooi_id):

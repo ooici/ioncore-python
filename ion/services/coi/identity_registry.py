@@ -33,7 +33,7 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       map_ooi_id_to_subject_data_provider_role, \
                                       subject_has_marine_operator_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
-                                      construct_user_role_lists
+                                      map_ooi_id_to_role, unmap_ooi_id_from_role
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID, \
                                                                     TYPE_OF_ID
@@ -509,13 +509,18 @@ class IdentityRegistryService(ServiceProcess):
         """
         self.broadcast_count += 1
         log.info('op_broadcast(): Received identity registry broadcast #%d: %s' % (self.broadcast_count, repr(content)))
-        body = content['body']
 
         if 'op' in content:
             op = content['op']
             log.info('doing op_broadcast operation %s' % (op))
-            if op == 'role_reload':
-                construct_user_role_lists(content['body'])
+            if op == 'set_user_role':
+                map_ooi_id_to_role(content['user-id'], content['role'])
+
+                # TODO: add association
+            elif op == 'unset_user_role':
+                unmap_ooi_id_from_role(content['user-id'], content['role'])
+
+                # TODO: remove association
 
         #log.info("op_announce(): Know about %s containers!" % (len(self.containers)))
 

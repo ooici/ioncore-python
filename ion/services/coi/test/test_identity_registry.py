@@ -417,17 +417,20 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         self.failUnlessEqual(irs.broadcast_count, 1)
 
     @defer.inlineCallbacks
-    def test_role_reload(self):
+    def test_set_role(self):
         irs = self._get_service_by_name('identity_registry')
         role_cfg = Config(userroledb_filename).getObject()
 
+        role = 'ADMIN'
         user_id = 'FAKE_TEST_USER_%d' % (random.randint(1, 1<<30))
-        log.info('test user id: %s' % (user_id))
-        role_cfg['roles']['ADMIN'].append(user_id)
-        print role_cfg
+        log.info('test user id: %s to get role: %s' % (user_id, role))
+        self.failIf(user_has_role(user_id, role))
 
-        self.irc.broadcast({'op': 'role_reload', 'body': role_cfg})
+        self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
         yield irs.defer_next_op('broadcast')
+        self.failUnless(user_has_role(user_id, role))
 
-        self.failUnless(irs.broadcast_count, 1)
+        self.irc.broadcast({'op': 'unset_user_role', 'user-id': user_id, 'role': role})
+        yield irs.defer_next_op('broadcast')
+        self.failIf(user_has_role(user_id, role))
 
