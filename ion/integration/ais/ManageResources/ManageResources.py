@@ -302,10 +302,6 @@ class ManageResources(object):
          Response.error_str = "AIS.getResourcesOfType: Unknown resource type [%s] in message"%msg.message_parameters_reference.resource_type
          defer.returnValue(Response)
 
-      # Get the list of resource IDs for this type of resource
-      Result = yield self.__findResourcesOfType(ResourceType)
-      log.debug('Found ' + str(len(Result.idrefs)) + ' resources.')
-
       try:
           # Get the list of resource IDs for this type of resource
           Result = yield self.__findResourcesOfType(ResourceType)
