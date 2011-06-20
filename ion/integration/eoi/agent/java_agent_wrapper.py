@@ -536,11 +536,19 @@ class JavaAgentWrapper(ServiceProcess):
             (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
         except ReceivedError, ex:
             log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
+
+            # tell dataset agent to stop doing its thing
+            nonemsg = yield self.mc.create_instance(None)
+            yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
+
             defer.returnValue(False)
+
         finally:
+            # cleanup timeout-increasing subscriber
             self._registered_life_cycle_objects.remove(self._subscriber)
             yield self._subscriber.terminate()
             self._subscriber = None
+
 
         log.debug('Ingestion is complete on the ingestion services side...')
 
