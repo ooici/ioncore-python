@@ -37,6 +37,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
 
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
@@ -90,6 +91,8 @@ class ManageDataResource(object):
         if result != None:
             result.error_str = "AIS.ManageDataResource.update: " + result.error_str
             defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
@@ -242,6 +245,8 @@ class ManageDataResource(object):
         if result != None:
             result.error_str = "AIS.ManageDataResource.delete: " + result.error_str
             defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
@@ -338,6 +343,8 @@ class ManageDataResource(object):
         if result != None:
             result.error_str = "AIS.ManageDataResource.create: " + result.error_str
             defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
@@ -719,6 +726,7 @@ class ManageDataResource(object):
 
     @defer.inlineCallbacks
     def _CheckRequest(self, request):
+       print "in _CheckRequest"
        # Check for correct request protocol buffer type
        if request.MessageType != AIS_REQUEST_MSG_TYPE:
           # build AIS error response
