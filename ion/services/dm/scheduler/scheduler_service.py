@@ -6,6 +6,7 @@
 @author Paul Hubbard
 @package ion.services.dm.scheduler.service Implementation of the scheduler
 """
+import sys
 import time
 from ion.core.data.store import IndexStore, Query
 from ion.core.exception import ApplicationError
@@ -236,7 +237,8 @@ class SchedulerService(ServiceProcess):
           rm_task(task)
         """
         for k, v in self._callback_tasks.iteritems():
-            v.cancel()
+            if v.active():
+                v.cancel()
 
     def _schedule_event(self, starttime, interval, task_id):
         """
@@ -286,6 +288,20 @@ class SchedulerService(ServiceProcess):
             desired_origin  = content.desired_origin
             if content.IsFieldSet('start_time'):
                 starttime = content.start_time
+
+                # need to sanity check this input
+                starttime_sec = int(starttime / 1000.0)
+                oneyearahead_sec = int(time.time()) + 31536000
+
+                if starttime_sec < -sys.maxint-1 or starttime_sec > sys.maxint:
+                    raise SchedulerError("start_time %d out of allowable range (%d to %d)" % (starttime, (-sys.maxint-1)*1000, sys.maxint*1000), content.ResponseCodes.BAD_REQUEST)
+
+                # now make sure start time + interval is in the same range
+                if starttime_sec + msg_interval < -sys.maxint-1 or starttime_sec + msg_interval > sys.maxint:
+                    raise SchedulerError("start_time + interval %d out of allowable range (%d to %d)" % (starttime + msg_interval, (-sys.maxint-1)*1000, sys.maxint*1000), content.ResponseCodes.BAD_REQUEST)
+
+                if starttime_sec > oneyearahead_sec:
+                    raise SchedulerError("start_time is more than one year ahead of now, not allowed.", content.ResponseCodes.BAD_REQUEST)
             else:
                 starttime = None
             if content.IsFieldSet('payload'):
@@ -305,7 +321,7 @@ class SchedulerService(ServiceProcess):
 
         except KeyError, ke:
             log.exception('Required keys in op_add_task content not found!')
-            raise SchedulerError(str(ke))
+            raise SchedulerError(str(ke), content.ResponseCodes.BAD_REQUEST)
 
         log.debug('AddTask: about to add task %s' % task_id)
 

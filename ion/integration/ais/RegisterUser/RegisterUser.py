@@ -14,11 +14,11 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.intercept.policy import subject_has_admin_role, \
-                                      subject_is_early_adopter, \
+                                      subject_has_early_adopter_role, \
                                       subject_has_marine_operator_role, \
                                       subject_has_data_provider_role, \
                                       map_ooi_id_to_subject_admin_role, \
-                                      map_ooi_id_to_subject_is_early_adopter, \
+                                      map_ooi_id_to_subject_early_adopter_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
                                       map_ooi_id_to_subject_data_provider_role
 
@@ -317,9 +317,9 @@ class RegisterUser(object):
           map_ooi_id_to_subject_admin_role(subject, ooi_id)
       else:
           Response.message_parameters_reference[0].user_is_admin = False
-      if subject_is_early_adopter(subject):
+      if subject_has_early_adopter_role(subject):
           Response.message_parameters_reference[0].user_is_early_adopter = True
-          map_ooi_id_to_subject_is_early_adopter(subject, ooi_id)
+          map_ooi_id_to_subject_early_adopter_role(subject, ooi_id)
       else:
           Response.message_parameters_reference[0].user_is_early_adopter = False
       if subject_has_data_provider_role(subject):

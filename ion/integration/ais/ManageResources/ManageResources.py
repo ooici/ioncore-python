@@ -446,6 +446,9 @@ class ManageResources(object):
          To.resource.add()
          To.resource[14].name = 'update_interval_seconds'
          To.resource[14].value = str(From.update_interval_seconds)
+         To.resource.add()
+         To.resource[15].name = 'visualization_url'
+         To.resource[15].value = From.visualization_url
       
       except:
          estr = 'Object ERROR!'

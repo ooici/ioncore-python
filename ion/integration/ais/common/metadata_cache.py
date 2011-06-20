@@ -68,6 +68,7 @@ MAX_INGEST_MILLIS = 'max_ingest_millis'
 ION_TITLE = 'ion_title'
 LCS = 'lcs'
 UPDATE_INTERVAL_SECONDS = 'update_interval_seconds'
+VISUALIZATION_URL = 'visualization_url'
 
 class MetadataCache(object):
     
@@ -557,6 +558,7 @@ class MetadataCache(object):
                 dSourceMetadata[LCS] = self.PRIVATE
             elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
                 dSourceMetadata[LCS] = self.PUBLIC
+            dSourceMetadata[VISUALIZATION_URL] = dSource.visualization_url
             
             log.debug('dSourceMetadata keys: ' + str(dSourceMetadata.keys()))
             #

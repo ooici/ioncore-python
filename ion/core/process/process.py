@@ -32,7 +32,6 @@ from ion.interact.conversation import ProcessConversationManager, CONV_TYPE_NONE
 from ion.interact.message import Message
 from ion.interact.request import RequestType
 from ion.interact.rpc import RpcType, GenericType
-from ion.util.context import StackLocal
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject, BasicStates
 
