@@ -47,19 +47,6 @@ log = ion.util.ionlog.getLogger(__name__)
             /dev/slave
 """
 
-
-
-# It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically. 
-SKIP_TESTS  = [
-                                'test_execute_instrument',
-                                #'test_state_transitions',
-                                'test_get_capabilities',
-                                'dummy'
-]    
-
-
 class TestNMEA0183Agent (IonTestCase):
 
     # Increase the timeout so we can handle longer instrument interactions.
@@ -69,8 +56,7 @@ class TestNMEA0183Agent (IonTestCase):
     @defer.inlineCallbacks
     def setUp (self):
 
-        print "\n||||||| TestNMEA0183Agent.setUp\n"     #DEBUG
-
+        log.info("||||||| TestNMEA0183Agent.setUp")
 
         yield self._start_container()
 
@@ -131,10 +117,9 @@ class TestNMEA0183Agent (IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown (self):
+        log.info("||||||| TestNMEA0183Agent.tearDown")
 
-        print "\n||||||| TestNMEA0183Agent.tearDown\n"     #DEBUG
-
-        pu.asleep           (1)
+        pu.asleep(1)
         yield self._stop_container()
 
 
@@ -144,10 +129,7 @@ class TestNMEA0183Agent (IonTestCase):
         Test cases for executing device commands through the instrument agent.
         """
 
-        print "\n||||||| TestNMEA0183Agent.test_state_transitions\n"     #DEBUG
-
-        if 'test_state_transitions' in SKIP_TESTS:
-            raise unittest.SkipTest     ('Skipping during development.')
+        log.info("||||||| TestNMEA0183Agent.test_state_transitions\n")
 
         # Check agent state upon creation. No transaction needed for get operation.
         params                          = [AgentStatus.AGENT_STATE]
@@ -269,11 +251,7 @@ class TestNMEA0183Agent (IonTestCase):
         """
         Test cases for exectuing device commands through the instrument agent.
         """
-
-        print "\n||||||| TestNMEA0183Agent.test_execute_instrument\n"     #DEBUG
-
-        if 'test_execute_instrument' in SKIP_TESTS:
-            raise unittest.SkipTest     ('Skipping during development.')
+        log.info("\n||||||| TestNMEA0183Agent.test_execute_instrument\n")
 
         # Check agent state upon creation. No transaction needed for get operation.
         params = [AgentStatus.AGENT_STATE]
@@ -509,14 +487,7 @@ class TestNMEA0183Agent (IonTestCase):
         Test cases for querying the device and observatory capabilities.
         """
 
-        print "\n||||||| TestNMEA0183Agent.test_get_capabilities\n"     #DEBUG
-
-        if not RUN_TESTS:
-            raise unittest.SkipTest("Do not run this test automatically.")
-        
-        if 'test_get_capabilities' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping during development.')
-
+        log.debug("||||||| TestNMEA0183Agent.test_get_capabilities")
 
         # Check agent state upon creation. No transaction needed for
         # get operation.

@@ -155,7 +155,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         self._refSecs = -1
         self._simRun = task.LoopingCall (self.NMEAOutput)
         self._simRun.start (1.0)
-        reactor.run()
+        # reactor.run()
 
     def NMEAOutput(self):
         """

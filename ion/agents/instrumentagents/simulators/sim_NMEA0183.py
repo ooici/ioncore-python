@@ -281,7 +281,6 @@ class NMEA0183SimBase:
         log.info ('----- Serial ports configured.')
         self.SimGPSSetup()           # Inits the local simulator or launches external
 
-    @defer.inlineCallbacks
     def SerialPortSetup (self):
         """
         Creates virtual serial ports then Launches the NEMA0183 GPS simulator

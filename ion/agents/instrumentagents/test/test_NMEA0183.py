@@ -12,6 +12,7 @@ from twisted.internet import defer
 from twisted.trial import unittest
 import ion.util.ionlog
 import ion.util.procutils as pu
+import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceDriverClient
 from ion.agents.instrumentagents.driver_NMEA0183 import DriverException
@@ -27,6 +28,7 @@ from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
     import SERPORTSLAVE
+
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -62,22 +64,6 @@ Simulator dependencies required:
     PREPLANNED:
         - socat
 """
-
-# It is useful to be able to easily turn tests on and off during development.
-# Also this will ensure tests do not run automatically.
-SKIP_TESTS = [
-    # 'test_NMEAparser'
-    # 'test_configure',
-    # 'test_connect',
-    'test_get_set',
-    'test_get_metadata',
-    'test_get_status',
-    'test_get_capabilities',
-    'test_execute',
-    'test_execute_direct',
-    'dummy'
-]
-
 
 class TestNMEADevice(IonTestCase):
     """
@@ -142,57 +128,33 @@ class TestNMEADevice(IonTestCase):
         yield self._sim.StopSimulator()
         yield self._stop_container()
 
-    @defer.inlineCallbacks
     def test_NMEAParser (self):
         """
         Verify NMEA parsing routines.
         """
-
-        import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
-
-        log.info ('----- Testing NMEA Parser -----')
-        if 'test_NMEAParser' in SKIP_TESTS:
-            raise unittest.SkipTest ('Test is implicitly marked for skip.')
-
         # Completely valid GPGGA string
         log.info ('Verify NMEA parsing with known good GPGGA sentence:')
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*52'
         parseNMEA = NMEA.NMEAString (testNMEA)
-        goodNMEA = parseNMEA.IsValid()
-        self.assert_ (goodNMEA)
-        log.info ('Test valid GPGGA MNEA string: %s ' % testNMEA)
-        if goodNMEA:
-            log.info (parseNMEA.GetNMEAData())
-
+        self.assertTrue(parseNMEA.IsValid())
+        
         # Completely valid dummy string
         log.info ('Verify NMEA parsing with defined dummy setence:')
         testNMEA = '$XXXXX,0'
         parseNMEA = NMEA.NMEAString(testNMEA)
-        goodNMEA = parseNMEA.IsValid()
-        self.assert_ (goodNMEA)
-        log.info ('Test valid GPGGA MNEA string: %s ' % testNMEA)
-        if goodNMEA:
-            log.info (parseNMEA.GetNMEAData())
-
+        self.assertTrue(parseNMEA.IsValid())
+        
         # Invalid GPGGA string checksum
         log.info ('Verify correct NMEA behavior when passed a bad NMEA checksum:')
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*F2'
         parseNMEA = NMEA.NMEAString(testNMEA)
-        goodNMEA = parseNMEA.IsValid()
-        self.assert_ (goodNMEA)
-        log.info ('Test valid GPGGA MNEA string: %s ' % testNMEA)
-        if goodNMEA:
-            log.info (parseNMEA.GetNMEAData())
-
+        self.assertTrue(parseNMEA.IsValid())
+        
     @defer.inlineCallbacks
     def test_configure (self):
         """
         Test driver configure functions.
         """
-
-        log.info  ('----- test_configure -----')
-        if 'test_configure' in SKIP_TESTS:
-            raise unittest.SkipTest ('Test is implicitly marked for skip.')
         params = self.driver_config
 
         # We should begin in the unconfigured state.
@@ -218,10 +180,6 @@ class TestNMEADevice(IonTestCase):
         """
         Test driver connect to device.
         """
-
-        log.info ('----- test_connect -----')
-        if 'test_connect' in SKIP_TESTS:
-            raise unittest.SkipTest ('Test is implicitly marked for skip.')
         params = self.driver_config
 
         # We should begin in the unconfigured state.
