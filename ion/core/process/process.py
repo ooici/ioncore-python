@@ -674,8 +674,8 @@ class Process(BasicLifecycleObject):
             # In case of an application error - do not terminate the process!
             if log.getEffectiveLevel() <= logging.INFO:    # only output all this stuff when debugging
                 log.exception("*****Non Conversation Application error in message processing*****")
-                log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
-                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
+                log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(payload))
+                log.error('*** Message Content: \n%s' % str(payload.get('content', '## No Content! ##')))
                 log.error("*****End Non Conversation Application error in message processing*****")
 
             # @todo Should we send an err or rather reject the msg?
@@ -687,9 +687,9 @@ class Process(BasicLifecycleObject):
             # *** PROBLEM. Here the conversation is in ERROR state
 
             log.exception("*****Non Conversation Application error in message processing*****")
-            log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
+            log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(payload))
             if log.getEffectiveLevel() <= logging.WARN:
-                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
+                log.error('*** Message Content: \n%s' % str(payload.get('content', '## No Content! ##')))
             log.error("*****End Non Conversation Application error in message processing*****")
 
             # @todo Should we send an err or rather reject the msg?
