@@ -37,8 +37,6 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 
-from ion.agents.instrumentagents.simulators.sim_NMEA0183 import NMEA0183Simulator as SIM
-
 
 log = ion.util.ionlog.getLogger(__name__)
 
