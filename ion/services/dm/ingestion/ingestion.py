@@ -335,12 +335,8 @@ class IngestionService(ServiceProcess):
 
 
         def _timeout():
-            # trigger execution to continue below with a False result
             log.info("Timed out in op_perform_ingest")
-
-            result = {'status'      :'Internal Timeout',
-                      'status_body' :'Time out in communication between the JAW and the Ingestion service'}
-            self._defer_ingest.callback(result)
+            self._defer_ingest.errback(IngestionError('Time out in communication between the JAW and the Ingestion service', content.ResponseCodes.TIMEOUT))
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         self.timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
@@ -372,7 +368,15 @@ class IngestionService(ServiceProcess):
             yield self._notify_ingest(ingest_res)
 
             # reraise - in the case of ApplicationError, will simply reply to the original sender
-            raise ex
+            # do NOT reraise in the case of a timeout on our side - JAW will timeout client-side
+            if hasattr(ex, 'response_code') and ex.response_code == content.ResponseCodes.TIMEOUT:
+                # ack the msg
+                yield msg.ack()
+
+                # just return from here
+                defer.returnValue(False)
+            else:
+                raise ex
 
         finally:
             # we finished waiting (either success/failure/timeout), cancel the timeout if active
