@@ -41,12 +41,7 @@ if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
         print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
 
 logging.config.fileConfig(logconf)
-if sys.platform == 'darwin':
-    #syslog_address = '/var/run/syslog'
-    #dont log to syslog
-    pass
-else:
-    #log to syslog if this is linux (hopefully not windows ;)
+if sys.platform == 'linux2':
     syslog_formatter = logging.Formatter("%(asctime)s.%(msecs)03d [%(module)-15s:%(lineno)3d] %(levelname)-5s:%(message)s")
     syslog_address = '/dev/log'
     syslog_user = logging.handlers.SysLogHandler.LOG_USER
