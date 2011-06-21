@@ -1573,7 +1573,7 @@ class DataStoreService(ServiceProcess):
 
             log.info('Preloading Roles')
 
-            for key, value in ION_ROLES.items():
+            for key, value in ION_ROLES.iteritems():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading Role Resources:' + str(value.get(NAME_CFG)))
@@ -1583,15 +1583,15 @@ class DataStoreService(ServiceProcess):
                         raise DataStoreError('Failed to create AIS Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
 
-            # Root was just created - need to give it a roll
+            # Root was just created - need to give it a role
             if not root_exists:
-                self._create_roll_association(ROOT_USER_ID, ADMIN_ROLE_ID )
+                self._create_role_association(ROOT_USER_ID, ADMIN_ROLE_ID)
 
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
             log.info('Preloading Resource Types')
 
-            for key, value in ION_RESOURCE_TYPES.items():
+            for key, value in ION_RESOURCE_TYPES.iteritems():
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
@@ -1606,7 +1606,7 @@ class DataStoreService(ServiceProcess):
         if self.preload[ION_IDENTITIES_CFG]:
             log.info('Preloading Identities')
 
-            for key, value in ION_IDENTITIES.items():
+            for key, value in ION_IDENTITIES.iteritems():
                 if key is root_name:
                     # Don't load root twice...
                     continue
@@ -1626,7 +1626,7 @@ class DataStoreService(ServiceProcess):
         if self.preload[ION_DATASETS_CFG]:
             log.info('Preloading Data Sets: %d' % len(ION_DATASETS))
 
-            for key, value in ION_DATASETS.items():
+            for key, value in ION_DATASETS.iteritems():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading DataSet:' + str(value.get(NAME_CFG)))
@@ -1646,7 +1646,7 @@ class DataStoreService(ServiceProcess):
 
 
             log.info('Preloading Data Sources: %d' % len(ION_DATA_SOURCES))
-            for key, value in ION_DATA_SOURCES.items():
+            for key, value in ION_DATA_SOURCES.iteritems():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading DataSource:' + str(value.get(NAME_CFG)))
@@ -1666,7 +1666,7 @@ class DataStoreService(ServiceProcess):
         if self.preload[ION_AIS_RESOURCES_CFG]:
             log.info('Preloading AIS Resources')
 
-            for key, value in ION_AIS_RESOURCES.items():
+            for key, value in ION_AIS_RESOURCES.iteritems():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading AIS Resource:' + str(value.get(NAME_CFG)))
@@ -1834,7 +1834,7 @@ class DataStoreService(ServiceProcess):
 
         return association_repo
 
-    def _create_roll_association(self, user_id, role_id):
+    def _create_role_association(self, user_id, role_id):
 
        association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
 
