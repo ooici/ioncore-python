@@ -35,46 +35,25 @@ def run():
     reactor.callWhenRunning(testrunner.load_runner_main)
     reactor.run()
 
-h = hpy()
-def dumpHeap():
-    h.dumph('out.pb')
-def showHeap():
-    print h.heap()
-
-#threads.deferToThread(dumpHeap)
-#reactor.callLater(5, showHeap)
-cProfile.run('run()', 'brokerload')
-
-pstats.Stats('brokerload').sort_stats('time').print_stats(100)
-pstats.Stats('brokerload').sort_stats('time').print_callers('isinstance')
-#pstats.Stats('brokerload').sort_stats('cumulative').print_stats(100)
-#pstats.Stats('brokerload').sort_stats('time').print_stats('google/protobuf')
-#pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
-#pstats.Stats('brokerload').sort_stats('cumulative').print_callers('isinstance')
-#pstats.Stats('brokerload').sort_stats('cumulative').print_stats('(gpb_wrapper|object_utils)')
-#pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
-
-
-#percentTime('brokerload', 'gpb_wrapper', printResult=True)
-percentTime('brokerload', 'protobuf', printResult=True)
-#percentTime('brokerload', 'twisted', printResult=True)
-#percentTime('brokerload', '{isinstance}', printResult=True)
-#percentTime('brokerload', '{select.select}', printResult=True)
-
-#showHeap()
-#h.pb('out.pb')
-
-# hh = h.heap().get_rp(40)
-# for i in range(5):
-#     print hh
-#     hh = hh.more
-
-
 
 #run()
-memoryOrCpu = 'cpu'
+memoryOrCpu = 'memory'
 
 if memoryOrCpu == 'memory':
+    import objgraph
+    #from pympler import muppy; muppy.print_summary()
+    import inspect, random
+    import pdb
+    
+    run()
+    objgraph.show_most_common_types(limit=20)
+    objgraph.show_growth()
+
+    ds = objgraph.by_type('dict')[-25:]
+    objgraph.show_backrefs(ds, max_depth=15, filename='objects.png')
+    pdb.set_trace()
+    
+elif memoryOrCpu == 'memory-heapy':
     from guppy import hpy
     
     h = hpy()
@@ -83,11 +62,14 @@ if memoryOrCpu == 'memory':
         h.dumph('out.pb')
 
     def showHeap():
-        print h.heap()
+        hh = h.heap()
+        for i in range(5):
+            print hh
+            hh = hh.more
 
     run()
 
-    #showHeap()
+    showHeap()
     #h.pb('out.pb')
     hh = h.heap().get_rp(40)
     for i in range(5):

@@ -8,13 +8,15 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.integration.ais.ManageResources.epu_controller_client_stub import EPUControllerClient
+from ion.services.cei.epu_controller_client import EPUControllerClient
+from ion.services.cei.epu_controller_list_client import EPUControllerListClient
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
                                                                     identity_res_type_name, \
@@ -86,13 +88,15 @@ class ManageResources(object):
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
       self.mc = ais.mc
-      self.asc = AssociationServiceClient()
-      self.rc = ResourceClient()
+      self.asc = AssociationServiceClient(proc=ais)
+      self.rc = ResourceClient(proc=ais)
+      self.eclc = EPUControllerListClient(proc=ais)
         
 
    @defer.inlineCallbacks
    def getResourceTypes (self, msg):
-      log.debug('ManageResources.getResourceTypes()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResourceTypes()\n'+str(msg))
       
       # no input for this message, just build AIS response with list of resource types
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourceTypes response')
@@ -102,18 +106,18 @@ class ManageResources(object):
          log.info("Appending type=%s, name=%s"%(Type, self.ResourceTypes[Type]))
          Response.message_parameters_reference[0].resource_types_list.append(Type)
       Response.result = Response.ResponseCodes.OK
-      log.debug('ManageResources.getResourceTypes(): returning\n'+str(Response))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResourceTypes(): returning\n'+str(Response))
       defer.returnValue(Response)
 
 
+   @defer.inlineCallbacks
    def __findEpuControllers(self):
       log.debug('__findEpuControllers')
-      # TODO: add code to get the list of running EPU controllers to replace this stubbed static list
       d = DictObj
-      d.idrefs = ['dataservices_epu_controller',
-                  'agentservices_epu_controller',
-                  'associationservices_epu_controller']
-      return d
+      d.idrefs = yield self.eclc.list()
+      log.debug('__findEpuControllers: returning '+str(d))
+      defer.returnValue(d)
 
 
    @defer.inlineCallbacks
@@ -121,7 +125,8 @@ class ManageResources(object):
 
       if resourceType == EPU_CONTROLLER_TYPE_ID:
          # get the resources from the EPU management
-         defer.returnValue(self.__findEpuControllers())
+         result = yield self.__findEpuControllers()
+         defer.returnValue(result)
       
       # get the resources out of the Association Service
       request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
@@ -250,7 +255,8 @@ class ManageResources(object):
 
    @defer.inlineCallbacks
    def getResourcesOfType (self, msg):
-      log.debug('ManageResources.getResourcesOfType()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResourcesOfType()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
@@ -310,7 +316,8 @@ class ManageResources(object):
             LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
          i = i + 1
 
-      log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
       defer.returnValue(Response)
 
 
@@ -461,7 +468,8 @@ class ManageResources(object):
 
    @defer.inlineCallbacks
    def getResource (self, msg):
-      log.debug('ManageResources.getResource()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResource()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
@@ -479,7 +487,8 @@ class ManageResources(object):
       if 'epu_controller' in msg.message_parameters_reference.ooi_id:
          Result = yield self.__GetEpuControllerInfo(msg.message_parameters_reference.ooi_id)
          # debug print for dumping the attributes of the resource
-         log.debug("got back resource \n"+str(Result))
+         if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("got back resource \n"+str(Result))
          ResourceType = 'epucontrollers'
       else:
          # get resource from resource registry
@@ -494,7 +503,8 @@ class ManageResources(object):
             defer.returnValue(Response)
    
          # debug print for dumping the attributes of the resource
-         log.debug("got back resource \n"+str(Result))
+         if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("got back resource \n"+str(Result))
          log.debug("object GPB id = "+str(Result.ResourceObjectType.object_id))
          ResourceType = self.MapGpbTypeToResourceType[Result.ResourceObjectType.object_id]
 
@@ -508,7 +518,8 @@ class ManageResources(object):
       LoaderFunc = self.ResourceTypes[ResourceType][4]
       LoaderFunc(Response.message_parameters_reference[0], Result)
       Response.result = Response.ResponseCodes.OK
-      log.debug('ManageResources.getResource(): returning\n'+str(Response))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('ManageResources.getResource(): returning\n'+str(Response))
       defer.returnValue(Response)
 
 

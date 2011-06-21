@@ -7,6 +7,7 @@
 """
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 
 from twisted.internet import defer
 from ion.core import ioninit, bootstrap
@@ -210,8 +211,8 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [rsa_private_key] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
             
-        log.debug('in op_register_user_credentials:\n'+str(request))
-        log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
         response = yield self.register_user_credentials(request)
 
@@ -220,7 +221,6 @@ class IdentityRegistryService(ServiceProcess):
         
     @defer.inlineCallbacks
     def register_user_credentials(self, request):
-        log.debug('in register_user_credentials:\n'+str(request))
         identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='User identity information')
         identity.certificate = request.configuration.certificate
         identity.rsa_private_key = request.configuration.rsa_private_key
@@ -277,8 +277,8 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [ooi_id] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
 
-        #log.debug('in op_get_user:\n'+str(request))
-        log.debug('in op_get_user: request.configuration\n'+str(request.configuration))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('in op_get_user: request.configuration\n'+str(request.configuration))
 
         response = yield self.get_user(request)
         
@@ -303,20 +303,20 @@ class IdentityRegistryService(ServiceProcess):
             Response.resource_reference.email = identity.email
             Response.resource_reference.authenticating_organization = identity.authenticating_organization
             if identity.IsFieldSet('profile'):
-               i = 0
-               for item in identity.profile:
-                  log.debug('get_user: setting profile to '+str(item))
-                  Response.resource_reference.profile.add()
-                  Response.resource_reference.profile[i].name = item.name
-                  Response.resource_reference.profile[i].value = item.value
-                  i = i + 1
+                i = 0
+                for item in identity.profile:
+                    log.debug('get_user: setting profile to '+str(item))
+                    Response.resource_reference.profile.add()
+                    Response.resource_reference.profile[i].name = item.name
+                    Response.resource_reference.profile[i].value = item.value
+                    i = i + 1
             log.debug('get_user: lcs = '+identity._get_life_cycle_state())
             Response.result = "OK"
             defer.returnValue(Response)
         except ApplicationError, ex:
-           log.debug('get_user: no match')
-           raise IdentityRegistryException("user [%s] not found: %s"%(request.configuration.ooi_id, ex),
-                                           request.ResponseCodes.NOT_FOUND)
+            log.debug('get_user: no match')
+            raise IdentityRegistryException("user [%s] not found: %s"%(request.configuration.ooi_id, ex),
+                                            request.ResponseCodes.NOT_FOUND)
 
 
     @defer.inlineCallbacks
@@ -336,8 +336,8 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [rsa_private_key] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
 
-        log.debug('in op_authenticate_user_credentials:\n'+str(request))
-        log.debug('in op_authenticate_user_credentials: request.configuration\n'+str(request.configuration))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('in op_authenticate_user_credentials: request.configuration\n'+str(request.configuration))
 
         response = yield self.authenticate_user_credentials(request)
 
@@ -383,8 +383,8 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [subject] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
  
-        log.debug('in op_get_ooiid_for_user:\n'+str(request))
-        log.debug('in op_get_ooiid_for_user: request.configuration\n'+str(request.configuration))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('in op_get_ooiid_for_user: request.configuration\n'+str(request.configuration))
 
         response = yield self.get_ooiid_for_user(request)
 
@@ -420,8 +420,8 @@ class IdentityRegistryService(ServiceProcess):
         # Check for correct protocol buffer type
         self._CheckRequest(request)
         
-        log.debug('in op_update_user_profile:\n'+str(request))
-        log.debug('in op_update_user_profile: request.configuration\n'+str(request.configuration))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('in op_update_user_profile: request.configuration\n'+str(request.configuration))
 
         response = yield self.update_user_profile(request)
 
@@ -434,47 +434,48 @@ class IdentityRegistryService(ServiceProcess):
         
         identity, ooi_id = yield self._findUser(request.configuration.subject)
         if identity != None:
-           log.info('update_user_profile: identity = '+str(identity))
+            if log.getEffectiveLevel() <= logging.INFO:
+                log.info('update_user_profile: identity = '+str(identity))
                        
-           if request.configuration.IsFieldSet('name'):
-              log.debug('update_user_profile: setting name to %s'%request.configuration.name)
-              identity.name = request.configuration.name
-           else:
-               log.debug('update_user_profile: name not set')
+            if request.configuration.IsFieldSet('name'):
+                log.debug('update_user_profile: setting name to %s'%request.configuration.name)
+                identity.name = request.configuration.name
+            else:
+                log.debug('update_user_profile: name not set')
                        
-           if request.configuration.IsFieldSet('institution'):
-              log.debug('update_user_profile: setting institution to %s'%request.configuration.institution)
-              identity.institution = request.configuration.institution
-           else:
-               log.debug('update_user_profile: institution not set')
+            if request.configuration.IsFieldSet('institution'):
+                log.debug('update_user_profile: setting institution to %s'%request.configuration.institution)
+                identity.institution = request.configuration.institution
+            else:
+                log.debug('update_user_profile: institution not set')
                        
-           if request.configuration.IsFieldSet('email'):
-              log.debug('update_user_profile: setting email to %s'%request.configuration.email)
-              identity.email = request.configuration.email
-           else:
-               log.debug('update_user_profile: email not set')
+            if request.configuration.IsFieldSet('email'):
+                log.debug('update_user_profile: setting email to %s'%request.configuration.email)
+                identity.email = request.configuration.email
+            else:
+                log.debug('update_user_profile: email not set')
 
-           if request.configuration.IsFieldSet('profile'):
-              identity.profile.__delslice__(0, identity.profile.__len__())
-              i = 0
-              for item in request.configuration.profile:
-                  log.debug('update_user_profile: setting profile to '+str(item))
-                  identity.profile.add()
-                  identity.profile[i].name = item.name
-                  identity.profile[i].value = item.value
-                  i = i + 1
-           else:
-               log.debug('update_user_profile: profile not set')
+            if request.configuration.IsFieldSet('profile'):
+                identity.profile.__delslice__(0, identity.profile.__len__())
+                i = 0
+                for item in request.configuration.profile:
+                    log.debug('update_user_profile: setting profile to '+str(item))
+                    identity.profile.add()
+                    identity.profile[i].name = item.name
+                    identity.profile[i].value = item.value
+                    i = i + 1
+            else:
+                log.debug('update_user_profile: profile not set')
               
-           # now save user's info
-           yield self.rc.put_instance(identity, 'Updated user profile information')
-           # Create the response object...
-           Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
-           Response.result = "OK"
+            # now save user's info
+            yield self.rc.put_instance(identity, 'Updated user profile information')
+            # Create the response object...
+            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+            Response.result = "OK"
         else:
-           log.debug('update_user_profile: no match')
-           raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
-                                           request.ResponseCodes.NOT_FOUND)
+            log.debug('update_user_profile: no match')
+            raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
+                                            request.ResponseCodes.NOT_FOUND)
 
 
     @defer.inlineCallbacks

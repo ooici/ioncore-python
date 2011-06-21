@@ -96,6 +96,14 @@ class TestNMEADevice(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp (self):
+<<<<<<< HEAD
+=======
+        raise unittest.SkipTest('Not working yet')
+
+        print '\n          ----- setUp -----'
+        yield self._start_container()
+
+>>>>>>> mainline_dev
         """
         Prepare container and simulator for testing
         """

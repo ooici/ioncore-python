@@ -16,7 +16,6 @@ from ion.core import ioninit
 
 import time
 
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)

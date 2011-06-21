@@ -9,14 +9,11 @@
 
 from twisted.internet import defer
 
-from ion.core.data.cassandra_bootstrap import CassandraSchemaProvider, IndexType
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.services.dm.distribution.events import ScheduleEventSubscriber
-from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, SchedulerService
-from ion.core.data import storage_configuration_utility
-from ion.core.data.storage_configuration_utility import STORAGE_PROVIDER, PERSISTENT_ARCHIVE
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 
 from ion.test.iontest import IonTestCase
 import ion.util.ionlog
@@ -25,7 +22,6 @@ from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.util.itv_decorator import itv
 
 # get configuration
 from ion.core import ioninit
@@ -62,7 +58,7 @@ class SchedulerTest(IonTestCase):
         yield self._start_container()
 
         yield self._setup_store()
-        sup = yield self._spawn_processes(services)
+        yield self._spawn_processes(services)
 
         self.proc = Process(spawnargs={'proc-name':'SchedulerTestProcess'})
         yield self.proc.spawn()
@@ -236,7 +232,7 @@ class SchedulerTest(IonTestCase):
         msg_r = yield mc.create_instance(RMTASK_REQ_TYPE)
         msg_r.task_id = resp_msg.task_id
 
-        rc = yield sc.rm_task(msg_r)
+        yield sc.rm_task(msg_r)
         
 
     @defer.inlineCallbacks
@@ -293,64 +289,3 @@ class SchedulerTest(IonTestCase):
 
         yield asleep(4)
         self.failUnless(len(self._notices) > 0, "Could be an intermittent failure, waiting for message delivery")
-
-class SchedulerCassandraTest(SchedulerTest):
-    """
-    Derived test for using the cassandra backend for scheduler service.
-    """
-
-    KEYSPACE = 'test_scheduler_ks'
-
-    @itv(CONF)
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield SchedulerTest.setUp(self)
-
-    def _get_spawn_args(self):
-        return {'storage_provider':CONF.getValue('storage_provider', {'host':'localhost', 'port': 9160}),
-                'index_store_class':CONF.getValue('index_store_class', 'ion.core.data.cassandra_bootstrap.CassandraIndexedStoreBootstrap'),
-                'username':CONF.getValue('username', None),
-                'password':CONF.getValue('password', None),
-                'keyspace':CONF.getValue('keyspace', self.KEYSPACE)}
-
-    @defer.inlineCallbacks
-    def _setup_store(self):
-        uname = CONF.getValue('cassandra_username', None)
-        pword = CONF.getValue('cassandra_password', None)
-        storage_provider = CONF.getValue(STORAGE_PROVIDER, self._get_spawn_args()['storage_provider'].copy())
-
-        keyspace = self.KEYSPACE
-
-        test_ks = storage_configuration_utility.base_ks_def.copy()
-        test_ks['name'] = keyspace
-
-        storage_conf = {
-            STORAGE_PROVIDER:storage_provider,
-            PERSISTENT_ARCHIVE:test_ks,
-        }
-
-        test_cf = storage_configuration_utility.base_cf_def.copy()
-        test_cf['name'] = SchedulerService.COLUMN_FAMILY
-        test_cf['keyspace'] = keyspace
-        test_cf['column_metadata'] = []
-
-        test_ks['cf_defs']=[test_cf]
-
-        for col in SchedulerService.INDICES:
-            test_col = storage_configuration_utility.base_col_def.copy()
-
-            test_col['name'] = col
-            test_col['index_type'] = IndexType.KEYS
-            test_cf['column_metadata'].append(test_col)
-
-
-        self.test_harness = CassandraSchemaProvider(uname,pword,storage_conf,error_if_existing=False)
-        self.test_harness.connect()
-        yield self.test_harness.run_cassandra_config()
-        yield self.test_harness.client.truncate(SchedulerService.COLUMN_FAMILY)
-
-    @defer.inlineCallbacks
-    def _cleanup_store(self):
-        yield self.test_harness.client.truncate(SchedulerService.COLUMN_FAMILY)
-        yield self.test_harness.disconnect()
-

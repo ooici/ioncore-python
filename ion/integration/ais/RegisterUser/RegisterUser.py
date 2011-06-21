@@ -7,6 +7,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
@@ -109,7 +110,8 @@ class RegisterUser(object):
 
    @defer.inlineCallbacks
    def getUser (self, msg):
-      log.info('RegisterUser.getUser()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('RegisterUser.getUser()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
@@ -165,7 +167,8 @@ class RegisterUser(object):
 
    @defer.inlineCallbacks
    def updateUserProfile (self, msg):
-      log.info('RegisterUser.updateUserProfile()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('RegisterUser.updateUserProfile()\n'+str(msg))
 
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
@@ -239,7 +242,8 @@ class RegisterUser(object):
 
    @defer.inlineCallbacks
    def registerUser (self, msg):
-      log.debug('RegisterUser.registerUser()\n'+str(msg))
+      if log.getEffectiveLevel() <= logging.DEBUG:
+         log.debug('RegisterUser.registerUser()\n'+str(msg))
       
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
@@ -271,14 +275,16 @@ class RegisterUser(object):
       # use authenticate_user to try to update a possibly already existing user 
       try:
          result = yield self.irc.authenticate_user(Request)
-         log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
+         if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
          UserAlreadyRegistered = True
       except ReceivedApplicationError, ex:
             log.info("RegisterUser.registerUser(): calling irc.register_user with\n"+str(Request.configuration))
             # user wasn't in Identity Registry, so register them now
             try:
                result = yield self.irc.register_user(Request)
-               log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+               if log.getEffectiveLevel() <= logging.DEBUG:
+                  log.debug('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
                UserAlreadyRegistered = False
             except ReceivedApplicationError, ex:
                log.info('RegisterUser.registerUser(): Error invoking Identity Registry Service: %s' %ex)

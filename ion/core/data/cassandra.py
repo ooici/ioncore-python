@@ -13,7 +13,7 @@
 """
 import os
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from zope.interface import implements
 
@@ -29,11 +29,16 @@ from ion.core.data.store import IndexStoreError
 
 from ion.util.tcp_connections import TCPConnection
 
+from ion.util.timeout import timeout
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 
+cassandra_timeout = CONF.getValue('CassandraTimeout',10.0)
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
@@ -89,8 +94,8 @@ class CassandraStore(TCPConnection):
         self._cache = cache # Cassandra Column Family maps to an ION Cache resource
         self._cache_name = cache.name
         log.info("leaving __init__")
-        
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get(self, key):
         """
@@ -99,7 +104,7 @@ class CassandraStore(TCPConnection):
         @retval Deferred that fires with the value of key
         """
         
-        log.debug("CassandraStore: Calling get on key %s " % key)
+        #log.debug("CassandraStore: Calling get on key %s " % key)
         try:
             result = yield self.client.get(key, self._cache_name, column='value')
             value = result.column.value
@@ -108,6 +113,7 @@ class CassandraStore(TCPConnection):
             value = None
         defer.returnValue(value)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value):
         """
@@ -117,11 +123,12 @@ class CassandraStore(TCPConnection):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
+        #log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
         columns = {"value": value, "has_key":"1"}
         yield self.client.batch_insert(key, self._cache_name, columns)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def has_key(self, key):
         """
@@ -136,6 +143,7 @@ class CassandraStore(TCPConnection):
             ret = False
         defer.returnValue(ret)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove(self, key):
         """
@@ -188,6 +196,7 @@ class CassandraIndexedStore(CassandraStore):
         self._query_attribute_names = None
             
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
         """
@@ -203,12 +212,13 @@ class CassandraIndexedStore(CassandraStore):
             index_cols = dict(**index_attributes)
 
             
-        log.info(" index_attributes %s" % (index_cols))
+        #log.info("Put: index_attributes %s" % (index_cols))
         yield self._check_index(index_cols)
         index_cols.update({"value":value, "has_key":"1"})
         
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
         """
@@ -218,11 +228,12 @@ class CassandraIndexedStore(CassandraStore):
         can be used to query the store to return rows based on the value of the attributes.
         """
         yield self._check_index(index_attributes)
-        log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
+        #log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         defer.succeed(None)
 
     
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def _check_index(self, index_attributes):
         """
@@ -236,7 +247,8 @@ class CassandraIndexedStore(CassandraStore):
         if self._query_attribute_names is None:
             query_attributes =  yield self.get_query_attributes()
             self._query_attribute_names = set(query_attributes)
-        
+
+
         index_attribute_names = set(index_attributes.keys())
         
         if not index_attribute_names.issubset(self._query_attribute_names):
@@ -251,7 +263,8 @@ class CassandraIndexedStore(CassandraStore):
             raise IndexStoreError("Values for the indexed columns must be of type str.")
         
 
-    @defer.inlineCallbacks    
+    @timeout(cassandra_timeout)
+    @defer.inlineCallbacks
     def query(self, query_predicates, row_count=100):
         """
         Search for rows in the Cassandra instance.
@@ -264,7 +277,7 @@ class CassandraIndexedStore(CassandraStore):
         
         raises a CassandraError if the query_predicate object is malformed.
         """
-        log.info(self._cache_name)
+        #log.info('Query against cache: %s' % self._cache_name)
         predicates = query_predicates.get_predicates()
         def fix_preds(query_tuple):
             if query_tuple[2] == Query.EQ:
@@ -276,10 +289,10 @@ class CassandraIndexedStore(CassandraStore):
             args = {'column_name':query_tuple[0], 'op':new_pred, 'value': query_tuple[1]}
             return IndexExpression(**args)
         selection_predicates = map(fix_preds, predicates)
-        log.info("Calling get_indexed_slices selection_predicate %s " % (selection_predicates,))
+        #log.debug("Calling get_indexed_slices selection_predicate %s " % (selection_predicates,))
         
         rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates, count=row_count)
-        log.info("Got rows back")
+        #log.info("Got rows back")
         result ={}
         for row in rows:
             row_vals = {}
@@ -289,13 +302,15 @@ class CassandraIndexedStore(CassandraStore):
 
         defer.returnValue(result)
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
         """
+        log.warn('Calling get_query_attributes - this is expensive!')
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
-        log.debug("keyspace desc %s" % (keyspace_description,))
+        #log.debug("keyspace desc %s" % (keyspace_description,))
         get_cfdef = lambda cfdef: cfdef.name == self._cache_name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
@@ -349,7 +364,7 @@ class CassandraDataManager(TCPConnection):
         TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
-        
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def create_persistent_archive(self, persistent_archive):
         """
@@ -366,6 +381,7 @@ class CassandraDataManager(TCPConnection):
         
         log.info("Added and set keyspace")
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_persistent_archive(self, persistent_archive):
         """
@@ -378,6 +394,7 @@ class CassandraDataManager(TCPConnection):
                       strategy_class=pa.strategy_class, cf_defs=[])
         yield self.client.system_update_keyspace(ksdef)
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove_persistent_archive(self, persistent_archive):
         """
@@ -388,6 +405,7 @@ class CassandraDataManager(TCPConnection):
         log.info("Removing keyspace with name %s" % (keyspace,))
         yield self.client.system_drop_keyspace(keyspace)
         
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def create_cache(self, persistent_archive, cache):
         """
@@ -399,6 +417,7 @@ class CassandraDataManager(TCPConnection):
         cfdef = CfDef(keyspace=persistent_archive.name, name=cache.name)
         yield self.client.system_add_column_family(cfdef)
     
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def remove_cache(self, persistent_archive, cache):
         """
@@ -409,6 +428,7 @@ class CassandraDataManager(TCPConnection):
         yield self.client.set_keyspace(persistent_archive.name)
         yield self.client.system_drop_column_family(cache.name)
 
+    @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_cache(self, persistent_archive, cache):
         """
@@ -444,7 +464,7 @@ class CassandraDataManager(TCPConnection):
         log.info("cf_def: " + str(cf_def))      
         yield self.client.system_update_column_family(cf_def) 
     
-    @defer.inlineCallbacks    
+    @defer.inlineCallbacks
     def _describe_keyspace(self, keyspace):
         """    
         @brief internal method used to get a description of the keyspace

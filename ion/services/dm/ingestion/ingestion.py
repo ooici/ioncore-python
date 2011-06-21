@@ -62,6 +62,7 @@ CDM_STRING_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10015, ver
 CDM_OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
 
 CDM_BOUNDED_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10021, version=1)
+CDM_ARRAY_STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=10025, version=1)
 
 SUPPLEMENT_MSG_TYPE = object_utils.create_type_identifier(object_id=2001, version=1)
 PERFORM_INGEST_MSG_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
@@ -155,7 +156,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_create_dataset_topics(self, content, headers, msg):
+    def op_create_dataset_topics(self, content, headers, msg_in):
         """
         Creates ingestion and notification topics that can be used to publish ingestion
         data and notifications about ingestion.
@@ -169,14 +170,14 @@ class IngestionService(ServiceProcess):
         msg.exchange_space_name = 'swapmeet'
 
         rc = yield self._pscclient.declare_exchange_space(msg)
-        #self._xs_id = rc.id_list[0]
+        self._xs_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(XP_TYPE)
         msg.exchange_point_name = 'science_data'
         msg.exchange_space_id = self._xs_id
 
         rc = yield self._pscclient.declare_exchange_point(msg)
-        #self._xp_id = rc.id_list[0]
+        self._xp_id = rc.id_list[0]
 
         msg = yield self.mc.create_instance(TOPIC_TYPE)
         msg.topic_name = content.dataset_id
@@ -185,7 +186,7 @@ class IngestionService(ServiceProcess):
 
         rc = yield self._pscclient.declare_topic(msg)
 
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg_in)
 
         log.info('op_create_dataset_topics - Complete')
 
@@ -232,32 +233,9 @@ class IngestionService(ServiceProcess):
 
         yield self.dataset.Repository.fetch_links(ba_links)
 
-        try:
-            att = self.dataset.root_group.FindAttributeByName('title')
-            title = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            title = 'None Given'
-
-
-        try:
-            att = self.dataset.root_group.FindAttributeByName('references')
-            references = att.GetValue()
-        except OOIObjectError, oe:
-            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
-            references = 'None Given'
-
-
-
-        data_details = {EM_TITLE:title,
-                       EM_URL:references,
-                       EM_DATA_SOURCE:content.datasource_id,
-                       EM_DATASET:content.dataset_id,
-                       }
-
         log.debug('_prepare_ingest - Complete')
 
-        defer.returnValue(data_details)
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def _setup_ingestion_topic(self, content):
@@ -295,7 +273,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type PerfromIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
-        data_details = yield self._prepare_ingest(content)
+        yield self._prepare_ingest(content)
 
         log.info('Created dataset details, Now setup subscriber...')
 
@@ -337,33 +315,97 @@ class IngestionService(ServiceProcess):
         yield self._subscriber.terminate()
         self._subscriber = None
 
-        if ingest_res:
-            log.debug("Ingest succeeded, respond to original request")
+        data_details = self.get_data_details(content)
 
+        if isinstance(ingest_res, dict):
             ingest_res.update(data_details)
 
-            yield self.rc.put_instance(self.dataset)
-
-            # send notification we performed an ingest
-            yield self._notify_ingest(ingest_res)
-
-
-            # now reply ok to the original message
-            yield self.reply_ok(msg)
         else:
-            log.debug("Ingest failed, error back to original request")
-            raise IngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
+            ingest_res={EM_ERROR:'Ingestion Failed!'}
+            ingest_res.update(data_details)
+            
+        data_source = None
+        if ingest_res.has_key(EM_ERROR):
+            log.info("Ingest Failed!")
+
+            # Don't change life cycle state - yet...
+            #data_source.ResourceLifeCycleState = data_source.INACTIVE
+            #self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
+
+        else:
+            log.info("Ingest succeeded!")
+
+            # If the dataset / source is new 
+            if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
+
+                log.info('Fetching datasource id - %s - to set life cycle state' % content.datasource_id)
+                data_source = yield self.rc.get_instance(content.datasource_id)
+
+                if data_source.is_public == True:
+
+                    data_source.ResourceLifeCycleState = data_source.COMMISSIONED
+                    self.dataset.ResourceLifeCycleState = self.dataset.COMMISSIONED
+
+                else:
+
+                    data_source.ResourceLifeCycleState = data_source.ACTIVE
+                    self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
+
+
+        resources=[self.dataset]
+        if data_source is not None:
+            resources.append(data_source)
+
+        for res in resources:
+            log.info('Resource %s life cycle state is %s' % (res.ResourceName, res.ResourceLifeCycleState))
+
+        yield self.rc.put_resource_transaction(resources)
+
+        yield self._notify_ingest(ingest_res)
 
         self.dataset=None
 
+        # now reply ok to the original message
+        yield self.reply_ok(msg)
+
+
+
         log.info('op_ingest - Complete')
 
+
+    def get_data_details(self, content):
+        try:
+            att = self.dataset.root_group.FindAttributeByName('title')
+            title = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            title = 'None Given'
+
+
+        try:
+            att = self.dataset.root_group.FindAttributeByName('references')
+            references = att.GetValue()
+        except OOIObjectError, oe:
+            log.warn('No title attribute found in Dataset: "%s"' % content.dataset_id)
+            references = 'None Given'
+
+
+
+        data_details = {EM_TITLE:title,
+                       EM_URL:references,
+                       EM_DATA_SOURCE:content.datasource_id,
+                       EM_DATASET:content.dataset_id,
+                       }
+
+        return data_details
 
 
     @defer.inlineCallbacks
     def _notify_ingest(self, ingest_res):
         """
         Generate a notification/event that an ingest succeeded.
+
+        This method is really not needed but I like it for testing...
         """
 
         log.debug('_notify_ingest - Start')
@@ -419,7 +461,7 @@ class IngestionService(ServiceProcess):
                         else:
                             i += 1
             else:
-                var.content = resource_instance.CreateObject(array_structure_type)
+                var.content = self.dataset.CreateObject(CDM_ARRAY_STRUCTURE_TYPE)
 
         yield msg.ack()
 
@@ -550,11 +592,13 @@ class IngestionService(ServiceProcess):
         if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
 
+
         # Commit the current state of the supplement - ingest of new content is complete
         self.dataset.Repository.commit('Ingest received complete notification.')
 
         # The current branch on entering recv done is the supplement branch
         merge_branch = self.dataset.Repository.current_branch_key()
+
         # Merge it with the current state of the dataset in the datastore
         yield self.dataset.MergeWith(branchname=merge_branch, parent_branch='master')
 
@@ -567,6 +611,8 @@ class IngestionService(ServiceProcess):
 
         # Get the root group of the supplement we are merging
         merge_root = self.dataset.Merge[0].root_group
+
+        log.info('Starting Find Dimension LooP')
 
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []
@@ -584,7 +630,12 @@ class IngestionService(ServiceProcess):
         # This is the inner most!
         merge_agg_dim = dimension_order[0]
 
+        log.info('Merge aggregation dimension name is: %s' % merge_agg_dim.name)
+
+
         supplement_length = merge_agg_dim.length
+
+        result = {EM_TIMESTEPS:supplement_length}
 
         agg_offset = 0
         try:
@@ -603,9 +654,13 @@ class IngestionService(ServiceProcess):
             string_time = merge_root.FindAttributeByName('ion_time_coverage_end')
             supplement_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
 
+            result.update({EM_START_DATE:supplement_stime*1000,
+                           EM_END_DATE:supplement_etime*1000})
+
         except OOIObjectError, oe:
             log.debug('No start time attribute found in dataset supplement!' + str(oe))
             raise IngestionError('No start time attribute found in dataset supplement!')
+            # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
 
 
         # Get the end time of the current dataset
@@ -627,7 +682,7 @@ class IngestionService(ServiceProcess):
         except OOIObjectError, oe:
             log.debug(oe)
             log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
-
+            # This is not an error - it is a new dataset.
 
 
         ###
@@ -652,13 +707,8 @@ class IngestionService(ServiceProcess):
         else:
             # We are appending an existing dataset - adjust the length of the aggregation dimension
             agg_dim = dims[merge_agg_dim.name]
-            agg_dim.length += agg_offset
+            agg_dim.length = agg_offset + supplement_length
             log.info('Setting the aggregation dimension %s to %d' % (agg_dim.name, agg_dim.length))
-
-
-        for var in root.variables:
-            log.info('Root Var Name: %s' % var.name)
-
 
 
         for merge_var in merge_root.variables:
@@ -749,80 +799,67 @@ class IngestionService(ServiceProcess):
         for merge_att in merge_root.attributes:
 
             att_name = merge_att.name
-
-            log.info('Merging Attribute: %s' % att_name)
-
-            if att_name == 'ion_time_coverage_start':
-                root.MergeAttLesser(att_name, merge_root)
-
-            elif att_name == 'ion_time_coverage_end':
-                root.MergeAttGreater(att_name, merge_root)
-
-            elif att_name == 'ion_geospatial_lat_min':
-                root.MergeAttLesser(att_name, merge_root)
-
-            elif att_name == 'ion_geospatial_lat_max':
-                root.MergeAttGreater(att_name, merge_root)
-
-            elif att_name == 'ion_geospatial_lon_min':
-                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                root.MergeAttSrc(att_name, merge_root)
-
-            elif att_name == 'ion_geospatial_lon_max':
-                # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                root.MergeAttSrc(att_name, merge_root)
+            try:
 
 
-            elif att_name == 'ion_geospatial_vertical_min':
+                log.info('Merging Attribute: %s' % att_name)
 
-                if vertical_positive == 'down':
+                if att_name == 'ion_time_coverage_start':
                     root.MergeAttLesser(att_name, merge_root)
 
-                elif vertical_positive == 'up':
+                elif att_name == 'ion_time_coverage_end':
                     root.MergeAttGreater(att_name, merge_root)
 
-                else:
-                    raise OOIObjectError('Invalid value for Vertical Positive')
-
-
-            elif att_name == 'ion_geospatial_vertical_max':
-
-                if vertical_positive == 'down':
-                    root.MergeAttGreater(att_name, merge_root)
-
-                elif vertical_positive == 'up':
+                elif att_name == 'ion_geospatial_lat_min':
                     root.MergeAttLesser(att_name, merge_root)
 
+                elif att_name == 'ion_geospatial_lat_max':
+                    root.MergeAttGreater(att_name, merge_root)
+
+                elif att_name == 'ion_geospatial_lon_min':
+                    # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                    root.MergeAttSrc(att_name, merge_root)
+
+                elif att_name == 'ion_geospatial_lon_max':
+                    # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
+                    root.MergeAttSrc(att_name, merge_root)
+
+
+                elif att_name == 'ion_geospatial_vertical_min':
+
+                    if vertical_positive == 'down':
+                        root.MergeAttLesser(att_name, merge_root)
+
+                    elif vertical_positive == 'up':
+                        root.MergeAttGreater(att_name, merge_root)
+
+                    else:
+                        raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_min is present')
+
+
+                elif att_name == 'ion_geospatial_vertical_max':
+
+                    if vertical_positive == 'down':
+                        root.MergeAttGreater(att_name, merge_root)
+
+                    elif vertical_positive == 'up':
+                        root.MergeAttLesser(att_name, merge_root)
+
+                    else:
+                        raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_max is present')
+
+
+                elif att_name == 'history':
+                    # @TODO is this the correct treatment for history?
+                    root.MergeAttDstOver(att_name, merge_root)
+
                 else:
-                    raise OOIObjectError('Invalid value for Vertical Positive')
+                    root.MergeAttSrc(att_name, merge_root)
 
+            except OOIObjectError, oe:
 
-            elif att_name == 'history':
-                # @TODO is this the correct treatment for history?
-                root.MergeAttDstOver(att_name, merge_root)
-
-            else:
-                root.MergeAttSrc(att_name, merge_root)
-
-
-
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-
-        #print root.PPrint()
-
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-        #print 'LMDLDMDLMDLMDLDMDLMDLDMDLMDLDMDLM2222'
-
-
-        result = {EM_START_DATE:supplement_stime*1000,
-                  EM_END_DATE:supplement_etime*1000,
-                  EM_TIMESTEPS:supplement_length}
+                log.exception('Attribute merger failed for global attribute: %s' % att_name)
+                result[EM_ERROR] = 'Error during ingestion of global attributes'
 
 
         log.debug('_merge_supplement - Complete')

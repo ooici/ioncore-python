@@ -333,7 +333,7 @@ class ProcessTest(IonTestCase):
     def test_register_lco_during_transition(self):
         # test a process which registers lcos during init/activate
         lcap = life_cycle_process.LCOProcessAddingObjects()
-        self.failUnlessEquals(len(lcap._registered_life_cycle_objects), 0)
+        self.failUnlessEquals(len(lcap._registered_life_cycle_objects), 1)      # the 1 is the LCC event publisher
         self.failUnlessEquals(lcap._get_state(), state_object.BasicStates.S_INIT)
 
         yield lcap.initialize()

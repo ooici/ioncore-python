@@ -46,8 +46,6 @@ class ExchangeManagementService(ServiceProcess):
         self.exchange_types = ExchangeTypes(self.controller)
         yield self.controller.start()
         
-        self.xs = {}
-        self.xn = {}
         
 
 
@@ -105,9 +103,6 @@ class ExchangeManagementService(ServiceProcess):
             description = exchangespace.configuration.description
             if len(name) == 0:
                 raise res_wrapper.ExchangeManagementError("exchangespace.name is invalid") 
-            if self.xs.has_key(name):
-                raise res_wrapper.ExchangeManagementError("exchangespace.name already exists") 
-            
         except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
             return
@@ -118,7 +113,6 @@ class ExchangeManagementService(ServiceProcess):
 
         # Response
         response = yield self.helper.push_object(object)
-        self.xs[name] = response.configuration.MyId;
         log.debug('Created exchangespace.  id: %s', response.resource_reference.key)
         yield self.reply_ok(msg, response)
 
@@ -154,12 +148,8 @@ class ExchangeManagementService(ServiceProcess):
             exchangespace = exchangename.configuration.exchangespace.strip()
             if len(name) == 0:
                 raise res_wrapper.ExchangeManagementError("exchangename.name is required") 
-            if self.xn.has_key(name):
-                raise res_wrapper.ExchangeManagementError("exchangename.name already exists") 
             if len(exchangespace) == 0:
                 raise res_wrapper.ExchangeManagementError("exchangename.exchangespace is required") 
-            if not self.xs.has_key(exchangespace):
-                raise res_wrapper.ExchangeManagementError("exchangename.exchangespace doesn't exist") 
             
         except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
@@ -175,7 +165,6 @@ class ExchangeManagementService(ServiceProcess):
         
         # Response
         response = yield self.helper.push_object(object)
-        self.xn[name] = response.configuration.MyId;
         log.debug('Created exchangename.  id: %s', response.resource_reference.key)
         yield self.reply_ok(msg, response)
 

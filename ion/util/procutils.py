@@ -13,6 +13,9 @@ import re
 import time
 import uuid
 
+import pprint
+import StringIO
+
 import os
 from twisted.internet import defer, reactor
 
@@ -171,8 +174,15 @@ def asleep(secs):
     @param secs Time, in seconds
     @retval Deferred whose callback will fire after time has expired
     """
-    d = defer.Deferred()
-    reactor.callLater(secs, d.callback, None)
+
+    #d = defer.Deferred()
+    #reactor.callLater(secs, d.callback, None)
+
+    # This is a better implementation - the delayed call can now be cancelled by the deferred which prevents dirty reactor!
+    def deferLaterCancel(deferred):
+       delayedCall.cancel()
+    d = defer.Deferred(deferLaterCancel)
+    delayedCall = reactor.callLater(secs, d.callback, None)
     return d
 
 def currenttime():
@@ -186,6 +196,18 @@ def currenttime_ms():
     @retval current UTC time as int with milliseconds in epoch
     """
     return int(currenttime() * 1000)
+
+
+def isnan(x):
+    """
+    Python 2.5 does not support isnan in the math module.
+    Using string conversion is the safest method - comparison with self does not always work...
+    http://stackoverflow.com/questions/944700/how-to-check-for-nan-in-python
+    """
+
+    return str(float(x)).lower() == 'nan'
+
+    
 
 
 def get_ion_path(filename):
@@ -244,3 +266,14 @@ def get_last_or_default(alist, default=None):
         log.debug('get_last_or_default: using default!')
         res=default
     return res
+
+
+def pprint_to_string(obj):
+
+    fstream = StringIO.StringIO()
+
+    pprint.pprint(obj, stream=fstream)
+
+    result = fstream.getvalue()
+    fstream.close()
+    return result

@@ -27,7 +27,6 @@ import ion.util.procutils as pu
 
 from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
 
-from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -59,7 +58,7 @@ class TestEventPublisher(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        self._proc.terminate()
+        yield self._proc.terminate()
         self._proc = None
         yield self._stop_container()
 
