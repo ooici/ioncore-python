@@ -400,6 +400,14 @@ class JavaAgentWrapper(ServiceProcess):
         @param dataset_id: The OOI Resource ID of the Dataset which has been updated
         @param data_source_id: The OOI Resource ID of the Data Source which has been updated
         """
+
+        # Step 0: retrieve the dataset_id from the data_source_id if it is not provided -- and vise versa
+        if dataset_id and not data_source_id:
+            data_source_id = yield self._get_associated_data_source_id(dataset_id)
+        elif data_source_id and not dataset_id:
+            dataset_id = yield self._get_associated_dataset_id(data_source_id)
+        elif not dataset_id and not data_source_id:
+            raise JavaAgentWrapperException('Must provide data source or dataset ID!')
     
         # Step 1: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
@@ -542,12 +550,7 @@ class JavaAgentWrapper(ServiceProcess):
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-        # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
-        if datasetID and not dataSourceID:
-            dataSourceID = yield self._get_associated_data_source_id(datasetID)
-        elif dataSourceID and not datasetID:
-            datasetID = yield self._get_associated_dataset_id(dataSourceID)
-        elif not datasetID and not dataSourceID:
+        if not datasetID and not dataSourceID:
             raise JavaAgentWrapperException('Must provide data source or dataset ID!')
 
         
