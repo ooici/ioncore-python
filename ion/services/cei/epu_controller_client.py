@@ -15,7 +15,6 @@ class EPUControllerClient(ServiceClient):
             kwargs['targetname'] = "epu_controller"
         self.EpuControllerName = kwargs['targetname']
         ServiceClient.__init__(self, proc, **kwargs)
-        self.ServiceName = kwargs['targetname']
 
     @defer.inlineCallbacks
     def reconfigure(self, newconf):
@@ -46,7 +45,7 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def whole_state(self):
-        ServiceExists = yield self.does_service_exist(self.ServiceName)
+        ServiceExists = yield self.does_service_exist(self.EpuControllerName)
         if not ServiceExists:
             log.debug("%s.whole_state: Returning static list for AIS unit testing"%self.EpuControllerName)
             de_state = 'STABLE_DE'   # from epu/epucontroller/de_states.py
