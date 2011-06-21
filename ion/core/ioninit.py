@@ -8,6 +8,7 @@
 
 import logging
 import logging.config
+import logging.handlers
 import re
 import os, os.path
 
@@ -24,7 +25,6 @@ if not hasattr(sys, "version_info") or sys.version_info < (2,5):
     raise RuntimeError("ioncore requires Python 2.5 or later.")
 if sys.version_info > (3,0):
     raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
-del sys
 
 # The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
 # variable can go away with the new ion environment directories 
@@ -41,6 +41,19 @@ if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
         print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
 
 logging.config.fileConfig(logconf)
+if sys.platform == 'darwin':
+    #syslog_address = '/var/run/syslog'
+    #dont log to syslog
+    pass
+else:
+    #log to syslog if this is linux (hopefully not windows ;)
+    syslog_formatter = logging.Formatter("%(asctime)s.%(msecs)03d [%(module)-15s:%(lineno)3d] %(levelname)-5s:%(message)s")
+    syslog_address = '/dev/log'
+    syslog_user = logging.handlers.SysLogHandler.LOG_USER
+    syslog_handler = logging.handlers.SysLogHandler(syslog_address, syslog_user) 
+    syslog_handler.setLevel(logging.DEBUG)
+    syslog_handler.setFormatter(syslog_formatter)
+    logging.root.addHandler(syslog_handler)
 
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
