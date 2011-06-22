@@ -86,9 +86,9 @@ RUN_TESTS = True if os.environ.get('LIVE_SBE37_HARDWARE',None) \
 # during development. Also this will ensure tests do not run
 # automatically. 
 SKIP_TESTS = [
-    'test_execute_instrument',
-    'test_state_transitions',
-    'test_get_capabilities',
+    #'test_execute_instrument',
+    #'test_state_transitions',
+    #'test_get_capabilities',
     'dummy'
 ]    
 
