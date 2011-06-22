@@ -186,7 +186,13 @@ class CdmValidationService(ServiceProcess):
             # @todo:  Error if binary is None
             if None == binary or not os.path.exists(binary):
                 raise OSError("CfChecks binary (given by configuration as 'cfchecks_binary' does not specify a valid filepath: '%s'" % binary)
-            proc = OSProcess(binary, args)
+
+            newenv = os.environ.copy()
+            ld_library_path = CONF.getValue('LD_LIBRARY_PATH', None)
+            if ld_library_path:
+                newenv['LD_LIBRARY_PATH'] = ld_library_path
+
+            proc = OSProcess(binary, args, env=newenv)
             
             # Start the process
             if log.getEffectiveLevel() <= logging.DEBUG:
