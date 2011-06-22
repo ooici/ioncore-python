@@ -83,7 +83,6 @@ class InstrumentFSM():
         
         (success,next_state,result) = yield self.state_handlers[self.current_state](event,params)
         
-        
         #if next_state in self.states:
         if self.states.has(next_state):
             yield self._on_transition_async(next_state,params)
@@ -117,5 +116,4 @@ class InstrumentFSM():
         yield self.state_handlers[self.current_state](self.exit_event,params)
         self.previous_state = self.current_state
         self.current_state = next_state
-        yield self.state_handlers[self.current_state](self.enter_event,params)
-        
+        yield self.state_handlers[self.current_state](self.enter_event,params)        

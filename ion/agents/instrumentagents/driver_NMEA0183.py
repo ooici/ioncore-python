@@ -6,7 +6,6 @@
 @brief Driver code for connecting to NMEA0183 devices
 """
 
-
 import time
 from twisted.internet import defer, reactor
 from serial.serialutil import SerialException
@@ -27,6 +26,7 @@ from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.exception import ApplicationError
 
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
+
 from twisted.protocols import basic
 from twisted.internet.serialport import SerialPort
 from serial import PARITY_NONE, PARITY_EVEN, PARITY_ODD
@@ -35,10 +35,6 @@ from serial import FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS
 
 
 log = ion.util.ionlog.getLogger(__name__)
-DEBUG_PRINT = (True, False)[0]
-IO_LOG = (True, False)[1]
-IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
-
 
 ###############################################################################
 # Driver-specific constants
@@ -181,66 +177,6 @@ class ConfigureNMEADevice(object):
         pass
 
 
-class DeviceCommandSpecification:
-    """
-    A translation unit of a op_* function call into a sequence of low level
-    device commands for use by the appropriate state handler for writing the
-    commands to the device, managing the construction of a reply and firing the
-    deferred returned by the op_* call upon completion.
-    """
-
-    def __init__(self, command):
-        self.command = command
-        self.device_command_buffer = None
-        self.previous_key = None
-        self.errors = False
-        self.deferred = None
-        self.timeoutf = None
-        self.reply = {'success': None, 'result': {}}
-
-    def do_reply(self):
-        """
-        Fire the command deferred with reply.
-        """
-
-        if self.timeoutf != None:
-            self.timeoutf.cancel()
-            self.timeoutf = None
-        if self.deferred != None:
-            d, self.deferred = self.deferred, None
-            d.callback(self.reply)
-
-    def do_timeout(self):
-        """
-        Fire the command deferred with timeout error.
-        """
-
-        reply = {'success': InstErrorCode.TIMEOUT, 'result': {}}
-        if self.deferred != None:
-            d, self.deferred = self.deferred, None
-            d.callback(reply)
-        self.timeoutf = None
-
-    def set_success(self, success_val, fail_val):
-        """
-        Set the overall command success message according to any
-        accumulated errors.
-        """
-
-        if self.errors:
-            self.reply['success'] = fail_val
-        else:
-            self.reply['success'] = success_val
-
-    def set_previous_result(self, prev_result):
-        """
-        For composite device commands that set a success or other result with
-        each device command response prompt, use this function to build
-        up the composite result.
-        """
-
-        if self.previous_key != None:
-            self.reply['result'][self.previous_key] = prev_result
 
 
 ###############################################################################
@@ -270,9 +206,6 @@ class NMEADeviceDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, *args, **kwargs)
 
-        # Deferred that handles blocking on connect messages
-        self._connection_complete_deferred = None
-
         # Com port of the device serial server. ex: '/dev/slave'
         self._port = None
         # Serial baud rate:  default =9600
@@ -295,13 +228,7 @@ class NMEADeviceDriver(InstrumentDriver):
         # Device IO Logfile parameters. The device io log is used to precisely
         # trace comms with the device for design and debugging purposes.
         # If enabled, a new file is created each time op_connect is attempted.
-        self._logfile = None
         self._start_time = time.localtime()
-        self._logfile_name = ('NMEA0183_driver_io_log_%i_%i_%i.txt'
-                                        % (self._start_time[3],
-                                           self._start_time[4],
-                                           self._start_time[5]))
-        self._logfile_path = IO_LOG_DIR + self._logfile_name
 
         # List of active driver alarm conditions.
         self._alarms = []
@@ -345,6 +272,7 @@ class NMEADeviceDriver(InstrumentDriver):
 # State handling methods
 ###########################################################################
 
+    @defer.inlineCallbacks
     def state_handler_unconfigured(self, event, params):
         """
         Event handler for STATE_UNCONFIGURED.
@@ -355,8 +283,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_INITIALIZE: Reset comm params to null values.
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -364,7 +294,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer':    NMEADeviceChannel.GPS,
                        'value':         NMEADeviceState.UNCONFIGURED}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
             self._initialize()
@@ -382,8 +312,9 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_disconnected(self, event, params):
         """
         Event handler for STATE_DISCONNECTED.
@@ -393,8 +324,11 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_INITIALIZE: Transition to STATE_UNCONFIGURED.
         EVENT_CONNECT:    Transition to STATE_CONNECTING.
         """
+        
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -403,19 +337,7 @@ class NMEADeviceDriver(InstrumentDriver):
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.DISCONNECTED}
 
-            self.send(self.proc_supid, 'driver_event_occurred', content)
-
-            # If we enter a disconnect state with the connection complete
-            # deferred defined, then we are entering from a previous connection
-            # in response to a disconnect comment. Fire the deferred with
-            # reply to indicate successful disconnect.
-
-            print '          *****_connection_complete_deferred: %s' % self._connection_complete_deferred
-            if self._connection_complete_deferred:
-                d, self._connection_complete_deferred = \
-                    self._connection_complete_deferred, None
-                reply = {'success': InstErrorCode.OK, 'result': None}
-                d.callback(reply)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
         elif event == NMEADeviceEvent.EXIT:
             pass
@@ -429,8 +351,9 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_connecting(self, event, params):
         """
         Event handler for STATE_CONNECTING.
@@ -442,8 +365,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_CONNECTION_FAILED:   Transition to STATE_DISCONNECTED.
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -451,7 +376,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.CONNECTING}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
             self.getConnected()
@@ -469,8 +394,9 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_disconnecting(self, event, params):
         """
         Event handler for STATE_DISCONNECTING.
@@ -480,8 +406,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_DISCONNECT_COMPLETE: Switch to STATE_DISCONNECTED.
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -489,11 +417,10 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.DISCONNECTING}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition into the state
-            self.getDisconnected()
-
+            yield self.getDisconnected()
         elif event == NMEADeviceEvent.EXIT:
             pass
 
@@ -503,8 +430,9 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_connected(self, event, params):
         """
         Event handler for STATE_CONNECTED.
@@ -518,9 +446,11 @@ class NMEADeviceDriver(InstrumentDriver):
                                 specific state for handling.
         EVENT_DATA_RECEIVED:    Pass
         """
-
+         
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -529,18 +459,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.CONNECTED}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
-
-            # If we enter connected with the connection complete deferred
-            # defined we are establishing the initial connection in response
-            # to a connect command. Send the reply to indicate successful
-            # connection.
-            if self._connection_complete_deferred:
-                print "          ***** CONNECTED handler: Entered with deferred"
-                d, self._connection_complete_deferred = self._connection_complete_deferred,None
-                reply = {'success': InstErrorCode.OK, 'result': None}
-                print "          ***** CONNECTED handler: d.callback(reply): %s" % reply
-                d.callback(reply)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
         elif event == NMEADeviceEvent.EXIT:
             pass
@@ -572,8 +491,9 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_acquire_sample(self, event, params):
         """
         Event handler for STATE_ACQUIRE_SAMPLE.
@@ -584,8 +504,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Publish data
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -593,7 +515,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.ACQUIRE_SAMPLE}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
             self.protocol._serialReadMode = "1"  # Acquire only 1 line and stop
@@ -615,13 +537,14 @@ class NMEADeviceDriver(InstrumentDriver):
                     content = {'type': DriverAnnouncement.DATA_RECEIVED,
                                'transducer': NMEADeviceChannel.GPS,
                                'value': nmeaLine}
-                self.send(self.proc_supid, 'driver_event_occurred', content)
+                yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_autosample(self, event, params):
         """
         Event handler for STATE_AUTOSAMPLE.
@@ -634,8 +557,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_DATA_RECEIVED:   Publish data
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -644,7 +569,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                        'value': NMEADeviceState.DISCONNECTING}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
             self.protocol._serialReadMode = "ON"  # Continuous-read mode
@@ -667,13 +592,14 @@ class NMEADeviceDriver(InstrumentDriver):
                     content = {'type': DriverAnnouncement.DATA_RECEIVED,
                                'transducer': NMEADeviceChannel.GPS,
                                'value': nmeaLine}
-                self.send(self.proc_supid, 'driver_event_occurred', content)
+                yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_update_params(self, event, params):
         """
         Event handler for STATE_UPDATE_PARAMS.
@@ -685,23 +611,25 @@ class NMEADeviceDriver(InstrumentDriver):
             EVENT_DATA_RECEIVED: Pass
         """
 
-        print "          ***** UPDATE PARAMS handler"
+        yield
+        log.debug("UPDATE PARAMS handler")
 
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
 
-            print "          ***** UPDATE PARAMS handler: ENTER"
+            log.debug("UPDATE PARAMS handler: ENTER")
 
             # Announce the state change to agent.
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer': NMEADeviceChannel.GPS,
                         'value': NMEADeviceState.UPDATE_PARAMS}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
-            print "          ***** UPDATE PARAMS handler: sent state change"
+            log.debug("UPDATE PARAMS handler: sent state change")
 
             # Transition-in action(s)
             # TODO:  Send command to NMEA device with parameter changes
@@ -727,10 +655,12 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        print "          ***** UPDATE PARAMS handler returning : success = %s and next_state = %s'"\
-                % (success, next_state)
-        return(success, next_state)
+        log.debug("UPDATE PARAMS handler returning : success = %s and next_state = %s",
+                  success, next_state)
+        
+        defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
     def state_handler_set(self, event, params):
         """
         Event handler for STATE_SET.
@@ -746,8 +676,10 @@ class NMEADeviceDriver(InstrumentDriver):
         EVENT_DATA_RECEIVED: Pass.
         """
 
+        yield
         success = InstErrorCode.OK
         next_state = None
+        result = None
         self._debug_print(event)
 
         if event == NMEADeviceEvent.ENTER:
@@ -756,7 +688,7 @@ class NMEADeviceDriver(InstrumentDriver):
             content = {'type': DriverAnnouncement.STATE_CHANGE,
                        'transducer':    NMEADeviceChannel.GPS,
                         'value':        NMEADeviceState.UPDATE_PARAMS}
-            self.send(self.proc_supid, 'driver_event_occurred', content)
+            yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
 
@@ -772,7 +704,7 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             success = InstErrorCode.INCORRECT_STATE
 
-        return(success, next_state)
+        defer.returnValue((success, next_state, result))
 
 ###########################################################################
 # Process lifecycle methods.
@@ -812,7 +744,7 @@ class NMEADeviceDriver(InstrumentDriver):
         connectionResult = NMEADeviceEvent.CONNECTION_COMPLETE
 
         try:
-            print '          ***** Attempting serial connection....'
+            log.debug("Attempting serial connection....")
             self._serConnection =  SerialPort(NMEA0183Protocol(),
                                               self._port,
                                               reactor,
@@ -825,19 +757,18 @@ class NMEADeviceDriver(InstrumentDriver):
                                               rtscts=self._rtscts)
 
         except SerialException, e:
-            print '          ***** Serial connection failed: %s' % e
-            print '          ***** Sending event: %s' % NMEADeviceEvent.CONNECTION_FAILED
+            log.debug("Serial connection failed: %s", e)
+            log.debug("Sending event: %s", NMEADeviceEvent.CONNECTION_FAILED)
             connectionResult = NMEADeviceEvent.CONNECTION_FAILED
 
-        print '          ***** Serial connection result: %s' % connectionResult
-        yield self.fsm.on_event(connectionResult)
+        log.debug("Serial connection result: %s", connectionResult)
+        yield self.fsm.on_event_async(connectionResult)
 
     def gotConnected(self, instrument):
         """
         Called from twisted framework when connection is established.
         """
-
-        print '          ***** gotConnected was called... why??????'
+        assert False, 'NMEA0183_driver.gotConnected() was called... why?'
 
     @defer.inlineCallbacks
     def getDisconnected(self):
@@ -848,16 +779,16 @@ class NMEADeviceDriver(InstrumentDriver):
         connectionResult = NMEADeviceEvent.DISCONNECT_COMPLETE
 
         try:
-            print '          ***** Attempting to disconnect serial....'
+            log.debug("Attempting to disconnect serial....")
             if self._serConnection:
                 self._serConnection.loseConnection()
         except SerialException, e:
-            print '          ***** Serial disconnection failed: %s' % e
-            print '          ***** Sending event: %s' % NMEADeviceEvent.CONNECTION_COMPLETE
+            log.debug("Serial disconnection failed: %s", e)
+            log.debug("Sending event: %s", NMEADeviceEvent.CONNECTION_COMPLETE)
             connectionResult = NMEADeviceEvent.CONNECTION_COMPLETE
 
-        print '          ***** Serial connection result: %s' % connectionResult
-        yield self.fsm.on_event(connectionResult)
+        log.debug("Serial connection result: %s", connectionResult)
+        yield self.fsm.on_event_async(connectionResult)
         
     def gotDisconnected(self, instrument):
         """
@@ -865,13 +796,13 @@ class NMEADeviceDriver(InstrumentDriver):
         Send an EVENT_DISCONNECT_COMPLETE.
         """
 
-        print '          ***** gotDiscnnected was called... why??????'
+        log.warn("gotDiscnnected was called... why??")
         self._serConnection = None
-        self.fsm.on_event(NMEADeviceEvent.DISCONNECT_COMPLETE)
+        self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
 
     def gotData(self, dataFrag):
 
-        print '          ***** gotData was called... why??????'
+        assert False, 'NMEA0183_driver.gotData() was called... why?'
 
     ###########################################################################
     # Agent interface methods.
@@ -1195,9 +1126,6 @@ class NMEADeviceDriver(InstrumentDriver):
         @param content A dict with optional timeout: {'timeout':timeout}.
         @retval A reply message with a dict {'success':success,'result':None}.
         """
-
-        print '          ***** op_initialize'
-
         # Timeout not implemented for this op.
         timeout = content.get('timeout', None)
         if timeout is not None:
@@ -1207,7 +1135,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success': None, 'result': None}
-        success = self.fsm.on_event(NMEADeviceEvent.INITIALIZE)
+        success = self.fsm.on_event_async(NMEADeviceEvent.INITIALIZE)
 
         # Set success and send reply.
         # Unsuccessful initialize means event is not handled in the cur. state.
@@ -1241,23 +1169,26 @@ class NMEADeviceDriver(InstrumentDriver):
         # Set up the reply message and validate the configuration parameters.
         # Reply with the error message if the parameters not valid.
         reply = {'success': None, 'result': params}
+        """
         reply['success'] = self._validate_configuration(params)
 
         if InstErrorCode.is_error(reply['success']):
             yield self.reply_ok(msg, reply)
             return
-
+        """
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if  event is not handled in the current state.
-        reply['success'] = self.fsm.on_event(NMEADeviceEvent.CONFIGURE, params)
+        (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.CONFIGURE, params)
+        reply['success'] = success
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
     def op_connect(self, content, headers, msg):
         """
         Establish connection to the device.
+        @param content A dict with optional timeout: {'timeout':timeout}.
         @retval A dict {'success': success, 'result': None} giving the
-        success status of the connect operation.
+            success status of the connect operation.
         """
 
         # Timeout not implemented for this op.
@@ -1266,16 +1197,12 @@ class NMEADeviceDriver(InstrumentDriver):
             assert(isinstance(timeout, int)), 'Expected integer timeout'
             assert(timeout > 0), 'Expected positive timeout'
             pass
+        
+        reply = {'success':None, 'result':None}
 
-        # Open the logfile if configured.
-        if IO_LOG:
-            self._logfile = open(self._logfile_path, 'w', 0)
-
-        # Create the connection complete deferred and fire EVENT_CONNECT.
-        print "          ***** op_connect: calling self._process_connect"
-        reply = yield self._process_connect()
-        print "          ***** op_connect reply: %s" % reply
-
+        (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.CONNECT)        
+        reply['success'] = success
+        reply['result'] = result
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
@@ -1285,9 +1212,6 @@ class NMEADeviceDriver(InstrumentDriver):
         @retval A dict {'success': success, 'result': None} giving the
         success status of the disconnect operation.
         """
-
-        print '          ***** op_disconnect'
-
         # Timeout not implemented for this op.
         timeout = content.get('timeout', None)
         if timeout is not None:
@@ -1295,8 +1219,13 @@ class NMEADeviceDriver(InstrumentDriver):
             assert(timeout > 0), 'Expected positive timeout'
             pass
 
-        # Create the connection complete deferred and fire EVENT_DISCONNECT.
-        reply = yield self._process_disconnect()
+        reply = {'success':None,'result':None}
+
+        # Send a disconnect event and setup the reply.
+        (success,result) = yield self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT)
+        
+        reply['success'] = success
+        reply['result'] = result        
         yield self.reply_ok(msg, reply)
 
 ###########################################################################
@@ -1356,7 +1285,7 @@ class NMEADeviceDriver(InstrumentDriver):
         self._rtscts = params.get('rtscts', None)
         if not self._rtscts:
             self._rtscts = 0
-        return True
+        return configCheck
 
     def _validate_configuration(self, params):
         """
@@ -1366,7 +1295,7 @@ class NMEADeviceDriver(InstrumentDriver):
         @retval A success/fail value.
         """
 
-        print '          ***** _validate_configuration'
+        log.debug("***** _validate_configuration: %s", params)
 
         # Get required parameters.
         _port = params.get('port', None)
@@ -1436,115 +1365,6 @@ class NMEADeviceDriver(InstrumentDriver):
         self._timeout = None
         self._xonxoff = None
         self._rtscts = None
-
-    def _process_connect(self):
-        """
-        Process a connect command.
-        @retval Deferred that will fire with a reply msg on completion
-            of connect processing.
-        The reply message is a dict {'success': success, 'result': None}
-        """
-
-        # Create the connection complete deferred to be fired with
-        # a reply at the conclusion of the command.
-        d = defer.Deferred()
-        print '          ***** _process_connect assigning deferred to _connection_complete_deferred'
-        self._connection_complete_deferred = d
-
-        # Fire EVENT_CONNECT. If the event fails the state is wrong.
-        print "          ***** _process_connect about to fire a CONNECT event"
-        success = self.fsm.on_event(NMEADeviceEvent.CONNECT)
-        print "          ***** _process_connect: returned from fsm_event with: %s" % success
-        if InstErrorCode.is_error(success):
-            print "          *****  _process_connect entered the if statement"
-            reply = {'success': success, 'result': None}
-            d, self._connection_complete_deferred = self._connection_complete_deferred, None
-            d.callback(reply)
-        print "          ***** _process_connect returning d: %s" % d
-
-        return d
-
-    def _process_disconnect(self):
-        """
-        Process a disconnect command.
-        @retval A deferred that will fire with a reply message
-            on completion of the disconnect command.
-               The reply message is a dict {'success': success, 'result': None}
-        """
-
-        # Create the connection complete deferred to be fired with
-        #   a reply at the conclusion of the command.
-        d = defer.Deferred()
-        self._connection_complete_deferred = d
-
-        # Fire EVENT_DISCONNECT. If the event fails the state is wrong.
-        success = self.fsm.on_event(NMEADeviceEvent.DISCONNECT)
-        if InstErrorCode.is_error(success):
-            reply = {'success': success, 'result': None}
-            d, self._connection_complete_deferred = \
-                self._connection_complete_deferred, None
-            d.callback(reply)
-        return d
-
-
-    def _process_command(self, command_spec, event, timeout=0):
-        """
-        Process a device command.
-        Append the command to the driver command buffer and fire the event
-        associated with the arrival of the command.
-        @param command_spec a DeviceCommandSpecification
-            that describes the command to execute.
-        @param event the event to handle the command.
-        @param timeout the driver timeout after which the dr
-        iver will cancel the command and return a timeout error.
-        @retval A deferred that will be fired
-            upon conclusion of the command processing
-                with a command specific reply message.
-        """
-
-        print "          ***** _process_command is not yet defined!"
-
-        # TODO: Code _process_command for NMEADevice
-        reply = {'success': InstErrorCode.INCORRECT_STATE, 'result': None}
-        return reply
-        
-        # Create the command deferred to be returned.
-        d = defer.Deferred()
-        command_spec.deferred = d
-
-        # Add the command specification to the driver command buffer.
-        self._driver_command_buffer.append(command_spec)
-
-        # If a timeout is specified, define and position it for callback.
-        if timeout > 0:
-            def _timeoutf(cs, driver):
-                driver._debug_print('in timeout func for command '
-                    + str(cs.command))
-
-                # If this command is still active apply timeout ops.
-                # If this doesn't match, then the operation completed normally
-                # and was already popped from the buffer.
-                if len(self._driver_command_buffer) > 0:
-                    if cs == self._driver_command_buffer[0]:
-                        driver._debug_print('popping command')
-
-                        # Pop the timed out command from the buffer.
-                        self._driver_command_buffer.pop(0)
-                        # Cancel any looping wakeup.
-                        self._stop_wakeup()
-                        driver._debug_print('firing timeout')
-                        # Fire the reply deferred with timeout error.
-                        cs.do_timeout()
-
-            command_spec.timeoutf = \
-                reactor.callLater(timeout, _timeoutf, command_spec, self)
-        # Fire the command received event and return deferred.
-        if self.fsm.on_event(event):
-            return d
-        else:
-            reply = {'success': InstErrorCode.INCORRECT_STATE, 'result': None}
-            del self._driver_command_buffer[-1]
-            return reply
 
     def _get_status(self,params):
         """
@@ -1722,9 +1542,6 @@ class NMEADeviceDriver(InstrumentDriver):
             'result':{(chan_arg,param_arg):(success,val),...,
                 (chan_arg,param_arg):(success,val)}
         """
-
-        print "          ***** _get_parameters"
-
         # Set up the reply message.
         reply = {'success': None, 'result': None}
         result = {}
@@ -1800,15 +1617,8 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         Dump state and event status to stdio.
         """
-
-        if DEBUG_PRINT:
-            print self.fsm.current_state + '  ' + event
-            if isinstance(data, dict):
-                for(key, val) in data.iteritems():
-                    print                   str(key), '  ', str(val)
-            elif data != None:
-                print                       data
-
+        log.debug ("Current state: %s, Current Event: %s, Data: %s",
+                   self.fsm.current_state, event, data)
 
 class NMEA0183Protocol(basic.LineReceiver):
 
@@ -1825,12 +1635,8 @@ class NMEA0183Protocol(basic.LineReceiver):
         """
         self._serialReadMode = "ON"
         if self._serialReadMode == "OFF":
-            print "||||| NMEA data received: OFF"
+            log.info("NMEA data received: OFF")
             return
-
-        # Write the read-in line to the IO log if the log is enabled
-        if IO_LOG:
-            NMEADeviceDriver._logfile.write(line)
 
         nmeaLine = NMEA.NMEAString(line)
         lineStatus = nmeaLine.IsValid()
@@ -1841,8 +1647,8 @@ class NMEA0183Protocol(basic.LineReceiver):
             #       - Store the setence
             #       - send a data received event
             NMEADeviceDriver.data_lines.insert(0, nmeaLine)
-            NMEADeviceDriver.fsm.on_event(NMEADeviceEvent.DATA_RECEIVED)
-            print "||||| NMEA data received: %s" % nmeaLine
+            NMEADeviceDriver.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
+            log.info("NMEA data received: %s", nmeaLine)
 
         if self._serialReadMode == "1":
             self._serialReadMode = "OFF"

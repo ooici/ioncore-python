@@ -47,14 +47,6 @@ log.info ('Using PREPLANNED ROUTE GPS Simulator')
 
 log = ion.util.ionlog.getLogger(__name__)
 
-def dump_dict (d, d2 = None):
-    print
-    for (key, val) in d.iteritems():
-        if d2:
-            print key, ' ', val, ' ', d2.get(key, None)
-        else:
-            print key, ' ', val
-
 """
 Simulator dependencies required:
     LIVESFBAY:
@@ -96,21 +88,7 @@ class TestNMEADevice(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp (self):
-<<<<<<< HEAD
-=======
-        raise unittest.SkipTest('Not working yet')
-
-        print '\n          ----- setUp -----'
         yield self._start_container()
-
->>>>>>> mainline_dev
-        """
-        Prepare container and simulator for testing
-        """
-
-        log.info ('\n----- Starting setUp() -----')
-        yield self._start_container()
-
         log.info ('----- Launching simulator:  ' + sim.WHICHSIM)
         self._sim = sim()
         if self._sim.IsSimOK():
@@ -206,16 +184,17 @@ class TestNMEADevice(IonTestCase):
 
         # Establish connection to device and verify.
         log.info ('----- Establish connection')
-        reply = yield self.driver_client.connect()
-
+        try:
+            reply = yield self.driver_client.connect()
+        except Exception, ex:
+            self.fail('Could not connect to the device.')
+            
         log.info ('----- Get State after establishing connection')
         current_state = yield self.driver_client.get_state()
-        log.info ('----- Got State: %s' % current_state)
-        success = reply['success']
-        result = reply['result']
-
-        self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result, None)
+        log.info ('----- Got State: %s, reply: %s', current_state, reply)
+        
+        self.assert_ (InstErrorCode.is_ok (reply['success']))
+        self.assertEqual (reply['result'], None)
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # Dissolve the connection to the device.
@@ -227,6 +206,7 @@ class TestNMEADevice(IonTestCase):
         result = reply['result']
 
         self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual(result, None)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
         
 

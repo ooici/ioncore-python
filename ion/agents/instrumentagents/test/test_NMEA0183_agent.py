@@ -53,7 +53,6 @@ class TestNMEA0183Agent (IonTestCase):
 
     @defer.inlineCallbacks
     def setUp (self):
-        raise unittest.SkipTest('Not working yet')
 
         log.info("||||||| TestNMEA0183Agent.setUp")
 
@@ -139,15 +138,12 @@ class TestNMEA0183Agent (IonTestCase):
         # Check that the driver and client descriptions were set by spawnargs, and save them for later restore.
 
         # Begin an explicit transaciton.
-        reply = yield self.ia_client.start_transaction (0)
+        reply = yield self.ia_client.start_transaction()
         success = reply['success']
         tid = reply['transaction_id']
         self.assert_(InstErrorCode.is_ok (success))
         self.assertEqual(type (tid), str)
         self.assertEqual(len (tid), 36)
-
-        # Initialize with a bad process desc. value.
-        # This should fail and leave us in the uninitialized state with null driver and client.
 
         # Initialize with a bad client desc. value.
         # This should fail and leave us in the uninitialized state with null driver and client.
