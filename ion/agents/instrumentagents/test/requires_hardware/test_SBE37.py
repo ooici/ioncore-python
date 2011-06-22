@@ -67,8 +67,7 @@ RUN_TESTS = True if os.environ.get('LIVE_SBE37_HARDWARE',None) \
 
 
 # It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically. 
+# during development. 
 SKIP_TESTS = [
     #'test_configure',
     #'test_connect',
