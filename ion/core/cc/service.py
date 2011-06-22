@@ -67,11 +67,8 @@ class Options(usage.Options):
         Gets a list of apps/rels/scripts to run as additional arguments to the container.
         @see CapabilityContainer.start_scripts
         """
-        f = lambda x: x.endswith(".app") or x.endswith(".rel")
-        f2 = lambda x: not x.endswith(".app") and not x.endswith(".rel")
-        self['scripts'] = filter(f, args)
-        self['add_args'] = filter(f2, args)
-
+        self['scripts'] = args
+        
     def postOptions(self):
         """
         Hack to actually make the -s option work since it was never
@@ -199,8 +196,7 @@ class CapabilityContainer(service.Service):
         given the path to a file, open that file and exec the code.
         The file may be an .app, a .rel, or a python code script.
         """
-        app_args = dict(map(lambda x: x.split("=") , self.config['add_args']))
-       
+        app_args = ioninit.cont_args
         # Try two script locations, one for IDEs and another for shell.
         for script in self.config['scripts']:
             script = adjust_dir(script)
