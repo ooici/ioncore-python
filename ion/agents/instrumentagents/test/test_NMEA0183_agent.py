@@ -37,6 +37,10 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 
+from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
+    import NMEA0183SimPrePlanned as sim
+from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
+    import SERPORTSLAVE
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -56,12 +60,17 @@ class TestNMEA0183Agent (IonTestCase):
 
         log.info("||||||| TestNMEA0183Agent.setUp")
 
+        self._sim = sim()
+        if self._sim.IsSimOK():
+            log.info ('----- Simulator launched.')
+        self.assertEqual (self._sim.IsSimulatorRunning(), 1)
+        
         yield self._start_container()
 
         # Driver and agent configuration. Configuration data will ultimately be accessed via
         # some persistence mechanism: platform filesystem or a device registry.
         # For now, we pass all configuration data that would be read this way as process arguments.
-        device_port             = "/dev/slave"
+        device_port             = SERPORTSLAVE
         device_baud             = 19200
         device_bytesize         = 8
         device_parity           = 'N'
@@ -117,7 +126,7 @@ class TestNMEA0183Agent (IonTestCase):
     def tearDown (self):
         log.info("||||||| TestNMEA0183Agent.tearDown")
 
-        pu.asleep(1)
+        yield self._sim.StopSimulator()
         yield self._stop_container()
 
 
