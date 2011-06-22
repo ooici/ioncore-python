@@ -26,6 +26,11 @@ NULLPORTMODE = 'w'
 # Open a null stream to pipe unwanted console messages to nowhere
 nullDesc = open (os.devnull, NULLPORTMODE)
 
+def WaitForConnect (t):
+    timeRef = datetime.now()
+    while (datetime.now() - timeRef).seconds < t:
+        pass
+
 def DecDegToNMEAStr (dd):
     """
     Converts standard decimal degrees into NMEA's weird degree representation
@@ -446,46 +451,45 @@ class NMEA0183SimBase:
         log.info ('simBase __init__')
         self._goodComms = False
         self._workingSim = False
-        log.info ('----- Configuring the serial ports')
         self.SerialPortSetup()       # Sets up the serial port
         if not self._goodComms:
-            log.error ('----- Serial ports not configured.')
+            log.error ('Serial ports not configured.')
             return
-        log.info ('----- Serial ports configured.')
-        self.SimGPSSetup()           # Inits the local simulator or launches external
+        log.info ('Serial ports configured.')
+        self.SimGPSSetup()           # Inits the selected simulator
 
+    @defer.inlineCallbacks
     def SerialPortSetup (self):
         """
         Creates virtual serial ports then Launches the NEMA0183 GPS simulator
         @param None
         @retval True if successfully launched, False if not
         """
-        log.info ('Starting serial port setup')
         self._goodComms = False
 
         # Create the virtual serial ports
         master = 'pty,link=' + SERPORTMASTER + ',raw,echo=0'
         slave = 'pty,link=' + SERPORTSLAVE + ',raw,echo=0'
         try:
-            log.info ('----- Creating virtual serial port. Running %s...' % SOCATapp)
-            self._vsp = subprocess.Popen([SOCATapp, master, slave],
-                                        stdout = nullDesc.fileno(),
-                                        stderr = nullDesc.fileno())
+            log.info ('Creating virtual serial port. Running %s...' % SOCATapp)
+            self._vsp = subprocess.Popen ([SOCATapp, master, slave],
+                                         stdout = nullDesc.fileno(),
+                                         stderr = nullDesc.fileno())
         except OSError, e:
-            log.error ('----- Failure:  Could not create virtual serial port(s): %s' % e)
+            log.error ('Failure:  Could not create virtual serial port(s): %s' % e)
             return
-        log.info ('----- Before sleep 5')
-        sleep (1)
-        log.info ('----- After sleep 5')
-        #time.sleep (1)
+        log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
+        # yield asleep (1)
+        WaitForConnect (1)
+        log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):
             log.error ('Failure:  Unknown reason.')
             return
-        log.info ('----- Successfully created virtual serial ports. socat PID: %d'
+        log.debug ('Successfully created virtual serial ports. socat PID: %d'
             % self._vsp.pid)
         self._serMaster = os.readlink (SERPORTMASTER)
         self._serSlave = os.readlink (SERPORTSLAVE)
-        log.info ('----- Master port: %s   Slave port: %s' % (self._serMaster, self._serSlave))
+        log.debug ('Master port: %s   Slave port: %s' % (self._serMaster, self._serSlave))
         self._goodComms = True
 
     def SimGPSSetup(self):
@@ -503,9 +507,8 @@ class NMEA0183SimBase:
         @param None
         @retval None
         """
-
         self.SimShutdown()               # Stop the simulator
-        log.info ('----- Freeing the serial ports...')
+        log.debug ('Freeing the serial ports...')
 
         # If the process isn't running any more, nothing to stop
         if  self.IsSocatRunning():
@@ -513,7 +516,7 @@ class NMEA0183SimBase:
             # Force the socat app to stop
             # (Python 2.6 and later would let us send a control-C to stop it)
             os.kill (self._vsp.pid, signal.SIG_IGN)
-        log.info ('----- Socat no longer running; serial ports freed.')
+        log.debug ('Socat no longer running; serial ports freed.')
 
     def SimShutdown(self):
         """
@@ -549,6 +552,3 @@ class NMEA0183SimBase:
 
 
 #
-
-
-

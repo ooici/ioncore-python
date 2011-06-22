@@ -174,27 +174,28 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         @param None
         @retval None
         """
-
-        log.info ('Setup: Preplanned NMEA0183 Simulator')
-        
+        log.debug ('Setup: Preplanned NMEA0183 Simulator')
         self._workingSim = False
         if not self._goodComms:
             log.info ('Could not start NMEA0183 simulator: no serial comms.')
             return
 
         # Connect to the master serial port
-        log.info ('Opening %s for simulator to connect with.' % self._serMaster)
-        baud = 57600
+        log.debug ('Opening %s for simulator to connect with.' % self._serMaster)
+        baud = 19200
         try:
             self.s = SerialPort (NMEASimProtocol(),
                                  self._serMaster,
                                  reactor,
-                                 baudrate = 57600)
+                                 baudrate = 19200)
         except Exception, e:
-            log.info ('Failure: ' + e.__str__())
+            log.error ('GPS Simulator Failure: ' + e.__str__())
             return
-        log.info ('Successfuly opened  %s.' % self._serMaster)
-        #asleep (1)
+        log.debug ('Successfuly opened  %s.' % self._serMaster)
+        log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
+        # yield asleep (1)
+        sim_NMEA0183.WaitForConnect (1)
+        log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         self._workingSim = True
         self._goodComms = True
 
@@ -202,7 +203,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         self._refSecs = -1
         self._simRun = task.LoopingCall (self.NMEAOutput)
         self._simRun.start (1.0)
-        # reactor.run()
+        log.info ('GPS Simulator is now running at 1hz')
 
     def NMEAOutput(self):
         """
@@ -220,7 +221,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         self._refSecs += 1
         if self._refSecs > PATHLEN:
             self._refSecs = 0
-        log.debug ('_refSecs: %d of %d' % (self._refSecs, PATHLEN))
+        log.debug ('        GPS SIM INDEX: %d of %d' % (self._refSecs, PATHLEN))
 
         lat = simPath[self._refSecs]['lat']
         lon = simPath[self._refSecs]['lon']

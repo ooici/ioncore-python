@@ -33,7 +33,6 @@ from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
 # SELECT ONE SIMULATOR
 #   - Comment out the simulator not being used
 
@@ -46,6 +45,15 @@ from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
 log.info ('Using PREPLANNED ROUTE GPS Simulator')
 
 log = ion.util.ionlog.getLogger(__name__)
+
+# It is useful to be able to easily turn tests on and off
+# during development. Also this will ensure tests do not run
+# automatically.
+SKIP_TESTS = [
+    #'test_NMEAParser',
+    'test_configure',
+    'test_connect'
+]
 
 def dump_dict (d, d2 = None):
     print
@@ -99,15 +107,12 @@ class TestNMEADevice(IonTestCase):
         """
         Prepare container and simulator for testing
         """
-
-        log.info ('\n----- Starting setUp() -----')
         yield self._start_container()
-
-        log.info ('----- Launching simulator:  ' + sim.WHICHSIM)
         self._sim = sim()
-        if self._sim.IsSimOK():
-            log.info ('----- Simulator launched.')
         self.assertEqual (self._sim.IsSimulatorRunning(), 1)
+        if not self._sim.IsSimOK():
+            return
+        log.debug ('Test setup verified simulator is running OK')
 
         services = [{'name': 'driver_NMEA0183',
                      'module': 'ion.agents.instrumentagents.driver_NMEA0183',
@@ -116,15 +121,12 @@ class TestNMEADevice(IonTestCase):
 
         self.sup = yield self._spawn_processes (services)
         self.driver_pid = yield self.sup.get_child_id ('driver_NMEA0183')
-        self.driver_client = NMEADeviceDriverClient (proc = self.sup,
-                                                     target = self.driver_pid)
+        self.driver_client = NMEADeviceDriverClient (proc = self.sup, target = self.driver_pid)
 
     @defer.inlineCallbacks
     def tearDown (self):
         """
         """
-
-        log.info ('----- tearDown -----')
         yield self._sim.StopSimulator()
         yield self._stop_container()
 
@@ -132,45 +134,81 @@ class TestNMEADevice(IonTestCase):
         """
         Verify NMEA parsing routines.
         """
-        # Completely valid GPGGA string
-        log.info ('Verify NMEA parsing with known good GPGGA sentence:')
+        if 'test_NMEAParser' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
+        # Verify parsing of known VALID GPGGA string
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*52'
         parseNMEA = NMEA.NMEAString (testNMEA)
-        self.assertTrue(parseNMEA.IsValid())
-        
-        # Completely valid dummy string
-        log.info ('Verify NMEA parsing with defined dummy setence:')
-        testNMEA = '$XXXXX,0'
-        parseNMEA = NMEA.NMEAString(testNMEA)
-        self.assertTrue(parseNMEA.IsValid())
-        
-        # Invalid GPGGA string checksum
-        log.info ('Verify correct NMEA behavior when passed a bad NMEA checksum:')
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify parsing of known INVALID GPGGA string (has bad checksum)
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*F2'
-        parseNMEA = NMEA.NMEAString(testNMEA)
-        self.assertTrue(parseNMEA.IsValid())
-        
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify parsing of known VALID dummy string
+        testNMEA = '$XXXXX,0'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify line endings: <LF>, <CR>, <CR><LF>, and <LF><CR>
+        testNMEA = '$XXXXX,0\r'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\n'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\r\n'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\n\r'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify parsing of known VALID GPRMC string with checksum
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify parsing of known VALID GPRMC string without checksum
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify parsing of known INVVALID GPRMC (not enough fields)
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify reporting of status (PGRMC command)
+        testNMEA = '$PGRMC'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
     @defer.inlineCallbacks
     def test_configure (self):
         """
         Test driver configure functions.
         """
+
+        if 'test_configure' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
         params = self.driver_config
 
         # We should begin in the unconfigured state.
-        log.info ('----- Begin in unconfigured state')
         current_state = yield self.driver_client.get_state()
         self.assertEqual (current_state, NMEADeviceState.UNCONFIGURED)
-        log.info ('----- Driver started in unconfigured state')
 
         # Configure the driver and verify.
-        log.info        ('----- Configure the driver')
-        reply           = yield self.driver_client.configure (params)
-        log.info        ('----- Configuration sent to driver')
-        current_state   = yield self.driver_client.get_state()
-        log.info        ('----- Now in %s state' %current_state)
-        success         = reply['success']
-        result          = reply['result']
+        log.debug ('Configure the driver')
+        reply = yield self.driver_client.configure (params)
+        log.debug ('Configuration sent to driver')
+        current_state = yield self.driver_client.get_state()
+        log.debug ('Now in %s state' %current_state)
+        success = reply['success']
+        result = reply['result']
         self.assert_ (InstErrorCode.is_ok (success))
         self.assertEqual (result, params)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
@@ -180,6 +218,10 @@ class TestNMEADevice(IonTestCase):
         """
         Test driver connect to device.
         """
+
+        if 'test_connect' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping during development.')
+
         params = self.driver_config
 
         # We should begin in the unconfigured state.
@@ -197,23 +239,16 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
 
         # Establish connection to device and verify.
-        log.info ('----- Establish connection')
         reply = yield self.driver_client.connect()
-
-        log.info ('----- Get State after establishing connection')
         current_state = yield self.driver_client.get_state()
-        log.info ('----- Got State: %s' % current_state)
         success = reply['success']
         result = reply['result']
-
         self.assert_ (InstErrorCode.is_ok (success))
         self.assertEqual (result, None)
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # Dissolve the connection to the device.
-        log.info ('----- Disconnect')
         reply = yield self.driver_client.disconnect()
-        log.info ('----- Get State after disconnecting')
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
