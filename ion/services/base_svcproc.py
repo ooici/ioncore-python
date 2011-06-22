@@ -68,7 +68,7 @@ class ProcessProcessFactory(ProcessFactory):
         return receiver
 
 # Spawn of the process using the module name
-factory = ProcessProcessFactory()
+factory = ProcessProcessFactory(Process)
 
 """
 from ion.services import base_svcproc as b

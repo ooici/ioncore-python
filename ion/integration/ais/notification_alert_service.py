@@ -7,8 +7,6 @@ __author__ = 'mauricemanning'
 @brief Utility service to send email alerts for user subscriptions
 """
 
-import sys
-import traceback
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -19,7 +17,7 @@ from twisted.internet import defer
 
 from ion.core.object import object_utils
 import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory
+
 
 import string
 import smtplib
@@ -30,8 +28,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
-#from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
-from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.core.data.store import Query
@@ -42,24 +39,15 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        SUBSCRIPTION_INFO_TYPE, \
-                                                       REGISTER_USER_REQUEST_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
-                                                       GET_SUBSCRIPTION_LIST_REQ_TYPE, \
-                                                       GET_SUBSCRIPTION_LIST_RESP_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_RSP_TYPE, \
-                                                       AIS_DATASET_METADATA_TYPE
+                                                       GET_SUBSCRIPTION_LIST_RESP_TYPE
 
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 
 
-class NotificationAlertException(ApplicationError):
+class NotificationAlertError(ApplicationError):
     """
-    IdentityRegistryService exception class
+    A class for Notification exceptions 
     """
 
 class NotificationAlertService(ServiceProcess):
@@ -113,9 +101,15 @@ class NotificationAlertService(ServiceProcess):
         log.info("NotificationAlertService.handle_offline_event  Rows returned %s " % (rows,))
 
         subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
+        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
 
+        BODY = string.join(("This data resource is currently unavailable.",
+                            "",
+                            "Explanation: %s" %  msg.additional_data.error_explanation,
+                            "",
+                            "You received this notification form ION because you asked to be notified about changes to this data resource. ",
+                            "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
         #add each result row into the response message
-        i = 0
         for key, row in rows.iteritems ( ) :
             log.info("NotificationAlertService.handle_offline_event  First row data set id %s", rows[key]['data_src_id'] )
 
@@ -133,12 +127,6 @@ class NotificationAlertService(ServiceProcess):
                 FROM = 'OOI@ucsd.edu'
                 TO = tempTbl['user_email']
 
-                SUBJECT = "OOI CI Data Source Alert"
-
-                BODY = string.join(("You have subscribed to data source %s in OOI CI." % msg.additional_data.datasource_id,
-                                        "This is an alert that the data source is currently unavailable.",
-                                        "Explanation: %s" %  msg.additional_data.error_explanation), "\r\n")
-
                 body = string.join((
 
 
@@ -155,7 +143,7 @@ class NotificationAlertService(ServiceProcess):
                    log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except smtplib.SMTPException:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
-                except ex:
+                except Exception, ex:
                     log.warning('NotificationAlertService.handle_offline_event Error: %s' %str(ex))
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
@@ -165,7 +153,7 @@ class NotificationAlertService(ServiceProcess):
             #Check that the item is in the store
             log.info('NotificationAlertService.handle_update_event content   : %s', content)
 
-            msg = content['content'];
+            msg = content['content']
 
             query = Query()
             query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
@@ -174,8 +162,25 @@ class NotificationAlertService(ServiceProcess):
 
             subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
 
+            startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
+            enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
+            steps =  str(msg.additional_data.number_of_timesteps)
+            log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
+            SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+
+            BODY = string.join((
+                            "Additional data have been received.",
+                            "",
+                            "Data Source Title: %s" %  msg.additional_data.title,
+                            "Data Source URL: %s" %  msg.additional_data.url,
+                            "Start time: %s" % startdt,
+                            "End time: %s" % enddt,
+                            "Number of time steps: %s" % steps,
+                            "",
+                            "You received this notification form ION because you asked to be notified about changes to this data resource. ",
+                            "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
+
             #add each result row into the response message
-            i = 0
             for key, row in rows.iteritems ( ) :
                 log.info("NotificationAlertService.handle_update_event  First row data set id %s", rows[key]['data_src_id'] )
 
@@ -189,27 +194,10 @@ class NotificationAlertService(ServiceProcess):
                     # Send the message via our own SMTP server, but don't include the envelope header.
                     # Create the container (outer) email message.
                     log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
-                    format = "%a %b %d %H:%M:%S %Y"
-                    startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
-                    enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
-                    steps =  str(msg.additional_data.number_of_timesteps)
-                    log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
                     FROM = 'OOI@ucsd.edu'
                     TO = tempTbl['user_email']
 
-                    SUBJECT = "OOI CI Data Alert"
-
-                    BODY = string.join(("You have subscribed to data set %s in OOI CI. " % msg.additional_data.datasource_id,
-                                    "This is an alert that additional data has been received.",
-                                    "Data Source Title: %s" %  msg.additional_data.title,
-                                    "Data Source URL: %s" %  msg.additional_data.url,
-                                    "Start time: %s" % startdt,
-                                    "End time: %s" % enddt,
-                                    "Number of time steps: %s" % steps,
-                                    "To modify or remove this subscription, please access the WebUI. "), "\r\n")
-
                     body = string.join((
-
 
                         "From: %s" % FROM,
                         "To: %s" % TO,
@@ -224,7 +212,7 @@ class NotificationAlertService(ServiceProcess):
                        log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                     except smtplib.SMTPException:
                         log.info('NotificationAlertService.handle_update_event Error: unable to send email')
-                    except ex:
+                    except Exception, ex:
                         log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
                     log.info('NotificationAlertService.handle_update_event completed ')
 
@@ -241,45 +229,45 @@ class NotificationAlertService(ServiceProcess):
 
         # Check only the type received
         if content.MessageType != AIS_REQUEST_MSG_TYPE:
-            raise NotificationAlertException('Bad message type receieved, ignoring',
+            raise NotificationAlertError('Bad message type receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         # check that AisDatasetMetadataType is present in GPB
         if not content.message_parameters_reference.IsFieldSet('datasetMetadata'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         # check that subscription type enum is present in GPB
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('date_registered'):
-            raise NotificationAlertException('date_registered (provided by AIS) missing, ignoring',
+            raise NotificationAlertError('date_registered (provided by AIS) missing, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         #Check that user ids in both GPBs match - decided not to do this check as one id is for the user requesting the subscription and the other is for the user who owns the data source
         #if not (content.message_parameters_reference.subscriptionInfo.user_ooi_id == content.message_parameters_reference.datasetMetadata.user_ooi_id ):
-        #   raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+        #   raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
         #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
         log.info('NotificationAlertService.handle_update_event subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
         log.info('NotificationAlertService.handle_update_event datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
-            raise NotificationAlertException('Inconsistent data in create subscription information, ignoring',
+            raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
 
@@ -291,9 +279,8 @@ class NotificationAlertService(ServiceProcess):
         query = Query()
         query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
         rows = yield self.index_store.query(query)
-        #log.info("NotificationAlertService.FOOBAR  Rows returned from query %s " % (rows,))
+        #log.info("NotificationAlertService  Rows returned from check subscribers query %s " % (rows,))
         #add each result row into the response message
-        i = 0
         for key, row in rows.iteritems ( ) :
             if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES :
                 updateSubscriptionExists = 1
@@ -304,7 +291,7 @@ class NotificationAlertService(ServiceProcess):
                 offlineSubscriptionExists = 1
 
 
-        log.info("NotificationAlertService.FOOBAR subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
+        log.info("NotificationAlertService subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
         #add the subscription to the index store
         log.info('NotificationAlertService.op_addSubscription add attributes\n ')
         self.attributes = {'user_ooi_id':content.message_parameters_reference.subscriptionInfo.user_ooi_id,
@@ -403,15 +390,15 @@ class NotificationAlertService(ServiceProcess):
 
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
@@ -420,7 +407,7 @@ class NotificationAlertService(ServiceProcess):
         log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
 
         if not ( yield self.index_store.has_key(self.keyval) ):
-              raise NotificationAlertException('Invalid request, subscription does not exist, ignoring',
+              raise NotificationAlertError('Invalid request, subscription does not exist, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
         yield self.index_store.remove(self.keyval)
 
@@ -447,15 +434,15 @@ class NotificationAlertService(ServiceProcess):
 
         # check that subscriptionInfo is present in GPB
         if not content.message_parameters_reference.IsFieldSet('subscriptionInfo'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('user_ooi_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         if not content.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
         log.info('NotificationAlertService.op_getSubscription  Returning subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
@@ -464,7 +451,7 @@ class NotificationAlertService(ServiceProcess):
         log.info("NotificationAlertService.op_getSubscription key: %s ", self.keyval)
 
         if not ( yield self.index_store.has_key(self.keyval) ):
-            raise NotificationAlertException('Invalid request, subscription does not exist',
+            raise NotificationAlertError('Invalid request, subscription does not exist',
                                              content.ResponseCodes.BAD_REQUEST)
         query = Query()
         query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.subscriptionInfo.user_ooi_id)
@@ -526,7 +513,7 @@ class NotificationAlertService(ServiceProcess):
 
         # check that ooi_id is present in GPB
         if not content.message_parameters_reference.IsFieldSet('user_ooi_id'):
-            raise NotificationAlertException('Incomplete message format receieved, ignoring',
+            raise NotificationAlertError('Incomplete message format receieved, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)            
 
         #Check that the item is in the store

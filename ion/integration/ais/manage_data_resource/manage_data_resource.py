@@ -132,6 +132,9 @@ class ManageDataResource(object):
                                                                            HAS_A_ID, 
                                                                            DATASET_RESOURCE_TYPE_ID)
 
+                    # @TODO Must update the existing scheduled event if it exists!
+                    # May have to delete and re add?
+
                     #dataset_id = dataset_resource.ResourceIdentity
                     sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
                                                                   msg.update_start_datetime_millis,
@@ -169,7 +172,8 @@ class ManageDataResource(object):
                     dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
 
-            yield self.rc.put_instance(datasrc_resource)
+            # This could be cleaned up to go faster - only call put if it is modified!
+            yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
 
         except ReceivedApplicationError, ex:
@@ -425,6 +429,9 @@ class ManageDataResource(object):
 
 
 
+            """
+            Moved this functionality to the ingestion services where it simplifies the interactions.
+
             #event to subscribe to
             log.info('Setting handler for DatasetSupplementAddedEventSubscriber')
             self._subscriber = DatasetSupplementAddedEventSubscriber(process=self._proc, origin=my_dataset_id)
@@ -435,8 +442,7 @@ class ManageDataResource(object):
             yield self._subscriber.register()
             yield self._subscriber.initialize()
             yield self._subscriber.activate()
-
-
+            """
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
@@ -499,10 +505,11 @@ class ManageDataResource(object):
         req_msg = yield self.mc.create_instance(SCHEDULER_ADD_REQ_TYPE)
         req_msg.interval_seconds       = interval
         req_msg.start_time             = start_time
+        req_msg.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
+
         req_msg.payload                = req_msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         req_msg.payload.dataset_id     = dataset_id
         req_msg.payload.datasource_id  = datasource_id
-        req_msg.payload.desired_origin = SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
         log.info("sending request to scheduler")
         response = yield self.sc.add_task(req_msg)
@@ -570,9 +577,13 @@ class ManageDataResource(object):
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
 
-        #casrefs... hopefully this is right
-        #datasrc_resource.authentication                = msg.authentication
-        #datasrc_resource.search_pattern                = msg.search_pattern
+        if msg.IsFieldSet('authentication'):
+            log.info("Setting datasource: authentication")
+            datasrc_resource.authentication                = msg.authentication
+
+        if msg.IsFieldSet('search_pattern'):
+            log.info("Setting datasource: search_pattern")
+            datasrc_resource.search_pattern                = msg.search_pattern
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 

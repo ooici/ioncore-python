@@ -12,6 +12,7 @@ resourceID.
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+import logging
 from twisted.internet import defer
 
 from decimal import Decimal
@@ -89,6 +90,12 @@ class MetadataCache(object):
         self.rc = ResourceClient(proc = ais)
         self.ac = AssociationClient(proc = ais)
 
+        #
+        # A lock to ensure exclusive access to cache when updating
+        #
+        self.cacheLock = {}
+        self.cacheLock = defer.DeferredLock()
+
 
     @defer.inlineCallbacks
     def loadDataSets(self):
@@ -98,7 +105,7 @@ class MetadataCache(object):
         the metadata if the data set is in the Active (Private) or
         Commissioned (Public) state.
         """
-        
+
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         if dSetResults == None:
@@ -108,10 +115,14 @@ class MetadataCache(object):
         numDSets =  len(dSetResults.idrefs)          
         log.debug('Found ' + str(numDSets) + ' datasets.')
 
+        yield self.__lockCache()
+        
         i = 0
         while (i < numDSets):
-            yield self.putDSetMetadata(dSetResults.idrefs[i].key)
+            yield self.__putDSetMetadata(dSetResults.idrefs[i].key)
             i = i + 1
+
+        self.__unlockCache()
             
         defer.returnValue(True)
 
@@ -124,6 +135,8 @@ class MetadataCache(object):
         the metadata if the data source is in the Active (Private) or
         Commissioned (Public) state.
         """
+
+
         
         # Get the list of datasource resource IDs
         dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
@@ -134,14 +147,18 @@ class MetadataCache(object):
         numDSources =  len(dSourceResults.idrefs)          
         log.debug('Found ' + str(numDSources) + ' datasources.')
 
+        yield self.__lockCache()
+        
         i = 0
         while (i < numDSources):
-            yield self.putDSourceMetadata(dSourceResults.idrefs[i].key)
+            yield self.__putDSourceMetadata(dSourceResults.idrefs[i].key)
             i = i + 1
+
+        self.__unlockCache()
             
         defer.returnValue(True)
 
-
+    @defer.inlineCallbacks
     def getDSet(self, dSetID):
         """
         Get the dictionary entry containing the metadata from the data set
@@ -150,17 +167,23 @@ class MetadataCache(object):
         """
         
         log.debug('getDSet')
+
+        yield self.__lockCache()
                     
         try:
             metadata = self.__metadata[dSetID]
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
+            returnValue = metadata[DSET]
         except KeyError:
             log.error('Metadata not found for datasetID: ' + dSetID)
-            return None
+            returnValue = None
+
+        self.__unlockCache()
         
-        return metadata[DSET]
+        defer.returnValue(returnValue)
 
 
+    @defer.inlineCallbacks
     def getDSetMetadata(self, dSetID):
         """
         Get the dictionary entry containing the metadata from the data set
@@ -168,15 +191,20 @@ class MetadataCache(object):
         """
         
         log.debug('getDSetMetadata')
+
+        yield self.__lockCache()
                     
         try:
             metadata = self.__metadata[dSetID]
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
+            returnValue = metadata
         except KeyError:
             log.error('Metadata not found for datasetID: ' + dSetID)
-            return None
+            returnValue = None
+
+        self.__unlockCache()
         
-        return metadata
+        defer.returnValue(returnValue)
 
 
     @defer.inlineCallbacks
@@ -189,10 +217,14 @@ class MetadataCache(object):
         
         log.debug('putDSetMetadata')
 
-        dSet = yield self.rc.get_instance(dSetID)
-        yield self.__loadDSetMetadata(dSet)
+        yield self.__lockCache()
+
+        yield self.__putDSetMetadata(dSetID)
+
+        self.__unlockCache()
                     
     
+    @defer.inlineCallbacks
     def deleteDSetMetadata(self, dSetID):
         """
         Delete the dictionary entry for the data set represented by the given
@@ -201,14 +233,28 @@ class MetadataCache(object):
         
         log.debug('deleteDSetMetadata')
 
+        yield self.__lockCache()
+
         try:
+            #
+            # Set the persistent flag to False
+            #
+            dSetMetadata = self.__metadata[dSetID]
+            dSet = dSetMetadata[DSET]
+            dSet.Repository.persistent = False
+
             self.__metadata.pop(dSetID)
-            return True
+            returnValue = True
         except KeyError:
             log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
-            return False
+            returnValue = False
                     
+        self.__unlockCache()
+        
+        defer.returnValue(returnValue)
+
     
+    @defer.inlineCallbacks
     def getDSource(self, dSourceID):
         """
         Get the dictionary entry containing the metadata from the data source
@@ -218,32 +264,43 @@ class MetadataCache(object):
         
         log.debug('getDSource for: ' + dSourceID)
                     
+        yield self.__lockCache()
+
         try:
             metadata = self.__metadata[dSourceID]
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
+            returnValue = metadata[DSOURCE]
         except KeyError:
             log.error('Metadata not found for datasetID: ' + dSourceID)
-            return None
-        
-        return metadata[DSOURCE]
+            returnValue = None
 
-    
+        self.__unlockCache()
+            
+        defer.returnValue(returnValue)            
+        
+
+    @defer.inlineCallbacks
     def getDSourceMetadata(self, dSourceID):
         """
         Get the dictionary entry containing the metadata from the data source
         represented by the given ResourceID (dSourceID).
         """
         
+        yield self.__lockCache()
+
         log.debug('getDSourceMetadata')
                     
         try:
             metadata = self.__metadata[dSourceID]
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
+            returnValue = metadata
         except KeyError:
             log.error('Metadata not found for datasetID: ' + dSourceID)
-            return None
-        
-        return metadata
+            returnValue = None
+
+        self.__unlockCache()
+            
+        defer.returnValue(returnValue)
     
     
     @defer.inlineCallbacks
@@ -256,10 +313,14 @@ class MetadataCache(object):
         
         log.debug('putDSourceMetadata')
 
-        dSource = yield self.rc.get_instance(dSourceID)
-        self.__loadDSourceMetadata(dSource)
+        yield self.__lockCache()
+
+        dSource = yield self.__putDSourceMetadata(dSourceID)
+
+        self.__unlockCache()
                     
 
+    @defer.inlineCallbacks
     def deleteDSourceMetadata(self, dSourceID):
         """
         Delete the dictionary entry for the data source represented by the given
@@ -268,14 +329,121 @@ class MetadataCache(object):
         
         log.debug('deleteDSourceMetadata')
 
+        yield self.__lockCache()
+        
         try:
+            #
+            # Set the persistent flag to False
+            #
+            dSourceMetadata = self.__metadata[dSourceID]
+            dSource = dSourceMetadata[DSOURCE]
+            dSource.Repository.persistent = False
+
             self.__metadata.pop(dSourceID)
-            return True
+            returnValue = True
         except KeyError:
             log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
-            return False
+            returnValue = False
+
+        self.__unlockCache()
+        
+        defer.returnValue(returnValue)
+
+
+    @defer.inlineCallbacks
+    def getAssociatedSource(self, dSetID):
+        """
+        Worker class private method to get the data source that associated
+        with a given data set.  
+        """
+        log.debug('getAssociatedSource() entry')
+
+        try:
+            dSet = yield self.rc.get_instance(dSetID)
+            
+        except ResourceClientError:    
+            log.error('Error getting dataset instance for datasetID: %s!' %(dSetID))
+            defer.returnValue(None)
+            
+        try:
+            results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('Error getting associated data source for Dataset: ' + \
+                      dSet.ResourceIdentity)
+            defer.returnValue(None)
+
+        #
+        # If there is not exactly 1 associated data source, log an error and
+        # return None.  
+        #
+        if len(results) != 1:
+            log.error('Dataset %s has %d associated sources.' %(len(results)))
+            defer.returnValue(None)
+        else:
+            for association in results:
+                log.debug('Associated Source for Dataset: ' + \
+                          association.ObjectReference.key + \
+                          ' is: ' + association.SubjectReference.key)
+
+        log.debug('getAssociatedSource() exit: returning: %s' %(association.SubjectReference.key))
+
+        defer.returnValue(association.SubjectReference.key)
+
+
+    @defer.inlineCallbacks
+    def __lockCache(self):
+        """
+        Lock the cache to insure exclusive access while updating
+        """
+        
+        log.debug('__lockCache')
+        yield self.cacheLock.acquire()
+
+
+    def __unlockCache(self):
+        """
+        Lock the cache to insure exclusive access while updating
+        """
+        
+        log.debug('__unlockCache')
+        self.cacheLock.release()
+
+
+    @defer.inlineCallbacks
+    def __putDSetMetadata(self, dSetID):
+        """
+        Get the instance of the data set represented by the given resource
+        ID (dSetID) and call the private __loadDSetMetadata method with the
+        data set as an argument. 
+        """
+        
+        log.debug('__putDSetMetadata')
+
+        try:
+            dSet = yield self.rc.get_instance(dSetID)
+            yield self.__loadDSetMetadata(dSet)
+        except ResourceClientError:    
+            log.error('Data set %s (LCS: %s) being updated but was never cached!' %(dSetID, dSet.LifeCycleState))
+
     
-    
+    @defer.inlineCallbacks
+    def __putDSourceMetadata(self, dSourceID):
+        """
+        Get the instance of the data source represented by the given resource
+        ID (dSourceID) and call the private __loadDSourceMetadata method with the
+        data source as an argument. 
+        """
+        
+        log.debug('__putDSourceMetadata')
+
+        try:
+            dSource = yield self.rc.get_instance(dSourceID)
+            self.__loadDSourceMetadata(dSource)
+        except ResourceClientError:    
+            log.error('Data source %s (LCS: %s) being updated but was never cached!' %(dSetID, dSource.LifeCycleState))
+
+
     @defer.inlineCallbacks
     def __loadDSetMetadata(self, dSet):
         """
@@ -299,7 +467,7 @@ class MetadataCache(object):
             #
             dSet.Repository.persistent = True
             dSetMetadata[DSET] = dSet
-            dSetMetadata[DSOURCE_ID] = yield self.__getAssociatedSource(dSet)
+            dSetMetadata[DSOURCE_ID] = yield self.getAssociatedSource(dSet.ResourceIdentity)
             dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
             dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
             for attrib in dSet.root_group.attributes:
@@ -345,7 +513,8 @@ class MetadataCache(object):
             #
             self.__metadata[dSet.ResourceIdentity] = dSetMetadata
     
-            self.__printMetadata(dSet)
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                self.__printMetadata(dSet)
         else:
             log.info('data set ' + dSet.ResourceIdentity + ' is not Private or Public.')
 
@@ -395,7 +564,8 @@ class MetadataCache(object):
             #
             self.__metadata[dSource.ResourceIdentity] = dSourceMetadata
     
-            self.__printMetadata(dSource)
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                self.__printMetadata(dSource)
         else:
             log.info('data source ' + dSource.ResourceIdentity + ' is not Private or Public.')
 
@@ -435,30 +605,6 @@ class MetadataCache(object):
             defer.returnValue(None)
 
         defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def __getAssociatedSource(self, dSet):
-        """
-        Worker class method to get the data source that associated with a given
-        data set.  
-        """
-        log.debug('__getAssociatedSource() entry')
-
-        try:
-            results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
-
-        except AssociationClientError:
-            log.error('AssociationError')
-            defer.returnValue(None)
-
-        for association in results:
-            log.debug('Associated Source for Dataset: ' + \
-                      association.ObjectReference.key + \
-                      ' is: ' + association.SubjectReference.key)
-
-        log.debug('__getAssociatedSource() exit')
-
-        defer.returnValue(association.SubjectReference.key)
 
 
     @defer.inlineCallbacks
@@ -519,4 +665,5 @@ class MetadataCache(object):
             log.debug('value: ' + str(value))
 
     def __printObject(self, object):
-        log.debug('Object: ' + str(object))
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('Object: ' + str(object))

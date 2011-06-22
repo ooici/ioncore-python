@@ -110,9 +110,6 @@ class TestNMEADevice(IonTestCase):
         yield self._start_container()
         self._sim = sim()
         self.assertEqual (self._sim.IsSimulatorRunning(), 1)
-        if not self._sim.IsSimOK():
-            return
-        log.debug ('Test setup verified simulator is running OK')
 
         services = [{'name': 'driver_NMEA0183',
                      'module': 'ion.agents.instrumentagents.driver_NMEA0183',
@@ -239,21 +236,30 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
 
         # Establish connection to device and verify.
-        reply = yield self.driver_client.connect()
+        log.info ('----- Establish connection')
+        try:
+            reply = yield self.driver_client.connect()
+        except Exception, ex:
+            self.fail('Could not connect to the device.')
+            
+        log.info ('----- Get State after establishing connection')
         current_state = yield self.driver_client.get_state()
-        success = reply['success']
-        result = reply['result']
-        self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result, None)
+        log.info ('----- Got State: %s, reply: %s', current_state, reply)
+        
+        self.assert_ (InstErrorCode.is_ok (reply['success']))
+        self.assertEqual (reply['result'], None)
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # Dissolve the connection to the device.
+        log.info ('----- Disconnect')
         reply = yield self.driver_client.disconnect()
+        log.info ('----- Get State after disconnecting')
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 
         self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual(result, None)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
         
 

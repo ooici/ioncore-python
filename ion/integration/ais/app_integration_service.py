@@ -9,6 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+import time
 
 from ion.core.object import object_utils
 from ion.core.process.process import ProcessFactory
@@ -46,6 +47,24 @@ class AppIntegrationService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
+    # set to None to turn off timing logging, set to anything else to turn on timing logging
+    AnalyzeTiming = None
+    
+    class TimeStampsClass (object):
+        pass
+    
+    TimeStamps = TimeStampsClass()
+    
+    def TimeStamp (self):
+        TimeNow = time.time()
+        TimeStampStr = "(wall time = " + str (TimeNow) + \
+                       ", elapse time = " + str(TimeNow - self.TimeStamps.StartTime) + \
+                       ", delta time = " + str(TimeNow - self.TimeStamps.LastTime) + \
+                       ")"
+        self.TimeStamps.LastTime = TimeNow
+        return TimeStampStr
+    
+
     def __init__(self, *args, **kwargs):
 
         ServiceProcess.__init__(self, *args, **kwargs)
@@ -64,9 +83,18 @@ class AppIntegrationService(ServiceProcess):
         yield self.metadataCache.loadDataSources()
 
         log.debug('instantiating DataResourceUpdateEventSubscriber')
-        subscriber = DataResourceUpdateEventSubscriber(process = self)
-        yield subscriber.initialize()
-        yield subscriber.activate()
+        self.subscriber = DataResourceUpdateEventSubscriber(self, process = self)
+        self.register_life_cycle_object(self.subscriber)
+        
+        # create worker instances
+        self.FindDataResourcesWorker = FindDataResources(self)
+        self.GetDataResourceDetailWorker = GetDataResourceDetail(self)       
+        self.CreateDownloadURLWorker = CreateDownloadURL(self)
+        self.RegisterUserWorker = RegisterUser(self)
+        self.ManageResourcesWorker = ManageResources(self)
+        self.ManageDataResourcWworker = ManageDataResource(self)
+        self.ValidateDataResourceWorker = ValidateDataResource(self)
+        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self)
         
         
     def getMetadataCache(self):
@@ -82,9 +110,7 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResources service method.')
-        # Instantiate the worker class
-        worker = FindDataResources(self)
-        returnValue = yield worker.findDataResources(content)
+        returnValue = yield self.FindDataResourcesWorker.findDataResources(content)
         yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
@@ -98,9 +124,7 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.debug('op_findDataResourcesByUser service method.')
-        # Instantiate the worker class
-        worker = FindDataResources(self)
-        returnValue = yield worker.findDataResourcesByUser(content)
+        returnValue = yield self.FindDataResourcesWorker.findDataResourcesByUser(content)
         yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
@@ -112,8 +136,7 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_getDataResourceDetail service method')
-        worker = GetDataResourceDetail(self)
-        returnValue = yield worker.getDataResourceDetail(content)
+        returnValue = yield self.GetDataResourceDetailWorker.getDataResourceDetail(content)
         yield self.reply_ok(msg, returnValue)
 
     @defer.inlineCallbacks
@@ -125,32 +148,25 @@ class AppIntegrationService(ServiceProcess):
         """
 
         log.info('op_createDownloadURL: '+str(content))
-        worker = CreateDownloadURL(self)
-        returnValue = yield worker.createDownloadURL(content)
+        returnValue = yield self.CreateDownloadURLWorker.createDownloadURL(content)
         yield self.reply_ok(msg, returnValue)   
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):
         log.debug('op_registerUser: \n'+str(content))
-        worker = RegisterUser(self)
-        log.debug('op_registerUser: calling worker')
-        response = yield worker.registerUser(content);
+        response = yield self.RegisterUserWorker.registerUser(content);
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def op_updateUserProfile(self, content, headers, msg):
         log.debug('op_updateUserProfile: \n'+str(content))
-        worker = RegisterUser(self)
-        log.debug('op_updateUserProfile: calling worker')
-        response = yield worker.updateUserProfile(content);
+        response = yield self.RegisterUserWorker.updateUserProfile(content);
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def op_getUser(self, content, headers, msg):
         log.debug('op_getUser: \n'+str(content))
-        worker = RegisterUser(self)
-        log.debug('op_getUser: calling worker')
-        response = yield worker.getUser(content);
+        response = yield self.RegisterUserWorker.getUser(content);
         yield self.reply_ok(msg, response)
         
     def getTestDatasetID(self):
@@ -159,26 +175,20 @@ class AppIntegrationService(ServiceProcess):
     @defer.inlineCallbacks
     def op_getResourceTypes(self, content, headers, msg):
         log.debug('op_getResourceTypes: \n'+str(content))
-        worker = ManageResources(self)
-        log.debug('op_getResourceTypes: calling worker')
-        response = yield worker.getResourceTypes(content);
+        response = yield self.ManageResourcesWorker.getResourceTypes(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
     def op_getResourcesOfType(self, content, headers, msg):
         log.debug('op_getResourcesOfType: \n'+str(content))
-        worker = ManageResources(self)
-        log.debug('op_getResourcesOfType: calling worker')
-        response = yield worker.getResourcesOfType(content);
+        response = yield self.ManageResourcesWorker.getResourcesOfType(content);
         yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
     def op_getResource(self, content, headers, msg):
         log.debug('op_getResource: \n'+str(content))
-        worker = ManageResources(self)
-        log.debug('op_getResource: calling worker')
-        response = yield worker.getResource(content);
+        response = yield self.ManageResourcesWorker.getResource(content);
         yield self.reply_ok(msg, response)
 
 
@@ -188,9 +198,7 @@ class AppIntegrationService(ServiceProcess):
         @brief create a new data resource
         """
         log.debug('op_createDataResource: \n'+str(content))
-        worker = ManageDataResource(self)
-        log.debug('op_createDataResource: calling worker')
-        response = yield worker.create(content);
+        response = yield self.ManageDataResourcWworker.create(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -199,9 +207,7 @@ class AppIntegrationService(ServiceProcess):
         @brief create a new data resource
         """
         log.debug('op_updateDataResource: \n'+str(content))
-        worker = ManageDataResource(self)
-        log.debug('op_updateDataResource: calling worker')
-        response = yield worker.update(content);
+        response = yield self.ManageDataResourcWworker.update(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -210,9 +216,7 @@ class AppIntegrationService(ServiceProcess):
         @brief create a new data resource
         """
         log.debug('op_deleteDataResource: \n'+str(content))
-        worker = ManageDataResource(self)
-        log.debug('op_deleteDataResource: calling worker')
-        response = yield worker.delete(content);
+        response = yield self.ManageDataResourcWworker.delete(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -221,9 +225,7 @@ class AppIntegrationService(ServiceProcess):
         @brief validate a data resource URL
         """
         log.debug('op_validateDataResource: \n'+str(content))
-        worker = ValidateDataResource(self)
-        log.debug('op_validateDataResource: calling worker')
-        response = yield worker.validate(content);
+        response = yield self.ValidateDataResourceWorker.validate(content);
         yield self.reply_ok(msg, response)
 
 
@@ -233,9 +235,7 @@ class AppIntegrationService(ServiceProcess):
         @brief subscribe to a data resource
         """
         log.debug('op_createDataResourceSubscription: \n'+str(content))
-        worker = ManageDataResourceSubscription(self)
-        log.debug('op_createDataResourceSubscription: calling worker')
-        response = yield worker.create(content);
+        response = yield self.ManageDataResourceSubscriptionWorker.create(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -244,9 +244,7 @@ class AppIntegrationService(ServiceProcess):
         @brief find subscriptions to a data resource
         """
         log.debug('op_findDataResourceSubscriptions: \n'+str(content))
-        worker = ManageDataResourceSubscription(self)
-        log.debug('op_findDataResourceSubscriptions: calling worker')
-        response = yield worker.find(content);
+        response = yield self.ManageDataResourceSubscriptionWorker.find(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -255,9 +253,7 @@ class AppIntegrationService(ServiceProcess):
         @brief delete subscription to a data resource
         """
         log.debug('op_deleteDataResourceSubscription: \n'+str(content))
-        worker = ManageDataResourceSubscription(self)
-        log.debug('op_deleteDataResourceSubscription: calling worker')
-        response = yield worker.delete(content);
+        response = yield self.ManageDataResourceSubscriptionWorker.delete(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -266,9 +262,7 @@ class AppIntegrationService(ServiceProcess):
         @brief update subscription to a data resource
         """
         log.debug('op_updateDataResourceSubscription: \n'+str(content))
-        worker = ManageDataResourceSubscription(self)
-        log.debug('op_updateDataResourceSubscription: calling worker')
-        response = yield worker.update(content);
+        response = yield self.ManageDataResourceSubscriptionWorker.update(content);
         yield self.reply_ok(msg, response)
 
 

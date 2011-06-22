@@ -615,6 +615,9 @@ class Repository(ObjectContainer):
         output += 'Number of current workspace objects: %d \n' % len(self._workspace)
         output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
         output += 'Current context identifier for repository: %s \n' % self.convid_context
+        output += 'Cached (%s) and Persistent (%s) settings \n' % (str(self.cached), str(self.persistent))
+        output += 'Branch Nicknames: %s \n' % str(self.branchnicknames)
+
 
         if self.merge is not None:
             output += 'Repository is currently merging %d state(s)! \n' % len(self.merge)

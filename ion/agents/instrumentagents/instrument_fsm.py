@@ -61,14 +61,14 @@ class InstrumentFSM():
         @retval Success/fail if the event was handled by the current state.
         """
         
-        (success,next_state) = self.state_handlers[self.current_state](event,params)
+        (success,next_state,result) = self.state_handlers[self.current_state](event,params)
         
         
         #if next_state in self.states:
         if self.states.has(next_state):
             self._on_transition(next_state,params)
                 
-        return success
+        return (success,result)
 
     @defer.inlineCallbacks
     def on_event_async(self,event,params=None):
@@ -81,14 +81,13 @@ class InstrumentFSM():
         @retval Success/fail if the event was handled by the current state.
         """
         
-        (success,next_state) = yield self.state_handlers[self.current_state](event,params)
-        
+        (success,next_state,result) = yield self.state_handlers[self.current_state](event,params)
         
         #if next_state in self.states:
         if self.states.has(next_state):
             yield self._on_transition_async(next_state,params)
                 
-        defer.returnValue(success)
+        defer.returnValue((success,result))
 
             
     def _on_transition(self,next_state,params):
@@ -117,5 +116,4 @@ class InstrumentFSM():
         yield self.state_handlers[self.current_state](self.exit_event,params)
         self.previous_state = self.current_state
         self.current_state = next_state
-        yield self.state_handlers[self.current_state](self.enter_event,params)
-        
+        yield self.state_handlers[self.current_state](self.enter_event,params)        

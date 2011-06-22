@@ -38,10 +38,12 @@ from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
 
+# despite being from services.dm this is safe - events should be moved to core sometime soon! @TODO
+from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
+
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
 from ion.core.ioninit import request
-import pprint
 
 CONF = ioninit.config(__name__)
 CF_fail_fast = CONF['fail_fast']
@@ -186,6 +188,10 @@ class Process(BasicLifecycleObject):
         self.connectors = []
         self.listeners = []
 
+        # publisher for lifecycle change notifications
+        self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
+        self.add_life_cycle_object(self._plcc_pub)
+
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
 
@@ -245,14 +251,6 @@ class Process(BasicLifecycleObject):
         if len(self._registered_life_cycle_objects) > pre_init_lco_len:
             log.debug("NEW LCOS ADDED DURING INIT")
             yield self._advance_life_cycle_objects(BasicStates.S_READY)
-
-        # create plc change publisher
-        from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
-        self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
-
-        # manually move through initialize, then add to registered LCOs so we don't have to advance manually anymore
-        yield self._plcc_pub.initialize()
-        yield self.register_life_cycle_object(self._plcc_pub)
 
         # publish initialize -> ready transition
         yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.READY)
@@ -675,17 +673,11 @@ class Process(BasicLifecycleObject):
 
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
-            log.exception("*****Non Conversation Application error in message processing*****")
-            log.error('*** Message payload received:')
-            log.error(pprint.pprint(payload))
-
-            if log.getEffectiveLevel() <= logging.INFO:
-                log.error('*** Message Content: \n \n')
-                log.error(str(payload.get('content', '## No Content! ##')))
-
-            log.error("*****End Non Conversation Application error in message processing*****")
-
-
+            if log.getEffectiveLevel() <= logging.INFO:    # only output all this stuff when debugging
+                log.exception("*****Non Conversation Application error in message processing*****")
+                log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
+                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
+                log.error("*****End Non Conversation Application error in message processing*****")
 
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
@@ -695,16 +687,11 @@ class Process(BasicLifecycleObject):
         except Exception, ex:
             # *** PROBLEM. Here the conversation is in ERROR state
 
-            log.exception("*****Non Conversation Container error in message processing*****")
-            log.error('*** Message payload received:')
-            log.error(pprint.pprint(payload))
-
+            log.exception("*****Non Conversation Application error in message processing*****")
+            log.error('*** Message Payload which cause the error: \n%s' % pu.pprint_to_string(headers))
             if log.getEffectiveLevel() <= logging.WARN:
-                log.error('*** Message Content: \n \n')
-                log.error(str(payload.get('content', '## No Content! ##')))
-
-            log.error("*****End Non Conversation Container error in message processing*****")
-
+                log.error('*** Message Content: \n%s' % str(headers.get('content', '## No Content! ##')))
+            log.error("*****End Non Conversation Application error in message processing*****")
 
             # @todo Should we send an err or rather reject the msg?
             # @note We can only send a reply_err to an RPC
@@ -823,15 +810,13 @@ class Process(BasicLifecycleObject):
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf():
             log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,conv.conv_id))
-            p_headers = StringIO.StringIO()
-            pprint.pprint(headers, stream=p_headers)
-            p_content = StringIO.StringIO()
-            pprint.pprint(content, stream=p_content)
+            p_headers = pu.pprint_to_string(headers)
+            p_content = pu.pprint_to_string(content)
 
             log.info('Timedout Message Receive: %s' % recv)
-            log.info('Timedout Message Headers: %s' % p_headers.getvalue())
+            log.info('Timedout Message Headers: %s' % p_headers)
             log.info('Timedout Message Operation: %s' % operation)
-            log.info('Timedout Message Content: %s' % p_content.getvalue())
+            log.info('Timedout Message Content: %s' % p_content)
 
             # Remove RPC. Delayed result will go to catch operation
             conv.timeout = str(pu.currenttime_ms())

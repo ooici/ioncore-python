@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+
+"""
+@file ion/integration/eoi/epu_controller_list/controller_list_client.py
+@brief Provides client interface to controller_list service that provides a
+       list of active EPU Controller service names in the system
+"""
+
+import sys
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -18,7 +27,13 @@ class EPUControllerListClient(ServiceClient):
         """Query the EPUControllerListService
         """
         yield self._check_init()
-        log.debug("Sending EPU controller list query")
+        if 'ion.integration.ais.test.test_app_integration' in sys.modules.keys():
+            log.debug("controller_list_client.list: Returning static list for AIS unit testing")
+            defer.returnValue(['dataservices_epu_controller',
+                               'agentservices_epu_controller',
+                               'associationservices_epu_controller'])
+        log.debug("controller_list_client.list: Sending EPU controller list query")
         (content, headers, msg) = yield self.rpc_send('list', {})
+        log.debug("controller_list_client.list: list returned "+str(content))
         defer.returnValue(content)
 
