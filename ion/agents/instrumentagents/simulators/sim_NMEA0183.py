@@ -4,14 +4,13 @@
 @brief Base class for GPS simulators that output NMEA0183 GPS to a local virtual serial port.
 @author Alon Yaari
 """
-
-from time import sleep
 import os
 import signal
+import time
 from twisted.internet import defer, reactor
 from datetime import datetime
 import subprocess
-from ion.util.procutils import asleep
+import ion.util.procutils as pu
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -28,10 +27,9 @@ ON = 'On'
 # Open a null stream to pipe unwanted console messages to nowhere
 nullDesc = open (os.devnull, NULLPORTMODE)
 
+
 def WaitForConnect (t):
-    timeRef = datetime.now()
-    while (datetime.now() - timeRef).seconds < t:
-        pass
+    time.sleep(t)
 
 def DecDegToNMEAStr (dd):
     """
@@ -481,7 +479,7 @@ class NMEA0183SimBase:
             log.error ('Failure:  Could not create virtual serial port(s): %s' % e)
             return
         log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
-        #yield asleep (1)
+        #yield pu.asleep(1)
         yield WaitForConnect (1)
         log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):

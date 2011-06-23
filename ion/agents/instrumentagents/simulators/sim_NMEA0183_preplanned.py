@@ -23,12 +23,13 @@
 """
 
 from datetime import datetime
-from twisted.internet import task, reactor
+from twisted.internet import task, reactor, defer
 from twisted.internet.serialport import SerialPort
 import sim_NMEA0183
 from gpsSimPath import simPath
 from twisted.protocols import basic
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
+import ion.util.procutils as pu
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -168,6 +169,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         log.debug ('Preplanned __init__')
         sim_NMEA0183.NMEA0183SimBase.__init__ (self)
 
+    @defer.inlineCallbacks
     def SimGPSSetup (self):
         """
         Initialize preplanned route GPS simulator
@@ -193,8 +195,8 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
             return
         log.debug ('Successfuly opened  %s.' % self._serMaster)
         log.debug ('Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
-        # yield asleep (1)
-        sim_NMEA0183.WaitForConnect (1)
+        #yield pu.asleep (1)
+        yield sim_NMEA0183.WaitForConnect (1)
         log.debug ('After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         self._workingSim = True
         self._goodComms = True
