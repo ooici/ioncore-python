@@ -339,6 +339,7 @@ class TestNMEADevice(IonTestCase):
         newParams[NMEADeviceChannel.GPS, 'PGRMF'] = OFF
         newParams[NMEADeviceChannel.GPS, 'PGRMC'] = OFF
         reply = yield self.driver_client.set (newParams, timeout)
+        log.debug("*** reply: %s", reply)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']

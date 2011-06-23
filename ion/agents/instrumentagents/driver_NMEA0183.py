@@ -163,26 +163,26 @@ class CfgNMEADevice(object):
                  'PGRMF':        'OFF',
                  'PGRMC':        'OFF',
                  'FIX_MODE':     'A',
-                 'ALT_MSL':      '',
+                 'ALT_MSL':      '0.0',
                  'E_DATUM':      '100',
-                 'SM_AXIS':      '',
-                 'DATUMIFF':     '',
-                 'DATUM_DX':     '',
-                 'DATUM_DY':     '',
-                 'DATUM_DZ':     '',
+                 'SM_AXIS':      '6360000.0',
+                 'DATUMIFF':     '285.0',
+                 'DATUM_DX':     '-5000.0',
+                 'DATUM_DY':     '-5000.0',
+                 'DATUM_DZ':     '-5000.0',
                  'DIFFMODE':     'A',
                  'BAUD_RT':      '5',
-                 'IGNORE':       '',
+                 'VEL_FILT':     '0',
                  'MP_OUT':       '1',
                  'MP_LEN':       '0',
-                 'DED_REC':      '1.0'}
+                 'DED_REC':      '1'}
     defParams = cfgParams
 
     def __init__(self):
         pass
-
+    
     def GetCurStatus(self, param):
-        return CfgNMEADevice.cfgParams.get(param)
+        return cfgParams.get(param)
 
     def SetSentences(self, toSet):
         assert(isinstance(toSet, dict)), 'Expected dict content.'
@@ -202,7 +202,7 @@ class CfgNMEADevice(object):
                 log.debug('Written to GPS: %s' % toWrite)
 
     def _BuildPGRMO(self, NMEA_CD, toSet):
-        if NMEA_CD in CfgNMEADevice.validSet and toSet in [ON, OFF]:
+        if NMEA_CD in self.validSet and toSet in [ON, OFF]:
             str = ['PGRMO']
             if toSet == OFF:
                 setVal = 0
@@ -227,50 +227,50 @@ class CfgNMEADevice(object):
 
     # 1 --- Fix Mode ------------------------------------
         x = 'FIX_MODE'
-        c = toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x]))[0]
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
         if 'A23'.find(c) > -1:
             str.append(c)
         else:
-            str.append(CfgNMEADevice.defParams['FIX_MODE'])
+            str.append(self.defParams['FIX_MODE'])
 
     # 2 --- Alt above/below MSL -------------------------
         x = 'ALT_MSL'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if -1500.0 > f or f > 18000.0:
             f = 0.0
         str.append('%.1f' % f)
 
     # 3 --- Earth Datum Index ---------------------------
         x = 'E_DATUM'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 0 or i > 109:
             i = 0
         str.append('%d' % i)
 
     # 4 --- User earth datum ----------------------------
         x = 'SM_AXIS'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if f < 6360000.0 or f > 6380000.0:
             f = 6360000.0
         str.append('%.3f' % f)
 
     # 5 --- User earth datum inverse flattening factor --
         x = 'DATUMIFF'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if f < 285.0 or f > 310.0:
             f = 285.0
         str.append('%.1f' % f)
 
     # 6 --- User earth datum delta X --------------------
         x = 'DATUM_DX'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if f < -5000.0 or f > 5000.0:
             f = -5000.0
         str.append('%.3f' % f)
 
     # 7 --- User earth datum delta Y --------------------
         x = 'DATUM_DY'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if f < -5000.0 or f > 5000.0:
             f = -5000.0
         str.append('%.3f' % f)
@@ -278,52 +278,52 @@ class CfgNMEADevice(object):
 
     # 8 --- User earth datum delta Z --------------------
         x = 'DATUM_DZ'
-        f = float(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if f < -5000.0 or f > 5000.0:
             f = -5000.0
         str.append('%.3f' % f)
 
     # 9 --- Differential mode ---------------------------
         x = 'DIFFMODE'
-        c = toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x]))[0]
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
         if 'AD'.find(c) > -1:
             str.append(c)
         else:
-            str.append (CfgNMEADevice.defParams['DIFFMODE'])
+            str.append (self.defParams['DIFFMODE'])
 
     # 10 -- NMEA 0183 Baud rate -------------------------
         x = 'BAUD_RT'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 1 or i > 8:
-            i = CfgNMEADevice.defParams['BAUD_RT']
+            i = self.defParams['BAUD_RT']
         str.append('%d' % i)
 
     # 11 -- Velocity Filter -----------------------------
         x = 'VEL_FILT'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 0 or i > 255:
-            i = CfgNMEADevice.defParams["VEL_FILT"]
+            i = self.defParams["VEL_FILT"]
         str.append('%d' % i)
 
     # 12 -- Measurement Pulse Output --------------------
         x = 'MP_OUT'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 1 or i > 2:
-            i = CfgNMEADevice.defParams['MP_OUT']
+            i = self.defParams['MP_OUT']
         str.append('%d' % i)
 
     # 13 -- Measurement Pulse Output Length -------------
         x = 'MP_LEN'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 0 or i > 48:
-            i = CfgNMEADevice.defParams['MP_LEN']
+            i = self.defParams['MP_LEN']
         str.append('%d' % i)
 
     # 14 -- Dead reckoning valid time -------------------
         x = 'DED_REC'
-        i = int(toSet.get(x, CfgNMEADevice.cfgParams.get(x, CfgNMEADevice.defParams[x])))
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
         if i < 1 or i > 30:
-            i = CfgNMEADevice.defParams['DED_REC']
+            i = self.defParams['DED_REC']
         str.append('%d' % i)
 
         coreStr = ','.join (str)
@@ -353,6 +353,13 @@ class NMEADeviceDriver(InstrumentDriver):
 
     def __init__(self, *args, **kwargs):
         InstrumentDriver.__init__(self, *args, **kwargs)
+
+        """
+        The standing NMEA configuration that knows how to send itself
+        to the device.
+        """
+        self._device_NMEA_config = CfgNMEADevice()
+        
         # Reading mode
         self._serialReadMode = OFF
         # Com port of the device serial server. ex: '/dev/slave'
@@ -512,7 +519,7 @@ class NMEADeviceDriver(InstrumentDriver):
             yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
-            self._getConnected()
+            yield self._getConnected()
 
         elif event == NMEADeviceEvent.EXIT:
             pass
@@ -611,20 +618,19 @@ class NMEADeviceDriver(InstrumentDriver):
             next_state = NMEADeviceState.DISCONNECTING
 
         elif event == NMEADeviceEvent.GET:
-            result = self._get_parameters(params)
+            result =  self._get_parameters(params)
             success = result['success']
             result = result['result']
 
         elif event == NMEADeviceEvent.SET:
-            result = yield self._set_parameters(params)
+            result = self._set_parameters(params)
             success = result['success']
             result = result['result']
-
             # Publish any config changes caused by a successful set
             if any(result.values()):
                 log.debug('Driver: Device configuration modified by set')
-                config = self._get_params([(NMEADeviceChannel.GPS,
-                                           NMEADeviceParam.ALL)])
+                config = self._get_parameters([(NMEADeviceChannel.GPS,
+                                                NMEADeviceParam.ALL)])
                 content = {'type': DriverAnnouncement.CONFIG_CHANGE,
                            'transducer': NMEADeviceChannel.GPS,
                            'value': config}
@@ -822,20 +828,20 @@ class NMEADeviceDriver(InstrumentDriver):
             log.debug("Driver's Serial connection failed: %s", e)
             connectionResult = NMEADeviceEvent.CONNECTION_FAILED
         log.debug("Serial connection result: %s", connectionResult)
-        yield self.fsm.on_event_async(connectionResult)
+        (success, result) = yield self.fsm.on_event_async(connectionResult)
 
     def _update_initial_params(self):
         """
         Sets configuration parameters on connection with the device
         """
         # First turn off all sentences
-        CfgNMEADevice.SetSentences({'ALL': OFF})
+        self._device_NMEA_config.SetSentences({'ALL': OFF})
 
         # Now turn on only GPGGA
-        CfgNMEADevice.SetSentences({'GPGGA': ON})
+        self._device_NMEA_config.SetSentences({'GPGGA': ON})
 
         # Now configure all the default settings
-        CfgNMEADevice.SendConfigToDevice(CfgNMEADevice.cfgParams)
+        self._device_NMEA_config.SendConfigToDevice(self._device_NMEA_config.cfgParams)
 
     @defer.inlineCallbacks
     def _getDisconnected(self):
@@ -853,7 +859,7 @@ class NMEADeviceDriver(InstrumentDriver):
             connectionResult = NMEADeviceEvent.CONNECTION_COMPLETE
 
         log.debug("Serial connection result: %s", connectionResult)
-        yield self.fsm.on_event_async(connectionResult)
+        (success, result) = yield self.fsm.on_event_async(connectionResult)
         
     def gotDisconnected(self, instrument):
         """
@@ -1081,10 +1087,20 @@ class NMEADeviceDriver(InstrumentDriver):
             {'success':success,'result':
                 {(chan_arg,param_arg):success,...,chan_arg,param_arg):success}}.
         """
+        assert(isinstance(content, dict)), 'Expected dict content'
+        params = content.get('params', None)
+        assert(isinstance(params, dict)), 'Expected dict of param/values'
+        timeout = content.get('timeout', None)
+        if timeout:
+            assert(isinstance(timeout, int)), 'Expected integer timeout'
+            assert(timeout > 0), 'Expected positive timeout'
+        reply = {'success': None, 'result': None}
 
-        # TODO:  Write code for op_set
-        #yield self.reply_ok(msg, reply)
-        yield
+        # Send get event and set up for a reply
+        (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.SET, params)
+        reply['success'] = success
+        reply['result'] = result
+        yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
     def op_execute_direct(self, content, headers, msg):
@@ -1317,7 +1333,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
 
         # Get current state from the state machine and reply.
-        cur_state = self.fsm.current_state
+        cur_state = self.fsm.get_current_state()
         yield self.reply_ok(msg, cur_state)
 
 ###########################################################################
@@ -1346,7 +1362,7 @@ class NMEADeviceDriver(InstrumentDriver):
         # Validate configuration.
         configCheck = self._validate_configuration(params)
         if InstErrorCode.is_error(configCheck):
-            return False
+            return configCheck
 
         # Set configuration parameters.
         self._port = params['port']
@@ -1417,7 +1433,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         self._protocol = NMEA0183Protocol()
         self._serialReadMode = OFF  # Ignore incoming NMEA lines
-        CfgNMEADevice.cfgParams = CfgNMEADevice.defParams
+        self._device_NMEA_config.cfgParams = self._device_NMEA_config.defParams
         self._port = None
         self._baudrate = None
         self._bytesize = None
@@ -1499,7 +1515,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
                 if arg == NMEADeviceCapability.DEVICE_PARAMS or all:
                     result[NMEADeviceCapability.DEVICE_PARAMS] = \
-                      (InstErrorCode.OK, CfgNMEADevice.defParams.keys())
+                      (InstErrorCode.OK, self._device_NMEA_config.defParams.keys())
 
                 if arg == NMEADeviceCapability.DEVICE_STATUSES or all:
                     result[NMEADeviceCapability.DEVICE_STATUSES] = \
@@ -1563,7 +1579,7 @@ class NMEADeviceDriver(InstrumentDriver):
         Return a dict with all driver parameters.
         """
         paramdict = dict(map(lambda x:(x[0], x[1]['value']),
-                             CfgNMEADevice.defParams.items()))
+                             self._device_NMEA_config.defParams.items()))
         return paramdict
 
     ###########################################################################
@@ -1578,26 +1594,28 @@ class NMEADeviceDriver(InstrumentDriver):
             @retval reply dict {'success':InstErrorCode,
                 'result':{(chan,param):InstErrorCode,...,(chan,param):InstErrorCode}
         """
-        reply = dict (success = None, result = None)
+        reply = {'success':None, 'result':None}
         result = {}
         set_errors = False
 
-        for (chan, param) in params:
+        for (chan, param) in params.keys():
             val = params[(chan, param)]
-            if CfgNMEADevice.defParams.get(param):
-                if param in CfgNMEADevice.validSet:
+            log.debug("*** cfgParams: %s", self._device_NMEA_config.cfgParams)
+            log.debug("*** defParams: %s", self._device_NMEA_config.defParams)
+            if self._device_NMEA_config.defParams.get(param):
+                if param in self._device_NMEA_config.validSet:
                     if val in [ON, OFF]:
-                        CfgNMEADevice.SetSentences({param: val})
+                        self._device_NMEA_config.SetSentences({param: val})
+                        self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
-                        CfgNMEADevice.cfgParams[param] = val
                     else:
                         result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
                         set_errors = True
                 else:
-                    if val in CfgNMEADevice.cfgParams:
-                        CfgNMEADevice.SendConfigToDevice({param: val})
+                    if val in self._device_NMEA_config.cfgParams:
+                        self._device_NMEA_config.SendConfigToDevice({param: val})
+                        self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
-                        CfgNMEADevice.cfgParams[param] = val
                     else:
                         result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
                         set_errors = True
@@ -1609,7 +1627,7 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             reply['success'] = InstErrorCode.OK
         reply['result'] = result
-        defer.returnValue(reply)
+        return reply
 
     def _get_parameters(self, params):
         """
@@ -1628,13 +1646,12 @@ class NMEADeviceDriver(InstrumentDriver):
 
         for(chan, param) in params:
             chan = NMEADeviceChannel.GPS        # GPS only has one channel
-            if param == 'all':
-                for (key, val) in CfgNMEADevice.cfgParams.iteritems():
-                    result[chan, key] =(InstErrorCode.OK, val['value'])
-
+            if param == NMEADeviceParam.ALL:
+                for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
+                    result[(chan, key)] = (InstErrorCode.OK, val)
             # Retrieve named channel-parameters
             else:
-                val = CfgNMEADevice.cfgParams.get(param)
+                val = self._device_NMEA_config.cfgParams.get(param)
                 if val:
                     result[(chan, param)] = (InstErrorCode.OK, val)
                 else:
