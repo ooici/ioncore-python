@@ -81,10 +81,11 @@ hardware tests to run.
 RUN_TESTS = True if os.environ.get('LIVE_SBE37_HARDWARE',None) \
     == 'available' else False
 
+PRINT_PUBLICATIONS = True if os.environ.get('PRINT_PUBLICATIONS',None) \
+    == 'True' else False
 
 # It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically. 
+# during development. 
 SKIP_TESTS = [
     #'test_execute_instrument',
     #'test_state_transitions',
@@ -93,7 +94,7 @@ SKIP_TESTS = [
 ]    
 
 
-PRINT_PUBLICATIONS = (True, False)[0]
+#PRINT_PUBLICATIONS = (True, False)[0]
 
 class TestSBE37Agent(IonTestCase):
 
