@@ -952,8 +952,13 @@ class Wrapper(object):
 
         self.ReadOnly = True
         for link in self.ChildLinks:
-            child = self.Repository.get_linked_object(link)
-            child.SetStructureReadOnly()
+            try:
+                child = self.Repository.get_linked_object(link)
+                child.SetStructureReadOnly()
+            except KeyError:
+                # we're just setting things read only, don't worry if we couldn't get part of it.
+                # this is intentionally happening in ingestion
+                pass
 
     @GPBSource
     def SetStructureReadWrite(self):
