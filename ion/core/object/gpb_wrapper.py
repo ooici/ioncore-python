@@ -435,12 +435,12 @@ class WrapperType(type):
         #--------------------------------------------------------------#
         if obj_type == LINK_TYPE:
             @_gpb_source
-            def obj_setlink(self, value):
+            def obj_setlink(self, value, ignore_copy_errors=False):
                 if self.Invalid:
                     raise OOIObjectError(
                         'Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
-                self.Repository.set_linked_object(self, value)
+                self.Repository.set_linked_object(self, value, ignore_copy_errors=ignore_copy_errors)
                 if not self.Modified:
                     self._set_parents_modified()
                 return
@@ -1608,14 +1608,14 @@ class ContainerWrapper(object):
 
 
     @GPBSourceCW
-    def SetLink(self, key, value):
+    def SetLink(self, key, value, ignore_copy_errors=False):
         if not isinstance(value, Wrapper):
             raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
 
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
         if item.ObjectType == LINK_TYPE:
-            self.Repository.set_linked_object(item, value)
+            self.Repository.set_linked_object(item, value, ignore_copy_errors)
         else:
             raise OOIObjectError(
                 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')

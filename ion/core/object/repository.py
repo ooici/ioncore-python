@@ -1514,7 +1514,7 @@ class Repository(ObjectContainer):
         defer.returnValue(res)
     '''
     
-    def copy_object(self, value, deep_copy=True):
+    def copy_object(self, value, deep_copy=True, ignore_copy_errors=False):
         """
         Copy an object. This method will serialize the current state of the value.
         Then read it back in as new objects in the repository. The copies will all be
@@ -1555,9 +1555,16 @@ class Repository(ObjectContainer):
             for link in new_obj.ChildLinks:
                 # Use the copies link to get the child - possibly from a different repo!
 
-                child = self.get_linked_object(link)
-                new_child = self.copy_object(child, True)
-                link.SetLink(new_child)
+                try:
+                    child = self.get_linked_object(link)
+                    new_child = self.copy_object(child, True)
+                    link.SetLink(new_child)
+                except KeyError, ke:
+                    if ignore_copy_errors:
+                        log.debug("Copy Object: ignored unfound child link %s" % link)
+                    else:
+                        # reraise
+                        raise ke
 
         log.debug('Copy Object: Complete')
 
@@ -1565,7 +1572,7 @@ class Repository(ObjectContainer):
     
     
         
-    def set_linked_object(self,link, value):        
+    def set_linked_object(self,link, value, ignore_copy_errors=False):
         # If it is a link - set a link to the value in the wrapper
         if link.ObjectType != LINK_TYPE:
             # Should never happen - checked in the caller...
@@ -1584,7 +1591,7 @@ class Repository(ObjectContainer):
         
         # if this value is from another repository... you need to load it from the hashed objects into this repository
         if not value.Repository is self:
-            value = self.copy_object(value)
+            value = self.copy_object(value, ignore_copy_errors=ignore_copy_errors)
         
         
         if link.key == value.MyId:

@@ -885,7 +885,7 @@ class IngestionService(ServiceProcess):
                 log.info('Variable %s does not yet exist in the dataset!' % var_name)
 
                 v_link = root.variables.add()
-                v_link.SetLink(merge_var)
+                v_link.SetLink(merge_var, ignore_copy_errors=True)
 
                 log.info('Copied Variable %s into the dataset!' % var_name)
                 continue # Go to next variable...
