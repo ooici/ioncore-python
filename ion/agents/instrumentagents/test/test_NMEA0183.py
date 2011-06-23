@@ -29,7 +29,6 @@ from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
     import SERPORTSLAVE, OFF, ON
 
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -45,16 +44,6 @@ from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
 log.info ('Using PREPLANNED ROUTE GPS Simulator')
 
 log = ion.util.ionlog.getLogger(__name__)
-
-# It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically.
-SKIP_TESTS = [
-    'test_NMEAParser',
-    # 'test_configure',
-    'test_connect',
-    'test_get_set'
-]
 
 def dump_dict (d, d2 = None):
     print
@@ -140,9 +129,6 @@ class TestNMEADevice(IonTestCase):
         """
         Verify NMEA parsing routines.
         """
-        if 'test_NMEAParser' in SKIP_TESTS:
-            raise unittest.SkipTest ('Skipping test_NMEAParser during development.')
-
         # Verify parsing of known VALID GPGGA string
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*52'
         parseNMEA = NMEA.NMEAString (testNMEA)
@@ -199,9 +185,6 @@ class TestNMEADevice(IonTestCase):
         """
         Test driver configure functions.
         """
-        if 'test_configure' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping test_configure during development.')
-
         # We should begin in the unconfigured state.
         log.debug ('Verifying driver is UNCONFIGURED state')
         current_state = yield self.driver_client.get_state()
@@ -234,9 +217,6 @@ class TestNMEADevice(IonTestCase):
         """
         Test driver connect to device.
         """
-        if 'test_connect' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping test_connect during development.')
-
         # We should begin in the unconfigured state.
         log.debug ('Verifying driver is UNCONFIGURED state')
         current_state = yield self.driver_client.get_state()
@@ -299,9 +279,6 @@ class TestNMEADevice(IonTestCase):
         """
         Test driver get/set methods with device.
         """
-        if 'test_connect' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping test_connect during development.')
-
         # We should begin in the unconfigured state.
         log.debug ('Verifying driver is UNCONFIGURED state')
         current_state = yield self.driver_client.get_state()
@@ -335,7 +312,7 @@ class TestNMEADevice(IonTestCase):
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-        gpsParams = { (NMEADeviceChannel.GPS, 'GPGGA'),
+        gpsParams = [ (NMEADeviceChannel.GPS, 'GPGGA'),
                       (NMEADeviceChannel.GPS, 'GPGLL'),
                       (NMEADeviceChannel.GPS, 'GPRMC'),
                       (NMEADeviceChannel.GPS, 'PGRMF'),
@@ -347,7 +324,7 @@ class TestNMEADevice(IonTestCase):
                       (NMEADeviceChannel.GPS, 'BAUD_RT'),
                       (NMEADeviceChannel.GPS, 'MP_OUT'),
                       (NMEADeviceChannel.GPS, 'MP_LEN'),
-                      (NMEADeviceChannel.GPS, 'DED_REC')}
+                      (NMEADeviceChannel.GPS, 'DED_REC')]
         self.assert_ (InstErrorCode.is_ok (success))
         self.assertEqual (gpsParams.sort(), result.keys().sort())
         self.assertEqual (all (map (lambda x: x[1] != None, result.values())), True)
