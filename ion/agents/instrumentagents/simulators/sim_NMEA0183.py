@@ -481,8 +481,8 @@ class NMEA0183SimBase:
             log.error ('Failure:  Could not create virtual serial port(s): %s' % e)
             return
         log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
-        # yield asleep (1)
-        WaitForConnect (1)
+        #yield asleep (1)
+        yield WaitForConnect (1)
         log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):
             log.error ('Failure:  Unknown reason.')

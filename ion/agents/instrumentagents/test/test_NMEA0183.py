@@ -107,7 +107,7 @@ class TestNMEADevice(IonTestCase):
         """
         yield self._start_container()
         self._sim = sim()
-        self.assertEqual (self._sim.IsSimulatorRunning(), 1)
+        self.assertTrue (self._sim.IsSimulatorRunning())
 
         services = [{'name': 'driver_NMEA0183',
                      'module': 'ion.agents.instrumentagents.driver_NMEA0183',
@@ -122,7 +122,8 @@ class TestNMEADevice(IonTestCase):
     def tearDown (self):
         """
         """
-        yield self._sim.StopSimulator()
+        self._sim.StopSimulator()
+        self.assertFalse(self._sim.IsSimulatorRunning())
         yield self._stop_container()
 
     def test_NMEAParser (self):
