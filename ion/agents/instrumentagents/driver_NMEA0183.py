@@ -1600,8 +1600,6 @@ class NMEADeviceDriver(InstrumentDriver):
 
         for (chan, param) in params.keys():
             val = params[(chan, param)]
-            log.debug("*** cfgParams: %s", self._device_NMEA_config.cfgParams)
-            log.debug("*** defParams: %s", self._device_NMEA_config.defParams)
             if self._device_NMEA_config.defParams.get(param):
                 if param in self._device_NMEA_config.validSet:
                     # Do PGRMO stuff here

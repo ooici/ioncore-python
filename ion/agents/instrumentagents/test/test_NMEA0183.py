@@ -330,7 +330,6 @@ class TestNMEADevice(IonTestCase):
         newParams[NMEADeviceChannel.GPS, 'PGRMF'] = OFF
         newParams[NMEADeviceChannel.GPS, 'PGRMC'] = OFF
         reply = yield self.driver_client.set (newParams, timeout)
-        log.debug("*** reply: %s", reply)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
@@ -452,14 +451,13 @@ class TestNMEADevice(IonTestCase):
 
         reply = yield self.driver_client.set(config_1, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
-        log.debug("*** reply to set: %s", reply)
 
         reply = yield self.driver_client.get(param_list, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
         
         # Make sure we got config 1 back out
         for (chan, param) in param_list:
-            self.assertEqual(reply['result'][(chan,param)], config_1[(chan,param)])
+            self.assertEqual(reply['result'][(chan,param)][1], config_1[(chan,param)])
         
         # Now try and check a change to config_2
         reply = yield self.driver_client.set(config_2, 10)
@@ -468,6 +466,6 @@ class TestNMEADevice(IonTestCase):
         reply = yield self.driver_client.get(param_list, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
         for (chan, param) in param_list:
-            self.assertEqual(reply['result'][(chan,param)], config_2[(chan,param)])
+            self.assertEqual(reply['result'][(chan,param)][1], config_2[(chan,param)])
 
 
