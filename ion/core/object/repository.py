@@ -1658,10 +1658,10 @@ class MergeRepository(ObjectContainer):
     @defer.inlineCallbacks
     def load_root(self, excluded_types):
 
-        self._workspace_root = yield self.checkout_commit(self.commit, excluded_types)
+        # may take a non-deferred path here
+        self._workspace_root = yield defer.maybeDeferred(self.checkout_commit, self.commit, excluded_types)
 
         self._workspace_root.SetStructureReadOnly()
-
 
 class MergeContainer(object):
 
