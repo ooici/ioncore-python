@@ -420,7 +420,7 @@ class IngestionService(ServiceProcess):
         resources = []
 
         if ingest_res.has_key(EM_ERROR):
-            log.info("Ingest Failed!")
+            log.info("Ingest Failed! %s" % str(ingest_res))
 
             # Don't change life cycle state - yet...
             #data_source.ResourceLifeCycleState = data_source.INACTIVE
