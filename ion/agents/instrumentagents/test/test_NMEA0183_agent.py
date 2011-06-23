@@ -7,18 +7,11 @@
 @author Alon Yaari
 """
 
-import uuid
-import re
-import os
-
 from twisted.internet import defer
-from ion.agents.instrumentagents.agent_shell_api import driver_config
 from ion.test.iontest import IonTestCase
-from twisted.trial import unittest
 
 import ion.util.ionlog
 import ion.util.procutils as pu
-from ion.core.exception import ReceivedError
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter

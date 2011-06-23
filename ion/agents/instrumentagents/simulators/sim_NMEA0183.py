@@ -7,10 +7,9 @@
 import os
 import signal
 import time
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from datetime import datetime
 import subprocess
-import ion.util.procutils as pu
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -93,9 +92,6 @@ def BuildPGRMC ():
     """
     Assemble an outgoing GPGGA sentence from stored configuration values.
     """
-
-    errFlag = False
-
     # 0     Sentence header
     str = ['PGRMC']
 
@@ -180,7 +176,8 @@ def BuildPGRMC ():
     str.append ('%.1f' % fVal)
 
     coreStr = ','.join (str)
-    return '$' + coreStr + '\r\n'
+    return '$' + coreStr + '*' + cs + '\r\n'
+
 
 
 def BuildGPGGA (n):

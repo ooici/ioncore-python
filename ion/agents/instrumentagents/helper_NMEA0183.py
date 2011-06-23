@@ -7,7 +7,7 @@
 """
 
 from string import hexdigits
-from ion.agents.instrumentagents.instrument_constants import *
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode, BaseEnum
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 

@@ -182,7 +182,7 @@ class CfgNMEADevice(object):
         pass
     
     def GetCurStatus(self, param):
-        return cfgParams.get(param)
+        return self.cfgParams.get(param)
 
     def SetSentences(self, toSet):
         assert(isinstance(toSet, dict)), 'Expected dict content.'

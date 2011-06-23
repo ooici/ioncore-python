@@ -5,13 +5,8 @@
 @author Alon Yaari
 """
 
-import re
-import os
-import time
 from twisted.internet import defer
-from twisted.trial import unittest
 import ion.util.ionlog
-import ion.util.procutils as pu
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceDriverClient
@@ -25,11 +20,9 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 \
     import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
-from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
     import SERPORTSLAVE, OFF, ON
 
-import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 # SELECT ONE SIMULATOR
@@ -42,8 +35,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
 log.info ('Using PREPLANNED ROUTE GPS Simulator')
-
-log = ion.util.ionlog.getLogger(__name__)
 
 def dump_dict (d, d2 = None):
     print

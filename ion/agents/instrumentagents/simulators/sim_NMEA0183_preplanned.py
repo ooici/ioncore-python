@@ -29,7 +29,6 @@ import sim_NMEA0183
 from gpsSimPath import simPath
 from twisted.protocols import basic
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
-import ion.util.procutils as pu
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -64,7 +63,7 @@ class NMEASimProtocol (basic.LineReceiver):
                 sim_NMEA0183.NMEA0183SimBase.cfg_FIXMODE = d['FIX_MODE'][0]
 
         if d.has_key ('ALT_MSL') and len (d['ALT_MSL']) > 0:
-            dVal = double (d['ALT_MSL'])
+            dVal = float (d['ALT_MSL'])
             if dVal >= -1500.0 and dVal <= 18000.0:
                 sim_NMEA0183.NMEA0183SimBase.cfg_ALT = dVal
 
@@ -184,7 +183,6 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
 
         # Connect to the master serial port
         log.debug ('Opening %s for simulator to connect with.' % self._serMaster)
-        baud = 19200
         try:
             self.s = SerialPort (NMEASimProtocol(),
                                  self._serMaster,
