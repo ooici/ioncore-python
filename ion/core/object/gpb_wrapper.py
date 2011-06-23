@@ -984,8 +984,8 @@ class Wrapper(object):
 
         self.recurse_count.count += 1
         local_cnt = self.recurse_count.count
-        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d' %
-              (local_cnt, type(self), len(self.ChildLinks), len(structure)))
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d:\n %s' %
+              (local_cnt, type(self), len(self.ChildLinks), len(structure), self.Modified))
 
         if not  self.Modified:
             # This object is already committed!
@@ -1008,25 +1008,26 @@ class Wrapper(object):
             child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
             #child_se = repo.index_hash.get(link.key, None)
 
-            #print 'Setting child Link:', child_se
+            #log.debug('Setting child Link: %s' % str(child_se))
             if  child_se is not None:
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
 
             else:
-                #print 'SE for child not found - determining number of child links'
-
-                child = repo.get_linked_object(link)
-
-                # Determine whether this is a leaf node
-                if len(child.ChildLinks) == 0:
-                    link.isleaf = True
+                # if isleaf set, type set, and the key is an actual SHA1 - we don't need to recurse into it or do anything, really.
+                if link.IsFieldSet('isleaf') and link.IsFieldSet('type') and len(link.key) == 20:
+                    log.debug('Disregarding un-index-hashed link %s' % link.key)
+                    pass
                 else:
-                    link.isleaf = False
+                    child = repo.get_linked_object(link)
 
+                    # Determine whether this is a leaf node
+                    if len(child.ChildLinks) == 0:
+                        link.isleaf = True
+                    else:
+                        link.isleaf = False
 
-                #print 'Calling Recurse Commit on child'
-                child.RecurseCommit(structure)
+                    child.RecurseCommit(structure)
 
             # Save the link info as a convience for sending!
             se.ChildLinks.add(link.key)
