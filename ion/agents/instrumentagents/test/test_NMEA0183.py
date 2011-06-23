@@ -408,5 +408,66 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual(result, None)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
 
-        log.debug ('test_get_set complete')
+    @defer.inlineCallbacks
+    def test_get_set_params(self):
+        """
+        Tests the getting and setting of parameters, not just the sentence stuff
+        """
+        # Get configured and connected
+        reply = yield self.driver_client.configure (self.driver_config)
+        reply = yield self.driver_client.connect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result, None)
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+        
+        param_list = [(NMEADeviceChannel.GPS, 'GPGGA'),
+                      (NMEADeviceChannel.GPS, 'GPGLL'),
+                      (NMEADeviceChannel.GPS, 'GPRMC'),
+                      (NMEADeviceChannel.GPS, 'PGRMF'),
+                      (NMEADeviceChannel.GPS, 'PGRMC'),
+                      (NMEADeviceChannel.GPS, 'ALT_MSL'),
+                      (NMEADeviceChannel.GPS, 'E_DATUM'),
+                      (NMEADeviceChannel.GPS, 'DED_REC')]
+        
+        config_1 = {(NMEADeviceChannel.GPS, 'GPGGA'): ON,
+                    (NMEADeviceChannel.GPS, 'GPGLL'): OFF,
+                    (NMEADeviceChannel.GPS, 'GPRMC'): ON,
+                    (NMEADeviceChannel.GPS, 'PGRMF'): OFF,
+                    (NMEADeviceChannel.GPS, 'PGRMC'): ON,
+                    (NMEADeviceChannel.GPS, 'ALT_MSL'): 10.2,
+                    (NMEADeviceChannel.GPS, 'E_DATUM'): 88,
+                    (NMEADeviceChannel.GPS, 'DED_REC'): 8}
+
+        config_2 = {(NMEADeviceChannel.GPS, 'GPGGA'): OFF,
+                    (NMEADeviceChannel.GPS, 'GPGLL'): ON,
+                    (NMEADeviceChannel.GPS, 'GPRMC'): OFF,
+                    (NMEADeviceChannel.GPS, 'PGRMF'): ON,
+                    (NMEADeviceChannel.GPS, 'PGRMC'): OFF,
+                    (NMEADeviceChannel.GPS, 'ALT_MSL'): 11.2,
+                    (NMEADeviceChannel.GPS, 'E_DATUM'): 99,
+                    (NMEADeviceChannel.GPS, 'DED_REC'): 9}
+
+        reply = yield self.driver_client.set(config_1, 10)
+        self.assert_(InstErrorCode.is_ok (reply['success']))
+        log.debug("*** reply to set: %s", reply)
+
+        reply = yield self.driver_client.get(param_list, 10)
+        self.assert_(InstErrorCode.is_ok (reply['success']))
+        
+        # Make sure we got config 1 back out
+        for (chan, param) in param_list:
+            self.assertEqual(reply['result'][(chan,param)], config_1[(chan,param)])
+        
+        # Now try and check a change to config_2
+        reply = yield self.driver_client.set(config_2, 10)
+        self.assert_(InstErrorCode.is_ok (reply['success']))
+
+        reply = yield self.driver_client.get(param_list, 10)
+        self.assert_(InstErrorCode.is_ok (reply['success']))
+        for (chan, param) in param_list:
+            self.assertEqual(reply['result'][(chan,param)], config_2[(chan,param)])
+
 

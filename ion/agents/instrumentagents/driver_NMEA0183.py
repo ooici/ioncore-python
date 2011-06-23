@@ -156,7 +156,7 @@ class CfgNMEADevice(object):
     Currently this class converts input commands into special NMEA config
     sentences that are sent to the device.
     """
-    validSet = ['ALL', 'GPGGA', 'GPRMC']
+    validSet = ['ALL', 'GPGGA', 'GPRMC', 'GPGLL', 'PGRMF', 'PGRMC']
     cfgParams = {'GPGGA':        'OFF',
                  'GPGLL':        'OFF',
                  'GPRMC':        'OFF',
