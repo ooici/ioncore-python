@@ -181,7 +181,8 @@ def BuildPGRMC ():
         fVal = float (0.0)
     str.append ('%.1f' % fVal)
 
-    return '$' + coreStr + '*' + cs + '\r\n'
+    coreStr = ','.join (str)
+    return '$' + coreStr + '\r\n'
 
 
 def BuildGPGGA (n):

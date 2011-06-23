@@ -16,7 +16,7 @@
     $PGRMO,GPGGA,0      Disables GPGGA sentence
     $PGRMO,GPRMC,0      Disables GPRMC sentence
     $PGRMO,GPGGA,1      Enables GPGGA sentence
-    $PGRMO,GPRMC,2      Enables GPRMC sentence
+    $PGRMO,GPRMC,1      Enables GPRMC sentence
 
     - No spaces allowed in a command sentence
     - Terminate sentence with '\r'

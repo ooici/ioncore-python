@@ -36,9 +36,19 @@ from serial import FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS
 
 log = ion.util.ionlog.getLogger(__name__)
 
+OFF = "Off"
+ON = "On"
+ONCE = "1"
+
 ###############################################################################
 # Driver-specific constants
 ###############################################################################
+
+class GoodValues():
+    baud = [300, 600, 4800, 9600, 19200, 38400, 57600]
+    byteSize = [FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS]
+    parity = [PARITY_NONE, PARITY_EVEN, PARITY_ODD]
+    stopBits = [STOPBITS_ONE, STOPBITS_TWO]
 
 # Device prompts
 class NMEADevicePrompt(BaseEnum):
@@ -80,6 +90,8 @@ class NMEADeviceChannel(BaseEnum):
     NMEADevice channels.
     """
     GPS = DriverChannel.GPS
+    INSTRUMENT = DriverChannel.INSTRUMENT
+    ALL = DriverChannel.ALL
 
 
 # Device specific parameters.
@@ -87,7 +99,7 @@ class NMEADeviceParam(DriverParameter):
     """
     Add specific NMEA device parameters here.
     """
-    GPGGA = 'GPGGPA'       # Global Position Fix Position
+    GPGGA = 'GPGGA'       # Global Position Fix Position
     GPGLL = 'GPGLL'        # Global Position Latitude and Longitude
     GPRMC = 'GPRMC'        # Recommended Minimum Sentence C
     PGRMF = 'PGRMF'        # Garmin GPS Fix Data Sentence
@@ -98,8 +110,8 @@ class NMEADeviceParam(DriverParameter):
     DIFFMODE = 'DIFFMODE'  # Diff mode can be 'A'utomatic or 'D'iff exc.
     BAUD_RT = 'BAUD_RT'    # Baud 3=4800,4=9600,5=19200,6=300,7=600,8=38400
     MP_OUT = 'MP_OUT'      # Measurement pulse output 1=disabled, 2=enabled
-    MP_LEN = 'MP_LEN'      # MPO length, (n+1)*20ms valid 0 to 48
-    DED_REC = 'DED_REC'    # Ded. reckoning time valud 0.2 to 30.0 seconds
+    MP_LEN = 'MP_LEN'      # MPO length,(n+1)*20ms valid 0 to 48
+    DED_REC = 'DED_REC'    # Ded. reckoning time value 0.2 to 30.0 seconds
 
 
 # Device specific statuses.
@@ -121,7 +133,7 @@ class NMEADeviceCapability(DriverCapability):
 # Device specific metadata parameters.
 class NMEADeviceMetadataParameter(MetadataParameter):
     """
-    Add insrument metadata types here.
+    Add instrument metadata types here.
     """
     pass
 
@@ -144,83 +156,218 @@ class ConfigureNMEADevice(object):
     Currently this class converts input commands into special NMEA config
     sentences that are sent to the device.
     """
-
     def __init__(self):
 
-        self.configParams = {   'GPGGA':        'PUBLISH',
-                                'GPGLL':        'NO_PUBLISH',
-                                'GPRMC':        'NO_PUBLISH',
-                                'PGRMF':        'ON_REQUEST',
-                                'PGRMC':        'NO_PUBLISH',
-                                'FIX_MODE':     'A',
-                                'ALT_MSL':      '',
-                                'E_DATUM':      '100',
-                                'SM_AXIS':      '',
-                                'DATUMIFF':     '',
-                                'DATUM_DX':     '',
-                                'DATUM_DY':     '',
-                                'DATUM_DZ':     '',
-                                'DIFFMODE':     'A',
-                                'BAUD_RT':      '5',
-                                'IGNORE':       '',
-                                'MP_OUT':       '1',
-                                'MP_LEN':       '0',
-                                'DED_REC':      '1.0'}
-
+        self.validSet = ['ALL', 'GPGGA', 'GPRMC']
+        self.cfgParams = {  'GPGGA':        'OFF',
+                             'GPGLL':        'OFF',
+                             'GPRMC':        'OFF',
+                             'PGRMF':        'OFF',
+                             'PGRMC':        'OFF',
+                             'FIX_MODE':     'A',
+                             'ALT_MSL':      '',
+                             'E_DATUM':      '100',
+                             'SM_AXIS':      '',
+                             'DATUMIFF':     '',
+                             'DATUM_DX':     '',
+                             'DATUM_DY':     '',
+                             'DATUM_DZ':     '',
+                             'DIFFMODE':     'A',
+                             'BAUD_RT':      '5',
+                             'IGNORE':       '',
+                             'MP_OUT':       '1',
+                             'MP_LEN':       '0',
+                             'DED_REC':      '1.0'}
+        self.defParams = self.cfgParams
 
     def GetCurStatus(self, param):
+        return self.cfgParams.get(param)
 
-        return                  self.configParams.get(param, None)
+    def SetSentences(self, toSet):
+        assert(isinstance(toSet, dict)), 'Expected dict content.'
+        for NMEA_CD in toSet:
+            self.WriteToDevice(self._BuildPGRMO(NMEA_CD, toSet[NMEA_CD]))
 
-    def SendConfigToDevice(self):
-        # TODO: Publish a $PGRMC sentence to the GPS
-        pass
+    def SendConfigToDevice(self, toSet):
+        assert(isinstance(toSet, dict)), 'Expected dict content.'
+        self.WriteToDevice(self._BuildPGRMC(toSet))
 
+    def WriteToDevice(self, toWrite):
+        """
+        """
+        if toWrite:
+            if NMEADeviceDriver.serConnection:
+                NMEADeviceDriver.serConnection.write (toWrite)
+                log.debug('Written to GPS: %s' % toWrite)
 
+    def _BuildPGRMO(self, NMEA_CD, toSet):
+        if NMEA_CD in self.validSet and toSet in [ON, OFF]:
+            str = ['PGRMO']
+            if toSet == OFF:
+                setVal = 0
+            else:
+                setVal = 1
+            if NMEA_CD == 'ALL':
+                NMEA_CD = ''
+                setVal += 2
+            str.append(NMEA_CD)
+            str.append('%d' % setVal)
+            coreStr = ','.join (str)
+            return '$' + coreStr + '\r\n'
+        return None
 
+    def _BuildPGRMC(self, toSet):
+        """
+        Assemble a PGRMC sentence to configure the GPS
+        """
+
+    # 0 --- Sentence header -----------------------------
+        str = ['PGRMC']
+
+    # 1 --- Fix Mode ------------------------------------
+        x = 'FIX_MODE'
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
+        if 'A23'.find(c) > -1:
+            str.append(c)
+        else:
+            str.append(self.defParams['FIX_MODE'])
+
+    # 2 --- Alt above/below MSL -------------------------
+        x = 'ALT_MSL'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if -1500.0 > f or f > 18000.0:
+            f = 0.0
+        str.append('%.1f' % f)
+
+    # 3 --- Earth Datum Index ---------------------------
+        x = 'E_DATUM'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 0 or i > 109:
+            i = 0
+        str.append('%d' % i)
+
+    # 4 --- User earth datum ----------------------------
+        x = 'SM_AXIS'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if f < 6360000.0 or f > 6380000.0:
+            f = 6360000.0
+        str.append('%.3f' % f)
+
+    # 5 --- User earth datum inverse flattening factor --
+        x = 'DATUMIFF'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if f < 285.0 or f > 310.0:
+            f = 285.0
+        str.append('%.1f' % f)
+
+    # 6 --- User earth datum delta X --------------------
+        x = 'DATUM_DX'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if f < -5000.0 or f > 5000.0:
+            f = -5000.0
+        str.append('%.3f' % f)
+
+    # 7 --- User earth datum delta Y --------------------
+        x = 'DATUM_DY'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if f < -5000.0 or f > 5000.0:
+            f = -5000.0
+        str.append('%.3f' % f)
+        str.append('0')
+
+    # 8 --- User earth datum delta Z --------------------
+        x = 'DATUM_DZ'
+        f = float(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if f < -5000.0 or f > 5000.0:
+            f = -5000.0
+        str.append('%.3f' % f)
+
+    # 9 --- Differential mode ---------------------------
+        x = 'DIFFMODE'
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
+        if 'AD'.find(c) > -1:
+            str.append(c)
+        else:
+            str.append (self.defParams['DIFFMODE'])
+
+    # 10 -- NMEA 0183 Baud rate -------------------------
+        x = 'BAUD_RT'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 1 or i > 8:
+            i = self.defParams['BAUD_RT']
+        str.append('%d' % i)
+
+    # 11 -- Velocity Filter -----------------------------
+        x = 'VEL_FILT'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 0 or i > 255:
+            i = self.defParams["VEL_FILT"]
+        str.append('%d' % i)
+
+    # 12 -- Measurement Pulse Output --------------------
+        x = 'MP_OUT'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 1 or i > 2:
+            i = self.defParams['MP_OUT']
+        str.append('%d' % i)
+
+    # 13 -- Measurement Pulse Output Length -------------
+        x = 'MP_LEN'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 0 or i > 48:
+            i = self.defParams['MP_LEN']
+        str.append('%d' % i)
+
+    # 14 -- Dead reckoning valid time -------------------
+        x = 'DED_REC'
+        i = int(toSet.get(x, self.cfgParams.get(x, self.defParams[x])))
+        if i < 1 or i > 30:
+            i = self.defParams['DED_REC']
+        str.append('%d' % i)
+
+        coreStr = ','.join (str)
+        return '$' + coreStr + '\r\n'
 
 ###############################################################################
 # NMEA Device Driver
 ###############################################################################
 
 
+#noinspection PyUnusedLocal
 class NMEADeviceDriver(InstrumentDriver):
     """
     Implements the abstract InstrumentDriver interface for the NMEA0183 driver.
     """
-
-    """
-    The software version of the NMEA0183 driver.
-    """
     version = '0.1.0'
+
+    serConnection = None
 
     @classmethod
     def get_version(cls):
         """
         Return the software version of the instrument driver.
         """
-
-        return                  cls.version
+        return cls.version
 
     def __init__(self, *args, **kwargs):
-
         InstrumentDriver.__init__(self, *args, **kwargs)
-
+        # Reading mode
+        self._serialReadMode = OFF
         # Com port of the device serial server. ex: '/dev/slave'
         self._port = None
-        # Serial baud rate:  default =9600
+        # Serial baud rate:  default = 9600
         self._baudrate = None
-        # Number of bits:  FIVEBITS, SIXBITS, SEVENBITS, default =EIGHTBITS
+        # Number of bits:  FIVEBITS, SIXBITS, SEVENBITS, default = EIGHTBITS
         self._bytesize = None
-        # Parity:  default =PARITY_NONE, PARITY_EVEN, PARITY_ODD
+        # Parity:  default = PARITY_NONE, PARITY_EVEN, PARITY_ODD
         self._parity = None
-        # Stop bits:  default =STOPBITS_ONE, STOPBITS_TWO
+        # Stop bits:  default = STOPBITS_ONE, STOPBITS_TWO
         self._stopbits = None
-        # MS till port timeout:  default =0(none)
+        # MS till port timeout:  default = 0(none)
         self._timeout = None
-        # Handshaking:   default =0(off)
+        # Handshaking:   default = 0(off)
         self._xonxoff = None
-        # Uses RTS/CTS:  default =0(no)
+        # Uses RTS/CTS:  default =0 (no)
         self._rtscts = None
 
         self._data_lines = []
@@ -233,50 +380,30 @@ class NMEADeviceDriver(InstrumentDriver):
         # List of active driver alarm conditions.
         self._alarms = []
 
-        # Dictionary of instrument parameters.
-        self.parameters = {
-            (NMEADeviceChannel.GPS, NMEADeviceParam.GPGGA):     {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.GPGLL):     {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.GPRMC):     {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.PGRMF):     {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.PGRMC):     {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.FIX_MODE):  {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.ALT_MSL):   {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.E_DATUM):   {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.DIFFMODE):  {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.BAUD_RT):   {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.MP_OUT):    {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.MP_LEN):    {'value': None},
-            (NMEADeviceChannel.GPS, NMEADeviceParam.DED_REC):   {'value': None}}
-
         # Instrument state handlers
         self.state_handlers = {
             NMEADeviceState.UNCONFIGURED:   self.state_handler_unconfigured,
             NMEADeviceState.DISCONNECTED:   self.state_handler_disconnected,
             NMEADeviceState.CONNECTING:     self.state_handler_connecting,
             NMEADeviceState.DISCONNECTING:  self.state_handler_disconnecting,
-            NMEADeviceState.CONNECTED:      self.state_handler_connected,
-            NMEADeviceState.ACQUIRE_SAMPLE: self.state_handler_acquire_sample,
-            NMEADeviceState.UPDATE_PARAMS:  self.state_handler_update_params,
-            NMEADeviceState.SET:            self.state_handler_set,
-            NMEADeviceState.AUTOSAMPLE:     self.state_handler_autosample}
+            NMEADeviceState.CONNECTED:      self.state_handler_connected}
 
         # Instrument state machine.
         self.fsm = InstrumentFSM(NMEADeviceState,
-                                 NMEADeviceEvent,
-                                 self.state_handlers,
-                                 NMEADeviceEvent.ENTER,
-                                 NMEADeviceEvent.EXIT)
+                                  NMEADeviceEvent,
+                                  self.state_handlers,
+                                  NMEADeviceEvent.ENTER,
+                                  NMEADeviceEvent.EXIT)
 
-###########################################################################
-# State handling methods
-###########################################################################
+    ###########################################################################
+    # State handling methods
+    ###########################################################################
 
     @defer.inlineCallbacks
     def state_handler_unconfigured(self, event, params):
         """
         Event handler for STATE_UNCONFIGURED.
-        On entering:      Driver is considered un-intialized and un-configured.
+        On entering:      Driver is considered un-initialized and un-configured.
         EVENT_ENTER:      Announce trans-in then reset comm params to nulls.
         EVENT_EXIT:       Pass
         EVENT_CONFIGURE:  Set comm params then trans to DISCONNECTED state
@@ -306,7 +433,8 @@ class NMEADeviceDriver(InstrumentDriver):
             self._initialize()
 
         elif event == NMEADeviceEvent.CONFIGURE:
-            if self._configure(params):
+            success = self._configure(params)
+            if InstErrorCode.is_ok(success):
                 next_state = NMEADeviceState.DISCONNECTED
 
         else:
@@ -348,6 +476,9 @@ class NMEADeviceDriver(InstrumentDriver):
         elif event == NMEADeviceEvent.CONNECT:
             next_state = NMEADeviceState.CONNECTING
 
+        elif event == NMEADeviceEvent.CONFIGURE:
+            success = self._configure(params)
+
         else:
             success = InstErrorCode.INCORRECT_STATE
 
@@ -379,16 +510,22 @@ class NMEADeviceDriver(InstrumentDriver):
             yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition-in action(s)
-            self.getConnected()
+            self._getConnected()
 
         elif event == NMEADeviceEvent.EXIT:
             pass
 
         elif event == NMEADeviceEvent.CONNECTION_COMPLETE:
-            next_state = NMEADeviceState.CONNECTED
+            # Verify a valid connection and if so, updated params then switch to connected state
+            if NMEADeviceDriver.serConnection:
+                yield self._update_initial_params()
+                next_state = NMEADeviceState.CONNECTED
+            else:
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+                next_state = NMEADeviceState.DISCONNECTED
 
         elif event == NMEADeviceEvent.CONNECTION_FAILED:
-            # TODO: Push error message to the agent
+            success = InstErrorCode.DRIVER_CONNECT_FAILED
             next_state = NMEADeviceState.DISCONNECTED
 
         else:
@@ -420,12 +557,17 @@ class NMEADeviceDriver(InstrumentDriver):
             yield self.send(self.proc_supid, 'driver_event_occurred', content)
 
             # Transition into the state
-            yield self.getDisconnected()
+            if NMEADeviceDriver.serConnection:
+                yield self._getDisconnected()
+
         elif event == NMEADeviceEvent.EXIT:
             pass
 
         elif event == NMEADeviceEvent.DISCONNECT_COMPLETE:
             next_state = NMEADeviceState.DISCONNECTED
+
+        elif event == NMEADeviceEvent.DATA_RECEIVED:
+            pass
 
         else:
             success = InstErrorCode.INCORRECT_STATE
@@ -446,7 +588,6 @@ class NMEADeviceDriver(InstrumentDriver):
                                 specific state for handling.
         EVENT_DATA_RECEIVED:    Pass
         """
-         
         yield
         success = InstErrorCode.OK
         next_state = None
@@ -467,132 +608,55 @@ class NMEADeviceDriver(InstrumentDriver):
         elif event == NMEADeviceEvent.DISCONNECT:
             next_state = NMEADeviceState.DISCONNECTING
 
+        elif event == NMEADeviceEvent.GET:
+            result = self._get_parameters(params)
+            success = result['success']
+            result = result['result']
+
         elif event == NMEADeviceEvent.SET:
-            next_state = NMEADeviceState.SET
+            result = yield self._set_parameters(params)
+            yield self._update_params()
+            success = result['success']
+            result = result['result']
+
+            # Publish any config changes caused by a successful set
+            if any(result.values()):
+                log.debug('Driver: Device configuration modified by set')
+                config = self._get_params([(NMEADeviceChannel.GPS,
+                                           NMEADeviceParam.ALL)])
+                content = {'type': DriverAnnouncement.CONFIG_CHANGE,
+                           'transducer': NMEADeviceChannel.GPS,
+                           'value': config}
+                yield self.send(self.proc_supid,'driver_event_occurred', content)
 
         elif event == NMEADeviceEvent.ACQUIRE_SAMPLE:
-            next_state = NMEADeviceState.ACQUIRE_SAMPLE
+            self._serialReadMode = ONCE  # Acquire only 1 line and stop
+            #TODO: Check that only one sentence is going for ONCE mode
+            #TODO: Based on the sentence, assign a timeout
+            #       i.e., almanac sentence may only come in once a day
+            #             GPGGA sentence at 1hz
 
         elif event == NMEADeviceEvent.START_AUTOSAMPLE:
-            next_state = NMEADeviceState.AUTOSAMPLE
-
-        elif event == NMEADeviceEvent.TEST:
-            next_state = NMEADeviceState.TEST
-
-        elif event == NMEADeviceEvent.CALIBRATE:
-            next_state = NMEADeviceState.CALIBRATE
-
-        elif event == NMEADeviceEvent.RESET:
-            next_state = NMEADeviceState.RESET
-
-        elif event == NMEADeviceEvent.DATA_RECEIVED:
-            pass
-
-        else:
-            success = InstErrorCode.INCORRECT_STATE
-
-        defer.returnValue((success, next_state, result))
-
-    @defer.inlineCallbacks
-    def state_handler_acquire_sample(self, event, params):
-        """
-        Event handler for STATE_ACQUIRE_SAMPLE.
-        On entering:         Assume driver is connected to the instrument
-        EVENT_ENTER:         Initialize data input buffer, set serial read mode
-        EVENT_EXIT:          Clear data input buffer, set serial read mode
-        EVENT_PROMPTED:      Pass
-        EVENT_DATA_RECEIVED: Publish data
-        """
-
-        yield
-        success = InstErrorCode.OK
-        next_state = None
-        result = None
-        self._debug_print(event)
-
-        if event == NMEADeviceEvent.ENTER:
-            # Announce the state change to agent.
-            content = {'type': DriverAnnouncement.STATE_CHANGE,
-                       'transducer': NMEADeviceChannel.GPS,
-                       'value': NMEADeviceState.ACQUIRE_SAMPLE}
-            yield self.send(self.proc_supid, 'driver_event_occurred', content)
-
-            # Transition-in action(s)
-            self.protocol._serialReadMode = "1"  # Acquire only 1 line and stop
-
-        elif event == NMEADeviceEvent.EXIT:
-            # Transitioning out this way means we didn't get a valid sample
-            self.protocol._serialReadMode = "OFF"  # Read no more lines
-            # command
-
-        elif event == NMEADeviceEvent.PROMPTED:
-            # TODO: Implement a prompted mode for NMEA0183 devices
-            pass
+            self._serialReadMode = ON    # Continually acquire lines
 
         elif event == NMEADeviceEvent.DATA_RECEIVED:
             while self._data_lines:
                 nmeaLine = self._data_lines.pop()
-                if len(nmeaLine) > 0:
-                    self._debug_print('Received NMEA', nmeaLine)
-                    content = {'type': DriverAnnouncement.DATA_RECEIVED,
-                               'transducer': NMEADeviceChannel.GPS,
-                               'value': nmeaLine}
-                yield self.send(self.proc_supid, 'driver_event_occurred', content)
-
-        else:
-            success = InstErrorCode.INCORRECT_STATE
-
-        defer.returnValue((success, next_state, result))
-
-    @defer.inlineCallbacks
-    def state_handler_autosample(self, event, params):
-        """
-        Event handler for STATE_AUTOSAMPLE.
-        On entering:       Driver is assumed to be connected to the instrument.
-        EVENT_ENTER:       Initialize data input buffer, set serial read mode
-        EVENT_EXIT:        Clear data input buffer, set serial read mode
-        EVENT_PROMPTED:    Cancel wakeup, write device commands, parse output
-                           and populate reply. Switch to STATE_CONNECTED.
-        EVENT_STOP_AUTOSAMPLE: Clear data input buffer, set serial read mode
-        EVENT_DATA_RECEIVED:   Publish data
-        """
-
-        yield
-        success = InstErrorCode.OK
-        next_state = None
-        result = None
-        self._debug_print(event)
-
-        if event == NMEADeviceEvent.ENTER:
-
-            # Announce the state change to agent.
-            content = {'type': DriverAnnouncement.STATE_CHANGE,
-                       'transducer': NMEADeviceChannel.GPS,
-                       'value': NMEADeviceState.DISCONNECTING}
-            yield self.send(self.proc_supid, 'driver_event_occurred', content)
-
-            # Transition-in action(s)
-            self.protocol._serialReadMode = "ON"  # Continuous-read mode
-
-        elif event == NMEADeviceEvent.EXIT:
-            self.protocol._serialReadMode = "OFF"  # Read no more lines
-
-        elif event == NMEADeviceEvent.PROMPTED:
-            pass
-
-        elif event == NMEADeviceEvent.STOP_AUTOSAMPLE:
-                self.protocol._serialReadMode = "OFF"
-                next_state = NMEADeviceState.CONNECTED
-
-        elif event == NMEADeviceEvent.DATA_RECEIVED:
-            while self._data_lines:
-                nmeaLine = self._data_lines.pop()
-                if len(nmeaLine) > 0:
-                    self._debug_print('Received NMEA', nmeaLine)
-                    content = {'type': DriverAnnouncement.DATA_RECEIVED,
-                               'transducer': NMEADeviceChannel.GPS,
-                               'value': nmeaLine}
-                yield self.send(self.proc_supid, 'driver_event_occurred', content)
+                log.debug('Handling NMEA line')
+                if nmeaLine['NMEA_CD'] == '$PGRMC':
+                    self._setParams(nmeaLine)
+                elif len(nmeaLine) > 0:
+                    readNow = False
+                    if self._serialReadMode == ONCE:
+                        readNow = True
+                        self._serialReadMode = OFF
+                    if self._serialReadMode == ON or readNow == True:
+                        content = {'type': DriverAnnouncement.DATA_RECEIVED,
+                                   'transducer': NMEADeviceChannel.GPS,
+                                   'value': nmeaLine}
+                        yield self.send(self.proc_supid,
+                                        'driver_event_occurred',
+                                        content)
 
         else:
             success = InstErrorCode.INCORRECT_STATE
@@ -706,9 +770,9 @@ class NMEADeviceDriver(InstrumentDriver):
 
         defer.returnValue((success, next_state, result))
 
-###########################################################################
-# Process lifecycle methods.
-###########################################################################
+    ###########################################################################
+    # Process lifecycle methods.
+    ###########################################################################
 
     @defer.inlineCallbacks
     def plc_init(self):
@@ -729,23 +793,21 @@ class NMEADeviceDriver(InstrumentDriver):
 
         yield
 
-###########################################################################
-# Communications methods.
-###########################################################################
+    ###########################################################################
+    # Communications methods.
+    ###########################################################################
 
     @defer.inlineCallbacks
-    def getConnected(self):
+    def _getConnected(self):
         """
         Called by this class to establish connection with the device.
         Send    EVENT_CONNECTION_COMPLETE   if successful or
                 EVENT_CONNECTION_FAILED     if not successful.
         """
-
         connectionResult = NMEADeviceEvent.CONNECTION_COMPLETE
-
         try:
-            log.debug("Attempting serial connection....")
-            self._serConnection =  SerialPort(NMEA0183Protocol(),
+            log.debug("Driver is attempting serial connection to device....")
+            NMEADeviceDriver.serConnection =  SerialPort(NMEA0183Protocol(),
                                               self._port,
                                               reactor,
                                               baudrate=self._baudrate,
@@ -755,33 +817,40 @@ class NMEADeviceDriver(InstrumentDriver):
                                               timeout=self._timeout,
                                               xonxoff=self._xonxoff,
                                               rtscts=self._rtscts)
-
         except SerialException, e:
-            log.debug("Serial connection failed: %s", e)
-            log.debug("Sending event: %s", NMEADeviceEvent.CONNECTION_FAILED)
+            log.debug("Driver's Serial connection failed: %s", e)
             connectionResult = NMEADeviceEvent.CONNECTION_FAILED
-
         log.debug("Serial connection result: %s", connectionResult)
         yield self.fsm.on_event_async(connectionResult)
 
-    def gotConnected(self, instrument):
+    def _update_initial_params(self):
         """
-        Called from twisted framework when connection is established.
+        Sets configuration parameters on connection with the device
         """
-        assert False, 'NMEA0183_driver.gotConnected() was called... why?'
+        # First turn off all sentences
+        ConfigureNMEADevice.SetSentences({'ALL': OFF})
+
+        # Now turn on only GPGGA
+        ConfigureNMEADevice.SetSentences({'GPGGA': ON})
+
+        # Now configure all the default settings
+        ConfigureNMEADevice.SendConfigToDevice(ConfigureNMEADevice.cfgParams)
+
+    def _update_params(self, params):
+        """
+        """
+        XXX
 
     @defer.inlineCallbacks
-    def getDisconnected(self):
+    def _getDisconnected(self):
         """
         Called by this class to close the connection to the device.
         """
-
         connectionResult = NMEADeviceEvent.DISCONNECT_COMPLETE
-
         try:
             log.debug("Attempting to disconnect serial....")
-            if self._serConnection:
-                self._serConnection.loseConnection()
+            if NMEADeviceDriver.serConnection:
+                NMEADeviceDriver.serConnection.loseConnection()
         except SerialException, e:
             log.debug("Serial disconnection failed: %s", e)
             log.debug("Sending event: %s", NMEADeviceEvent.CONNECTION_COMPLETE)
@@ -795,13 +864,13 @@ class NMEADeviceDriver(InstrumentDriver):
         Called by the twisted framework when the connection is closed.
         Send an EVENT_DISCONNECT_COMPLETE.
         """
-
-        log.warn("gotDiscnnected was called... why??")
-        self._serConnection = None
+        log.info("Driver has disconnected from the device")
+        NMEADeviceDriver.serConnection = None
         self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
 
     def gotData(self, dataFrag):
-
+        """
+        """
         assert False, 'NMEA0183_driver.gotData() was called... why?'
 
     ###########################################################################
@@ -820,10 +889,10 @@ class NMEADeviceDriver(InstrumentDriver):
                             'timeout': timeout}
         @retval A reply message with a dict
             {'success': success,
-            'result': {chan_arg: (success, command_specific_values), ...,
-            chan_arg: (success, command_specific_values)}}
+            'result': {chan_arg:(success, command_specific_values), ...,
+            chan_arg:(success, command_specific_values)}}
         """
-
+        """
         assert(isinstance(content, dict)), 'Expected dict content.'
 
         # Set up reply dict, get required parameters from message content.
@@ -843,12 +912,12 @@ class NMEADeviceDriver(InstrumentDriver):
             yield self.reply_ok(msg, reply)
             return
 
-        assert(isinstance(command, (list, tuple)))
+        assert(isinstance(command,(list, tuple)))
         assert(all(map(lambda x: isinstance(x, str), command)))
-        assert(isinstance(channels, (list, tuple)))
+        assert(isinstance(channels,(list, tuple)))
         assert(all(map(lambda x: isinstance(x, str), channels)))
 
-        if timeout != None:
+        if timeout is not None:
             assert(isinstance(timeout, int)), 'Expected integer timeout'
             assert(timeout > 0), 'Expected positive timeout'
             pass
@@ -975,8 +1044,9 @@ class NMEADeviceDriver(InstrumentDriver):
             reply['success'] = InstErrorCode.INVALID_COMMAND
             yield self.reply_ok(msg, reply)
             return
-
         yield self.reply_ok(msg, reply)
+        """
+        yield
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -989,8 +1059,19 @@ class NMEADeviceDriver(InstrumentDriver):
             {'success':success,'result':{(chan_arg,param_arg):(success,val),...
                 ,(chan_arg,param_arg):(success,val)}}
         """
+        assert(isinstance(content, dict)), 'Expected dict content.'
+        params = content.get('params', None)
+        assert(isinstance(params,(list, tuple))), 'Expected list or tuple params.'
+        timeout = content.get('timeout', None)
+        if timeout:
+            assert(isinstance(timeout, int)), 'Expected integer timeout'
+            assert(timeout > 0), 'Expected positive timeout'
+        reply = {'success': None, 'result': None}
 
-        # TODO:  Write code for op_get
+        # Send get event and set up for a reply
+        (success, result) = yield self._fsm.on_event_async(NMEADeviceEvent.GET, params)
+        reply['success'] = success
+        reply['result'] = result
         yield self.reply_ok(msg, reply)
 
     @defer.inlineCallbacks
@@ -1006,12 +1087,13 @@ class NMEADeviceDriver(InstrumentDriver):
         """
 
         # TODO:  Write code for op_set
-        yield self.reply_ok(msg, reply)
+        #yield self.reply_ok(msg, reply)
+        yield
 
     @defer.inlineCallbacks
     def op_execute_direct(self, content, headers, msg):
         """
-        Execute untraslated commands on the device.
+        Execute untranslated commands on the device.
         @param content A dict with a bytestring containing the raw device
             commands and optional timeout: {'bytes':bytes,'timeout':timeout}
         @retval Reply message with a dict containing success value and
@@ -1024,7 +1106,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
-        if timeout != None:
+        if timeout:
             assert(isinstance(timeout,int)), 'Expected integer timeout'
             assert(timeout>0), 'Expected positive timeout'
             pass
@@ -1039,7 +1121,7 @@ class NMEADeviceDriver(InstrumentDriver):
         Retrieve metadata for the device, its transducers and parameters.
         @param content A dict containing a params list and optional timeout:
             {'params':[(chan_arg,param_arg,meta_arg),...,
-            (chan_arg,param_arg,meta_arg)],
+          (chan_arg,param_arg,meta_arg)],
             'timeout':timeout}.
         @retval Reply message with a dict {'success':success,'result':
                 {(chan_arg,param_arg,meta_arg):(success,val),...,
@@ -1054,7 +1136,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
-        if timeout != None:
+        if timeout:
             assert(isinstance(timeout,int)), 'Expected integer timeout'
             assert(timeout>0), 'Expected positive timeout'
             pass
@@ -1076,18 +1158,17 @@ class NMEADeviceDriver(InstrumentDriver):
                 ...,chan_arg,status_arg):(success,val)}}.
         """
 
-        assert(isinstance(content,dict)), 'Expected dict content.'
-        params = content.get('params',None)
-        assert(isinstance(params,(list,tuple))), 'Expected list or tuple params.'
-        assert(all(map(lambda x:isinstance(x,tuple),params))), \
+        assert(isinstance(content, dict)), 'Expected dict content.'
+        params = content.get('params', None)
+        assert(isinstance(params,(list, tuple))), 'Expected list or tuple params.'
+        assert(all(map(lambda x:isinstance(x, tuple), params))), \
             'Expected tuple arguments'
 
         # Timeout not implemented for this op.
-        timeout = content.get('timeout',None)
-        if timeout != None:
-            assert(isinstance(timeout,int)), 'Expected integer timeout'
-            assert(timeout>0), 'Expected positive timeout'
-            pass
+        timeout = content.get('timeout', None)
+        if timeout:
+            assert(isinstance(timeout, int)), 'Expected integer timeout'
+            assert(timeout > 0), 'Expected positive timeout'
 
         reply = self._get_status(params)
         yield self.reply_ok(msg, reply)
@@ -1110,7 +1191,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Timeout not implemented for this op.
         timeout = content.get('timeout',None)
-        if timeout != None:
+        if timeout:
             assert(isinstance(timeout,int)), 'Expected integer timeout'
             assert(timeout>0), 'Expected positive timeout'
             pass
@@ -1131,7 +1212,6 @@ class NMEADeviceDriver(InstrumentDriver):
         if timeout is not None:
             assert(isinstance(timeout, int)), 'Expected integer timeout'
             assert(timeout > 0), 'Expected positive timeout'
-            pass
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success': None, 'result': None}
@@ -1169,13 +1249,12 @@ class NMEADeviceDriver(InstrumentDriver):
         # Set up the reply message and validate the configuration parameters.
         # Reply with the error message if the parameters not valid.
         reply = {'success': None, 'result': params}
-        """
-        reply['success'] = self._validate_configuration(params)
+        #reply['success'] = self._validate_configuration(params)
 
-        if InstErrorCode.is_error(reply['success']):
-            yield self.reply_ok(msg, reply)
-            return
-        """
+        #if InstErrorCode.is_error(reply['success']):
+        #    yield self.reply_ok(msg, reply)
+        #    return
+
         # Fire EVENT_CONFIGURE with the validated configuration parameters.
         # Set the error message if  event is not handled in the current state.
         (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.CONFIGURE, params)
@@ -1193,14 +1272,14 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Timeout not implemented for this op.
         timeout = content.get('timeout', None)
-        if timeout != None:
+        if timeout:
             assert(isinstance(timeout, int)), 'Expected integer timeout'
             assert(timeout > 0), 'Expected positive timeout'
             pass
         
         reply = {'success':None, 'result':None}
 
-        (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.CONNECT)        
+        (success, result) = yield self.fsm.on_event_async(NMEADeviceEvent.CONNECT)
         reply['success'] = success
         reply['result'] = result
         yield self.reply_ok(msg, reply)
@@ -1235,11 +1314,9 @@ class NMEADeviceDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def op_get_state(self, content, headers, msg):
         """
-        Retrive the current state of the driver.
+        Retrieve the current state of the driver.
         @retval The current instrument state, from sbe37_state_list
-        (See
-        ion.agents.instrumentagents.
-                instrument_agent_constants.device_state_list
+        (See ion.agents.instrumentagents.instrument_agent_constants.device_state_list
             for the common states.)
         """
 
@@ -1250,6 +1327,17 @@ class NMEADeviceDriver(InstrumentDriver):
 ###########################################################################
 # Nonpublic methods.
 ###########################################################################
+    def _debug_print(self, event, data=None):
+        """
+        Dump state and event status to stdio.
+        """
+        debugStr = "%s  %s" % (self._fsm.current_state, event)
+        if isinstance(data, dict):
+            for (key, val) in data.iteritems():
+                debugStr += str(key) + '  ' + str(val)
+            if data is not None:
+                debugStr += data
+            log.debug(debugStr)
 
     def _configure(self, params):
         """
@@ -1294,10 +1382,6 @@ class NMEADeviceDriver(InstrumentDriver):
             {'param1': val1,..., 'paramN': valN}.
         @retval A success/fail value.
         """
-
-        log.debug("***** _validate_configuration: %s", params)
-
-        # Get required parameters.
         _port = params.get('port', None)
         _baudrate = params.get('baudrate', None)
         _bytesize = params.get('bytesize', None)
@@ -1312,51 +1396,32 @@ class NMEADeviceDriver(InstrumentDriver):
             return InstErrorCode.REQUIRED_PARAMETER
 
         # Validate port name
-        # TODO: Validate valid port name
-            # DOES THIS REALLY NEED TO BE DONE?
             # Bad port name is caught with TRY on opening serial port
-            # if not valid...
-            # return InstErrorCode.INVALID_PARAM_VALUE
+            # if not valid it returns InstErrorCode.INVALID_PARAM_VALUE
 
-        # Validate baudrate
-        if _baudrate and _baudrate not in [300, 600, 4800, 9600, 19200, 38400]:
+        if _baudrate and _baudrate not in GoodValues.baud:
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate bytesize
-        if _bytesize and _bytesize not in \
-            [FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS]:
+        if _bytesize and _bytesize not in GoodValues.byteSize :
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate parity
-        if _parity and _parity not in \
-            [PARITY_NONE, PARITY_EVEN, PARITY_ODD]:
+        if _parity and _parity not in GoodValues.parity:
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate stopbits
-        if _stopbits and _stopbits not in \
-            [STOPBITS_ONE, STOPBITS_TWO]:
+        if _stopbits and _stopbits not in GoodValues.stopBits:
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate timeout
         if _timeout and not isinstance(_timeout, int):
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate xonxoff
         if _xonxoff and _xonxoff not in [0, 1]:
             return InstErrorCode.INVALID_PARAM_VALUE
-
-        # Validate rtscts
         if _rtscts and _rtscts not in [0, 1]:
             return InstErrorCode.INVALID_PARAM_VALUE
-
         return InstErrorCode.OK
 
     def _initialize(self):
         """
         Set the configuration to an initialized, unconfigured state.
         """
-
-        self.protocol = NMEA0183Protocol()
+        self._protocol = NMEA0183Protocol()
+        self._serialReadMode = OFF  # Ignore incoming NMEA lines
+        ConfigureNMEADevice.cfgParams = ConfigureNMEADevice.defParams
         self._port = None
         self._baudrate = None
         self._bytesize = None
@@ -1366,55 +1431,51 @@ class NMEADeviceDriver(InstrumentDriver):
         self._xonxoff = None
         self._rtscts = None
 
-    def _get_status(self,params):
+    def _get_status(self, params):
         """
         Get the instrument and channel status.
-        @params A list of (channel,status) keys.
+        @params A list of(channel,status) keys.
         @retval A dict containing success and status results:
             {'success':success,'result':
             {(chan,arg):(success,val),...,(chan,arg):(success,val)}}
         """
-
         # Set up the reply message.
         reply = {'success': None, 'result': None}
         result = {}
         get_errors = False
 
-        for (chan,arg) in params:
+        for(chan, arg) in params:
             if NMEADeviceChannel.has(chan) and NMEADeviceStatus.has(arg):
-                # If instrument channel or all.
-                if chan == NMEADeviceChannel.GPS or chan == NMEADeviceChannel.ALL:
-
-                    if arg == NMEADeviceStatus.DRIVER_STATE or arg == NMEADeviceStatus.ALL:
-                        result[(NMEADeviceChannel.GPS, NMEADeviceStatus.DRIVER_STATE)] = \
-                            (InstErrorCode.OK, self._fsm.get_current_state())
-
-                    if arg == NMEADeviceStatus.OBSERVATORY_STATE or arg == NMEADeviceStatus.ALL:
-                        result[(NMEADeviceChannel.INSTRUMENT, NMEADeviceStatus.OBSERVATORY_STATE)] = \
-                            (InstErrorCode.OK, self._get_observatory_state())
-
-                    if arg == NMEADeviceStatus.DRIVER_ALARMS or arg == NMEADeviceStatus.ALL:
-                        result[(NMEADeviceChannel.INSTRUMENT, NMEADeviceStatus.DRIVER_ALARMS)] = \
-                            (InstErrorCode.OK, self._alarms)
-
-                    if arg == NMEADeviceStatus.DRIVER_VERSION or arg == NMEADeviceStatus.ALL:
-                        result[(NMEADeviceChannel.INSTRUMENT, NMEADeviceStatus.DRIVER_VERSION)] = \
-                            (InstErrorCode.OK, self.get_version())
+                if chan in (NMEADeviceChannel.GPS,
+                            NMEADeviceChannel.INSTRUMENT,
+                            NMEADeviceChannel.ALL):
+                    chan = NMEADeviceChannel.GPS
+                    ok = InstErrorCode.OK
+                    all = (arg == NMEADeviceStatus.ALL)
+                    if arg == NMEADeviceStatus.DRIVER_STATE or all:
+                        result[(chan, NMEADeviceStatus.DRIVER_STATE)]\
+                            = (ok, self._fsm.get_current_state())
+                    if arg == NMEADeviceStatus.OBSERVATORY_STATE or all:
+                        result[(chan, NMEADeviceStatus.OBSERVATORY_STATE)]\
+                            = (ok, self._get_observatory_state())
+                    if arg == NMEADeviceStatus.DRIVER_ALARMS or all:
+                        result[(chan, NMEADeviceStatus.DRIVER_ALARMS)]\
+                            = (ok, self._alarms)
+                    if arg == NMEADeviceStatus.DRIVER_VERSION or all:
+                        result[(chan, NMEADeviceStatus.DRIVER_VERSION)]\
+                            = (ok, self.get_version())
 
             # Status or channel key or both invalid.
             else:
                 result[(chan, arg)] = (InstErrorCode.INVALID_STATUS, None)
                 get_errors = True
-
         reply['result'] = result
 
         # Set the overall error state.
         if get_errors:
             reply['success'] = InstErrorCode.GET_DEVICE_ERR
-
         else:
             reply['success'] = InstErrorCode.OK
-
         return reply
 
     def _get_capabilities(self,params):
@@ -1423,7 +1484,6 @@ class NMEADeviceDriver(InstrumentDriver):
         @param params a list of capability arguments.
         @retval reply message with the requested capability results.
         """
-
         # Set up the reply message.
         reply = {'success': None, 'result': None}
         result = {}
@@ -1431,34 +1491,30 @@ class NMEADeviceDriver(InstrumentDriver):
 
         for arg in params:
             if NMEADeviceCapability.has(arg):
+                all = (arg == NMEADeviceCapability.DEVICE_ALL)
 
-                if arg == NMEADeviceCapability.DEVICE_COMMANDS or \
-                        arg == NMEADeviceCapability.DEVICE_ALL:
+                if arg == NMEADeviceCapability.DEVICE_COMMANDS or all:
                     result[NMEADeviceCapability.DEVICE_COMMANDS] = \
-                        (InstErrorCode.OK, NMEADeviceCommand.list())
+                      (InstErrorCode.OK, NMEADeviceCommand.list())
 
-                if arg == NMEADeviceCapability.DEVICE_METADATA or \
-                        arg == NMEADeviceCapability.DEVICE_ALL:
+                if arg == NMEADeviceCapability.DEVICE_METADATA or all:
                     result[NMEADeviceCapability.DEVICE_METADATA] = \
-                        (InstErrorCode.OK, NMEADeviceMetadataParameter.list())
+                      (InstErrorCode.OK, NMEADeviceMetadataParameter.list())
 
-                if arg == NMEADeviceCapability.DEVICE_PARAMS or \
-                        arg == NMEADeviceCapability.DEVICE_ALL:
+                if arg == NMEADeviceCapability.DEVICE_PARAMS or all:
                     result[NMEADeviceCapability.DEVICE_PARAMS] = \
-                        (InstErrorCode.OK, self.parameters.keys())
+                      (InstErrorCode.OK, ConfigureNMEADevice.defParams.keys())
 
-                if arg == NMEADeviceCapability.DEVICE_STATUSES or \
-                        arg == NMEADeviceCapability.DEVICE_ALL:
+                if arg == NMEADeviceCapability.DEVICE_STATUSES or all:
                     result[NMEADeviceCapability.DEVICE_STATUSES] = \
-                        (InstErrorCode.OK, NMEADeviceStatus.list())
+                      (InstErrorCode.OK, NMEADeviceStatus.list())
 
-                if arg == NMEADeviceCapability.DEVICE_CHANNELS or \
-                        arg == NMEADeviceCapability.DEVICE_ALL:
+                if arg == NMEADeviceCapability.DEVICE_CHANNELS or all:
                     result[NMEADeviceCapability.DEVICE_CHANNELS] = \
-                        (InstErrorCode.OK, NMEADeviceChannel.list())
+                      (InstErrorCode.OK, NMEADeviceChannel.list())
 
             else:
-                result[arg] = (InstErrorCode.INVALID_CAPABILITY,None)
+                result[arg] =(InstErrorCode.INVALID_CAPABILITY,None)
                 get_errors = True
 
         if get_errors:
@@ -1484,29 +1540,17 @@ class NMEADeviceDriver(InstrumentDriver):
         elif curstate == NMEADeviceState.DISCONNECTING:
             return ObservatoryState.NONE
 
-        elif curstate == NMEADeviceState.ACQUIRE_SAMPLE:
+        elif curstate == NMEADeviceState.CONNECTED and self._serialReadMode == ONCE:
             return ObservatoryState.ACQUIRING
+
+        elif curstate == NMEADeviceState.CONNECTED and self._serialReadMode == ON:
+            return ObservatoryState.STREAMING
 
         elif curstate == NMEADeviceState.CONNECTED:
             return ObservatoryState.STANDBY
 
-        elif curstate == NMEADeviceState.CALIBRATE:
-            return ObservatoryState.CALIBRATING
-
-        elif curstate == NMEADeviceState.AUTOSAMPLE:
-            return ObservatoryState.STREAMING
-
-        elif curstate == NMEADeviceState.SET:
-            return ObservatoryState.UPDATING
-
-        elif curstate == NMEADeviceState.TEST:
-            return ObservatoryState.TESTING
-
         elif curstate == NMEADeviceState.UNCONFIGURED:
             return ObservatoryState.NONE
-
-        elif curstate == NMEADeviceState.UPDATE_PARAMS:
-            return ObservatoryState.UPDATING
 
         else:
             return ObservatoryState.UNKNOWN
@@ -1522,108 +1566,98 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         Return a dict with all driver parameters.
         """
-
-        paramdict = dict(map(lambda x: (x[0], x[1]['value']),
-                             self.parameters.items()))
+        paramdict = dict(map(lambda x:(x[0], x[1]['value']),
+                             ConfigureNMEADevice.defParams.items()))
         return paramdict
 
-###########################################################################
-# Other.
-###########################################################################
+    ###########################################################################
+    # Other.
+    ###########################################################################
 
-    def _get_parameters(self,params):
+    def _set_parameters(self, params):
+        """
+        Set named parameters to device hardware.
+            @param params A dict containing (InstrumentChannel,InstrumentParameter)
+                tuples as keys.
+            @retval reply dict {'success':InstErrorCode,
+                'result':{(chan,param):InstErrorCode,...,(chan,param):InstErrorCode}
+        """
+        reply = dict (success = None, result = None)
+        result = {}
+        set_errors = False
+
+        for (chan, param) in params:
+            val = params[(chan, param)]
+            if ConfigureNMEADevice.defParams.get(param):
+                if param in ConfigureNMEADevice.validSet:
+                    if val in [ON, OFF]:
+                        ConfigureNMEADevice.SetSentences({param: val})
+                        result[(chan, param)] = InstErrorCode.OK
+                        ConfigureNMEADevice.cfgParams[param] = val
+                    else:
+                        result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
+                        set_errors = True
+                else:
+                    if val in ConfigureNMEADevice.cfgParams:
+                        ConfigureNMEADevice.SendConfigToDevice({param, val})
+                        result[(chan, param)] = InstErrorCode.OK
+                        ConfigureNMEADevice.cfgParams[param] = val
+                    else:
+                        result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
+                        set_errors = True
+            else:
+                result[(chan, param)] = InstErrorCode.INVALID_PARAMETER
+                set_errors = True
+        if set_errors:
+            reply['success'] = InstErrorCode.SET_DEVICE_ERR
+        else:
+            reply['success'] = InstErrorCode.OK
+        reply['result'] = result
+        defer.returnValue(reply)
+
+    def _get_parameters(self, params):
         """
         Get named parameter values.
-        @param params a list of (chan_arg,param_arg) pairs, where chan_arg
-            is a valid device channel specifier (see sbe37_channel_list and
+        @param params a list of(chan_arg,param_arg) pairs, where chan_arg
+            is a valid device channel specifier(see sbe37_channel_list and
             driver_channel_list), and param_arg is a named parameter for that
             channel.
         @retval A dict {'success':success,
             'result':{(chan_arg,param_arg):(success,val),...,
-                (chan_arg,param_arg):(success,val)}
+              (chan_arg,param_arg):(success,val)}
         """
-        # Set up the reply message.
-        reply = {'success': None, 'result': None}
+        reply = dict (success = None, result = None)
         result = {}
         get_errors = False
 
-        # Get the lists of channels and parameters in the driver parameters.
-        keys = self.parameters.keys()
-        channels_list = [row[0] for row in keys]
-        params_list = [row[1] for row in keys]
-
         for(chan, param) in params:
-
-            # Retrieve all parameters.
-            if chan == 'all' and param == 'all':
-                for(key, val) in self.parameters.iteritems():
-                    result[key] = (InstErrorCode.OK, val['value'])
-
-            elif chan == 'all':
-
-                # Invalid parameter name.
-                if param not in params_list:
-                    result[(chan, param)] = \
-                        (InstErrorCode.INVALID_PARAMETER, None)
-                    get_errors = True
-
-                # Retrieve a valid named parameter for all channels.
-                else:
-                    for(key, val) in self.parameters.iteritems():
-                        if key[1] == param:
-                            result[key] = (InstErrorCode.OK, val['value'])
-
-            elif param == 'all':
-
-                # Invalid channel name.
-                if chan not in channels_list:
-                    result[(chan, param)] = \
-                        (InstErrorCode.INVALID_PARAMETER, None)
-                    get_errors = True
-
-                # Retrieve all parameters for a valid named channel.
-                else:
-                    for(key, val) in self.parameters.iteritems():
-                        if key[0] == chan:
-                            result[key] = (InstErrorCode.OK, val['value'])
+            chan = NMEADeviceChannel.GPS        # GPS only has one channel
+            if param == 'all':
+                for (key, val) in ConfigureNMEADevice.cfgParams.iteritems():
+                    result[chan, key] =(InstErrorCode.OK, val['value'])
 
             # Retrieve named channel-parameters
             else:
-
-                val = self.parameters.get((chan, param), None)
-
-                # Invalid channel or parameter name.
-                if val == None:
-                    result[(chan, param)] = \
-                        (InstErrorCode.INVALID_PARAMETER, None)
+                val = ConfigureNMEADevice.cfgParams.get(param)
+                if val:
+                    result[(chan, param)] = (InstErrorCode.OK, val)
+                else:
+                    result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
                     get_errors = True
 
-                # Valid channel parameter names.
-                else:
-                    result[(chan, param)] = \
-                        (InstErrorCode.OK, val['value'])
 
         # Set up reply success and return.
         if get_errors:
             reply['success'] = InstErrorCode.GET_DEVICE_ERR
-
         else:
             reply['success'] = InstErrorCode.OK
-
         reply['result'] = result
         return reply
-
-    def _debug_print(self, event, data=None):
-        """
-        Dump state and event status to stdio.
-        """
-        log.debug ("Current state: %s, Current Event: %s, Data: %s",
-                   self.fsm.current_state, event, data)
 
 class NMEA0183Protocol(basic.LineReceiver):
 
     def __init__(self):
-        self._serialReadMode = "OFF"
+        pass
 
     def lineReceived(self, line):
         """
@@ -1633,26 +1667,17 @@ class NMEA0183Protocol(basic.LineReceiver):
         the parsing pipeline.
         Sends EVENT_DATA_RECEIVED if a good NMEA line came in.
         """
-        self._serialReadMode = "ON"
-        if self._serialReadMode == "OFF":
-            log.info("NMEA data received: OFF")
-            return
-
         nmeaLine = NMEA.NMEAString(line)
         lineStatus = nmeaLine.IsValid()
 
         if NMEA.NMEAErrorCode.is_ok(lineStatus):
 
             # If a valid sentence was received:
-            #       - Store the setence
+            #       - Store the sentence
             #       - send a data received event
-            NMEADeviceDriver.data_lines.insert(0, nmeaLine)
+            NMEADeviceDriver._data_lines.insert(0, nmeaLine)
             NMEADeviceDriver.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
-            log.info("NMEA data received: %s", nmeaLine)
-
-        if self._serialReadMode == "1":
-            self._serialReadMode = "OFF"
-
+            log.debug("NMEA received: %s", nmeaLine)
 
 class NMEADeviceDriverClient(InstrumentDriverClient):
     """
@@ -1660,6 +1685,6 @@ class NMEADeviceDriverClient(InstrumentDriverClient):
     instrument agent can use for communicating with the driver.
     """
 
-
 # Spawn of the process using the module name
+#noinspection PyUnboundLocalVariable
 factory = ProcessFactory(NMEADeviceDriver)
