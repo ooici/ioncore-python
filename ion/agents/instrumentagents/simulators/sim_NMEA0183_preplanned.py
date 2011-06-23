@@ -8,6 +8,8 @@
 """
     Commands accepted by the simulator
 
+    $PGRMC...           Any valid PGRMC set command
+    $PGRMC              All valid and invalid PGRMC results in return of $PGRMC sentence with current settings
     $PGRMO,,3           Enables all sentences
     $PGRMO,,4           Enables all sentences
     $PGRMO,,2           Disables all sentences
@@ -159,8 +161,8 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
 
     pendingOutput = []
 
-    SentenceStatus = [{'Type': 'GPGGA', 'Status': 'Off'},
-                      {'Type': 'GPRMC', 'Status': 'Off'}]
+    SentenceStatus = [{'Type': 'GPGGA', 'Status': ON},
+                      {'Type': 'GPRMC', 'Status': OFF}]
 
     s = None
 
@@ -262,7 +264,8 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         """
 
         self._simRun.stop()
-        # reactor.run()
+        log.info ('1HZ GPS output has stopped.')
+        sim_NMEA0183.WaitForConnect (1)
         self._workingSim = False
 
     def IsSimulatorRunning(self):
