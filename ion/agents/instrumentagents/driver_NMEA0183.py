@@ -156,7 +156,7 @@ class CfgNMEADevice(object):
     Currently this class converts input commands into special NMEA config
     sentences that are sent to the device.
     """
-    validSet = ['ALL', 'GPGGA', 'GPRMC', 'GPGLL', 'PGRMF', 'PGRMC']
+    validSet = ['ALL', 'GPGGA', 'GPRMC']
     cfgParams = {'GPGGA':        'OFF',
                  'GPGLL':        'OFF',
                  'GPRMC':        'OFF',
@@ -1604,6 +1604,7 @@ class NMEADeviceDriver(InstrumentDriver):
             log.debug("*** defParams: %s", self._device_NMEA_config.defParams)
             if self._device_NMEA_config.defParams.get(param):
                 if param in self._device_NMEA_config.validSet:
+                    # Do PGRMO stuff here
                     if val in [ON, OFF]:
                         self._device_NMEA_config.SetSentences({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
@@ -1612,7 +1613,8 @@ class NMEADeviceDriver(InstrumentDriver):
                         result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
                         set_errors = True
                 else:
-                    if val in self._device_NMEA_config.cfgParams:
+                    # Doing PGRMC stuff here
+                    if param in self._device_NMEA_config.cfgParams.keys():
                         self._device_NMEA_config.SendConfigToDevice({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
