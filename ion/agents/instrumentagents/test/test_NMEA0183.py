@@ -27,7 +27,7 @@ from ion.agents.instrumentagents.driver_NMEA0183 \
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
-    import SERPORTSLAVE
+    import SERPORTSLAVE, OFF, ON
 
 
 import ion.util.ionlog
@@ -50,9 +50,10 @@ log = ion.util.ionlog.getLogger(__name__)
 # during development. Also this will ensure tests do not run
 # automatically.
 SKIP_TESTS = [
-    #'test_NMEAParser',
-    'test_configure',
-    'test_connect'
+    'test_NMEAParser',
+    # 'test_configure',
+    'test_connect',
+    'test_get_set'
 ]
 
 def dump_dict (d, d2 = None):
@@ -101,6 +102,14 @@ class TestNMEADevice(IonTestCase):
                       'timeout': device_timeout,
                       'xonxoff': device_xonxoff,
                       'rtscts': device_rtscts }
+    bogus_config  = { 'port': 'NOPORT',
+                      'baudrate': -1,
+                      'bytesize': 12,
+                      'parity': device_parity,
+                      'stopbits': device_stopbits,
+                      'timeout': device_timeout,
+                      'xonxoff': device_xonxoff,
+                      'rtscts': device_rtscts }
 
     @defer.inlineCallbacks
     def setUp (self):
@@ -132,7 +141,7 @@ class TestNMEADevice(IonTestCase):
         Verify NMEA parsing routines.
         """
         if 'test_NMEAParser' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping during development.')
+            raise unittest.SkipTest ('Skipping test_NMEAParser during development.')
 
         # Verify parsing of known VALID GPGGA string
         testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*52'
@@ -183,84 +192,251 @@ class TestNMEADevice(IonTestCase):
         parseNMEA = NMEA.NMEAString (testNMEA)
         self.assertTrue (parseNMEA.IsValid())
 
+        log.debug ('test_NMEAParser complete')
+
     @defer.inlineCallbacks
     def test_configure (self):
         """
         Test driver configure functions.
         """
-
         if 'test_configure' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping during development.')
-
-        params = self.driver_config
+            raise unittest.SkipTest('Skipping test_configure during development.')
 
         # We should begin in the unconfigured state.
+        log.debug ('Verifying driver is UNCONFIGURED state')
         current_state = yield self.driver_client.get_state()
         self.assertEqual (current_state, NMEADeviceState.UNCONFIGURED)
 
-        # Configure the driver and verify.
-        log.debug ('Configure the driver')
-        reply = yield self.driver_client.configure (params)
-        log.debug ('Configuration sent to driver')
+        # Configure the driver properly and verify that we're in DISCONNECTED state.
+        log.debug ('Configuring driver correctly then verifying driver is in DISCONNECTED state')
+        reply = yield self.driver_client.configure (self.driver_config)
         current_state = yield self.driver_client.get_state()
-        log.debug ('Now in %s state' %current_state)
         success = reply['success']
         result = reply['result']
         self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result, params)
+        self.assertEqual (result, self.driver_config)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
+
+        # Configure the driver improperly so that it fails to configure
+        log.debug ('Configuring driver incorrectly, verifying bad config and driver is still in DISCONNECTED state')
+        reply = yield self.driver_client.configure (self.bogus_config)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_error (success))
+        self.assertEqual (result, self.bogus_config)
+        self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
+
+        log.debug ('test_configure complete')
 
     @defer.inlineCallbacks
     def test_connect (self):
         """
         Test driver connect to device.
         """
-
         if 'test_connect' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping during development.')
-
-        params = self.driver_config
+            raise unittest.SkipTest('Skipping test_connect during development.')
 
         # We should begin in the unconfigured state.
+        log.debug ('Verifying driver is UNCONFIGURED state')
         current_state = yield self.driver_client.get_state()
         self.assertEqual (current_state, NMEADeviceState.UNCONFIGURED)
 
-        # Configure the driver and verify.
-        reply = yield self.driver_client.configure (params)
+        # Try to connect to the device without configuring first (should fail)
+        log.debug ('Verifying that driver cannot connect to device in UNCONFIGURED state')
+        reply = yield self.driver_client.connect()
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
+        self.assert_ (InstErrorCode.is_error (success))
+        self.assertEqual (result, None)
+        self.assertEqual (current_state, NMEADeviceState.UNCONFIGURED)
 
+        # Configure the driver properly and verify that we're in DISCONNECTED state.
+        log.debug ('Configuring driver correctly then verifying driver is in DISCONNECTED state')
+        reply = yield self.driver_client.configure (self.driver_config)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
         self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result, params)
+        self.assertEqual (result, self.driver_config)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
 
-        # Establish connection to device and verify.
-        log.info ('----- Establish connection')
-        try:
-            reply = yield self.driver_client.connect()
-        except Exception, ex:
-            self.fail('Could not connect to the device.')
-            
-        log.info ('----- Get State after establishing connection')
+        # Establish connection to the device and verify that we're in CONNECTED state..
+        log.debug ('Connecting to the device then verifying driver is in CONNECTED state')
+        reply = yield self.driver_client.connect()
         current_state = yield self.driver_client.get_state()
-        log.info ('----- Got State: %s, reply: %s', current_state, reply)
-        
-        self.assert_ (InstErrorCode.is_ok (reply['success']))
-        self.assertEqual (reply['result'], None)
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result, None)
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+
+        # Verify that since driver is connected, connection cannot happen again (should fail)
+        log.debug ('Verifying driver cannot connect again to a connected device')
+        reply = yield self.driver_client.connect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_error (success))
+        self.assertEqual (result, None)
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # Dissolve the connection to the device.
-        log.info ('----- Disconnect')
+        log.debug ('Disconnecting from device and verifying back in DISCONNECTED state')
         reply = yield self.driver_client.disconnect()
-        log.info ('----- Get State after disconnecting')
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-
         self.assert_ (InstErrorCode.is_ok (success))
         self.assertEqual(result, None)
         self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
-        
 
-        
+        log.debug ('test_configure complete')
+
+    @defer.inlineCallbacks
+    def test_get_set (self):
+        """
+        Test driver get/set methods with device.
+        """
+        if 'test_connect' in SKIP_TESTS:
+            raise unittest.SkipTest('Skipping test_connect during development.')
+
+        # We should begin in the unconfigured state.
+        log.debug ('Verifying driver is UNCONFIGURED state')
+        current_state = yield self.driver_client.get_state()
+        self.assertEqual (current_state, NMEADeviceState.UNCONFIGURED)
+
+        # Configure the driver properly and verify that we're in DISCONNECTED state.
+        log.debug ('Configuring driver correctly then verifying driver is in DISCONNECTED state')
+        reply = yield self.driver_client.configure (self.driver_config)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result, self.driver_config)
+        self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
+
+        # Establish connection to the device and verify that we're in CONNECTED state..
+        log.debug ('Connecting to the device then verifying driver is in CONNECTED state')
+        reply = yield self.driver_client.connect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result, None)
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+
+        # Get all parameters and verify that the ones being reported are what we expect
+        log.debug ('Getting and verifying expected parameters from the device')
+        timeout = 30
+        params = [(NMEADeviceChannel.GPS, NMEADeviceParam.ALL)]
+        reply = yield self.driver_client.get (params, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        gpsParams = { (NMEADeviceChannel.GPS, 'GPGGA'),
+                      (NMEADeviceChannel.GPS, 'GPGLL'),
+                      (NMEADeviceChannel.GPS, 'GPRMC'),
+                      (NMEADeviceChannel.GPS, 'PGRMF'),
+                      (NMEADeviceChannel.GPS, 'PGRMC'),
+                      (NMEADeviceChannel.GPS, 'FIX_MODE'),
+                      (NMEADeviceChannel.GPS, 'ALT_MSL'),
+                      (NMEADeviceChannel.GPS, 'E_DATUM'),
+                      (NMEADeviceChannel.GPS, 'DIFFMODE'),
+                      (NMEADeviceChannel.GPS, 'BAUD_RT'),
+                      (NMEADeviceChannel.GPS, 'MP_OUT'),
+                      (NMEADeviceChannel.GPS, 'MP_LEN'),
+                      (NMEADeviceChannel.GPS, 'DED_REC')}
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (gpsParams.sort(), result.keys().sort())
+        self.assertEqual (all (map (lambda x: x[1] != None, result.values())), True)
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+
+        # Use set to turn off all sentences
+        newParams = {}
+        newParams[NMEADeviceChannel.GPS, 'GPGGA'] = OFF
+        newParams[NMEADeviceChannel.GPS, 'GPGLL'] = OFF
+        newParams[NMEADeviceChannel.GPS, 'GPRMC'] = OFF
+        newParams[NMEADeviceChannel.GPS, 'PGRMF'] = OFF
+        newParams[NMEADeviceChannel.GPS, 'PGRMC'] = OFF
+        reply = yield self.driver_client.set (newParams, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok(success))
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+
+        # Get parameters to verify that sentences are off
+        log.debug ('Shutting off all sentences and verifing they are off')
+        reply = yield self.driver_client.get (params, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')], OFF)
+        self.assertEqual (current_state,NMEADeviceState.CONNECTED)
+
+        # Use set to turn on all sentences
+        newParams = {}
+        newParams[NMEADeviceChannel.GPS, 'GPGGA'] = ON
+        newParams[NMEADeviceChannel.GPS, 'GPGLL'] = ON
+        newParams[NMEADeviceChannel.GPS, 'GPRMC'] = ON
+        newParams[NMEADeviceChannel.GPS, 'PGRMF'] = ON
+        newParams[NMEADeviceChannel.GPS, 'PGRMC'] = ON
+        reply = yield self.driver_client.set (newParams, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok(success))
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
+
+        # Get parameters to verify that sentences are on
+        log.debug ('Turning on all sentences and verifing they are on')
+        reply = yield self.driver_client.get (params, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')], ON)
+        self.assertEqual (current_state,NMEADeviceState.CONNECTED)
+
+        # Try getting a mix of good and bad parameters
+        log.debug ('Testing get of implicitly named good and bad parameters')
+        params = [
+            ('BOGUS Channel Name', 'GPGGA'),
+            (NMEADeviceChannel.GPS, 'GPGGA'),
+            (NMEADeviceChannel.GPS, 'BOGUS') ]
+        reply = yield self.driver_client.get (params, timeout)
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assert_ (InstErrorCode.is_error (result[('BOGUS Channel Name', 'GPGGA')][0]))
+        self.assertEqual (result [('BOGUS Channel Name', 'GPGGA')][1], None)
+        self.assert_ (InstErrorCode.is_ok (result[(NMEADeviceChannel.GPS, 'GPGGA')][0]))
+        self.assert_ (InstErrorCode.is_error (result[(NMEADeviceChannel.GPS, 'BOGUS')][0]))
+        self.assertEqual (current_state,NMEADeviceState.CONNECTED)
+
+        # TODO: Try setting mix of good and bad parameters
+
+        # Dissolve the connection to the device.
+        log.debug ('Disconnecting from device and verifying back in DISCONNECTED state')
+        reply = yield self.driver_client.disconnect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual(result, None)
+        self.assertEqual (current_state, NMEADeviceState.DISCONNECTED)
+
+        log.debug ('test_get_set complete')
+

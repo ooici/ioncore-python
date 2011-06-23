@@ -147,7 +147,7 @@ class ConfigureNMEADevice(object):
 
     def __init__(self):
 
-        self.configParams = {'GPGGA':        'PUBLISH',
+        self.configParams = {   'GPGGA':        'PUBLISH',
                                 'GPGLL':        'NO_PUBLISH',
                                 'GPRMC':        'NO_PUBLISH',
                                 'PGRMF':        'ON_REQUEST',

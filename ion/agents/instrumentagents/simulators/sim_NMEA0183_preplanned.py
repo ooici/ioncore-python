@@ -33,8 +33,6 @@ import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-OFF = 'Off'
-ON = 'On'
 PATHLEN = len (simPath) - 1
 
 class NMEASimProtocol (basic.LineReceiver):
@@ -116,23 +114,23 @@ class NMEASimProtocol (basic.LineReceiver):
         new = []
         if mode > 2:
             for sen in NMEA0183SimPrePlanned.SentenceStatus:
-                new.append ({'Type': sen['Type'], 'Status': ON})
+                new.append ({'Type': sen['Type'], 'Status': sim_NMEA0183.ON})
             log.info ('PGRMO statement enabled all NMEA output.')
         elif mode == 2:
             for sen in NMEA0183SimPrePlanned.SentenceStatus:
-                new.append ({'Type': sen['Type'], 'Status': OFF})
+                new.append ({'Type': sen['Type'], 'Status': sim_NMEA0183.OFF})
             log.info ('PGRMO statement disabled all NMEA output.')
         elif mode == 1:
             for sen in NMEA0183SimPrePlanned.SentenceStatus:
                 if sen['Type'] == target:
-                    new.append ({'Type': target, 'Status': ON})
+                    new.append ({'Type': target, 'Status': sim_NMEA0183.ON})
                 else:
                     new.append ({'Type': sen['Type'], 'Status': sen['Status']})
             log.info ('PGRMO statement enabled NMEA statement %s' % target)
         elif mode == 0:
             for sen in NMEA0183SimPrePlanned.SentenceStatus:
                 if sen['Type'] == target:
-                    new.append ({'Type': target, 'Status': OFF})
+                    new.append ({'Type': target, 'Status': sim_NMEA0183.OFF})
                 else:
                     new.append ({'Type': sen['Type'], 'Status': sen['Status']})
             log.info ('PGRMO statement disabled NMEA statement %s' % target)
@@ -161,13 +159,13 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
 
     pendingOutput = []
 
-    SentenceStatus = [{'Type': 'GPGGA', 'Status': ON},
-                      {'Type': 'GPRMC', 'Status': OFF}]
+    SentenceStatus = [{'Type': 'GPGGA', 'Status': sim_NMEA0183.ON},
+                      {'Type': 'GPRMC', 'Status': sim_NMEA0183.OFF}]
 
     s = None
 
     def __init__ (self):
-        log.info ('Preplanned __init__')
+        log.debug ('Preplanned __init__')
         sim_NMEA0183.NMEA0183SimBase.__init__ (self)
 
     def SimGPSSetup (self):
@@ -194,10 +192,10 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
             log.error ('GPS Simulator Failure: ' + e.__str__())
             return
         log.debug ('Successfuly opened  %s.' % self._serMaster)
-        log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
+        log.debug ('Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
         # yield asleep (1)
         sim_NMEA0183.WaitForConnect (1)
-        log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
+        log.debug ('After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
         self._workingSim = True
         self._goodComms = True
 
@@ -236,7 +234,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
              'sog': '%3.1f' % sog,
              'cog': '%3.1f' % cog}
         for sen in NMEA0183SimPrePlanned.SentenceStatus:
-            if sen['Status'] == ON:
+            if sen['Status'] == sim_NMEA0183.ON:
                 if sen['Type'] == 'GPGGA':
                     nmeaOut = sim_NMEA0183.BuildGPGGA (n)
                     self.SimWriteToSerial (nmeaOut)

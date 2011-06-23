@@ -22,6 +22,8 @@ SERPORTSLAVE = '/tmp/serPortSlave'
 SOCATapp = 'socat'
 SERPORTMODE = 'w+'
 NULLPORTMODE = 'w'
+OFF = 'Off'
+ON = 'On'
 
 # Open a null stream to pipe unwanted console messages to nowhere
 nullDesc = open (os.devnull, NULLPORTMODE)
