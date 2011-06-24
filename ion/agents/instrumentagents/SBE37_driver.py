@@ -2447,6 +2447,7 @@ class SBE37Driver(InstrumentDriver):
         try:
             date_time = time.strptime(datestr,fmt)
             date = (date_time[2],date_time[1],date_time[0])
+
         except ValueError:
             return None
                         
