@@ -448,7 +448,6 @@ class TestNMEADevice(IonTestCase):
 
         reply = yield self.driver_client.set(config_1, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
-        log.debug("*** reply to set: %s", reply)
 
         reply = yield self.driver_client.get(param_list, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
@@ -466,4 +465,50 @@ class TestNMEADevice(IonTestCase):
         for (chan, param) in param_list:
             self.assertEqual(reply['result'][(chan,param)][1], config_2[(chan,param)])
 
+    @defer.inlineCallbacks
+    def test_acquire_sample(self):
+        """
+        The NMEA driver only has a few commands, so lets try acquiring samples
+        """
+        # Get configured and connected, then try to execute something
+        reply = yield self.driver_client.configure(self.driver_config)
+        reply = yield self.driver_client.connect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual(result, None)
+        self.assertEqual(current_state, NMEADeviceState.CONNECTED)
+        
+        reply = yield self.driver_client.execute({"channels":[NMEADeviceChannel.GPS],
+                                                  "command":[NMEADriverCommand.ACQUIRE_SAMPLE],
+                                                  "timeout":10})
+        self.assert_(InstErrorCode.is_ok(reply['success']))
+
+    @defer.inlineCallbacks
+    def test_bad_commands(self):
+        """
+        Test for non implemented commands
+        """
+        # We arent configured yet!
+        reply = yield self.driver_client.execute({"channels":NMEADeviceChannel.GPS,
+                                                  "command":[NMEADeviceCommand.ACQUIRE_SAMPLE],
+                                                  "timeout":10})        
+        self.assert_(InstErrorCode.is_equal(reply['success'],InstErrorCode.INCORRECT_STATE))
+        
+        # Get configured and connected, then try to execute something
+        reply = yield self.driver_client.configure(self.driver_config)
+        reply = yield self.driver_client.connect()
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        self.assert_ (InstErrorCode.is_ok (success))
+        self.assertEqual(result, None)
+        self.assertEqual(current_state, NMEADeviceState.CONNECTED)
+        
+        # Wait a minute...we dont implement that one!
+        reply = yield self.driver_client.execute({"channels":NMEADeviceChannel.GPS,
+                                                  "command":[NMEADeviceCommand.CALIBRATE],
+                                                  "timeout":10})        
+        self.assert_(InstErrorCode.is_equal(reply['success'],InstErrorCode.NOT_IMPLEMENTED))
 

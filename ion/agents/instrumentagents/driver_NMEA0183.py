@@ -73,9 +73,7 @@ class NMEADeviceCommand(DriverCommand):
     """
     Add NMEADevice specific commands here.
     """
-    ACQUIRE_SINGLE_NMEA_SENTENCE = 'ACQUIRE_SINGLE_NMEA_SENTENCE'
-    START_STREAMING = 'START_STREAMING'
-    STOP_STREAMING = 'STOP_STREAMING'
+    pass
 
 
 # Device channels / transducers.
@@ -634,12 +632,13 @@ class NMEADeviceDriver(InstrumentDriver):
                            'value': config}
                 yield self.send(self.proc_supid,'driver_event_occurred', content)
 
-        elif event == NMEADeviceEvent.ACQUIRE_SAMPLE:
-            self._serialReadMode = ONCE  # Acquire only 1 line and stop
-            #TODO: Check that only one sentence is going for ONCE mode
-            #TODO: Based on the sentence, assign a timeout
-            #       i.e., almanac sentence may only come in once a day
-            #             GPGGA sentence at 1hz
+        elif event == NMEADeviceEvent.EXECUTE:
+            if params['command'][0] == NMEADeviceCommand.ACQUIRE_SAMPLE:        
+                self._serialReadMode = ONCE  # Acquire only 1 line and stop
+                #TODO: Check that only one sentence is going for ONCE mode
+                #TODO: Based on the sentence, assign a timeout
+                #       i.e., almanac sentence may only come in once a day
+                #             GPGGA sentence at 1hz
 
         elif event == NMEADeviceEvent.START_AUTOSAMPLE:
             self._serialReadMode = ON    # Continually acquire lines
@@ -892,7 +891,6 @@ class NMEADeviceDriver(InstrumentDriver):
             'result': {chan_arg:(success, command_specific_values), ...,
             chan_arg:(success, command_specific_values)}}
         """
-        """
         assert(isinstance(content, dict)), 'Expected dict content.'
 
         # Set up reply dict, get required parameters from message content.
@@ -938,115 +936,76 @@ class NMEADeviceDriver(InstrumentDriver):
         drv_cmd = command[0]
 
         if drv_cmd == NMEADeviceCommand.ACQUIRE_SAMPLE:
-
-            # Create command spec and set event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.ACQUIRE_SAMPLE
-
-            # This command only applies to the instrument as a whole.
             # Fail if the channel is not set properly.
             if len(channels) > 1 or channels[0] != NMEADeviceChannel.GPS:
                 reply['success'] = InstErrorCode.INVALID_CHANNEL
                 yield self.reply_ok(msg, reply)
                 return
 
-            # If the command has a length greater than 2, fail.
+            # If the command has a length greater than 1, fail.
             else:
                 reply['success'] = InstErrorCode.INVALID_COMMAND
                 yield self.reply_ok(msg, reply)
                 return
 
-            # Set up the reply deferred and fire the command event.
-            reply = yield self._process_command(command_spec, event, timeout)
+            # Send an execute event and setup reply            
+            (success,result) = yield self._fsm.on_event_async(NMEADeviceEvent.EXECUTE, command)
+            reply['success'] = success
+            reply['result'] = result
 
         elif drv_cmd == NMEADeviceCommand.START_AUTO_SAMPLING:
-
-            # Create command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.START_AUTOSAMPLE
-
-            # This command only applies to the instrument as a whole.
-            # Fail if channel not set properly.
             if len(channels) > 1 or channels[0] != NMEADeviceChannel.GPS:
                 reply['success'] = InstErrorCode.INVALID_CHANNEL
                 yield self.reply_ok(msg, reply)
                 return
 
-            # Set up the reply deferred and fire the command event.
-            reply = yield self._process_command(command_spec, event, timeout)
-
-        elif drv_cmd == NMEADeviceCommand.STOP_AUTO_SAMPLING:
-
-            # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.STOP_AUTO_SAMPLING
-
-            # This command only applies to the instrument as a whole.
-            # Fail if the channel is not set properly.
-            if len(channels) > 1 or channels[0] != NMEADeviceChannel.GPS:
-                reply['success'] = InstErrorCode.INVALID_CHANNEL
-                yield self.reply_ok(msg, reply)
-                return
-
-            # If the command has a length greater than 2, fail.
+            # If the command has a length greater than 1, fail.
             else:
                 reply['success'] = InstErrorCode.INVALID_COMMAND
                 yield self.reply_ok(msg, reply)
                 return
+            
+            # Send an start autosample event and setup reply            
+            (success,result) = yield self._fsm.on_event_async(NMEADeviceEvent.START_AUTOSAMPLE)
+            reply['success'] = success
+            reply['result'] = result
 
-            # Set up the reply deferred and fire the command event.
-            reply = yield self._process_command(command_spec, event, timeout)
+        elif drv_cmd == NMEADeviceCommand.STOP_AUTO_SAMPLING:
+           # Get optional stop parameters.
+            if len(channels) > 1 or channels[0] != NMEADeviceChannel.GPS:
+                reply['success'] = InstErrorCode.INVALID_CHANNEL
+                yield self.reply_ok(msg, reply)
+                return
 
+            # If the command has a length greater than 1, fail.
+            else:
+                reply['success'] = InstErrorCode.INVALID_COMMAND
+                yield self.reply_ok(msg, reply)
+                return
+            
+            # Send stop autosample event and setup reply.
+            (success,result) = yield self._fsm.on_event_async(NMEADeviceEvent.STOP_AUTOSAMPLE)
+            reply['success'] = success
+            reply['result'] = result
+            
         # Process test command.
-        elif drv_cmd == NMEADeviceCommand.TEST:
-
-            # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.TEST
-
+        elif drv_cmd in [NMEADriverCommand.TEST,
+                         NMEADriverCommand.CALIBRATE,
+                         NMEADriverCommand.RESET,
+                         NMEADriverCommand.TEST_ERRORS]:
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg, reply)
             return
-
-        # Process test command.
-        elif drv_cmd == NMEADeviceCommand.CALIBRATE:
-
-            # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.CALIBRATE
-
-            # Return not implemented reply.
-            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
-            yield self.reply_ok(msg, reply)
-            return
-
-        # Process test command.
-        elif drv_cmd == NMEADeviceCommand.RESET:
-
-            # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
-            event = NMEADeviceEvent.RESET
-
-            # Return not implemented reply.
-            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
-            yield self.reply_ok(msg, reply)
-            return
-
-        # Process test command.
-        elif drv_cmd == NMEADeviceCommand.TEST_ERRORS:
-
-            # Create a command spec and set the event to fire.
-            command_spec = DeviceCommandSpecification(command)
 
         else:
-
+            # The command is properly handled in the above clause.
             reply['success'] = InstErrorCode.INVALID_COMMAND
             yield self.reply_ok(msg, reply)
             return
-        yield self.reply_ok(msg, reply)
-        """
-        yield
+
+        yield self.reply_ok(msg,reply)        
+
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -1668,6 +1627,83 @@ class NMEADeviceDriver(InstrumentDriver):
             reply['success'] = InstErrorCode.OK
         reply['result'] = result
         return reply
+
+
+    def _execute(self, params):
+        """
+        Execute a driver command on the specified channels
+        @param params A dict with channels and command lists and optional
+            timeout:
+            {'channels':[chan_arg,...,chan_arg],
+            'command':[command,arg,...,argN]),
+            'timeout':timeout}.
+        @retval A reply message with a dict
+            {'success':success,
+            'result':{chan_arg:(success,command_specific_values),...,
+            chan_arg:(success,command_specific_values)}}. 
+        """
+        assert(isinstance(params,dict)), 'Expected dict content.'
+
+        # Set up reply dict, get required parameters from message content.
+        reply = {'success':None,'result':None}
+        command = params.get('command',None)
+        channels = params.get('channels',None)
+        timeout = params.get('timeout',None)
+        
+                # Fail if required parameters absent.
+        if not command:
+            reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+            return reply
+        if not channels:
+            reply['success'] = InstErrorCode.REQUIRED_PARAMETER
+            return reply
+        
+        assert(isinstance(command,(list,tuple)))        
+        assert(all(map(lambda x:isinstance(x,str),command)))
+        assert(isinstance(channels,(list,tuple)))        
+        assert(all(map(lambda x:isinstance(x,str),channels)))
+        if timeout != None:
+            assert(isinstance(timeout,int)), 'Expected integer timeout'
+            assert(timeout>0), 'Expected positive timeout'
+            pass
+
+        # Fail if command or channels not valid for sbe37.
+        if not NMEADeviceCommand.has(command[0]):
+            reply['success'] = InstErrorCode.UNKNOWN_COMMAND
+            return reply
+
+        for chan in channels:
+            if not NMEADeviceChannel.has(chan):
+                reply['success'] = InstErrorCode.UNKNOWN_CHANNEL
+                return reply
+
+        drv_cmd = command[0]
+
+
+        if drv_cmd == NMEADeviceCommand.ACQUIRE_SAMPLE:        
+            self._serialReadMode = ONCE  # Acquire only 1 line and stop
+            #TODO: Check that only one sentence is going for ONCE mode
+            #TODO: Based on the sentence, assign a timeout
+            #       i.e., almanac sentence may only come in once a day
+            #             GPGGA sentence at 1hz
+            reply['success'] = InstErrorCode.OK
+            return reply
+        
+
+        # Process test command.
+        elif drv_cmd in [NMEADriverCommand.TEST,
+                         NMEADriverCommand.CALIBRATE,
+                         NMEADriverCommand.RESET,
+                         NMEADriverCommand.TEST_ERRORS]:
+            # Return not implemented reply.
+            reply['success'] = InstErrorCode.NOT_IMPLEMENTED
+            return reply
+
+        else:
+
+            # The command is properly handled in the above clause.
+            reply['success'] = InstErrorCode.INVALID_COMMAND
+            return reply
 
 class NMEA0183Protocol(basic.LineReceiver):
 
