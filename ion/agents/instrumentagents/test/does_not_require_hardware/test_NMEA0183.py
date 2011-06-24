@@ -36,14 +36,6 @@ from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
 log.info ('Using PREPLANNED ROUTE GPS Simulator')
 
-def dump_dict (d, d2 = None):
-    print
-    for (key, val) in d.iteritems():
-        if d2:
-            print key, ' ', val, ' ', d2.get(key, None)
-        else:
-            print key, ' ', val
-
 """
 Simulator dependencies required:
     LIVESFBAY:
@@ -479,21 +471,21 @@ class TestNMEADevice(IonTestCase):
         self.assert_ (InstErrorCode.is_ok (success))
         self.assertEqual(result, None)
         self.assertEqual(current_state, NMEADeviceState.CONNECTED)
-        
-        reply = yield self.driver_client.execute({"channels":[NMEADeviceChannel.GPS],
-                                                  "command":[NMEADriverCommand.ACQUIRE_SAMPLE],
-                                                  "timeout":10})
-        self.assert_(InstErrorCode.is_ok(reply['success']))
 
+        reply = yield self.driver_client.execute([NMEADeviceChannel.GPS],
+                                                 [NMEADeviceCommand.ACQUIRE_SAMPLE])
+        self.assert_(InstErrorCode.is_ok(reply['success']))
+        # get a clue to see if we actually got data
+        self.assert_(str(reply['result']).startswith("%GPGGA"))
+                     
     @defer.inlineCallbacks
     def test_bad_commands(self):
         """
         Test for non implemented commands
         """
         # We arent configured yet!
-        reply = yield self.driver_client.execute({"channels":NMEADeviceChannel.GPS,
-                                                  "command":[NMEADeviceCommand.ACQUIRE_SAMPLE],
-                                                  "timeout":10})        
+        reply = yield self.driver_client.execute([NMEADeviceChannel.GPS],
+            [NMEADeviceCommand.ACQUIRE_SAMPLE])        
         self.assert_(InstErrorCode.is_equal(reply['success'],InstErrorCode.INCORRECT_STATE))
         
         # Get configured and connected, then try to execute something
@@ -507,8 +499,7 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual(current_state, NMEADeviceState.CONNECTED)
         
         # Wait a minute...we dont implement that one!
-        reply = yield self.driver_client.execute({"channels":NMEADeviceChannel.GPS,
-                                                  "command":[NMEADeviceCommand.CALIBRATE],
-                                                  "timeout":10})        
+        reply = yield self.driver_client.execute([NMEADeviceChannel.GPS],
+                                                  [NMEADeviceCommand.CALIBRATE])        
         self.assert_(InstErrorCode.is_equal(reply['success'],InstErrorCode.NOT_IMPLEMENTED))
 
