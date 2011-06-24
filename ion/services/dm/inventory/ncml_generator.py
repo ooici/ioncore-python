@@ -17,7 +17,7 @@ file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http:/
 from os import path, environ, chmod, unlink, listdir, remove
 import fnmatch
 
-from twisted.internet import reactor, defer, error
+from twisted.internet import defer
 from ion.util.os_process import OSProcess
 
 import ion.util.ionlog
@@ -27,7 +27,6 @@ from ion.core import ioninit
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 RSYNC_CMD = CONF['rsync']
-SSH_ADD_CMD = CONF['ssh-add']
 
 def create_ncml(id_ref, filepath=""):
     """
@@ -111,7 +110,6 @@ def rsync_ncml(local_filepath, server_url, ssh_key_filename):
     """
     ssh_cmd = "".join(("'","-e ", '"', "ssh -i ", ssh_key_filename, '"', "'"))
     args = ['-r', '--perms', ssh_cmd, '--include', '"*.ncml"',
-            "'-e  \"ssh -i /path/to/private.key\"'",
             '-v', '-h', '--delete', local_filepath + '/', server_url]
     rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
