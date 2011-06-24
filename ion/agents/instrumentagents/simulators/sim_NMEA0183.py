@@ -10,13 +10,14 @@ import time
 from twisted.internet import defer
 from datetime import datetime
 import subprocess
+import tempfile
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
-SERPORTMASTER = '/tmp/serPortMaster'
-SERPORTSLAVE = '/tmp/serPortSlave'
+tmpDir = tempfile.gettempdir()
+SERPORTMASTER = tmpDir +  '/serPortMaster'
+SERPORTSLAVE = tmpDir + 'serPortSlave'
 SOCATapp = 'socat'
 SERPORTMODE = 'w+'
 NULLPORTMODE = 'w'
