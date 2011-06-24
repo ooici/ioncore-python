@@ -16,6 +16,7 @@ import re, urllib
 
 # Imports: Twisted
 from twisted.internet import defer
+from twisted.web.client import getPage
 
 
 # Imports: ION core
@@ -113,7 +114,7 @@ class CdmValidationService(ServiceProcess):
 
         # Step 2: Validate the URL against the CDM Validator WebService
         try:
-            cdm_output = self.validate_cdm(data_url)
+            cdm_output = yield self.validate_cdm(data_url)
             cdm_resp = yield self.process_cdm_validation_output(cdm_output)
         except Exception, ex:
             log.warn('CDM Validation or validation output processing failed:  Cause: %s' % str(ex))
@@ -140,6 +141,7 @@ class CdmValidationService(ServiceProcess):
         yield self.reply_ok(msg, response)
     
     
+    @defer.inlineCallbacks
     def validate_cdm(self, data_url):
         """
         @brief: Validates the given data_url against the CDM Validation Webservice
@@ -153,18 +155,10 @@ class CdmValidationService(ServiceProcess):
         
         full_url = '%s/%s?URL=%s&xml=true' % (base_url, command, urllib.quote(data_url))
         
-        f = None
-        try:
-            log.debug('validate_cdm(): Requesting validation from CDMValidator WS: \n\n"%s"\n\n' % full_url)
-            f = urllib.urlopen(full_url)
-            result = f.readlines()
-            if isinstance(result, list):
-                result = "".join(result)
-        finally:
-            if f:
-                f.close()
+        log.debug('validate_cdm(): Requesting validation from CDMValidator WS: \n\n"%s"\n\n' % full_url)
+        result = yield getPage(full_url)
 
-        return result
+        defer.returnValue(result)
 
 
     @defer.inlineCallbacks
