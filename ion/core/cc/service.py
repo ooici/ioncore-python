@@ -68,7 +68,7 @@ class Options(usage.Options):
         @see CapabilityContainer.start_scripts
         """
         self['scripts'] = args
-
+        
     def postOptions(self):
         """
         Hack to actually make the -s option work since it was never
@@ -196,7 +196,7 @@ class CapabilityContainer(service.Service):
         given the path to a file, open that file and exec the code.
         The file may be an .app, a .rel, or a python code script.
         """
-
+        app_args = ioninit.cont_args
         # Try two script locations, one for IDEs and another for shell.
         for script in self.config['scripts']:
             script = adjust_dir(script)
@@ -204,7 +204,7 @@ class CapabilityContainer(service.Service):
                 log.error('Bad startup script path: %s' % script)
             else:
                 if script.endswith('.app'):
-                    yield self.container.start_app(app_filename=script)
+                    yield self.container.start_app(app_filename=script,app_args=app_args)
                 elif script.endswith('.rel'):
                     yield self.container.start_rel(rel_filename=script)
                 else:

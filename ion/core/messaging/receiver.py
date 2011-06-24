@@ -288,7 +288,7 @@ class Receiver(BasicLifecycleObject):
                 log.debug('PROTOCOL "%s"' % protocol)
                 log.debug('Current Context "%s"' % str(current_context))
 
-                log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(workbench))
+                #log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(workbench))
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
@@ -377,7 +377,7 @@ class Receiver(BasicLifecycleObject):
 
                             log.info('Receiver Process: Calling workbench clear:')
 
-                            log.debug("WORKBENCH STATE Before Clear:\n%s" % str(self.process.workbench))
+                            #log.debug("WORKBENCH STATE Before Clear:\n%s" % str(self.process.workbench))
 
                             self.process.workbench.manage_workbench_cache(workbench_context)
 
@@ -397,7 +397,7 @@ class Receiver(BasicLifecycleObject):
                                     # Print a warning if someone else is using the persistence tricks...
                                     log.warn('The "%s" process is holding persistent state in %d repository objects!' % (pname, count))
 
-                            log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
+                            #log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
 
                         else:
                             log.debug('Workbench context does not match the Convid - Do not clear anything from the workbench!')

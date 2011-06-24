@@ -47,7 +47,7 @@ class CreateDownloadURL(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS createDownloadURL error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [data_resource_id] not found in message"
+            Response.error_str = "AIS.createDownloadURL: Required field [data_resource_id] not found in message"
             defer.returnValue(Response)
             
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)

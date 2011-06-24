@@ -143,7 +143,8 @@ A good learning example is the HelloService
 ::
     bin/trial ion.play.test.test_hello
 
-Or in the mypython interpreter:
+Or in the cc shell.
+bin/twistd -n cc -h amoeba.ucsd.edu 
 ><>
     from ion.play import hello_service
     spawn(hello_service)

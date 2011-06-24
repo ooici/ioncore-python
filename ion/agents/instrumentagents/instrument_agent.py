@@ -8,6 +8,7 @@
 """
 
 import time
+import os
 from uuid import uuid4
 
 from twisted.internet import defer, reactor
@@ -34,7 +35,7 @@ from ion.agents.instrumentagents.instrument_constants import *
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True, False)[0]
+DEBUG_PRINT = True if os.environ.get('DEBUG_PRINT',None) == 'True' else False
 
 """
 Instrument agent observatory metadata.
