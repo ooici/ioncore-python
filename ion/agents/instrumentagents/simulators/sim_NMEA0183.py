@@ -17,7 +17,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 tmpDir = tempfile.gettempdir()
 SERPORTMASTER = tmpDir +  '/serPortMaster'
-SERPORTSLAVE = tmpDir + 'serPortSlave'
+SERPORTSLAVE = tmpDir + '/serPortSlave'
 SOCATapp = 'socat'
 SERPORTMODE = 'w+'
 NULLPORTMODE = 'w'
