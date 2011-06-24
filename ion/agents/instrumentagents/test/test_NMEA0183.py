@@ -330,6 +330,7 @@ class TestNMEADevice(IonTestCase):
         newParams[NMEADeviceChannel.GPS, 'PGRMF'] = OFF
         newParams[NMEADeviceChannel.GPS, 'PGRMC'] = OFF
         reply = yield self.driver_client.set (newParams, timeout)
+        log.debug("*** reply: %s", reply)
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
@@ -343,11 +344,11 @@ class TestNMEADevice(IonTestCase):
         success = reply['success']
         result = reply['result']
         self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')], OFF)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')], OFF)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')], OFF)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')], OFF)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')][1], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')][1], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')][1], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')][1], OFF)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')][1], OFF)
         self.assertEqual (current_state,NMEADeviceState.CONNECTED)
 
         # Use set to turn on all sentences
@@ -371,11 +372,11 @@ class TestNMEADevice(IonTestCase):
         success = reply['success']
         result = reply['result']
         self.assert_ (InstErrorCode.is_ok (success))
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')], ON)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')], ON)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')], ON)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')], ON)
-        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGGA')][1], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPGLL')][1], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'GPRMC')][1], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMF')][1], ON)
+        self.assertEqual (result[(NMEADeviceChannel.GPS, 'PGRMC')][1], ON)
         self.assertEqual (current_state,NMEADeviceState.CONNECTED)
 
         # Try getting a mix of good and bad parameters
@@ -388,11 +389,7 @@ class TestNMEADevice(IonTestCase):
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
-        self.assert_ (InstErrorCode.is_ok (success))
-        self.assert_ (InstErrorCode.is_error (result[('BOGUS Channel Name', 'GPGGA')][0]))
-        self.assertEqual (result [('BOGUS Channel Name', 'GPGGA')][1], None)
-        self.assert_ (InstErrorCode.is_ok (result[(NMEADeviceChannel.GPS, 'GPGGA')][0]))
-        self.assert_ (InstErrorCode.is_error (result[(NMEADeviceChannel.GPS, 'BOGUS')][0]))
+        self.assert_ (InstErrorCode.is_error (success))
         self.assertEqual (current_state,NMEADeviceState.CONNECTED)
 
         # TODO: Try setting mix of good and bad parameters
@@ -451,6 +448,7 @@ class TestNMEADevice(IonTestCase):
 
         reply = yield self.driver_client.set(config_1, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))
+        log.debug("*** reply to set: %s", reply)
 
         reply = yield self.driver_client.get(param_list, 10)
         self.assert_(InstErrorCode.is_ok (reply['success']))

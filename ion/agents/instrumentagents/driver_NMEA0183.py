@@ -44,12 +44,6 @@ ONCE = "1"
 # Driver-specific constants
 ###############################################################################
 
-class GoodValues():
-    baud = [300, 600, 4800, 9600, 19200, 38400, 57600]
-    byteSize = [FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS]
-    parity = [PARITY_NONE, PARITY_EVEN, PARITY_ODD]
-    stopBits = [STOPBITS_ONE, STOPBITS_TWO]
-
 # Device prompts
 class NMEADevicePrompt(BaseEnum):
     """
@@ -137,8 +131,12 @@ class NMEADeviceMetadataParameter(MetadataParameter):
     """
     pass
 
-# Add a parameters enum for instrument specific params.
-
+class GoodValues():
+    baud = [300, 600, 4800, 9600, 19200, 38400, 57600]
+    byteSize = [FIVEBITS, SIXBITS, SEVENBITS, EIGHTBITS]
+    parity = [PARITY_NONE, PARITY_EVEN, PARITY_ODD]
+    stopBits = [STOPBITS_ONE, STOPBITS_TWO]
+    validChans = [NMEADeviceChannel.ALL, NMEADeviceChannel.GPS, NMEADeviceChannel.INSTRUMENT]
 
 ###############################################################################
 # Helper classes.
@@ -1458,9 +1456,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         for(chan, arg) in params:
             if NMEADeviceChannel.has(chan) and NMEADeviceStatus.has(arg):
-                if chan in (NMEADeviceChannel.GPS,
-                            NMEADeviceChannel.INSTRUMENT,
-                            NMEADeviceChannel.ALL):
+                if chan in GoodValues.validChans:
                     chan = NMEADeviceChannel.GPS
                     ok = InstErrorCode.OK
                     all = (arg == NMEADeviceStatus.ALL)
@@ -1476,6 +1472,8 @@ class NMEADeviceDriver(InstrumentDriver):
                     if arg == NMEADeviceStatus.DRIVER_VERSION or all:
                         result[(chan, NMEADeviceStatus.DRIVER_VERSION)]\
                             = (ok, self.get_version())
+                else:
+                    result[(chan, arg)] = (InstErrorCode.INVALID_CHANNEL, chan)
 
             # Status or channel key or both invalid.
             else:
@@ -1643,21 +1641,25 @@ class NMEADeviceDriver(InstrumentDriver):
         reply = dict (success = None, result = None)
         result = {}
         get_errors = False
+        validChans = [NMEADeviceChannel.ALL,
+                      NMEADeviceChannel.GPS,
+                      NMEADeviceChannel.INSTRUMENT]
 
         for(chan, param) in params:
-            chan = NMEADeviceChannel.GPS        # GPS only has one channel
-            if param == NMEADeviceParam.ALL:
-                for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
-                    result[(chan, key)] = (InstErrorCode.OK, val)
-            # Retrieve named channel-parameters
-            else:
-                val = self._device_NMEA_config.cfgParams.get(param)
-                if val:
-                    result[(chan, param)] = (InstErrorCode.OK, val)
+            if chan in validChans:
+                if param == NMEADeviceParam.ALL:
+                    for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
+                        result[(chan, key)] = (InstErrorCode.OK, val)
+                # Retrieve named channel-parameters
                 else:
-                    result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
-                    get_errors = True
-
+                    val = self._device_NMEA_config.cfgParams.get(param)
+                    if val:
+                        result[(chan, param)] = (InstErrorCode.OK, val)
+                    else:
+                        result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
+                        get_errors = True
+            else:
+                result[(chan, param)] = (InstErrorCode.INVALID_CHANNEL, chan)
 
         # Set up reply success and return.
         if get_errors:
