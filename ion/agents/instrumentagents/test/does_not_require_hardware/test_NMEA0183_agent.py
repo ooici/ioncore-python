@@ -33,7 +33,7 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
-    import SERPORTSLAVE
+    import SERPORTSLAVE, OFF, ON
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -325,45 +325,36 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
 
         # Set a few parameters. This will test the device set functions
-        # and set up the driver for sampling commands. 
+        # and set up the driver for sampling commands.
+        chan = DriverChannel.GPS
         params = {}
-        params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 5
-        params[(DriverChannel.INSTRUMENT,'OUTPUTSV')] = True
-        params[(DriverChannel.INSTRUMENT,'OUTPUTSAL')] = True
-        params[(DriverChannel.INSTRUMENT,'TXREALTIME')] = True
-        params[(DriverChannel.INSTRUMENT,'STORETIME')] = True
+        params[(chan, 'GPGGA')] = ON
+        params[(chan, 'GPGLL')] = OFF
+        params[(chan, 'GPRMC')] = OFF
+        params[(chan, 'PGRMF')] = OFF
+        params[(chan, 'ALT_MSL')] = 7.7
+        params[(chan, 'DED_REC')] = 11
         
         reply = yield self.ia_client.set_device(params,tid)
         success = reply['success']
         result = reply['result']
         setparams = params
-        
         self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the set changes were made.
         params = [(DriverChannel.ALL,DriverParameter.ALL)]
-        reply = yield self.ia_client.get_device(params,tid)
+        reply = yield self.ia_client.get_device(params, tid)
         success = reply['success']
         result = reply['result']
 
         self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(setparams[(chan, 'GPGGA')], result[(chan, 'GPGGA')][1])
+        self.assertEqual(setparams[(chan, 'GPGLL')], result[(chan, 'GPGLL')][1])
+        self.assertEqual(setparams[(chan, 'GPRMC')], result[(chan, 'GPRMC')][1])
+        self.assertEqual(setparams[(chan, 'PGRMF')], result[(chan, 'PGRMF')][1])
+        self.assertEqual(setparams[(chan, 'ALT_MSL')], result[(chan, 'ALT_MSL')][1])
+        self.assertEqual(setparams[(chan, 'DED_REC')], result[(chan, 'DED_REC')][1])
 
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'NAVG')],
-                         result[(DriverChannel.INSTRUMENT,'NAVG')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'INTERVAL')],
-                         result[(DriverChannel.INSTRUMENT,'INTERVAL')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSV')],
-                         result[(DriverChannel.INSTRUMENT,'OUTPUTSV')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSAL')],
-                         result[(DriverChannel.INSTRUMENT,'OUTPUTSAL')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'TXREALTIME')],
-                         result[(DriverChannel.INSTRUMENT,'TXREALTIME')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'STORETIME')],
-                         result[(DriverChannel.INSTRUMENT,'STORETIME')][1])
-        
-        #print 'acquisition parameters successfully set'
-        
         # Acquire sample.
         chans = [DriverChannel.INSTRUMENT]
         cmd = [DriverCommand.ACQUIRE_SAMPLE]

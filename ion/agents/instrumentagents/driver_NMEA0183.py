@@ -1566,23 +1566,17 @@ class NMEADeviceDriver(InstrumentDriver):
         reply = dict (success = None, result = None)
         result = {}
         get_errors = False
-        validChans = [NMEADeviceChannel.ALL,
-                      NMEADeviceChannel.GPS,
-                      NMEADeviceChannel.INSTRUMENT]
+        gpsChan = NMEADeviceChannel.GPS
 
+        # TODO: Separate parameters from .GPS into .INSTRUMENT
         for(chan, param) in params:
-            if chan in validChans:
-                if param == NMEADeviceParam.ALL:
+            if chan in GoodValues.validChans:
+                if param == NMEADeviceParam.ALL or param == gpsChan:
                     for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
-                        result[(chan, key)] = (InstErrorCode.OK, val)
-                # Retrieve named channel-parameters
+                        result[(gpsChan, key)] = (InstErrorCode.OK, val)
                 else:
-                    val = self._device_NMEA_config.cfgParams.get(param)
-                    if val:
-                        result[(chan, param)] = (InstErrorCode.OK, val)
-                    else:
-                        result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
-                        get_errors = True
+                    result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
+                    get_errors = True
             else:
                 result[(chan, param)] = (InstErrorCode.INVALID_CHANNEL, chan)
 
