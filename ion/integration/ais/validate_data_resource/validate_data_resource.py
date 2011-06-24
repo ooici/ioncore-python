@@ -6,8 +6,6 @@
 @brief The worker class that implements data source URL validation
 """
 
-import urllib
-
 from ply.lex import lex
 from ply.yacc import yacc
 
@@ -109,7 +107,7 @@ class ValidateDataResource(object):
 
 
             #get metadata!
-            parsed_das = self._parseDas(msg.data_resource_url)
+            parsed_das = yield self._parseDas(msg.data_resource_url)
 
 
 
@@ -186,18 +184,17 @@ class ValidateDataResource(object):
             out_msg.ion_geospatial_vertical_positive  = 'True'
             # TODO add download URL?
 
-
+    @defer.inlineCallbacks
     def _parseDas(self, url):
         #prepare to parse!
         lexer = lex(module=Lexer())
         parser = yacc(module=Parser(), write_tables=0, debug=False)
 
         #fetch file
-        fullurl = url + ".das"
-        dasfile = yield getPage(full_url)
+        dasfile = yield getPage(url + ".das")
         
         #crunch it!
-        return parser.parse(dasfile, lexer=lexer)
+        defer.returnValue(parser.parse(dasfile, lexer=lexer))
 
 
     @defer.inlineCallbacks
