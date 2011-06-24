@@ -16,6 +16,7 @@ from ion.integration.ais.validate_data_resource.data_resource_parser import Lexe
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+from twisted.web.client import getPage
 
 #from ion.core.messaging.message_client import MessageClient
 #from ion.core.object import object_utils
@@ -193,9 +194,7 @@ class ValidateDataResource(object):
 
         #fetch file
         fullurl = url + ".das"
-        webfile = urllib.urlopen(fullurl)
-        dasfile = webfile.read()
-        webfile.close()
+        dasfile = yield getPage(full_url)
         
         #crunch it!
         return parser.parse(dasfile, lexer=lexer)
