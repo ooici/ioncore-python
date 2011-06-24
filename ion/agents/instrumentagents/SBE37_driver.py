@@ -2454,7 +2454,7 @@ class SBE37Driver(InstrumentDriver):
     
     
     @staticmethod
-    def _time_to_sting(v):
+    def _time_to_string(v):
         """
         Write a time tuple to a string formatted for sbe37 set operations.
         @param v a time tuple (hours,minutes,seconds).
