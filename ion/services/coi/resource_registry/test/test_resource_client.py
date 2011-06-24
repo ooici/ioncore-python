@@ -310,7 +310,7 @@ class ResourceClientTest(IonTestCase):
 
     def test_get_invalid(self):
 
-        self.failUnlessFailure(self.rc.get_instance('foobar'), ResourceClientError)
+        yield self.failUnlessFailure(self.rc.get_instance('foobar'), ResourceClientError)
 
 
 

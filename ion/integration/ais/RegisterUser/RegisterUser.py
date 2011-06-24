@@ -14,11 +14,11 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.core.intercept.policy import subject_has_admin_role, \
-                                      subject_is_early_adopter, \
+                                      subject_has_early_adopter_role, \
                                       subject_has_marine_operator_role, \
                                       subject_has_data_provider_role, \
                                       map_ooi_id_to_subject_admin_role, \
-                                      map_ooi_id_to_subject_is_early_adopter, \
+                                      map_ooi_id_to_subject_early_adopter_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
                                       map_ooi_id_to_subject_data_provider_role
 
@@ -116,6 +116,7 @@ class RegisterUser(object):
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
       if result != None:
+         result.error_str = "AIS.getUser: " + result.error_str
          defer.returnValue(result)
          
       # check that ooi_id is present in GPB
@@ -123,7 +124,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+         Response.error_str = "AIS.getUser: Required field [user_ooi_id] not found in message"
          defer.returnValue(Response)
 
       # build the Identity Registry request for get_user message
@@ -138,7 +139,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getUser error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = 'Error calling get_user (AIS): '+ex.msg_content.MessageResponseBody
+         Response.error_str = 'AIS.getUser: Error calling IR.get_user: '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
                 
       # build AIS response
@@ -173,6 +174,7 @@ class RegisterUser(object):
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
       if result != None:
+         result.error_str = "AIS.updateUserProfile: " + result.error_str
          defer.returnValue(result)
          
       # check that ooi_id is present in GPB
@@ -180,7 +182,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [user_ooi_id] not found in message (AIS)"
+         Response.error_str = "AIS.updateUserProfile: Required field [user_ooi_id] not found in message"
          defer.returnValue(Response)
 
       # build the Identity Registry request for get_user message
@@ -195,7 +197,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserProfile error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = 'Error calling get_user (AIS): '+ex.msg_content.MessageResponseBody
+         Response.error_str = 'AIS.updateUserProfile: Error calling IR.get_user: '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
       # build the Identity Registry request for update_user_profile message
@@ -231,7 +233,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserProfile error response')
          Response.error_num = ex.msg_content.MessageResponseCode
-         Response.error_str = 'Error calling update_user_profile (AIS): '+ex.msg_content.MessageResponseBody
+         Response.error_str = 'AIS.updateUserProfile: Error calling IR.update_user_profile: '+ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
          
       # build AIS response
@@ -248,6 +250,7 @@ class RegisterUser(object):
       # check that the GPB is correct type & has a payload
       result = yield self._CheckRequest(msg)
       if result != None:
+         result.error_str = "AIS.registerUser: " + result.error_str
          defer.returnValue(result)
          
       # check that certificate is present in GPB
@@ -255,7 +258,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [certificate] not found in message"
+         Response.error_str = "AIS.registerUser: Required field [certificate] not found in message"
          defer.returnValue(Response)
 
       # check that key is present in GPB
@@ -263,7 +266,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [key] not found in message"
+         Response.error_str = "AIS.registerUser: Required field [key] not found in message"
          defer.returnValue(Response)
 
       # build Identity Registry request for authenticate_user message
@@ -276,22 +279,22 @@ class RegisterUser(object):
       try:
          result = yield self.irc.authenticate_user(Request)
          if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
+            log.debug('AIS.registerUser: user exists in IR with ooi_id = '+str(result))
          UserAlreadyRegistered = True
       except ReceivedApplicationError, ex:
-            log.info("RegisterUser.registerUser(): calling irc.register_user with\n"+str(Request.configuration))
+            log.info("AIS.registerUser: calling irc.register_user with\n"+str(Request.configuration))
             # user wasn't in Identity Registry, so register them now
             try:
                result = yield self.irc.register_user(Request)
                if log.getEffectiveLevel() <= logging.DEBUG:
-                  log.debug('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+                  log.debug('AIS.registerUser: added new user in IR with ooi_id = '+str(result))
                UserAlreadyRegistered = False
             except ReceivedApplicationError, ex:
-               log.info('RegisterUser.registerUser(): Error invoking Identity Registry Service: %s' %ex)
+               log.info('AIS.registerUser: Error invoking Identity Registry Service: %s' %ex)
                # build AIS error response
                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS RegisterUser error response')
                Response.error_num = ex.msg_content.MessageResponseCode
-               Response.error_str = 'Error calling register_user (AIS): '+ex.msg_content.MessageResponseBody
+               Response.error_str = 'AIS.registerUser: Error calling IR.register_user: '+ex.msg_content.MessageResponseBody
                defer.returnValue(Response)
 
       # Get subject from certificate to allow lookup of user roles/attributes
@@ -314,9 +317,9 @@ class RegisterUser(object):
           map_ooi_id_to_subject_admin_role(subject, ooi_id)
       else:
           Response.message_parameters_reference[0].user_is_admin = False
-      if subject_is_early_adopter(subject):
+      if subject_has_early_adopter_role(subject):
           Response.message_parameters_reference[0].user_is_early_adopter = True
-          map_ooi_id_to_subject_is_early_adopter(subject, ooi_id)
+          map_ooi_id_to_subject_early_adopter_role(subject, ooi_id)
       else:
           Response.message_parameters_reference[0].user_is_early_adopter = False
       if subject_has_data_provider_role(subject):
@@ -340,7 +343,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = 'Bad message type receieved, ignoring (AIS)'
+         Response.error_str = 'Bad message type receieved, ignoring'
          defer.returnValue(Response)
 
       # Check payload in message
@@ -348,7 +351,7 @@ class RegisterUser(object):
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
          Response.error_num = Response.ResponseCodes.BAD_REQUEST
-         Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
+         Response.error_str = "Required field [message_parameters_reference] not found in message"
          defer.returnValue(Response)
   
       defer.returnValue(None)

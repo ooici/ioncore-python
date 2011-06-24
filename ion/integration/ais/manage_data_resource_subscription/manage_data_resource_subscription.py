@@ -37,8 +37,6 @@ from ion.integration.ais.notification_alert_service import NotificationAlertServ
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
 from ion.integration.ais.common.metadata_cache import  MetadataCache
 
-from ion.core.intercept.policy import get_dispatcher_id_for_user
-
 from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
@@ -130,6 +128,7 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.update()\n')
+        # repackage the subscription info into a one item list for the delete() call
         reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptions.add();
@@ -155,15 +154,18 @@ class ManageDataResourceSubscription(object):
             self.ais.TimeStamps.LastTime = self.ais.TimeStamps.StartTime
             log.warning('ManageDataResourceSubscription.create: started at ' + str(self.ais.TimeStamps.StartTime))
 
-        if msg.MessageType != AIS_REQUEST_MSG_TYPE:
-            raise NotificationAlertError('Expected message class AIS_REQUEST_MSG_TYPE, received %s')
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg)
+        if result != None:
+            result.error_str = "AIS.ManageDataResourceSubscription.create: " + result.error_str
+            defer.returnValue(result)
 
         # check that subscriptionInfo is present in GPB
         if not msg.message_parameters_reference.IsFieldSet('subscriptionInfo'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscriptionInfo] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [subscriptionInfo] not found in message"
              defer.returnValue(Response)
 
         # check that AisDatasetMetadataType is present in GPB
@@ -171,7 +173,7 @@ class ManageDataResourceSubscription(object):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [datasetMetadata] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [datasetMetadata] not found in message"
              defer.returnValue(Response)
 
         # check that ooi_id is present in GPB
@@ -179,14 +181,14 @@ class ManageDataResourceSubscription(object):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [user_ooi_id] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [user_ooi_id] not found in message"
              defer.returnValue(Response)
 
         if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('data_src_id'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [data_src_id] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [data_src_id] not found in message"
              defer.returnValue(Response)
 
         # check that subscription type enum is present in GPB
@@ -194,7 +196,7 @@ class ManageDataResourceSubscription(object):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscription_type] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [subscription_type] not found in message"
              defer.returnValue(Response)
 
         userID = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
@@ -232,7 +234,7 @@ class ManageDataResourceSubscription(object):
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                     Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
-                    Response.error_str = errString
+                    Response.error_str = "AIS.ManageDataResourceSubscription.create: " + errString
                     defer.returnValue(Response)
                 log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                 self.userID = self.userRes.ResourceIdentity
@@ -246,7 +248,7 @@ class ManageDataResourceSubscription(object):
                     # build AIS error response
                     Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                     Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = errString
+                    Response.error_str = "AIS.ManageDataResourceSubscription.create: " + errString
                     defer.returnValue(Response)
                 else:
                     log.info('FOUND DISPATCHER: ' + dispatcherID)
@@ -271,7 +273,7 @@ class ManageDataResourceSubscription(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  ex.msg_content.MessageResponseBody
+            Response.error_str =  "AIS.ManageDataResourceSubscription.create: " + ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
 
 
@@ -392,12 +394,18 @@ class ManageDataResourceSubscription(object):
             self.ais.TimeStamps.LastTime = self.ais.TimeStamps.StartTime
             log.warning('ManageDataResourceSubscription.delete: started at ' + str(self.ais.TimeStamps.StartTime))
 
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg)
+        if result != None:
+            result.error_str = "AIS.ManageDataResourceSubscription.delete: " + result.error_str
+            defer.returnValue(result)
+
         # check that subscriptionInfo is present in GPB
         if not msg.message_parameters_reference.IsFieldSet('subscriptions'):
              # build AIS error response
              Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
-             Response.error_str = "Required field [subscriptions] not found in message"
+             Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [subscriptions] not found in message"
              defer.returnValue(Response)
              
         for Subscription in msg.message_parameters_reference.subscriptions:
@@ -406,7 +414,7 @@ class ManageDataResourceSubscription(object):
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
-                Response.error_str = "Required field [user_ooi_id] not found in message"
+                Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [user_ooi_id] not found in message"
                 defer.returnValue(Response)
     
             # check that data_src_id is present in GPB
@@ -414,7 +422,7 @@ class ManageDataResourceSubscription(object):
                 # build AIS error response
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
-                Response.error_str = "Required field [data_src_id] not found in message"
+                Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [data_src_id] not found in message"
                 defer.returnValue(Response)
 
             reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -455,7 +463,7 @@ class ManageDataResourceSubscription(object):
                         # build AIS error response
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                         Response.error_num = Response.ResponseCodes.INTERNAL_SERVER_ERROR
-                        Response.error_str = errString
+                        Response.error_str = "AIS.ManageDataResourceSubscription.delete: " + errString
                         defer.returnValue(Response)
                     log.info('Got user resource instance: ' + self.userRes.ResourceIdentity)
                     if  self.ais.AnalyzeTiming != None:
@@ -468,7 +476,7 @@ class ManageDataResourceSubscription(object):
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                         Response.error_num = Response.ResponseCodes.NOT_FOUND
                         errString = 'Dispatcher not found for userID' + UserID
-                        Response.error_str = errString
+                        Response.error_str = "AIS.ManageDataResourceSubscription.delete: " + errString
                         defer.returnValue(Response)
                     else:
                         log.info('FOUND DISPATCHER %s for user %s'%(dispatcherID, UserID))
@@ -485,13 +493,13 @@ class ManageDataResourceSubscription(object):
                 log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex.msg_content.MessageResponseBody)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  ex.msg_content.MessageResponseCode
-                Response.error_str =  ex.msg_content.MessageResponseBody
+                Response.error_str =  "AIS.ManageDataResourceSubscription.delete: " + ex.msg_content.MessageResponseBody
                 defer.returnValue(Response)
         
             except ApplicationError, ex:
                 log.info('ManageDataResourceSubscription.delete(): Error attempting to remove Subscription(): %s' %ex)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-                Response.error_num =  ex.response_code
+                Response.error_num =  "AIS.ManageDataResourceSubscription.delete: " + ex.response_code
                 Response.error_str =  str(ex)
                 defer.returnValue(Response)
 
@@ -588,21 +596,15 @@ class ManageDataResourceSubscription(object):
         @retval success
         """
         log.info('ManageDataResourceSubscription.findDataResourceSubscriptions()\n')
-        log.debug('user_ooi_id = ' + msg.message_parameters_reference.user_ooi_id)
 
         try:
-
-            log.debug('find: Calling getSubscriptionList service getSubscriptionList()')
+            log.debug('find: Calling NAS.getSubscriptionList service')
             reply = yield self.nac.getSubscriptionList(msg)
             numSubsReturned = len(reply.message_parameters_reference[0].subscriptionListResults)
             log.debug('getSubscriptionList returned: ' + str(numSubsReturned) + ' subscriptions.')
-
-
         except ReceivedApplicationError, ex:
-            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to addSubscription(): %s' %ex)
-
+            log.info('AIS.ManageDataResourceSubscription.find(): Error calling NAS.getSubscriptionList: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
             Response.error_str =  ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
@@ -624,7 +626,6 @@ class ManageDataResourceSubscription(object):
                 if bounds.isInBounds(dSetMetadata) == False:                
                     del result
    
-
         defer.returnValue(reply)
 
 
@@ -635,7 +636,7 @@ class ManageDataResourceSubscription(object):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = 'Bad message type receieved, ignoring (AIS)'
+            Response.error_str = 'Bad message type receieved, ignoring'
             defer.returnValue(Response)
 
         # Check payload in message
@@ -643,7 +644,7 @@ class ManageDataResourceSubscription(object):
             # build AIS error response
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [message_parameters_reference] not found in message (AIS)"
+            Response.error_str = "Required field [message_parameters_reference] not found in message"
             defer.returnValue(Response)
   
         defer.returnValue(None)

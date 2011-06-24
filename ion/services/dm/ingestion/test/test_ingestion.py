@@ -5,8 +5,12 @@
 @author David Stuebe
 @brief test for eoi ingestion demo
 """
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 import ion.util.ionlog
+from ion.util.iontime import IonTime
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -36,6 +40,14 @@ GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 
 CONF = ioninit.config(__name__)
 
+
+class FakeDelayedCall(object):
+
+    def cancel(self):
+        pass
+
+    def delay(self, int):
+        pass
 
 class IngestionTest(IonTestCase):
     """
@@ -90,7 +102,7 @@ class IngestionTest(IonTestCase):
 
         self.sup = yield self._spawn_processes(services)
 
-        self.proc = process.Process()
+        self.proc = process.Process(spawnargs={'proc-name':'test_ingestion_proc'})
         yield self.proc.spawn()
 
         self._ic = IngestionClient(proc=self.proc)
@@ -140,8 +152,13 @@ class IngestionTest(IonTestCase):
 
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
+        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+
 
         yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         #print '\n\n\n Got Dataset in Ingest \n\n\n\n'
 
@@ -152,7 +169,7 @@ class IngestionTest(IonTestCase):
         #print '\n\n\n Filled out message with a dataset \n\n\n\n'
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
         # ==========
         # Can't use messaging and client because the send returns before the op is complete so the result is untestable.
@@ -175,8 +192,11 @@ class IngestionTest(IonTestCase):
 
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
+        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
 
         yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         self.ingest.dataset.CreateUpdateBranch()
 
@@ -204,7 +224,7 @@ class IngestionTest(IonTestCase):
         self.create_chunk(supplement_msg)
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_chunk(supplement_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_chunk(supplement_msg, '', self.fake_msg())
 
         updated_bounded_arrays = var.content.bounded_arrays[:]
 
@@ -268,22 +288,24 @@ class IngestionTest(IonTestCase):
         # Receive a dataset to get setup...
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
         content.dataset_id = SAMPLE_PROFILE_DATASET_ID
+        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
 
         yield self.ingest._prepare_ingest(content)
 
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
         yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
 
         complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
 
         complete_msg.status = complete_msg.StatusCode.OK
-        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
 
 
 
@@ -312,17 +334,50 @@ class IngestionTest(IonTestCase):
 
         self.datastore._create_resource(data_set_description)
 
-        ds_res = self.datastore.workbench.get_repository(new_dataset_id)
-
-
-        yield self.datastore.workbench.flush_repo_to_backend(ds_res)
-
-        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
-        # ============================================
-        # Don't need a real data source at this time!
-        # ============================================
+        dset_res = self.datastore.workbench.get_repository(new_dataset_id)
 
         log.info('Created Dataset Resource for test.')
+
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        def create_datasource(datasource, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            datasource.source_type = datasource.SourceType.NETCDF_S
+            datasource.request_type = datasource.RequestType.DAP
+
+            datasource.base_url = "http://not_a_real_url.edu"
+
+            datasource.max_ingest_millis = 6000
+
+            datasource.registration_datetime_millis = IonTime().time_ms
+
+            datasource.ion_title = "NTAS1 Data Source"
+            datasource.ion_description = "Data NTAS1"
+
+            datasource.aggregation_rule = datasource.AggregationRule.OVERLAP
+
+            return True
+
+
+        data_source_description = {ID_CFG:new_datasource_id,
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:'datasource for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station datasource',
+                      CONTENT_CFG:create_datasource,
+                      }
+
+        self.datastore._create_resource(data_source_description)
+
+        dsource_res = self.datastore.workbench.get_repository(new_datasource_id)
+
+        log.info('Created Datasource Resource for test.')
+
+        yield self.datastore.workbench.flush_repo_to_backend(dset_res)
+        yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
+
+        log.info('Data resources flushed to backend')
+
 
         # Receive a dataset to get setup...
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
@@ -331,6 +386,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
+        self.ingest.timeoutcb = FakeDelayedCall()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
@@ -339,7 +395,7 @@ class IngestionTest(IonTestCase):
         log.info('Calling Receive Dataset')
 
         # Call the op of the ingest process directly
-        yield self.ingest.op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
         log.info('Calling Receive Dataset: Complete')
 
@@ -348,7 +404,7 @@ class IngestionTest(IonTestCase):
         log.info('Calling Receive Done')
 
         complete_msg.status = complete_msg.StatusCode.OK
-        yield self.ingest.op_recv_done(complete_msg, '', self.fake_msg())
+        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
 
         log.info('Calling Receive Done: Complete!')
 
@@ -415,3 +471,113 @@ class IngestionTest(IonTestCase):
         nsteps = yield test_deferred
 
         self.assertEqual(nsteps, 7)
+
+    @defer.inlineCallbacks
+    def test_error_in_ingest(self):
+        """
+        Attempts to raise an error during the ingestion process to ensure they are trapped and
+        reported properly.  We are simulating JAW/DatasetAgent interaction and do a simple "incorrect message type"
+        to the first sub-ingestion method.
+        """
+
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+
+        def create_dataset(dataset, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            group = dataset.CreateObject(GROUP_TYPE)
+            dataset.root_group = group
+            return True
+
+        data_set_description = {ID_CFG:new_dataset_id,
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:'Blank dataset for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:create_dataset,
+                      }
+
+        self.datastore._create_resource(data_set_description)
+
+        dset_res = self.datastore.workbench.get_repository(new_dataset_id)
+
+        log.info('Created Dataset Resource for test.')
+
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        def create_datasource(datasource, *args, **kwargs):
+            """
+            Create an empty dataset
+            """
+            datasource.source_type = datasource.SourceType.NETCDF_S
+            datasource.request_type = datasource.RequestType.DAP
+
+            datasource.base_url = "http://not_a_real_url.edu"
+
+            datasource.max_ingest_millis = 6000
+
+            datasource.registration_datetime_millis = IonTime().time_ms
+
+            datasource.ion_title = "NTAS1 Data Source"
+            datasource.ion_description = "Data NTAS1"
+
+            datasource.aggregation_rule = datasource.AggregationRule.OVERLAP
+
+            return True
+
+
+        data_source_description = {ID_CFG:new_datasource_id,
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:'datasource for testing ingestion',
+                      DESCRIPTION_CFG:'An example of a station datasource',
+                      CONTENT_CFG:create_datasource,
+                      }
+
+        self.datastore._create_resource(data_source_description)
+
+        dsource_res = self.datastore.workbench.get_repository(new_datasource_id)
+
+        log.info('Created Datasource Resource for test.')
+
+        yield self.datastore.workbench.flush_repo_to_backend(dset_res)
+        yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
+
+        log.info('Data resources flushed to backend')
+
+
+
+        # now, start ingestion on this fake dataset
+        msg = yield self.proc.message_client.create_instance(PERFORM_INGEST_MSG_TYPE)
+        msg.dataset_id = new_dataset_id
+        msg.reply_to = "fake.respond"
+        msg.ingest_service_timeout = 45
+        msg.datasource_id = new_datasource_id
+
+        # get a subscriber going for the ingestion ready message
+        def_ready = defer.Deferred()
+        def readyrecv(data):
+            def_ready.callback(True)
+
+        readysub = Subscriber(xp_name="magnet.topic",
+                              binding_key="fake.respond",
+                              process=self.proc)
+        readysub.ondata = readyrecv
+        yield readysub.initialize()
+        yield readysub.activate()
+
+        # start ingestion, hold its deferred as we need to do something with it in a bit
+        ingestdef = self._ic.ingest(msg)
+
+        # wait for ready response from ingestion
+        yield def_ready
+
+        log.info("Ready response from ingestion, proceeding to give it an incorrect message type to recv_chunk")
+
+        # now send it an incorrect message, make sure we get an error back
+        badmsg = yield self.proc.message_client.create_instance(SUPPLEMENT_MSG_TYPE)
+        yield self.proc.send(new_dataset_id, 'recv_dataset', badmsg)
+
+        yield self.failUnlessFailure(ingestdef, ReceivedApplicationError)
+
+        # check called back thing
+        self.failUnless("Expected message type" in ingestdef.result.msg_content.MessageResponseBody)
+        self.failUnless(ingestdef.result.msg_content.MessageResponseCode, msg.ResponseCodes.BAD_REQUEST)

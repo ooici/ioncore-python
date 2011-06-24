@@ -50,23 +50,26 @@ def validateUrl(data_resource_url):
 
     #url doesn't exist
     except IOError:
-        print ("Couldn't fetch '%s'" % data_resource_url)
+        print "Couldn't fetch '%s'" % data_resource_url
+        return {}
         
     #bad data
     except ParseException:
-        print ("Content of '%s' didn't parse" % data_resource_url)
+        print "Content of '%s' didn't parse" % data_resource_url
+        return {}
 
     print "\n\nResults of parsing this URL:\n%s" % data_resource_url
     print "\n  Found these sections:"
     for k in parsed_das.keys():
-        print "    %s" % k
+        print  ("    %s" % k)
         
         for k2, v2 in parsed_das[k].iteritems():
             print "      %s (%s): %s" % (k2, v2['TYPE'], str(v2['VALUE']))
-        print
+        print 
 
     print "\n"
 
+    return parsed_das
 
 if __name__ == "__main__":
     validateUrl(sys.argv[1])

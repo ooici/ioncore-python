@@ -17,6 +17,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 import time, calendar
 from ion.core.object.gpb_wrapper import OOIObjectError
+from ion.util import procutils as pu
 
 @_gpb_source
 def MergeAttSrc(self, attname, src):
@@ -106,6 +107,10 @@ def MergeAttGreater(self, attname, src):
     
     src_val = self._GetNumericValue(src_att.GetDataType(), src_att.GetValue())
     dst_val = self._GetNumericValue(dst_att.GetDataType(), dst_att.GetValue())
+    
+    if pu.isnan(src_val) or pu.isnan(dst_val):
+        raise ValueError('Cannot merge valid attributes with NaN values for attribute "%s". SRC: %s.   DST: %s' % (attname, str(src_val), str(dst_val)))
+    
     if src_val > dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val > src_val:
@@ -147,6 +152,11 @@ def MergeAttLesser(self, attname, src):
     
     src_val = self._GetNumericValue(src_att.GetDataType(), src_att.GetValue())
     dst_val = self._GetNumericValue(dst_att.GetDataType(), dst_att.GetValue())
+    
+    
+    if pu.isnan(src_val) or pu.isnan(dst_val):
+        raise ValueError('Cannot merge valid attributes with NaN values for attribute "%s". SRC: %s.   DST: %s' % (attname, str(src_val), str(dst_val)))
+        
     if src_val < dst_val:
         self.SetAttribute(attname, src_att.GetValues(), src_att.GetDataType())
     elif dst_val < src_val:

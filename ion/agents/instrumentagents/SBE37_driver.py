@@ -7,11 +7,13 @@
 """
 
 import re
+import os
 import time
 import datetime
 
 from twisted.internet import defer, reactor, task
 from twisted.internet.protocol import ClientCreator
+from twisted.internet.error import ConnectError
 
 import ion.util.ionlog
 import ion.util.procutils as pu
@@ -36,9 +38,10 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[0]
-IO_LOG = (True,False)[1]
-IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
+DEBUG_PRINT = True if os.environ.get('DEBUG_PRINT',None) == 'True' else False
+IO_LOG = True if os.environ.get('IO_LOG',None) == 'True' else False
+IO_LOG_DIR = os.environ.get('IO_LOG_DIR','~/')
+
 
 ###############################################################################
 # Constants specific to the SBE37Driver. 
@@ -280,6 +283,10 @@ class SBE37Driver(InstrumentDriver):
         mode.
         """
         self._autosample_prompt_acquired_deferred = None
+        
+        """
+        """
+        self._disconnect_complete_deferred = None
         
         """
         Device IO Logfile parameters. The device io log is used to precisely
@@ -785,15 +792,22 @@ class SBE37Driver(InstrumentDriver):
 
             # Attempt to set up a tcp connection to the serial server.
             cc = ClientCreator(reactor, InstrumentConnection, self)
-            self._instrument_connection = yield cc.connectTCP(self._ipaddr,
-                                                          int(self._ipport))        
-            if self._instrument_connection:
-                self._instrument_connection.transport.setTcpNoDelay(1)
+            try:
+                self._instrument_connection = yield cc.connectTCP(self._ipaddr,
+                                                          int(self._ipport))
+            except ConnectError, ex:
+                self._instrument_connection = None
+                success = InstErrorCode.DRIVER_CONNECT_FAILED
+
+            else:
+                self._instrument_connection.transport.setTcpNoDelay(True)
+
 
         elif event == SBE37Event.EXIT:
             pass
                     
         elif event == SBE37Event.CONNECTION_COMPLETE:
+
             # If connection valid, update parameters and switch to connected.
             if self._instrument_connection:
                 yield self._update_params()
@@ -827,19 +841,27 @@ class SBE37Driver(InstrumentDriver):
         self._debug_print(event)
             
         if event == SBE37Event.ENTER:
-            
+
             # Announce the state change to agent.            
             content = {'type':DriverAnnouncement.STATE_CHANGE,
                        'transducer':SBE37Channel.INSTRUMENT,
                        'value':SBE37State.DISCONNECTED}
-            yield self.send(self.proc_supid,'driver_event_occurred',content)            
-
-            # Drop the driver connection.            
+            yield self.send(self.proc_supid,'driver_event_occurred',content)
+            
+            # Drop the driver connection.
+            # This blocks until the framework closes the connection,
+            # so the op_ call doesn't return until it is closed.
             if self._instrument_connection:
+                self._disconnect_complete_deferred = defer.Deferred()
                 self._instrument_connection.transport.loseConnection()
-                       
+                yield self._disconnect_complete_deferred
+
         elif event == SBE37Event.EXIT:
-            pass
+            
+            # Fire the disconnect deferred to end the op_ call.
+            if self._disconnect_complete_deferred:
+                self._disconnect_complete_deferred.callback(None)
+                self._disconnect_complete_deferred = None
                     
         elif event == SBE37Event.DISCONNECT_COMPLETE:
             
@@ -1014,7 +1036,7 @@ class SBE37Driver(InstrumentDriver):
             prompt = yield self._get_autosample_prompt()
             prompt = yield self._do_cmd_no_prompt('stop')
             prompt = yield self._get_prompt()
-            if 'GETDATA' in params:
+            if params and 'GETDATA' in params:
                 result = self._sample_buffer
             next_state = SBE37State.CONNECTED
             
@@ -1065,14 +1087,53 @@ class SBE37Driver(InstrumentDriver):
     # Communications methods.
     ###########################################################################
 
+    @defer.inlineCallbacks
+    def _get_connected(self):
+        """
+        Establish connection to the device hardware with the current
+        configuration.
+        @retval (success, result)
+        """
+        
+        # Initiate the connection.
+        # This blocks until a connection is established.
+        # Fails if in wrong state or connection fails.
+        (success, result) = yield self._fsm.on_event_async(SBE37Event.CONNECT)
+        
+        # If connection successful, finalize connection.
+        # This blocks on driver parameter intialization and switches to
+        # connected state.
+        if InstErrorCode.is_ok(success):
+            (success, result) = yield self._fsm.on_event_async(\
+                                            SBE37Event.CONNECTION_COMPLETE)
+        
+        defer.returnValue((success, result))
 
+   
+    @defer.inlineCallbacks
+    def _get_disconnected(self):
+        """
+        Close connection to the device hardware.
+        @retval (success, result).
+        """
+
+        # Send the disconnect event to lose the connection.
+        # This fails if the state is incorrect.
+        # If state is correct, this event blocks until the connection is
+        # closed and the state is switched.
+        (success, result) = yield self._fsm.on_event_async(\
+                                                SBE37Event.DISCONNECT)            
+
+        defer.returnValue((success, result))
+
+        
     @defer.inlineCallbacks
     def gotConnected(self, instrument):
         """
         Called from twisted framework when connection is established.
         """
         
-        yield        
+        yield
         """        
         if self._instrument_connection:
             self._instrument_connection.transport.setTcpNoDelay(1)
@@ -1088,7 +1149,19 @@ class SBE37Driver(InstrumentDriver):
         Send an EVENT_DISCONNECT_COMPLETE.
         """
 
-        self._instrument_connection = None
+        # Destroy the protocol.
+        # self._instrument_connection = None
+        
+        # Fire the disconnect complete deferred if it exists.
+        # This causes disconnect op to complete.
+        #if self._disconnect_complete_deferred:
+        #    self._disconnect_complete_deferred.callback(None)
+        #    self._disconnect_complete_deferred = None
+            
+        # Send the disconnect complete event.
+        # This switches state if we are closing properly, and
+        # allows errors to be caught by other state handlers
+        # if disconnect occurs spontaneously.
         yield self._fsm.on_event_async(SBE37Event.DISCONNECT_COMPLETE)
 
 
@@ -1106,12 +1179,12 @@ class SBE37Driver(InstrumentDriver):
         # Write the fragment to the IO log if it is enabled.
         if IO_LOG:
             self._logfile.write(dataFrag)
-        
+
         # Add the fragment to the line buffer.
         self._line_buffer += dataFrag
-                
+
         new_lines = False
-                            
+   
         # If the line buffer has newlines, extract complete lines and add
         # to the data buffer. Keep the tail fragment if any in the line buffer
         # to append further incomming data to.
@@ -1127,7 +1200,7 @@ class SBE37Driver(InstrumentDriver):
             self._data_lines.append(self._line_buffer.replace(SBE37Prompt.PROMPT,''))
             self._line_buffer = SBE37Prompt.PROMPT
             new_lines = True
-        
+
         # If the line buffer ends with a bad command prompt, extract and
         # append the prefix data to the data buffer. Keep the prompt in the
         # line buffer.
@@ -1136,7 +1209,7 @@ class SBE37Driver(InstrumentDriver):
                                     replace(SBE37Prompt.BAD_COMMAND,''))
             self._line_buffer = SBE37Prompt.BAD_COMMAND
             new_lines = True
-        
+
         # If new complete lines are detected, send an EVENT_DATA_RECEIVED.
         if new_lines and self._fsm.get_current_state() == SBE37State.AUTOSAMPLE:
             yield self._fsm.on_event_async(SBE37Event.DATA_RECEIVED)
@@ -1214,13 +1287,13 @@ class SBE37Driver(InstrumentDriver):
             assert(isinstance(timeout,int)), 'Expected integer timeout'
             assert(timeout>0), 'Expected positive timeout'
             pass
-        
+
         # Fail if command or channels not valid for sbe37.
         if not SBE37Command.has(command[0]):
             reply['success'] = InstErrorCode.UNKNOWN_COMMAND
             yield self.reply_ok(msg,reply)
             return
-        
+
         for chan in channels:
             if not SBE37Channel.has(chan):
                 reply['success'] = InstErrorCode.UNKNOWN_CHANNEL
@@ -1243,58 +1316,58 @@ class SBE37Driver(InstrumentDriver):
             (success,result) = yield self._fsm.on_event_async(SBE37Event.ACQUIRE_SAMPLE)
             reply['success'] = success
             reply['result'] = result
-                        
+
         # Process start autosampling command.
         elif drv_cmd == SBE37Command.START_AUTO_SAMPLING:
-            
+
             # Send an start autosample event and setup reply
             (success,result) = yield self._fsm.on_event_async(SBE37Event.START_AUTOSAMPLE)
             reply['success'] = success
             reply['result'] = result
-                        
+
         # Process stop autosampling command.
         elif drv_cmd == SBE37Command.STOP_AUTO_SAMPLING:
-            
+
             # Get optional stop parameters.
             if len(command)>1:
                 params = command[1:]
             else:
                 params = None
-                
+
             # Send stop autosample event and setup reply.
             (success,result) = yield self._fsm.on_event_async(SBE37Event.STOP_AUTOSAMPLE,params)
             reply['success'] = success
             reply['result'] = result
-            
+
         # Process test command.
         elif drv_cmd == SBE37Command.TEST:
-                        
+
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
         elif drv_cmd == SBE37Command.CALIBRATE:
-            
+
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
         elif drv_cmd == SBE37Command.RESET:
-                       
+
             # Return not implemented reply.
             reply['success'] = InstErrorCode.NOT_IMPLEMENTED
             yield self.reply_ok(msg,reply)
             return
 
         else:
-            
+
             # The command is properly handled in the above clause.
             reply['success'] = InstErrorCode.INVALID_COMMAND
             yield self.reply_ok(msg,reply)
             return
-        
+
         yield self.reply_ok(msg,reply)        
 
 
@@ -1506,7 +1579,7 @@ class SBE37Driver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success':None,'result':None}         
-        success = yield self._fsm.on_event_async(SBE37Event.INITIALIZE)
+        (success, result) = yield self._fsm.on_event_async(SBE37Event.INITIALIZE)
         
         # Set success and send reply. Unsuccessful initialize means the
         # event is not handled in the current state.
@@ -1581,16 +1654,10 @@ class SBE37Driver(InstrumentDriver):
 
         reply = {'success':None,'result':None}
 
-        # Attempt connection to instrument hardware in two events.
-        
-        # Initialize connection: switch to connecting and try open the tcp port.
-        (success,result) = yield self._fsm.on_event_async(\
-                                                SBE37Event.CONNECT)
-        
-        # Finialze connection, update driver parameters or return
-        # to disconnected if connection failed.
-        (success,result) = yield self._fsm.on_event_async(\
-                                                SBE37Event.CONNECTION_COMPLETE)
+        # Successful if the state is correct and the connection
+        # is successfully opened.
+        (success, result) = yield self._get_connected()
+            
         reply['success'] = success
         
         yield self.reply_ok(msg, reply)
@@ -1613,9 +1680,11 @@ class SBE37Driver(InstrumentDriver):
             pass
 
         reply = {'success':None,'result':None}
-
-        # Send a disconnect event and setup the reply.
-        (success,result) = yield self._fsm.on_event_async(SBE37Event.DISCONNECT)
+        
+        # Successful if the state is correct and the connection is
+        # successfully closed.
+        (success, result) = yield self._get_disconnected()
+       
         reply['success'] = success
         
         yield self.reply_ok(msg,reply)

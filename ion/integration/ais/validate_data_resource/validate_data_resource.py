@@ -24,11 +24,10 @@ from ion.core.exception import ReceivedApplicationError
 from ion.integration.eoi.validation.cdm_validation_service import CdmValidationClient
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        VALIDATE_DATASOURCE_REQ, \
                                                        VALIDATE_DATASOURCE_RSP
-
-
 
 
 class ValidateDataResource(object):
@@ -52,12 +51,18 @@ class ValidateDataResource(object):
         @GPB{Returns,FIXME,1}
         @retval success
         """
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+   
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ValidateDataResource.validate: " + result.error_str
+            defer.returnValue(result)
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, VALIDATE_DATASOURCE_REQ):
-                errtext = "ValidateDataResource.validate(): " + \
+                errtext = "AIS.ValidateDataResource.validate: " + \
                     "Expected ValidateDataResourceReqMsg type, got " + str(msg)
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -67,7 +72,7 @@ class ValidateDataResource(object):
 
             if not (msg.IsFieldSet("data_resource_url")):
 
-                errtext = "ValidateDataResource.validate(): " + \
+                errtext = "AIS.ValidateDataResource.validate: " + \
                     "required fields not provided (data_resource_url)"
                 log.info(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -91,7 +96,7 @@ class ValidateDataResource(object):
                        }[cdm_result.response_type]
 
 
-                errtext = "ValidateDataResource.validate(): INVALID: %s " % why
+                errtext = "AIS.ValidateDataResource.validate: INVALID: %s " % why
                 more_out  = " :: cf_output: %s :: cdm_output: %s :: err_msg: %s " % (cdm_result.cf_output, cdm_result.cdm_output, cdm_result.err_msg)
 
                 errtext = errtext + more_out
@@ -102,7 +107,6 @@ class ValidateDataResource(object):
                 defer.returnValue(Response)
 
 
-
             #get metadata!
             parsed_das = self._parseDas(msg.data_resource_url)
 
@@ -110,7 +114,7 @@ class ValidateDataResource(object):
 
         #url doesn't exist
         except IOError:
-            my_msg = "ValidateDataResource.validate(): couldn't fetch DAS for '%s'" % msg.data_resource_url
+            my_msg = "AIS.ValidateDataResource.validate(): couldn't fetch DAS for '%s'" % msg.data_resource_url
             log.info(my_msg)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -121,7 +125,7 @@ class ValidateDataResource(object):
 
         #bad data
         except ParseException:
-            my_msg = "ValidateDataResource.validate(): DAS content for '%s' didn't parse" % msg.data_resource_url
+            my_msg = "AIS.ValidateDataResource.validate(): DAS content for '%s' didn't parse" % msg.data_resource_url
             log.info(my_msg)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -132,12 +136,12 @@ class ValidateDataResource(object):
 
         #something else???
         except ReceivedApplicationError, ex:
-            log.info('ValidateDataResource.validate(): Error: %s' %ex)
+            log.info('AIS.ValidateDataResource.validate(): Error: %s' %ex)
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ValidateDataResource.validate(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ValidateDataResource.validate(): Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
 
             defer.returnValue(Response)
@@ -156,7 +160,6 @@ class ValidateDataResource(object):
         Response.message_parameters_reference[0].cdmResponse.cf_info_count = cdm_result.cf_info_count
         Response.message_parameters_reference[0].cdmResponse.err_msg = cdm_result.err_msg
         defer.returnValue(Response)
-
 
 
     def _populateResult(self, out_msg, das):
@@ -196,3 +199,24 @@ class ValidateDataResource(object):
         
         #crunch it!
         return parser.parse(dasfile, lexer=lexer)
+
+
+    @defer.inlineCallbacks
+    def _CheckRequest(self, request):
+       # Check for correct request protocol buffer type
+       if request.MessageType != AIS_REQUEST_MSG_TYPE:
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = 'Bad message type receieved, ignoring'
+          defer.returnValue(Response)
+ 
+       # Check payload in message
+       if not request.IsFieldSet('message_parameters_reference'):
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = "Required field [message_parameters_reference] not found in message"
+          defer.returnValue(Response)
+   
+       defer.returnValue(None)

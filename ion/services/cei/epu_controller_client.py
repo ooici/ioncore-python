@@ -45,7 +45,8 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def whole_state(self):
-        if 'ion.integration.ais.test.test_app_integration' in sys.modules.keys():
+        ServiceExists = yield self.does_service_exist(self.EpuControllerName)
+        if not ServiceExists:
             log.debug("%s.whole_state: Returning static list for AIS unit testing"%self.EpuControllerName)
             de_state = 'STABLE_DE'   # from epu/epucontroller/de_states.py
             # following from epu/decisionengine/impls/npreserving.py & pu/decisionengine/impls/default_engine.py

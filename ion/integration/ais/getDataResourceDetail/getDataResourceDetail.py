@@ -22,7 +22,8 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
 
 from ion.integration.ais.ais_object_identifiers import GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE
@@ -46,15 +47,31 @@ class GetDataResourceDetail(object):
     @defer.inlineCallbacks
     def getDataResourceDetail(self, msg):
         if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('getDataResourceDetail Worker Class got GPB: \n' + str(msg))
+            log.debug('AIS.getDataResourceDetail: Worker Class got GPB: \n' + str(msg))
 
+        # Check for correct request protocol buffer type
+        if msg.MessageType != AIS_REQUEST_MSG_TYPE:
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = 'AIS.getDataResourceDetail: Bad message type receieved, ignoring'
+            defer.returnValue(Response)
+ 
+        # Check payload in message
+        if not msg.IsFieldSet('message_parameters_reference'):
+           # build AIS error response
+           Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+           Response.error_num = Response.ResponseCodes.BAD_REQUEST
+           Response.error_str = "AIS.getDataResourceDetail: Required field [message_parameters_reference] not found in message"
+           defer.returnValue(Response)
+           
         if msg.message_parameters_reference.IsFieldSet('data_resource_id'):
             dSetResID = msg.message_parameters_reference.data_resource_id
         else:
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.BAD_REQUEST
-            Response.error_str = "Required field [data_resource_id] not found in message"
+            Response.error_str = "AIS.getDataResourceDetail: Required field [data_resource_id] not found in message"
             defer.returnValue(Response)
 
         if self.bUseMetadataCache:            
@@ -64,7 +81,7 @@ class GetDataResourceDetail(object):
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                       MessageName='AIS getDataResourceDetail error response')
                 Response.error_num = Response.ResponseCodes.NOT_FOUND
-                Response.error_str = "No Data Set Found for Dataset ID: " + dSetResID
+                Response.error_str = "AIS.getDataResourceDetail: No Data Set Found for Dataset ID: " + dSetResID
                 defer.returnValue(Response)
 
             dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
@@ -97,7 +114,7 @@ class GetDataResourceDetail(object):
                 RspMsg = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                     MessageName='AIS getDataResourceDetail error response')
                 RspMsg.error_num = ex.msg_content.MessageResponseCode
-                RspMsg.error_str = ex.msg_content.MessageResponseBody
+                RspMsg.error_str = 'AIS.getDataResourceDetail: Error calling RR.get_instance: '+ex.msg_content.MessageResponseBody
                 defer.returnValue(RspMsg)
 
             #
@@ -115,11 +132,18 @@ class GetDataResourceDetail(object):
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
 
+        if (userProfile is None):
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS getDataResourceDetail error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "AIS.getDataResourceDetail: No entry in IR for ownerID " + ownerID
+            defer.returnValue(Response)
+
         if (dSourceResID is None):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "No Associated Data Source Found"
+            Response.error_str = "AIS.getDataResourceDetail: No Associated Data Source Found"
             defer.returnValue(Response)
 
         log.debug('Associated datasourceID: ' + dSourceResID)
@@ -132,7 +156,7 @@ class GetDataResourceDetail(object):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')
             Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "Data Source Found for ID: " + dSourceResID
+            Response.error_str = "AIS.getDataResourceDetail: Data Source Found for ID: " + dSourceResID
             defer.returnValue(Response)
 
         #self.__printSourceMetadata(dSource)
@@ -195,6 +219,8 @@ class GetDataResourceDetail(object):
         GPBSource.ion_name = userProfile.resource_reference.name
         GPBSource.ion_email = userProfile.resource_reference.email
         GPBSource.ion_institution = userProfile.resource_reference.institution
+
+        GPBSource.visualization_url = dSource.visualization_url
         
         
     def __printSourceMetadata(self, dSource):
@@ -252,7 +278,7 @@ class GetDataResourceDetail(object):
         try:
             result = yield self.irc.get_user(OoiIdRequest)
         except ReceivedApplicationError, ex:
-            self.fail("get_user failed to find a registered user")
+            defer.returnValue(None)
             
         defer.returnValue(result)            
 

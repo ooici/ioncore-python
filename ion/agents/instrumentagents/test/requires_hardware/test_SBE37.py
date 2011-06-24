@@ -29,17 +29,16 @@ from ion.agents.instrumentagents.instrument_constants import ObservatoryState
 
 log = ion.util.ionlog.getLogger(__name__)
 
-
-def dump_dict(d,d2=None):
-    print
-    for (key,val) in d.iteritems():
-        if d2:
-            print key, ' ', val, ' ',d2.get(key,None)            
-        else:
-            print key, ' ', val
-
+#############################################################################
+#
+# Methods to isolate testing to allowed machines.
+# These tests will be skipped or disabled where not explicitly allowed.
+#
+############################################################################
 
 """
+This method is deprecated in favor of an environment variable flag below.
+
 List of mac addresses for machines which should run these tests. If no
 mac address of a NIC on the machine running the tests matches one in this
 list, the tests are skipped. This is to prevent the trial robot from
@@ -47,7 +46,7 @@ commanding the instrument hardware, forcing these tests to be run
 intentionally. Add the mac address of your development machine as
 returned by ifconfig to cause the tests to run for you locally.
 """
-
+"""
 allowed_mac_addr_list = [
     '00:26:bb:19:83:33'         # Edward's Macbook
     ]
@@ -56,20 +55,28 @@ mac_addr_pattern = r'\b\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w[:\-]\w\w\b'
 mac_addr_re = re.compile(mac_addr_pattern,re.MULTILINE)
 mac_addr_list = mac_addr_re.findall(os.popen('ifconfig').read())
 RUN_TESTS = any([addr in allowed_mac_addr_list for addr in mac_addr_list])
+"""
+
+"""
+Set RUN_TESTS flag if the correct environment variable has been assigned.
+Export this variable to 'available' in your shell startup script to enable
+hardware tests to run.
+"""
+RUN_TESTS = True if os.environ.get('LIVE_SBE37_HARDWARE',None) \
+    == 'available' else False
 
 
 # It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically. 
+# during development. 
 SKIP_TESTS = [
-    'test_configure',
-    'test_connect',
-    'test_get_set',
-    'test_get_metadata',
-    'test_get_status',
-    'test_get_capabilities',
-    'test_execute',
-    'test_execute_direct',
+    #'test_configure',
+    #'test_connect',
+    #'test_get_set',
+    #'test_get_metadata',
+    #'test_get_status',
+    #'test_get_capabilities',
+    #'test_execute',
+    #'test_execute_direct',
     'dummy'
 ]
 
@@ -98,6 +105,11 @@ class TestSBE37(IonTestCase):
     sbe_config = {
         'ipport':sbe_port, 
         'ipaddr':sbe_host
+    }
+
+    no_device_config = {
+        'ipport':6006, 
+        'ipaddr': sbe_host
     }
 
     bogus_config = {
@@ -207,6 +219,17 @@ class TestSBE37(IonTestCase):
         current_state = yield self.driver_client.get_state()
         self.assertEqual(current_state,SBE37State.UNCONFIGURED)
 
+        # Try to connect without configuration. This should fail.
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.UNCONFIGURED)
+
         # Configure the driver and verify.
         reply = yield self.driver_client.configure(self.sbe_config)        
         current_state = yield self.driver_client.get_state()
@@ -217,19 +240,25 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,self.sbe_config)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
 
-        
         # Establish connection to device and verify.
-        try:
-            reply = yield self.driver_client.connect()
-            
-        except Exception, ex:
-            self.fail('Could not connect to the device.')
+        reply = yield self.driver_client.connect()
             
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
         
         self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.CONNECTED)
+
+        # Try to connect again. This should fail
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.CONNECTED)
         
@@ -240,6 +269,28 @@ class TestSBE37(IonTestCase):
         result = reply['result']
 
         self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,None)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+        # Configure the driver and verify.
+        reply = yield self.driver_client.configure(self.no_device_config)        
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+
+        self.assert_(InstErrorCode.is_ok(success))
+        self.assertEqual(result,self.no_device_config)
+        self.assertEqual(current_state,SBE37State.DISCONNECTED)
+
+        # Establish connection to device and verify.
+        # This should fail.
+        reply = yield self.driver_client.connect()
+            
+        current_state = yield self.driver_client.get_state()
+        success = reply['success']
+        result = reply['result']
+        
+        self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.DISCONNECTED)
         
@@ -286,7 +337,7 @@ class TestSBE37(IonTestCase):
         self.assertEqual(result,None)
         self.assertEqual(current_state,SBE37State.CONNECTED)
 
-        timeout = 30
+        timeout = 60
         
         # Get all parameters and verify. Store the current config for later.
         params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
@@ -853,11 +904,6 @@ class TestSBE37(IonTestCase):
         result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
         self.assertEqual(current_state,SBE37State.CONNECTED)        
-
-        # Comment this out for automated testing.
-        # It is useful to examine the instrument parameters during
-        # interactive testing.
-        # dump_dict(result)
         
         # Acquire a polled sample and verify result.
         channels = [SBE37Channel.INSTRUMENT]
@@ -970,7 +1016,7 @@ class TestSBE37(IonTestCase):
         
         # Send raw bytes commands to the device.
         bytes = 'to_be_done'
-        timeout = 10
+        timeout = 60
         reply = yield self.driver_client.execute_direct(bytes,timeout)
             
         success = reply['success']
