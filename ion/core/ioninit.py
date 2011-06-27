@@ -11,6 +11,7 @@ import logging.config
 import logging.handlers
 import re
 import os, os.path
+import socket
 
 from ion.util.context import ContextLocal
 from ion.util.path import adjust_dir
@@ -55,7 +56,7 @@ def use_syslog():
         syslog_handler.setLevel(logging.DEBUG)
         syslog_handler.setFormatter(syslog_formatter)
         logging.root.addHandler(syslog_handler)
-    except:
+    except socket.error:
         pass
 
 if sys.platform == 'linux2':
