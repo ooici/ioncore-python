@@ -49,12 +49,22 @@ def start(container, starttype, app_definition, *args, **kwargs):
     yield proc.activate()
     rc = ResourceClient(proc)
     song = yield rc.create_instance(BLOB_TYPE, "WagnerSong", "Ride of the Valkyries")    
-        
-    filename = kwargs['filename']
-    f = open(filename, "rb")
-    bytes_buffer = f.read()
     
+    if not 'filename' in kwargs:
+        log.warn("The filename of the mp3 song is not passed into the app correctly!")
+        log.warn("Please restart the app!")
+        defer.returnValue(res)
+            
+    filename = kwargs['filename']
+    
+    try:
+        f = open(filename, "rb")
+    except IOError, ex:
+        log.warn("Problem opening the file of the mp3.")
+        log.warn("Please restart the app!")
+        defer.returnValue(res)
         
+    bytes_buffer = f.read()    
     song.blob = bytes_buffer
     print "putting song into registry"
     yield rc.put_instance(song, "Persisting song resource")

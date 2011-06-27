@@ -431,6 +431,8 @@ class SchedulerService(ServiceProcess):
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
+        self.workbench.cache_repository(msg.Repository)
+
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
         self._schedule_event(None, int(tdef['interval_seconds']), task_id)
 
