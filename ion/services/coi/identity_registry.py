@@ -35,10 +35,11 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
                                       map_ooi_id_to_role, unmap_ooi_id_from_role
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID, \
-                                                                    TYPE_OF_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config \
+    import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
 
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, \
+                                                          ASSOCIATION_QUERY_MSG_TYPE
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
@@ -175,6 +176,13 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
+    def set_role(self, user_id, role):
+        log.debug("in set_role client")
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('set_role', {'user-id': user_id, 'role': role})
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def broadcast(self, message):
         log.debug('in broadcast for identity registry client')
         yield self._check_init()
@@ -204,21 +212,27 @@ class IdentityRegistryService(ServiceProcess):
         self.rc = ResourceClient(proc=self)
         self.asc = AssociationServiceClient()
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
-        
-        self.instance_counter = 1
 
+    @defer.inlineCallbacks
     def slc_activate(self):
         # Setup broadcast channel (for policy reloading)
-
         self.bc_receiver = FanoutReceiver(name=broadcast_name,
-                                           label='.'.join(broadcast_name, self.receiver.label),
+                                           label='.'.join((broadcast_name, self.receiver.label)),
                                            scope=FanoutReceiver.SCOPE_SYSTEM,
                                            group=self.receiver.group,
                                            handler=self.receive,
                                            error_handler=self.receive_error)
-        self.bc_name = yield self.ann_receiver.attach()
+        self.bc_name = yield self.bc_receiver.attach()
 
         log.info('Listening to identity registry broadcasts: %s' % (self.bc_name))
+
+        # Load current role associations
+        request = yield self.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = HAS_ROLE_ID
+        role_map = yield self.asc.get_associations_map(request)
+        for user_id, role_id in role_map.iteritems():
+            map_ooi_id_to_role(user_id, ROLE_NAMES_BY_ID[role_id])
 
     @defer.inlineCallbacks
     def op_register_user_credentials(self, request, headers, msg):
@@ -502,6 +516,31 @@ class IdentityRegistryService(ServiceProcess):
             log.debug('update_user_profile: no match')
             raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
                                             request.ResponseCodes.NOT_FOUND)
+
+    @defer.inlineCallbacks
+    def op_set_role(self, content, headers, msg):
+        user_id, role = content['user-id'], content['role']
+        #role_id = ROLE_IDS_BY_NAME[role]
+        map_ooi_id_to_role(user_id, role)
+
+        # See if there is already a role for this user that needs to be removed
+        '''
+        TODO: Re-add this when there's a way to delete associations
+        request = yield self.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
+        request.subject = request.CreateObject(IDREF_TYPE)
+        request.subject.key = user_id
+        request.predicate = request.CreateObject(IDREF_TYPE)
+        request.predicate.key = HAS_ROLE_ID
+        associations = yield self.asc.get_associations_map(request)
+        for ruser_id, role_id in associations.iteritems():
+            yield self.asc.remove_association(thing1, thing2)
+
+        print associations
+        '''
+
+        #self.asc.
+
+
 
     def op_broadcast(self, content, headers, msg):
         """

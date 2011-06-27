@@ -635,6 +635,33 @@ class AssociationService(ServiceProcess):
 
         yield self.reply_ok(msg, response)
 
+    @defer.inlineCallbacks
+    def op_get_associations_map(self, association_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_associations
+        """
+        log.info('op_get_association: ')
+
+        if association_query.MessageType != ASSOCIATION_QUERY_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(association_query), association_query.ResponseCodes.BAD_REQUEST)
+
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
+
+        if association_query.IsFieldSet('subject'):
+            q.add_predicate_eq(SUBJECT_KEY, association_query.subject.key)
+
+        if association_query.IsFieldSet('predicate'):
+            q.add_predicate_eq(PREDICATE_KEY, association_query.predicate.key)
+
+        if association_query.IsFieldSet('object'):
+            q.add_predicate_eq(OBJECT_KEY, association_query.object.key)
+
+        rows = yield self.index_store.query(q)
+
+        role_map = dict((row[SUBJECT_KEY], row[OBJECT_KEY]) for key,row in rows.iteritems())
+        yield self.reply_ok(msg, role_map)
 
 
 
@@ -739,6 +766,19 @@ class AssociationServiceClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('get_associations', msg)
 
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations_map(self, msg):
+        """
+        @brief Get the associations between any of subject, predicate and object. Becareful - you can ask very big questions with this method!
+        @param params msg, GPB 27/1, an association query message with IDrefs for each of the subject, predicate and object
+        @retval Query Results as a dict
+        @GPB{Input,27,1}
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations_map', msg)
         defer.returnValue(content)
 
 

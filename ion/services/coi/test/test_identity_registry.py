@@ -426,6 +426,10 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         log.info('test user id: %s to get role: %s' % (user_id, role))
         self.failIf(user_has_role(user_id, role))
 
+        resp = yield self.irc.set_role(user_id, role)
+        print resp
+
+        '''
         self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
         yield irs.defer_next_op('broadcast')
         self.failUnless(user_has_role(user_id, role))
@@ -433,4 +437,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         self.irc.broadcast({'op': 'unset_user_role', 'user-id': user_id, 'role': role})
         yield irs.defer_next_op('broadcast')
         self.failIf(user_has_role(user_id, role))
+        '''
+
+        print 'MONKEY'
 

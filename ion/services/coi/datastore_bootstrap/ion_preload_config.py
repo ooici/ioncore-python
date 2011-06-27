@@ -482,6 +482,7 @@ AUTHENTICATED_ROLE_ID = ION_ROLES[authenticated_name][ID_CFG]
 ROLE_IDS_BY_NAME = {'ADMIN': ADMIN_ROLE_ID, 'DATA_PROVIDER': DATA_PROVIDER_ROLE_ID,
                     'MARINE_OPERATOR': MARINE_OPERATOR_ROLE_ID, 'EARLY_ADOPTER': EARLY_ADOPTER_ROLE_ID,
                     'AUTHENTICATED': AUTHENTICATED_ROLE_ID}
+ROLE_NAMES_BY_ID = dict((v,k) for k,v in ROLE_IDS_BY_NAME.iteritems())
 
 ##### Define Datasets and data sources #####:
 
