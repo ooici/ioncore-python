@@ -21,7 +21,6 @@ from ion.core.messaging.receiver import Receiver, FanoutReceiver
 from ion.core.pack import app_supervisor
 from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
-from ion.services.coi.exchange.agent_client import ExchangeManagementClient
 
 CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)
@@ -88,6 +87,11 @@ class CCAgent(Process):
                  'event':event}
         yield self.send(self.ann_name, 'announce', cdesc)
 
+    @staticmethod
+    def set_announce(announce):
+        global CF_announce
+        CF_announce = announce
+        
     def op_announce(self, content, headers, msg):
         """
         Service operation: announce a capability container

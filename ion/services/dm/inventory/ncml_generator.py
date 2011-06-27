@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/ncml_generator.py
 @author Paul Hubbard
+@author Matt Rodriguez
 @date 4/29/11
 @brief For each dataset in the inventory, create a corresponding NcML file and
 sync with remove server. Some tricky code for running a process and noting its
@@ -108,9 +109,13 @@ def rsync_ncml(local_filepath, server_url, ssh_key_filename):
     @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    ssh_cmd = "".join(("'","-e ", '"', "ssh -i ", ssh_key_filename, '"', "'"))
+    ssh_cmd = "".join(("-e ", "ssh -i ", ssh_key_filename ))
     args = ['-r', '--perms', ssh_cmd, '--include', '"*.ncml"',
             '-v', '-h', '--delete', local_filepath + '/', server_url]
+
+
+    log.debug("rsync command %s " % (RSYNC_CMD,))
+    
     rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
     return rp.spawn()

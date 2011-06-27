@@ -32,6 +32,9 @@ omit =
     */test/*
     # omit sandbox from buildbot
     /*/sandbox/*
+    /*/utilities/SBE37_util*
+    /*/utilities/client_*
+    /*/utilities/inst_*
 
 [html]
 directory = coverage_results

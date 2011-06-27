@@ -154,11 +154,20 @@ class AppManager(BasicLifecycleObject):
                                         app_config=app_config, app_args=app_args)
         return d
 
+
+    @defer.inlineCallbacks
+    def stop_app(self, appname):
+        for app in self.applications:
+            if app.name == appname:
+                yield AppLoader.stop_application(self.container, app)
+                self.applications.remove(app)
+                return
+
     def create_processapp_def(self, process_app,
                                     app_name=None, app_version=None,
                                     app_config=None, app_args=None):
         """
-        @bried boilerplate for creating apps in release files without an app file.
+        @brief boilerplate for creating apps in release files without an app file.
         """
         app_dict = {
             "type":"application",

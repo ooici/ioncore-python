@@ -2447,6 +2447,7 @@ class SBE37Driver(InstrumentDriver):
         try:
             date_time = time.strptime(datestr,fmt)
             date = (date_time[2],date_time[1],date_time[0])
+
         except ValueError:
             return None
                         
@@ -2454,7 +2455,7 @@ class SBE37Driver(InstrumentDriver):
     
     
     @staticmethod
-    def _time_to_sting(v):
+    def _time_to_string(v):
         """
         Write a time tuple to a string formatted for sbe37 set operations.
         @param v a time tuple (hours,minutes,seconds).
