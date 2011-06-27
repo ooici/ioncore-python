@@ -59,8 +59,6 @@ class AppLoader(object):
             modkwargs.update(app_args)
 
         # Look for command line arguments for this app
-        if appdef.name is None:
-            import pdb; pdb.set_trace()
         startup_app_args = ioninit.cont_args.get("apparg_" + appdef.name, None)
         if startup_app_args:
             if type(startup_app_args) is dict:
