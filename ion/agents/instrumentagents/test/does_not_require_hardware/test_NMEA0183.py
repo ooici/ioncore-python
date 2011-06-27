@@ -22,6 +22,7 @@ from ion.agents.instrumentagents.driver_NMEA0183 \
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
     import SERPORTSLAVE, OFF, ON
+import ion.util.procutils as pu
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -288,6 +289,9 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual (result, None)
         self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
+        #Give the driver a moment to acquire some GPS data
+        yield pu.asleep(3.0)
+
         # Get all parameters and verify that the ones being reported are what we expect
         log.debug ('Getting and verifying expected parameters from the device')
         timeout = 30
@@ -382,7 +386,7 @@ class TestNMEADevice(IonTestCase):
         success = reply['success']
         result = reply['result']
         self.assert_ (InstErrorCode.is_error (success))
-        self.assertEqual (current_state,NMEADeviceState.CONNECTED)
+        self.assertEqual (current_state, NMEADeviceState.CONNECTED)
 
         # TODO: Try setting mix of good and bad parameters
 
@@ -404,6 +408,10 @@ class TestNMEADevice(IonTestCase):
         # Get configured and connected
         reply = yield self.driver_client.configure (self.driver_config)
         reply = yield self.driver_client.connect()
+
+        #Give the driver a moment to acquire some GPS data
+        yield pu.asleep(3.0)
+
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
@@ -442,6 +450,7 @@ class TestNMEADevice(IonTestCase):
         self.assert_(InstErrorCode.is_ok (reply['success']))
 
         reply = yield self.driver_client.get(param_list, 10)
+        log.debug(reply)
         self.assert_(InstErrorCode.is_ok (reply['success']))
         
         # Make sure we got config 1 back out
@@ -465,6 +474,10 @@ class TestNMEADevice(IonTestCase):
         # Get configured and connected, then try to execute something
         reply = yield self.driver_client.configure(self.driver_config)
         reply = yield self.driver_client.connect()
+
+        #Give the driver a moment to acquire some GPS data
+        yield pu.asleep(3.0)
+
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
@@ -472,11 +485,17 @@ class TestNMEADevice(IonTestCase):
         self.assertEqual(result, None)
         self.assertEqual(current_state, NMEADeviceState.CONNECTED)
 
+        log.debug('Issuing acquire sample command')
         reply = yield self.driver_client.execute([NMEADeviceChannel.GPS],
                                                  [NMEADeviceCommand.ACQUIRE_SAMPLE])
+        log.debug('Returned from issuing acquire sample command')
         self.assert_(InstErrorCode.is_ok(reply['success']))
         # get a clue to see if we actually got data
-        self.assert_(str(reply['result']).startswith("%GPGGA"))
+        log.debug(reply)
+        retCDs = []
+        for cd in reply['result']:
+            retCDs.append(cd['NMEA_CD'])
+        self.assert_('GPGGA' in retCDs)
                      
     @defer.inlineCallbacks
     def test_bad_commands(self):
@@ -491,6 +510,10 @@ class TestNMEADevice(IonTestCase):
         # Get configured and connected, then try to execute something
         reply = yield self.driver_client.configure(self.driver_config)
         reply = yield self.driver_client.connect()
+
+        #Give the driver a moment to acquire some GPS data
+        yield pu.asleep(3.0)
+
         current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']

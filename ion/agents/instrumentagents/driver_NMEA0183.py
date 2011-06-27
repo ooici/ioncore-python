@@ -24,7 +24,7 @@ from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import BaseEnum
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.exception import ApplicationError
-
+import ion.util.procutils as pu
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 
 from twisted.protocols import basic
@@ -152,7 +152,7 @@ class CfgNMEADevice(object):
     Currently this class converts input commands into special NMEA config
     sentences that are sent to the device.
     """
-    validSet = ['ALL', 'GPGGA', 'GPRMC']
+    validSet = ['GPGGA', 'GPRMC']
     cfgParams = {'GPGGA':        'OFF',
                  'GPGLL':        'OFF',
                  'GPRMC':        'OFF',
@@ -182,7 +182,8 @@ class CfgNMEADevice(object):
 
     def SetSentences(self, toSet):
         assert(isinstance(toSet, dict)), 'Expected dict content.'
-        for NMEA_CD in toSet:
+        for NMEA_CD in toSet.keys():
+            self.cfgParams[NMEA_CD] = toSet[NMEA_CD]
             self.WriteToDevice(self._BuildPGRMO(NMEA_CD, toSet[NMEA_CD]))
 
     def SendConfigToDevice(self, toSet):
@@ -375,7 +376,8 @@ class NMEADeviceDriver(InstrumentDriver):
         # Uses RTS/CTS:  default =0 (no)
         self._rtscts = None
 
-        NMEADeviceDriver.data_lines = []
+        self._data_lines = []
+        self._most_recent = {}
 
         # Device IO Logfile parameters. The device io log is used to precisely
         # trace comms with the device for design and debugging purposes.
@@ -635,12 +637,30 @@ class NMEADeviceDriver(InstrumentDriver):
         elif event == NMEADeviceEvent.EXECUTE:
             # params is a single command list, already checked for channels
             # and sanitized in op_execute
-            if params[0] == NMEADeviceCommand.ACQUIRE_SAMPLE:        
-                self._serialReadMode = ONCE  # Acquire only 1 line and stop
-                #TODO: Check that only one sentence is going for ONCE mode
-                #TODO: Based on the sentence, assign a timeout
-                #       i.e., almanac sentence may only come in once a day
-                #             GPGGA sentence at 1hz
+            if params[0] == NMEADeviceCommand.ACQUIRE_SAMPLE:
+                log.debug('ACQUIRE SAMPLE called %d' % len(self._most_recent))
+                turnedOn = False
+
+                # At least one valid sentence should be turned on
+                for cd in self._device_NMEA_config.validSet:
+                    if self._device_NMEA_config.cfgParams[cd] == ON:
+                        turnedOn = True
+                if turnedOn:
+                    result = yield self._acquire_sample()
+                    success = result['success']
+                    result = result['result']
+                    if len(result) > 0:
+                        log.debug('Acquired sample: %s' % result)
+                        content = {'type': DriverAnnouncement.DATA_RECEIVED,
+                                   'transducer': NMEADeviceChannel.GPS,
+                                   'value': result}
+                        yield self.send(self.proc_supid,
+                                        'driver_event_occurred',
+                                        content)
+                    else:
+                        log.debug('Acquire Sample had no data to return')
+                else:
+                    log.debug('Acquire Sample could not return data; all GPS output is off')
 
             if params[0] == NMEADeviceCommand.START_AUTO_SAMPLING:
                 self._serialReadMode = ON    # Continually acquire lines
@@ -649,17 +669,13 @@ class NMEADeviceDriver(InstrumentDriver):
                 self._serialReadMode = OFF    # Stop continually acquiring lines
 
         elif event == NMEADeviceEvent.DATA_RECEIVED:
-            while NMEADeviceDriver._data_lines:
-                nmeaLine = NMEADeviceDriver._data_lines.pop()
-                log.debug('Handling NMEA line')
-                if nmeaLine['NMEA_CD'] == '$PGRMC':
-                    self._setParams(nmeaLine)
-                elif len(nmeaLine) > 0:
-                    readNow = False
-                    if self._serialReadMode == ONCE:
-                        readNow = True
-                        self._serialReadMode = OFF
-                    if self._serialReadMode == ON or readNow == True:
+            while self._data_lines:
+                nmeaLine = self._data_lines.pop()
+                if len(nmeaLine) > 0:
+
+                    # This is where NMEA data is published
+                    if self._serialReadMode == ON:
+                        log.debug('Streaming data published: %s' % nmeaLine)
                         content = {'type': DriverAnnouncement.DATA_RECEIVED,
                                    'transducer': NMEADeviceChannel.GPS,
                                    'value': nmeaLine}
@@ -816,7 +832,7 @@ class NMEADeviceDriver(InstrumentDriver):
         connectionResult = NMEADeviceEvent.CONNECTION_COMPLETE
         try:
             log.debug("Driver is attempting serial connection to device....")
-            NMEADeviceDriver.serConnection =  SerialPort(NMEA0183Protocol(),
+            NMEADeviceDriver.serConnection =  SerialPort(self._protocol,
                                               self._port,
                                               reactor,
                                               baudrate=self._baudrate,
@@ -836,10 +852,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         Sets configuration parameters on connection with the device
         """
-        # First turn off all sentences
-        self._device_NMEA_config.SetSentences({'ALL': OFF})
-
-        # Now turn on only GPGGA
+        self._device_NMEA_config.SetSentences({'GPRMC': ON})
         self._device_NMEA_config.SetSentences({'GPGGA': ON})
 
         # Now configure all the default settings
@@ -871,11 +884,6 @@ class NMEADeviceDriver(InstrumentDriver):
         log.info("Driver has disconnected from the device")
         NMEADeviceDriver.serConnection = None
         self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
-
-    def gotData(self, dataFrag):
-        """
-        """
-        assert False, 'NMEA0183_driver.gotData() was called... why?'
 
     ###########################################################################
     # Agent interface methods.
@@ -1354,7 +1362,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         Set the configuration to an initialized, unconfigured state.
         """
-        self._protocol = NMEA0183Protocol()
+        self._protocol = NMEA0183Protocol(self)
         self._serialReadMode = OFF  # Ignore incoming NMEA lines
         self._device_NMEA_config.cfgParams = self._device_NMEA_config.defParams
         self._port = None
@@ -1490,13 +1498,6 @@ class NMEADeviceDriver(InstrumentDriver):
         else:
             return ObservatoryState.UNKNOWN
 
-#    @defer.inlineCallbacks
-#    def publish(self, topic, transducer, data):
-#        """
-#        """
-#
-#        yield
-
     def get_parameter_dict(self):
         """
         Return a dict with all driver parameters.
@@ -1508,6 +1509,33 @@ class NMEADeviceDriver(InstrumentDriver):
     ###########################################################################
     # Other.
     ###########################################################################
+
+    @defer.inlineCallbacks
+    def _acquire_sample(self):
+        """
+        Acquire a data sample in acquire sample polled mode.
+        """
+        reply = {'success':None, 'result':None}
+        self._data_lines = []
+
+        # Wait until enough data is populated
+        relevant = 0
+        found = 0
+        while relevant and relevant - found != 0:
+            yield put.asleep(0.5)
+            for cd in self._device_NMEA_config.validSet:
+                if self._device_NMEA_config.cfgParams[cd] == ON:
+                    relevant += 1
+                    if self._most_recent.has(cd) and len (self._most_recent[cd]) > 0:
+                        found += 1
+        reply['success'] = InstErrorCode.OK
+        samples = []
+        for cd in self._device_NMEA_config.validSet:
+            if self._device_NMEA_config.cfgParams[cd] == ON:
+                samples.append(self._most_recent[cd])
+        reply['result'] = samples
+        defer.returnValue(reply)
+
 
     def _set_parameters(self, params):
         """
@@ -1552,6 +1580,14 @@ class NMEADeviceDriver(InstrumentDriver):
         reply['result'] = result
         return reply
 
+    def _set_local_parameters(self, nmeaData):
+        """
+        Sets local parameters based on a parameters sentence from the device
+        """
+        for nmeaKey in nmeaData.keys():
+            if self._device_NMEA_config.defParams.get(nmeaKey):
+                self._device_NMEA_config.cfgParams[nmeaKey] = nmeaData[nmeaKey]
+
     def _get_parameters(self, params):
         """
         Get named parameter values.
@@ -1565,35 +1601,70 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         reply = dict (success = None, result = None)
         result = {}
-        get_errors = False
+        gotErrors = False
         gpsChan = NMEADeviceChannel.GPS
 
         # TODO: Separate parameters from .GPS into .INSTRUMENT
+        log.debug (params)
         for(chan, param) in params:
             if chan in GoodValues.validChans:
-                if param == NMEADeviceParam.ALL or param == gpsChan:
-                    for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
-                        result[(gpsChan, key)] = (InstErrorCode.OK, val)
+                if chan == NMEADeviceChannel.ALL or chan == gpsChan:
+                    if param == NMEADeviceParam.ALL:
+                        for (key, val) in self._device_NMEA_config.cfgParams.iteritems():
+                            result[(gpsChan, key)] = (InstErrorCode.OK, val)
+                    elif self._device_NMEA_config.cfgParams.has_key(param):
+                        val = self._device_NMEA_config.cfgParams[param]
+                        result[(gpsChan, param)] = (InstErrorCode.OK, val)
+                    else:
+                        result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
+                        gotErrors = True
                 else:
-                    result[(chan, param)] = (InstErrorCode.INVALID_PARAMETER, None)
-                    get_errors = True
+                    result[(chan, param)] = (InstErrorCode.INVALID_CHANNEL, None)
+                    gotErrors = True
             else:
                 result[(chan, param)] = (InstErrorCode.INVALID_CHANNEL, chan)
+                gotErrors = True
 
         # Set up reply success and return.
-        if get_errors:
+        if gotErrors:
             reply['success'] = InstErrorCode.GET_DEVICE_ERR
         else:
             reply['success'] = InstErrorCode.OK
         reply['result'] = result
         return reply
 
+    @defer.inlineCallbacks
+    def gotData(self, data):
+        """
+        Called by the NMEA0183Protocol whenever a line of data is received.
+        """
+        yield
+        log.debug("GOTDATA Received from GPS: %s", data)
+        nmea = NMEA.NMEAString(data)
+        nmeaLine = nmea.GetNMEAData()
+        if NMEA.NMEAErrorCode.is_ok(nmea.IsValid()):
+            NMEA_CD = nmeaLine['NMEA_CD']
+
+            # Handle configuration data
+            if NMEA_CD == 'PGRMC':
+                self._set_local_parameters(nmeaLine)
+
+            # PGRMO commands are simply echoed commands driver sent to GPS
+            elif NMEA_CD == 'PGRMO':
+                pass
+
+            # Handle non-configuration data sentences
+            elif NMEA_CD in self._device_NMEA_config.cfgParams:
+                self._most_recent[NMEA_CD] = nmeaLine
+                self._data_lines.append(nmeaLine)
+            self.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
+            
 class NMEA0183Protocol(basic.LineReceiver):
 
-    def __init__(self):
-        pass
+    def __init__(self, parent):
+        self.parent = parent
 
-    def lineReceived(self, line):
+    def lineReceived(self, data):
         """
         Called by the twisted framework when a serial line is received.
         Override of basic.LineReceiver method.
@@ -1601,17 +1672,19 @@ class NMEA0183Protocol(basic.LineReceiver):
         the parsing pipeline.
         Sends EVENT_DATA_RECEIVED if a good NMEA line came in.
         """
-        nmeaLine = NMEA.NMEAString(line)
-        lineStatus = nmeaLine.IsValid()
+        if len(data) > 1:
+            self.parent.gotData(data)
+        #nmeaLine = NMEA.NMEAString(data)
+        #lineStatus = nmeaLine.IsValid()
 
-        if NMEA.NMEAErrorCode.is_ok(lineStatus):
+        #if NMEA.NMEAErrorCode.is_ok(lineStatus):
 
             # If a valid sentence was received:
             #       - Store the sentence
             #       - send a data received event
-            NMEADeviceDriver._data_lines.insert(0, nmeaLine)
-            NMEADeviceDriver.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
-            log.debug("NMEA received: %s", nmeaLine)
+            #NMEADeviceDriver._data_lines.insert(0, nmeaLine)
+            #NMEADeviceDriver.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
+            #log.debug("NMEA received: %s", nmeaLine)
 
 class NMEADeviceDriverClient(InstrumentDriverClient):
     """
