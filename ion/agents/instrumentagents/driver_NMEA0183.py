@@ -657,6 +657,7 @@ class NMEADeviceDriver(InstrumentDriver):
                         yield self.send(self.proc_supid,
                                         'driver_event_occurred',
                                         content)
+
                     else:
                         log.debug('Acquire Sample had no data to return')
                 else:
@@ -1522,7 +1523,7 @@ class NMEADeviceDriver(InstrumentDriver):
         relevant = 0
         found = 0
         while relevant and relevant - found != 0:
-            yield put.asleep(0.5)
+            yield pu.asleep(0.5)
             for cd in self._device_NMEA_config.validSet:
                 if self._device_NMEA_config.cfgParams[cd] == ON:
                     relevant += 1

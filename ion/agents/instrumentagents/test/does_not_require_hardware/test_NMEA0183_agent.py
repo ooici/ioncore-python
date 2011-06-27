@@ -366,7 +366,9 @@ class TestNMEA0183Agent (IonTestCase):
         self.assertEqual(setparams[(chan, 'PGRMF')], result[(chan, 'PGRMF')][1])
         self.assertEqual(setparams[(chan, 'ALT_MSL')], result[(chan, 'ALT_MSL')][1])
         self.assertEqual(setparams[(chan, 'DED_REC')], result[(chan, 'DED_REC')][1])
-
+        
+        """ TODO Needs more work!
+        
         # Acquire sample.
         log.debug('+++++ Acquire sample.')
         chans = [DriverChannel.GPS]
@@ -420,6 +422,7 @@ class TestNMEA0183Agent (IonTestCase):
         success = reply['success']
         result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
+        """
 
     def test_NMEAParser (self):
         """
