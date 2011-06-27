@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/ncml_generator.py
 @author Paul Hubbard
+@author Matt Rodriguez
 @date 4/29/11
 @brief For each dataset in the inventory, create a corresponding NcML file and
 sync with remove server. Some tricky code for running a process and noting its
@@ -17,7 +18,7 @@ file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http:/
 from os import path, environ, chmod, unlink, listdir, remove
 import fnmatch
 
-from twisted.internet import reactor, defer, error
+from twisted.internet import defer
 from ion.util.os_process import OSProcess
 
 import ion.util.ionlog
@@ -27,7 +28,6 @@ from ion.core import ioninit
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 RSYNC_CMD = CONF['rsync']
-SSH_ADD_CMD = CONF['ssh-add']
 
 def create_ncml(id_ref, filepath=""):
     """
@@ -109,10 +109,13 @@ def rsync_ncml(local_filepath, server_url, ssh_key_filename):
     @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    ssh_cmd = "".join(("'","-e ", '"', "ssh -i ", ssh_key_filename, '"', "'"))
+    ssh_cmd = "".join(("-e ", "ssh -i ", ssh_key_filename ))
     args = ['-r', '--perms', ssh_cmd, '--include', '"*.ncml"',
-            "'-e  \"ssh -i /path/to/private.key\"'",
             '-v', '-h', '--delete', local_filepath + '/', server_url]
+
+
+    log.debug("rsync command %s " % (RSYNC_CMD,))
+    
     rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
     return rp.spawn()

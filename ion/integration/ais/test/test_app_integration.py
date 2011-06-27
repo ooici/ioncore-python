@@ -767,8 +767,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response does not contain an OOI_ID GPB')
         if reply.message_parameters_reference[0].user_already_registered != False:
             self.fail("response does not indicate user wasn't already registered")
-        if reply.message_parameters_reference[0].user_is_admin != True:
-            self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_is_admin != False:
+            self.fail("response indicates user is administrator")
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
@@ -783,8 +783,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response does not contain an OOI_ID GPB')
         if reply.message_parameters_reference[0].user_already_registered != True:
             self.fail("response does not indicate user was already registered")
-        if reply.message_parameters_reference[0].user_is_admin != True:
-            self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_is_admin != False:
+            self.fail("response indicates user is administrator")
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
