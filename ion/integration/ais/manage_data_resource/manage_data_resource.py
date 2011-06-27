@@ -21,7 +21,8 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
-from ion.services.dm.distribution.events import ScheduleEventPublisher
+from ion.services.dm.distribution.events import ScheduleEventPublisher, \
+                                                DatasourceChangeEventPublisher
 
 from ion.util.iontime import IonTime
 import time
@@ -74,8 +75,8 @@ class ManageDataResource(object):
         self.ing   = IngestionClient(proc=ais)
         
         #necessary to receive events i think
-        self.pub   = ScheduleEventPublisher(process=ais)
-
+        self.pub_schd   = ScheduleEventPublisher(process=ais)
+        self.pub_dsrc   = DatasourceChangeEventPublisher(process=ais)
 
     @defer.inlineCallbacks
     def update(self, msg_wrapped):
@@ -202,16 +203,18 @@ class ManageDataResource(object):
                 datasrc_resource.is_public = msg.is_public
                 if not msg.is_public:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
                 else:
                     datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
                 datasrc_resource.visualization_url = msg.visualization_url
 
             # This could be cleaned up to go faster - only call put if it is modified!
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
+
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
 
         except ReceivedApplicationError, ex:
             log.info('AIS.ManageDataResource.update: Error: %s' %ex)
@@ -444,8 +447,8 @@ class ManageDataResource(object):
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
-            #these start new, and get set on the first ingest event
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
+            #resource lifecycle states as per 6/27/11 call with dstuebe
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
             yield self.rc.put_resource_transaction(resource_transaction)
@@ -483,14 +486,14 @@ class ManageDataResource(object):
         @brief create a single ingest event trigger and send it
         """
         log.info("triggering an immediate ingest event")
-        msg = yield self.pub.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
-                                          task_id="manage_data_resource_FAKED_TASK_ID")
+        msg = yield self.pub_schd.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                               task_id="manage_data_resource_FAKED_TASK_ID")
         
         msg.additional_data.payload = msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         msg.additional_data.payload.dataset_id     = dataset_id
         msg.additional_data.payload.datasource_id  = datasource_id
 
-        yield self.pub.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+        yield self.pub_schd.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
 
 
     @defer.inlineCallbacks
