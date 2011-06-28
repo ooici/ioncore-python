@@ -496,7 +496,7 @@ traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
                       DESCRIPTION_CFG:'An example of a trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':trj_dataset_loc},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
@@ -505,7 +505,7 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       DESCRIPTION_CFG:'An example of a station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_dataset_name:{
@@ -548,7 +548,7 @@ ntas2_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':ntas2_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 whots1_dataset_name:{
@@ -569,7 +569,7 @@ whots2_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':whots2_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_dataset_name:{
@@ -580,7 +580,7 @@ moanalua_rain_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':moanalua_rain_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_dataset_name:{
@@ -623,7 +623,7 @@ traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5'
                       DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F6',
@@ -632,7 +632,7 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       DESCRIPTION_CFG:'An example of a data source for the station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04800',
@@ -669,7 +669,7 @@ ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803
                       CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[ntas2_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
@@ -688,7 +688,7 @@ whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E0480
                       CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[whots2_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04806',
@@ -698,7 +698,7 @@ moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28
                       CONTENT_CFG:dataset_bootstrap.bootstrap_moanalua_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[moanalua_rain_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04807',
