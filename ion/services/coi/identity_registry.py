@@ -21,6 +21,7 @@ from ion.core.exception import ApplicationError
 from ion.core.security.authentication import Authentication
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
@@ -38,6 +39,7 @@ from ion.core.intercept.policy import subject_has_admin_role, \
 from ion.services.coi.datastore_bootstrap.ion_preload_config \
     import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
 
+from ion.services.coi.datastore import ASSOCIATION_TYPE, DataStoreError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, \
                                                           ASSOCIATION_QUERY_MSG_TYPE
 
@@ -183,10 +185,18 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def broadcast(self, message):
+    def unset_role(self, user_id, role):
+        log.debug("in unset_role client")
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('unset_role', {'user-id': user_id, 'role': role})
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def broadcast(self, msg):
         log.debug('in broadcast for identity registry client')
         yield self._check_init()
-        yield self.send('broadcast', message)
+        broadcast_target = self.proc.get_scoped_name(FanoutReceiver.SCOPE_SYSTEM, broadcast_name)
+        yield self.proc.send(broadcast_target, 'broadcast', msg)
 
 class IdentityRegistryException(ApplicationError):
     """
@@ -202,7 +212,7 @@ class IdentityRegistryService(ServiceProcess):
         super(IdentityRegistryService, self).__init__(*args, **kwargs)
 
         self.broadcast_count = 0
-    
+
     def slc_init(self):
         """
         """
@@ -211,26 +221,21 @@ class IdentityRegistryService(ServiceProcess):
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
         self.asc = AssociationServiceClient()
+        self.ac = AssociationClient(proc=self)
+        self.irc = IdentityRegistryClient(proc=self)
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
 
     @defer.inlineCallbacks
     def slc_activate(self):
         # Setup broadcast channel (for policy reloading)
-        self.bc_receiver = FanoutReceiver(name=broadcast_name,
-                                           label='.'.join((broadcast_name, self.receiver.label)),
-                                           scope=FanoutReceiver.SCOPE_SYSTEM,
-                                           group=self.receiver.group,
-                                           handler=self.receive,
-                                           error_handler=self.receive_error)
+        self.bc_receiver = FanoutReceiver(name=broadcast_name, scope=FanoutReceiver.SCOPE_SYSTEM,
+                                           handler=self.receive, error_handler=self.receive_error)
         self.bc_name = yield self.bc_receiver.attach()
 
         log.info('Listening to identity registry broadcasts: %s' % (self.bc_name))
 
         # Load current role associations
-        request = yield self.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
-        request.predicate = request.CreateObject(IDREF_TYPE)
-        request.predicate.key = HAS_ROLE_ID
-        role_map = yield self.asc.get_associations_map(request)
+        role_map = yield self.asc.get_associations_map({'predicate': HAS_ROLE_ID})
         for user_id, role_id in role_map.iteritems():
             map_ooi_id_to_role(user_id, ROLE_NAMES_BY_ID[role_id])
 
@@ -518,28 +523,74 @@ class IdentityRegistryService(ServiceProcess):
                                             request.ResponseCodes.NOT_FOUND)
 
     @defer.inlineCallbacks
+    def create_role_association(self, user_id, role_id):
+       association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
+
+       # Set the subject
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       id_ref.key = user_id
+       association_repo.root_object.subject = id_ref
+
+       # Set the predicate
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       id_ref.key = HAS_ROLE_ID
+       association_repo.root_object.predicate = id_ref
+
+       # Set the Object
+       id_ref = association_repo.create_object(IDREF_TYPE)
+       id_ref.key = role_id
+       association_repo.root_object.object = id_ref
+
+       association_repo.commit('Ownership association created for identity object.')
+       yield self.workbench.push('datastore', association_repo)
+
+    @defer.inlineCallbacks
+    def _unset_roles(self, user_id, role_id=None):
+        ''' Specify a single role_id to remove, else remove all. '''
+
+        request = {'subject': user_id, 'predicate': HAS_ROLE_ID}
+        if role_id is not None: request['object'] = role_id
+        associations = yield self.asc.get_associations_list(request)
+        
+        for assoc in associations:
+            a_id, a_user_id, role_id = assoc['id'], assoc['user_id'], assoc['role_id']
+            role = ROLE_NAMES_BY_ID[role_id]
+
+            # I would do these with DeferredLists, but there should only be one iteration through this loop
+            asc_inst = yield self.ac.get_instance(a_id)
+            asc_inst.SetNull()
+            yield self.rc.put_instance(asc_inst)
+            yield self.irc.broadcast({'op': 'unset_user_role', 'user-id': user_id, 'role': role})
+
+    @defer.inlineCallbacks
     def op_set_role(self, content, headers, msg):
+        # First remove existing roles
         user_id, role = content['user-id'], content['role']
-        #role_id = ROLE_IDS_BY_NAME[role]
+        role_id = ROLE_IDS_BY_NAME[role]
+        yield self._unset_roles(user_id)
+
+        # Next setup new role association and policy cache
+        try:
+            yield self.create_role_association(user_id, role_id)
+        except DataStoreError, ex:
+            log.error('Failed to create role association: %s' % (ex))
+            raise
         map_ooi_id_to_role(user_id, role)
 
-        # See if there is already a role for this user that needs to be removed
-        '''
-        TODO: Re-add this when there's a way to delete associations
-        request = yield self.message_client.create_instance(ASSOCIATION_QUERY_MSG_TYPE)
-        request.subject = request.CreateObject(IDREF_TYPE)
-        request.subject.key = user_id
-        request.predicate = request.CreateObject(IDREF_TYPE)
-        request.predicate.key = HAS_ROLE_ID
-        associations = yield self.asc.get_associations_map(request)
-        for ruser_id, role_id in associations.iteritems():
-            yield self.asc.remove_association(thing1, thing2)
+        # Tell all the other identity registry services to update the policy cache
+        yield self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
 
-        print associations
-        '''
+        response = True
+        yield self.reply_ok(msg, response)
 
-        #self.asc.
+    @defer.inlineCallbacks
+    def op_unset_role(self, content, headers, msg):
+        user_id, role = content['user-id'], content['role']
+        role_id = ROLE_IDS_BY_NAME[role]
+        yield self._unset_roles(user_id, role_id)
 
+        response = True
+        yield self.reply_ok(msg, response)
 
 
     def op_broadcast(self, content, headers, msg):
@@ -547,21 +598,15 @@ class IdentityRegistryService(ServiceProcess):
         Service operation: announce a capability container
         """
         self.broadcast_count += 1
-        log.info('op_broadcast(): Received identity registry broadcast #%d: %s' % (self.broadcast_count, repr(content)))
+        log.info('op_broadcast(): Received identity registry broadcast #%d' % (self.broadcast_count))
 
         if 'op' in content:
             op = content['op']
             log.info('doing op_broadcast operation %s' % (op))
             if op == 'set_user_role':
                 map_ooi_id_to_role(content['user-id'], content['role'])
-
-                # TODO: add association
             elif op == 'unset_user_role':
                 unmap_ooi_id_from_role(content['user-id'], content['role'])
-
-                # TODO: remove association
-
-        #log.info("op_announce(): Know about %s containers!" % (len(self.containers)))
 
     @defer.inlineCallbacks
     def _findUser(self, Subject):

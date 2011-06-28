@@ -96,6 +96,8 @@ def user_has_role(ooi_id, role):
         return ooi_id in user_role_dict[role]['ooi_id']
 
 def map_ooi_id_to_role(ooi_id, role):
+    if not role in user_role_dict:
+        user_role_dict[role] = {'subject': set(), 'ooi_id': set()}
     user_role_dict[role]['ooi_id'].add(ooi_id)
 
 def unmap_ooi_id_from_role(ooi_id, role):

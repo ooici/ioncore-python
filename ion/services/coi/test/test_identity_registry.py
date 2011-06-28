@@ -422,22 +422,13 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         role_cfg = Config(userroledb_filename).getObject()
 
         role = 'ADMIN'
-        user_id = 'FAKE_TEST_USER_%d' % (random.randint(1, 1<<30))
+        user_id = self.user2_ooi_id
         log.info('test user id: %s to get role: %s' % (user_id, role))
         self.failIf(user_has_role(user_id, role))
 
-        resp = yield self.irc.set_role(user_id, role)
-        print resp
-
-        '''
-        self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
-        yield irs.defer_next_op('broadcast')
+        yield self.irc.set_role(user_id, role)
         self.failUnless(user_has_role(user_id, role))
 
-        self.irc.broadcast({'op': 'unset_user_role', 'user-id': user_id, 'role': role})
-        yield irs.defer_next_op('broadcast')
+        yield self.irc.unset_role(user_id, role)
         self.failIf(user_has_role(user_id, role))
-        '''
-
-        print 'MONKEY'
 
