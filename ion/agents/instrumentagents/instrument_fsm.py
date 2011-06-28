@@ -7,6 +7,9 @@
 """
 
 from twisted.internet import defer
+import ion.util.ionlog
+
+log = ion.util.ionlog.getLogger(__name__)
 
 
 
@@ -80,9 +83,8 @@ class InstrumentFSM():
             handler.
         @retval Success/fail if the event was handled by the current state.
         """
-        
+        log.debug("Instrument FSM handling async event %s with current state %s", event, self.current_state)
         (success,next_state,result) = yield self.state_handlers[self.current_state](event,params)
-        
         
         #if next_state in self.states:
         if self.states.has(next_state):
@@ -117,5 +119,5 @@ class InstrumentFSM():
         yield self.state_handlers[self.current_state](self.exit_event,params)
         self.previous_state = self.current_state
         self.current_state = next_state
-        yield self.state_handlers[self.current_state](self.enter_event,params)
-        
+        log.debug("Instrument Driver FSM transitioning from %s to %s", self.previous_state, self.current_state)
+        yield self.state_handlers[self.current_state](self.enter_event,params)        
