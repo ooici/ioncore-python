@@ -107,6 +107,8 @@ class MetadataCache(object):
         Commissioned (Public) state.
         """
 
+        log.debug('loadDataSets()')
+
         # Get the list of dataset resource IDs
         dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         if dSetResults == None:
@@ -137,7 +139,7 @@ class MetadataCache(object):
         Commissioned (Public) state.
         """
 
-
+        log.debug('loadDataSources()')
         
         # Get the list of datasource resource IDs
         dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
@@ -272,7 +274,7 @@ class MetadataCache(object):
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
             returnValue = metadata[DSOURCE]
         except KeyError:
-            log.error('Metadata not found for datasetID: ' + dSourceID)
+            log.error('Metadata not found for datasourceID: ' + dSourceID)
             returnValue = None
 
         self.__unlockCache()
@@ -296,7 +298,7 @@ class MetadataCache(object):
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
             returnValue = metadata
         except KeyError:
-            log.error('Metadata not found for datasetID: ' + dSourceID)
+            log.error('Metadata not found for datasourceID: ' + dSourceID)
             returnValue = None
 
         self.__unlockCache()
@@ -393,6 +395,34 @@ class MetadataCache(object):
 
 
     @defer.inlineCallbacks
+    def getAssociatedDatasets(self, dSource):
+        """
+        Worker class private method to get the data sets that associated
+        with a given data source.  
+        """
+        log.debug('getAssociatedDatasets() entry')
+
+        try:
+            results = yield self.ac.find_associations(subject=dSource, predicate_or_predicates=HAS_A_ID)
+            #associations = yield ac.find_associations(subject=dsource_resource, predicate_or_predicates=HAS_A_ID)
+
+        except AssociationClientError:
+            log.error('Error getting associated data sets for Datasource: ' + \
+                      dSource.ResourceIdentity)
+            defer.returnValue(None)
+
+        log.error('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(results)))
+        for association in results:
+            log.debug('Associated Dataset for Datasource: ' + \
+                      association.SubjectReference.key + \
+                      ' is: ' + association.ObjectReference.key)
+
+        log.debug('getAssociatedDatasets) exit: returning: %s' %(association.ObjectReference.key))
+
+        defer.returnValue(association.ObjectReference.key)
+
+
+    @defer.inlineCallbacks
     def __lockCache(self):
         """
         Lock the cache to insure exclusive access while updating
@@ -425,7 +455,7 @@ class MetadataCache(object):
             dSet = yield self.rc.get_instance(dSetID)
             yield self.__loadDSetMetadata(dSet)
         except ResourceClientError:    
-            log.error('Data set %s (LCS: %s) being updated but was never cached!' %(dSetID, dSet.LifeCycleState))
+            log.error('get_instance failed for data set ID %s !' %(dSetID))
 
     
     @defer.inlineCallbacks
@@ -440,9 +470,9 @@ class MetadataCache(object):
 
         try:
             dSource = yield self.rc.get_instance(dSourceID)
-            self.__loadDSourceMetadata(dSource)
+            yield self.__loadDSourceMetadata(dSource)
         except ResourceClientError:    
-            log.error('Data source %s (LCS: %s) being updated but was never cached!' %(dSetID, dSource.LifeCycleState))
+            log.error('get_instance failed for data source ID %s !' %(dSourceID))
 
 
     @defer.inlineCallbacks
@@ -453,73 +483,82 @@ class MetadataCache(object):
         dictionary of dictionaries).  Only do this if the data set is Private
         or Public.
         """
+
+        log.debug('__loadDSetMetadata for dSet: %s' %(dSet.ResourceIdentity))
         
         #
-        # Only cache the metadata if the data set is in the ACTIVE or
-        # COMMISSIONED state.
+        # Only cache the metadata if the data set and the data source are both
+        # in the ACTIVE state.  Get the associated data source so that both
+        # states can be checked before loading the dataset into the cache.
         #
-        if ((dSet.ResourceLifeCycleState == dSet.ACTIVE) or 
-            (dSet.ResourceLifeCycleState == dSet.COMMISSIONED)):
-            dSetMetadata = {}
-            #
-            # Store the entire dataset now; should be doing only that anyway.
-            # Set persisence to true.  NOTE: remember to set this to false
-            # on delete.
-            #
-            dSet.Repository.persistent = True
-            dSetMetadata[DSET] = dSet
-            dSetMetadata[DSOURCE_ID] = yield self.getAssociatedSource(dSet.ResourceIdentity)
-            dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
-            dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
-            for attrib in dSet.root_group.attributes:
-                #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
-                if attrib.name == TITLE:
-                    dSetMetadata[TITLE] = attrib.GetValue()
-                elif attrib.name == INSTITUTION:                
-                    dSetMetadata[INSTITUTION] = attrib.GetValue()
-                elif attrib.name == SOURCE:                
-                    dSetMetadata[SOURCE] = attrib.GetValue()
-                elif attrib.name == REFERENCES:                
-                    dSetMetadata[REFERENCES] = attrib.GetValue()
-                elif attrib.name == TIME_START:                
-                    dSetMetadata[TIME_START] = attrib.GetValue()
-                elif attrib.name == TIME_END:                
-                    dSetMetadata[TIME_END] = attrib.GetValue()
-                elif attrib.name == SUMMARY:                
-                    dSetMetadata[SUMMARY] = attrib.GetValue()
-                elif attrib.name == COMMENT:                
-                    dSetMetadata[COMMENT] = attrib.GetValue()
-                elif attrib.name == LAT_MIN:                
-                    dSetMetadata[LAT_MIN] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == LAT_MAX:                
-                    dSetMetadata[LAT_MAX] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == LON_MIN:                
-                    dSetMetadata[LON_MIN] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == LON_MAX:                
-                    dSetMetadata[LON_MAX] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == VERT_MIN:                
-                    dSetMetadata[VERT_MIN] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == VERT_MAX:                
-                    dSetMetadata[VERT_MAX] = Decimal(str(attrib.GetValue()))
-                elif attrib.name == VERT_POS:                
-                    dSetMetadata[VERT_POS] = attrib.GetValue()
-            if dSet.ResourceLifeCycleState == dSet.ACTIVE:
-                dSetMetadata[LCS] = self.PRIVATE
-            elif dSet.ResourceLifeCycleState == dSet.COMMISSIONED:
-                dSetMetadata[LCS] = self.PUBLIC
-            
-            log.debug('dSetMetadata keys: ' + str(dSetMetadata.keys()))
-            #
-            # Store this dSetMetadata in the dictionary, indexed by the resourceID
-            #
-            self.__metadata[dSet.ResourceIdentity] = dSetMetadata
-    
-            if log.getEffectiveLevel() <= logging.DEBUG:
-                self.__printMetadata(dSet)
-        else:
-            log.info('data set ' + dSet.ResourceIdentity + ' is not Private or Public.')
+        dSourceID = yield self.getAssociatedSource(dSet.ResourceIdentity)
+        try:
+            dSource = yield self.rc.get_instance(dSourceID)
+        except ResourceClientError:    
+            log.error('get_instance failed for data source ID %s !' %(dSourceID))
+        else:            
+            if ((dSet.ResourceLifeCycleState == dSet.ACTIVE) and
+                (dSource.ResourceLifeCycleState == dSource.ACTIVE)):
+                dSetMetadata = {}
+                #
+                # Store the entire dataset now; should be doing only that anyway.
+                # Set persisence to true.  NOTE: remember to set this to false
+                # on delete.
+                #
+                dSet.Repository.persistent = True
+                dSetMetadata[DSET] = dSet
+                dSetMetadata[DSOURCE_ID] = dSourceID
+                dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
+                dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
+                for attrib in dSet.root_group.attributes:
+                    #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
+                    if attrib.name == TITLE:
+                        dSetMetadata[TITLE] = attrib.GetValue()
+                    elif attrib.name == INSTITUTION:                
+                        dSetMetadata[INSTITUTION] = attrib.GetValue()
+                    elif attrib.name == SOURCE:                
+                        dSetMetadata[SOURCE] = attrib.GetValue()
+                    elif attrib.name == REFERENCES:                
+                        dSetMetadata[REFERENCES] = attrib.GetValue()
+                    elif attrib.name == TIME_START:                
+                        dSetMetadata[TIME_START] = attrib.GetValue()
+                    elif attrib.name == TIME_END:                
+                        dSetMetadata[TIME_END] = attrib.GetValue()
+                    elif attrib.name == SUMMARY:                
+                        dSetMetadata[SUMMARY] = attrib.GetValue()
+                    elif attrib.name == COMMENT:                
+                        dSetMetadata[COMMENT] = attrib.GetValue()
+                    elif attrib.name == LAT_MIN:                
+                        dSetMetadata[LAT_MIN] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == LAT_MAX:                
+                        dSetMetadata[LAT_MAX] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == LON_MIN:                
+                        dSetMetadata[LON_MIN] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == LON_MAX:                
+                        dSetMetadata[LON_MAX] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == VERT_MIN:                
+                        dSetMetadata[VERT_MIN] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == VERT_MAX:                
+                        dSetMetadata[VERT_MAX] = Decimal(str(attrib.GetValue()))
+                    elif attrib.name == VERT_POS:                
+                        dSetMetadata[VERT_POS] = attrib.GetValue()
+                if dSet.ResourceLifeCycleState == dSet.ACTIVE:
+                    dSetMetadata[LCS] = self.PRIVATE
+                elif dSet.ResourceLifeCycleState == dSet.COMMISSIONED:
+                    dSetMetadata[LCS] = self.PUBLIC
+                
+                log.debug('dSetMetadata keys: ' + str(dSetMetadata.keys()))
+                #
+                # Store this dSetMetadata in the dictionary, indexed by the resourceID
+                #
+                self.__metadata[dSet.ResourceIdentity] = dSetMetadata
+        
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    self.__printMetadata(dSet)
+            else:
+                log.info('data set %s and data source %s are not both ACTIVE: Not caching.' %(dSet.ResourceIdentity, dSource.ResourceIdentity))
 
-
+    @defer.inlineCallbacks
     def __loadDSourceMetadata(self, dSource):
         """
         Create and load a dictionary entry with the metadata from the given
@@ -528,48 +567,61 @@ class MetadataCache(object):
         or Public.
         """
         
+        log.debug('__loadDSourceMetadata for dSource: %s' %(dSource.ResourceIdentity))
+        
         #
-        # Only cache the metadata if the data source is in the ACTIVE or
-        # COMMISSIONED state.
+        # Only cache the metadata if the data source and the data set are both
+        # in the ACTIVE state.  Get the associated data set so that both
+        # states can be checked before loading the dataset into the cache.
         #
-        if ((dSource.ResourceLifeCycleState == dSource.ACTIVE) or 
-            (dSource.ResourceLifeCycleState == dSource.COMMISSIONED)):
-            dSourceMetadata = {}
+        dSetID = yield self.getAssociatedDatasets(dSource)
+        try:
+            dSet = yield self.rc.get_instance(dSetID)
+        except ResourceClientError:    
+            log.error('get_instance failed for data set ID %s !' %(dSetID))
+        else:            
             #
-            # Store the entire datasource now; should be doing only that anyway
-            # Set persisence to true.  NOTE: remember to set this to false
-            # on delete.
+            # Only cache the metadata if the data source is in the ACTIVE or
+            # COMMISSIONED state.
             #
-            dSource.Repository.persistent = True
-            dSourceMetadata[DSOURCE] = dSource
-            for property in dSource.property:
-                dSourceMetadata[PROPERTY] = property
-    
-            for sid in dSource.station_id:                
-                dSourceMetadata[STATION_ID] = sid
+            if ((dSource.ResourceLifeCycleState == dSource.ACTIVE) and
+                (dSet.ResourceLifeCycleState == dSet.ACTIVE)):
+                dSourceMetadata = {}
+                #
+                # Store the entire datasource now; should be doing only that anyway
+                # Set persisence to true.  NOTE: remember to set this to false
+                # on delete.
+                #
+                dSource.Repository.persistent = True
+                dSourceMetadata[DSOURCE] = dSource
+                for property in dSource.property:
+                    dSourceMetadata[PROPERTY] = property
+        
+                for sid in dSource.station_id:                
+                    dSourceMetadata[STATION_ID] = sid
+                    
+                dSourceMetadata[REGISTRATION_TIME] = dSource.registration_datetime_millis
+                dSourceMetadata[REQUEST_TYPE] = dSource.request_type
+                dSourceMetadata[BASE_URL] = dSource.base_url
+                dSourceMetadata[MAX_INGEST_MILLIS] = dSource.max_ingest_millis
+                dSourceMetadata[ION_TITLE] = dSource.ion_title
+                dSourceMetadata[UPDATE_INTERVAL_SECONDS] = dSource.update_interval_seconds
+                if dSource.ResourceLifeCycleState == dSource.ACTIVE:
+                    dSourceMetadata[LCS] = self.PRIVATE
+                elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
+                    dSourceMetadata[LCS] = self.PUBLIC
+                dSourceMetadata[VISUALIZATION_URL] = dSource.visualization_url
                 
-            dSourceMetadata[REGISTRATION_TIME] = dSource.registration_datetime_millis
-            dSourceMetadata[REQUEST_TYPE] = dSource.request_type
-            dSourceMetadata[BASE_URL] = dSource.base_url
-            dSourceMetadata[MAX_INGEST_MILLIS] = dSource.max_ingest_millis
-            dSourceMetadata[ION_TITLE] = dSource.ion_title
-            dSourceMetadata[UPDATE_INTERVAL_SECONDS] = dSource.update_interval_seconds
-            if dSource.ResourceLifeCycleState == dSource.ACTIVE:
-                dSourceMetadata[LCS] = self.PRIVATE
-            elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
-                dSourceMetadata[LCS] = self.PUBLIC
-            dSourceMetadata[VISUALIZATION_URL] = dSource.visualization_url
-            
-            log.debug('dSourceMetadata keys: ' + str(dSourceMetadata.keys()))
-            #
-            # Store this dSourceMetadata in the dictionary, indexed by the resourceID
-            #
-            self.__metadata[dSource.ResourceIdentity] = dSourceMetadata
-    
-            if log.getEffectiveLevel() <= logging.DEBUG:
-                self.__printMetadata(dSource)
-        else:
-            log.info('data source ' + dSource.ResourceIdentity + ' is not Private or Public.')
+                log.debug('dSourceMetadata keys: ' + str(dSourceMetadata.keys()))
+                #
+                # Store this dSourceMetadata in the dictionary, indexed by the resourceID
+                #
+                self.__metadata[dSource.ResourceIdentity] = dSourceMetadata
+        
+                if log.getEffectiveLevel() <= logging.DEBUG:
+                    self.__printMetadata(dSource)
+            else:
+                log.info('data source %s and data set %s are not both ACTIVE: Not caching.' %(dSource.ResourceIdentity, dSet.ResourceIdentity))
 
 
     @defer.inlineCallbacks

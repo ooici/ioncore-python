@@ -47,7 +47,7 @@ class GetDataResourceDetail(object):
     @defer.inlineCallbacks
     def getDataResourceDetail(self, msg):
         if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('AIS.getDataResourceDetail: Worker Class got GPB: \n' + str(msg))
+            log.debug('AIS.getDataResourceDetail()')
 
         # Check for correct request protocol buffer type
         if msg.MessageType != AIS_REQUEST_MSG_TYPE:
@@ -148,6 +148,7 @@ class GetDataResourceDetail(object):
 
         log.debug('Associated datasourceID: ' + dSourceResID)
         if self.bUseMetadataCache:
+            log.debug('getting cached dSource')
             dSource = yield self.metadataCache.getDSource(dSourceResID)
         else:
             dSource = yield self.rc.get_instance(dSourceResID)

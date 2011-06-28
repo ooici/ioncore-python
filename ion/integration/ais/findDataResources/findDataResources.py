@@ -181,7 +181,12 @@ class FindDataResources(object):
         log.debug('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by ' + str(userID))
 
         # Get the list of PUBLIC dataset resource IDs
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PUBLIC)
+        #
+        # We can't find by PUBLIC any more...need to find all active, then only include those
+        # that have the is_public() attribute set.  This self.PRIVATE & self.PUBLIC goes away
+        #
+        #dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PUBLIC)
+        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PRIVATE)
         if dSetResults == None:
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -386,7 +391,7 @@ class FindDataResources(object):
                         Response.error_str = "AIS.findDataResources: Datasource not found."
                         defer.returnValue(Response)
 
-                    dSource = yield self.metadataCache.getDSetMetadata(dSourceResID)
+                    dSource = yield self.metadataCache.getDSourceMetadata(dSourceResID)
                     if dSource is None:
                         log.info('metadata not found for datasourceID: ' + dSourceResID)
                         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -566,6 +571,24 @@ class FindDataResources(object):
         type_ref.key = resourceType
         pair.object = type_ref
         
+        # 
+        # Set up a search term using:
+        # - HAS_LIFE_CYCLE_STATE_ID as predicate
+        # - LCS_REFERENCE_TYPE object set to given resourceState as object
+        #
+        pair = request.pairs.add()
+
+        # ..(predicate)
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+        # ..(object)
+        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
         log.info('Getting resources of type %s with owner: %s' % (resourceType, owner))
 
         try:
@@ -781,27 +804,12 @@ class FindDataResources(object):
     def __loadRspByOwnerPayload(self, rspPayload, dSetMetadata, userID, dSource):
         rspPayload.data_resource_id = dSetMetadata['ResourceIdentity']
         rspPayload.title = dSetMetadata['title']
-        #rspPayload.date_registered = dSource.registration_datetime_millis
         rspPayload.date_registered = dSource['registration_datetime_millis']
-        #rspPayload.ion_title = dSource.ion_title
         rspPayload.ion_title = dSource['ion_title']
-        #rspPayload.activation_state = dSource.ResourceLifeCycleState
         #
         # Set the activate state based on the resource lcs
         #
-        """
-        FIXME FIXME FIXME: there needs to be an element in dSource representing state
-        if dSource.ResourceLifeCycleState == dSource.NEW:
-            rspPayload.activation_state = self.REGISTERED
-        elif dSource.ResourceLifeCycleState == dSource.ACTIVE:
-            rspPayload.activation_state = self.PRIVATE
-        elif dSource.ResourceLifeCycleState == dSource.COMMISSIONED:
-            rspPayload.activation_state = self.PUBLIC
-        else:
-            rspPayload.activation_state = self.UNKNOWN
-        """            
         rspPayload.activation_state = dSource['lcs']
-        #rspPayload.update_interval_seconds = dSource.update_interval_seconds
         rspPayload.update_interval_seconds = dSource['update_interval_seconds']
 
     @defer.inlineCallbacks
