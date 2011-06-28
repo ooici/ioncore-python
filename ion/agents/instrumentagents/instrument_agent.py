@@ -2728,18 +2728,9 @@ class InstrumentAgent(Process):
         @param transducer String transducer producing the event.
         @param value Value of the event.
         """
-        if DEBUG_PRINT:
-            if isinstance(value, str):
-                print 'driver event: ' + type + ',  ' + transducer + ',  ' \
-                    + value
+        log.debug('Driver event type: %s, transducer: %s, value: %s',
+                  type, transducer, value)
 
-            elif isinstance(value, dict):
-                print 'driver event: ' + type + ',  ' + transducer
-                for (key, val) in value.iteritems():
-                    print str(key), ' ', str(val)
-            else:
-                print 'driver event: ' + type + ',  ' + transducer
-                print value
 
     def _debug_print(self, event=None, value=None):
         """
@@ -2747,8 +2738,7 @@ class InstrumentAgent(Process):
         @param event String event type.
         @param value String event value.
         """
-        if DEBUG_PRINT:
-            print event, ' ', value
+        log.debug("Event: %s, value: %s", event, value)
 
 
 class InstrumentAgentClient(ProcessClient):
