@@ -407,9 +407,7 @@ class IngestionService(ServiceProcess):
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed!")
 
-            # Don't change life cycle state - yet...
-            #data_source.ResourceLifeCycleState = data_source.INACTIVE
-            #self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
+            self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
 
         else:
             log.info("Ingest succeeded!")
@@ -417,29 +415,17 @@ class IngestionService(ServiceProcess):
             resources.append(self.dataset)
 
             # If the dataset / source is new 
-            if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
+            if self.dataset.ResourceLifeCycleState != self.dataset.ACTIVE:
 
-                log.info('Fetching datasource id - %s - to set life cycle state' % content.datasource_id)
-                data_source = yield self.rc.get_instance(content.datasource_id)
-
-                if self.data_source.is_public == True:
-
-                    data_source.ResourceLifeCycleState = data_source.COMMISSIONED
-                    self.dataset.ResourceLifeCycleState = self.dataset.COMMISSIONED
-
-                else:
-
-                    data_source.ResourceLifeCycleState = data_source.ACTIVE
-                    self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
-
-                resources.append(self.data_source)
+                self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
+        try:
+            yield self.rc.put_instance(self.dataset)
+        except ResourceClientError, rce:
+            ingest_res[EM_ERROR] = 'Ingestion put_instance operation failed!'
+            log.exception('Ingestion put_instance operation failed!')
 
-        for res in resources:
-            log.info('Resource %s life cycle state is %s' % (res.ResourceName, res.ResourceLifeCycleState))
-
-        yield self.rc.put_resource_transaction(resources)
 
         yield self._notify_ingest(ingest_res)
 
@@ -495,11 +481,24 @@ class IngestionService(ServiceProcess):
         if ingest_res.has_key(EM_ERROR):
             # Report an error with the data source
             datasource_id = ingest_res[EM_DATA_SOURCE]
-            yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
+
+            # Don't use **kw args - it may fail depending on what is in the dict...
+            #yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
+
+            msg = yield self._notify_unavailable_publisher.create_event(origin=datasource_id)
+            self._notify_unavailable_publisher._set_msg_fields(msg.additional_data, ingest_res.copy())
+            yield self._notify_unavailable_publisher.publish_event(msg,origin=datasource_id)
+
         else:
             # Report a successful update to the dataset
             dataset_id = ingest_res[EM_DATASET]
-            yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+            # Don't use **kw args - it may fail depending on what is in the dict...
+            #yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+            msg = yield self._notify_ingest_publisher.create_event(origin=dataset_id)
+            self._notify_ingest_publisher._set_msg_fields(msg.additional_data, ingest_res.copy())
+            yield self._notify_ingest_publisher.publish_event(msg, origin=dataset_id)
 
             yield self._notify_dataset_change_publisher.create_and_publish_event(origin=dataset_id, dataset_id=dataset_id)
 
