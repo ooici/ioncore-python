@@ -7,6 +7,7 @@
 """
 
 import re
+import os
 import time
 import datetime
 
@@ -37,9 +38,10 @@ from ion.core.exception import ApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
 
-DEBUG_PRINT = (True,False)[0]
-IO_LOG = (True,False)[1]
-IO_LOG_DIR = '/Users/edwardhunter/Documents/Dev/code/logfiles/'
+DEBUG_PRINT = True if os.environ.get('DEBUG_PRINT',None) == 'True' else False
+IO_LOG = True if os.environ.get('IO_LOG',None) == 'True' else False
+IO_LOG_DIR = os.environ.get('IO_LOG_DIR','~/')
+
 
 ###############################################################################
 # Constants specific to the SBE37Driver. 
@@ -2445,6 +2447,7 @@ class SBE37Driver(InstrumentDriver):
         try:
             date_time = time.strptime(datestr,fmt)
             date = (date_time[2],date_time[1],date_time[0])
+
         except ValueError:
             return None
                         
@@ -2452,7 +2455,7 @@ class SBE37Driver(InstrumentDriver):
     
     
     @staticmethod
-    def _time_to_sting(v):
+    def _time_to_string(v):
         """
         Write a time tuple to a string formatted for sbe37 set operations.
         @param v a time tuple (hours,minutes,seconds).

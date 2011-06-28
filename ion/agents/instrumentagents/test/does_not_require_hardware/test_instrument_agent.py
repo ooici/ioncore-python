@@ -105,7 +105,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test that transactions expire after the appropriate time.
         """
-        raise unittest.SkipTest("Long running test.")
+        #raise unittest.SkipTest("Long running test.")
         
         
         # Set the expire timeout to a high value.
@@ -244,7 +244,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test lifetime of an asynchronous transaction request.
         """
-        raise unittest.SkipTest("Long running test.")
+        #raise unittest.SkipTest("Long running test.")
         
         
         # Start a transaction.        

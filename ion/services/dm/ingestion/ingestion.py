@@ -13,7 +13,7 @@ To test this with the Java CC!
 """
 
 import time, calendar
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher, DatasetChangeEventPublisher
 import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
@@ -150,6 +150,8 @@ class IngestionService(ServiceProcess):
         pub_factory = PublisherFactory(process=self)
 
         self._notify_ingest_publisher = yield pub_factory.build(publisher_type=DatasetSupplementAddedEventPublisher)
+
+        self._notify_dataset_change_publisher = yield pub_factory.build(publisher_type=DatasetChangeEventPublisher)
 
         self._notify_unavailable_publisher = yield pub_factory.build(publisher_type=DatasourceUnavailableEventPublisher)
 
@@ -498,6 +500,9 @@ class IngestionService(ServiceProcess):
             # Report a successful update to the dataset
             dataset_id = ingest_res[EM_DATASET]
             yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+            yield self._notify_dataset_change_publisher.create_and_publish_event(origin=dataset_id, dataset_id=dataset_id)
+
 
         log.debug('_notify_ingest - Complete')
 

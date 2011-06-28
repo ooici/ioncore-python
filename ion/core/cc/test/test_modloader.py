@@ -23,10 +23,10 @@ class ModuleLoaderTest(IonTestCase):
         ml.load_modules(['ion.core.cc.test.test_modloader'])
 
         # Single package syntax
-        ml.load_modules(['ion.core.cc.test.*'])
+        #ml.load_modules(['ion.core.cc.test.*'])
 
         # Tree of packages syntax
-        ml.load_modules(['ion.core.cc.**'])
+        #ml.load_modules(['ion.core.cc.**'])
 
         # Load configured modules
-        ml.load_modules()
+        #ml.load_modules()
