@@ -68,7 +68,7 @@ policydb_filename = ioninit.adjust_dir(CONF.getValue('policydecisionpointdb'))
 policy_dictionary = construct_policy_lists(Config(policydb_filename).getObject())
 
 def construct_user_role_lists(userroledict):
-    roles, attributes = userroledict['roles'], userroledict['user-attributes']
+    roles = userroledict['roles']
 
     roledict = {}
     for role_name in ('ADMIN', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'EARLY_ADOPTER'):

@@ -416,6 +416,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
     @defer.inlineCallbacks
     def test_broadcast(self):
         irs = self._get_service_by_name('identity_registry')
+        self.failUnlessEqual(irs.broadcast_count, 0)
 
         self.irc.broadcast({'body': 'I am a broadcast.'})
         yield irs.defer_next_op('broadcast')
@@ -424,9 +425,6 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
 
     @defer.inlineCallbacks
     def test_set_role(self):
-        irs = self._get_service_by_name('identity_registry')
-        role_cfg = Config(userroledb_filename).getObject()
-
         role = 'ADMIN'
         user_id = self.user2_ooi_id
         log.info('test user id: %s to get role: %s' % (user_id, role))
