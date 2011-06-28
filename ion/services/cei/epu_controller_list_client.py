@@ -14,10 +14,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from ion.core.process.service_process import ServiceClient
 
-from ion.core import ioninit
-CONF = ioninit.config(__name__)
-NoEpuControllerListService = CONF.getValue('no_epu_controller_list_service', False)
-
 
 class EPUControllerListClient(ServiceClient):
     """Client for querying EPUControllerListService
@@ -26,13 +22,16 @@ class EPUControllerListClient(ServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "epu_controller_list"
         ServiceClient.__init__(self, proc, **kwargs)
+        self.ServiceName = kwargs['targetname']
 
     @defer.inlineCallbacks
     def list(self):
         """Query the EPUControllerListService
         """
+        log.debug("ServiceName = " + self.ServiceName)
         yield self._check_init()
-        if NoEpuControllerListService:
+        ServiceExists = yield self.does_service_exist(self.ServiceName)
+        if not ServiceExists:
             log.debug("controller_list_client.list: Returning static list for AIS unit testing")
             defer.returnValue(['dataservices_epu_controller',
                                'agentservices_epu_controller',

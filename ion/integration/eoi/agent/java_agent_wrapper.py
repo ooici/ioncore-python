@@ -67,6 +67,44 @@ log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 
+class OSProcess130Friendly(ion.util.os_process.OSProcess):
+    """
+    When a script is terminated in an interactive console by Control-C the fatal signal causes the process
+    to die with a 130 exit code.  This version of OSProcess interprets Control-C termination as a valid
+    termination mechanism; it will not error-out when receiving an error code of 130.
+    """
+    
+    def processEnded(self, reason):
+        """
+        Notice that the process has ended.
+        Will callback the deferred returned by spawn with a dict containing
+        the exit code, the lines produced on stdout, and the lines on stderr.
+        If the exit code is non zero, the errback is raised.
+        """
+        ec = 0
+        if hasattr(reason, 'value') and hasattr(reason.value, 'exitCode') and reason.value.exitCode != None:
+            ec = reason.value.exitCode
+
+        log.debug("OSProcess: process ended (exitcode: %d)" % ec)
+
+        # if this was called as a result of a close() call, we need to cancel the timeout so
+        # it won't try to kill again
+        if self.close_timeout != None and self.close_timeout.active():
+            self.close_timeout.cancel()
+
+        # form a dict of status to be passed as the result
+        cba = { 'exitcode' : ec,
+                'outlines' : self.outlines,
+                'errlines' : self.errlines }
+
+        if ec != 0 and ec != 130:
+            self.deferred_exited.errback(OSProcessError(cba))
+            return
+
+        self.deferred_exited.callback(cba)
+        
+        
+
 class JavaAgentWrapperException(ApplicationError):
     """
     An exception class for the Java Agent Wrapper
@@ -271,7 +309,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 2: Start the Dataset Agent (java) passing necessary spawn arguments
         try:
-            proc = OSProcess(binary, args)
+            proc = OSProcess130Friendly(binary, args)
             proc.spawn()
             proc.deferred_exited.addBoth(self._osp_terminate_callback)
         except ValueError, ex:
@@ -400,6 +438,14 @@ class JavaAgentWrapper(ServiceProcess):
         @param dataset_id: The OOI Resource ID of the Dataset which has been updated
         @param data_source_id: The OOI Resource ID of the Data Source which has been updated
         """
+
+        # Step 0: retrieve the dataset_id from the data_source_id if it is not provided -- and vise versa
+        if dataset_id and not data_source_id:
+            data_source_id = yield self._get_associated_data_source_id(dataset_id)
+        elif data_source_id and not dataset_id:
+            dataset_id = yield self._get_associated_dataset_id(data_source_id)
+        elif not dataset_id and not data_source_id:
+            raise JavaAgentWrapperException('Must provide data source or dataset ID!')
     
         # Step 1: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
@@ -542,12 +588,7 @@ class JavaAgentWrapper(ServiceProcess):
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-        # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
-        if datasetID and not dataSourceID:
-            dataSourceID = yield self._get_associated_data_source_id(datasetID)
-        elif dataSourceID and not datasetID:
-            datasetID = yield self._get_associated_dataset_id(dataSourceID)
-        elif not datasetID and not dataSourceID:
+        if not datasetID and not dataSourceID:
             raise JavaAgentWrapperException('Must provide data source or dataset ID!')
 
         

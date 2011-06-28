@@ -6,10 +6,6 @@ import sys
 from twisted.internet import defer
 from ion.core.process.service_process import ServiceClient
 
-from ion.core import ioninit
-CONF = ioninit.config(__name__)
-NoEpuControllerService = CONF.getValue('no_epu_controller_service', False)
-
 class EPUControllerClient(ServiceClient):
     """
     Client for sending messages directly to an EPU Controller
@@ -49,7 +45,8 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def whole_state(self):
-        if NoEpuControllerService:
+        ServiceExists = yield self.does_service_exist(self.EpuControllerName)
+        if not ServiceExists:
             log.debug("%s.whole_state: Returning static list for AIS unit testing"%self.EpuControllerName)
             de_state = 'STABLE_DE'   # from epu/epucontroller/de_states.py
             # following from epu/decisionengine/impls/npreserving.py & pu/decisionengine/impls/default_engine.py

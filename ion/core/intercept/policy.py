@@ -74,13 +74,14 @@ def construct_user_role_lists(userroledict):
     for role_name in ('ADMIN', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'EARLY_ADOPTER'):
         roledict[role_name] = {'subject': set(roles[role_name]), 'ooi_id': set()}
 
-    attriblist = []
-    return roledict, attriblist
+    return roledict
 
 userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
-user_role_dict, user_attrib_list = construct_user_role_lists(Config(userroledb_filename).getObject())
+user_role_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
 
-def subject_has_role(subject,role):
+def subject_has_role(subject, role):
+    if role == 'ANONYMOUS':
+        return True
     return subject in user_role_dict[role]['subject']
 
 # Role methods
@@ -324,7 +325,12 @@ class PolicyInterceptor(EnvelopeInterceptor):
         if isinstance(content, MessageInstance):
             wrapper = content.Message
             repo = content.Repository
-            return self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+            uuid_list = self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+            if len(uuid_list) == 0:
+                log.error("Policy Interceptor: Rejecting improperly defined message.  No uuids found.")
+                invocation.drop(note='Error: Expected uuids missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
+            else:
+                return uuid_list
         else:
             log.error("Policy Interceptor: Rejecting improperly defined message missing MessageInstance [%s]." % str(msg))
             invocation.drop(note='Error: MessageInstance missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
@@ -351,7 +357,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 gpbMessage = obj.GPBMessage
                 uuid = getattr(gpbMessage,resources[typeId])
                 log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  GPB type: %s UUID: %s' % (str(typeId),uuid))
-                if uuid is None:
+                if not uuid:
                     log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
                     invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
                     return

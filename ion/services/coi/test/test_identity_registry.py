@@ -25,6 +25,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.intercept.policy import userroledb_filename, user_has_role
 from ion.util.config import Config
+from ion.core.security.authentication import Authentication
 
 CONF = ioninit.config(__name__)
 
@@ -406,6 +407,11 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         self.assertEqual(user2.resource_reference.profile.__len__(), 1)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
         self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value")
+
+        authentication = Authentication()
+        self.assertFalse(authentication.is_certificate_valid(self.user1_certificate))
+        self.assertEqual(authentication.get_certificate_level(self.user1_certificate),'Invalid')
+        self.assertFalse(authentication.is_certificate_within_date_range(self.user1_certificate))
 
     @defer.inlineCallbacks
     def test_broadcast(self):

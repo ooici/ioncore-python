@@ -7,7 +7,9 @@
 """
 
 from string import hexdigits
-from ion.agents.instrumentagents.instrument_constants import *
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode, BaseEnum
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 # Constants
 CR = '\r'
@@ -74,6 +76,27 @@ class NMEADefs (BaseEnum):
     # WEEK_NO  int     GPS week number (0 to 1023)
     # SECONDS  int     GPS seconds (0 to 604799)
     # LEAPSEC  int     GPS leap second count
+
+    nmeaInTypes = { \
+    'PGRMO': ['Output Sentence Enable/Disable', #0
+              'TARGET',                         #1
+              'PGRMODE'],                       #2
+
+    'PGRMC': ['Garmin Sensor Configuration Information', # 0
+              'FIX_MODE',        # 1
+              'ALT_MSL',         # 2
+              'E_DATUM',         # 3
+              'SM_AXIS',         # 4
+              'DATUMIFF',        # 5
+              'DATUM_DX',        # 6
+              'DATUM_DY',        # 7
+              'DATUM_DZ',        # 8
+              'DIFFMODE',        # 9
+              'BAUD_RT',         # 10
+              'VEL_FILT',         # 11
+              'MP_OUT',          # 12
+              'MP_LEN',          # 13
+              'DED_REC']}        # 14
 
     nmeaTypes = { \
     'GPGGA': {'Parsing': ['GPS Fix Data',    #0
@@ -211,9 +234,164 @@ class NMEADefs (BaseEnum):
                           'PDOP',
                           'TDOP']}}
 
+class NMEAInString ():
+    """
+    Representation of a single ASCII NMEA command (sent to the NMEA device).
+    """
+
+    def __init__ (self, inNMEA):
+        """
+        Takes the input NMEA string through the parsing process.
+        """
+        self._inNMEA = inNMEA
+        self._valid = self.ValidateInNMEA()
+
+    def ValidateInNMEA (self):
+        """
+        Checks that an NMEA string is valid.
+        @retval OK if valid NMEA string, otherwise relevant error code
+        """
+
+        # Rules for a valid input NMEA string:
+        #   - Must always start with '$'
+        #   - Must always end with <CR>, <LF>, or <CR><LF>
+        #   - Maximum 82 characters, inclusive of '$' and <CR><LF>
+        #   - Must have 5 chars immediately after '$'
+        #   - Therefore, minimum string is "$XXXXX<CR><LF>" len = 8
+
+        # Validate NMEA string length
+        nmeaLen = len (self._inNMEA)
+        if nmeaLen < MIN_NMEA_LEN or nmeaLen > MAX_NMEA_LEN:
+            return NMEAErrorCode.INVALID_NMEA_STRING
+
+        # Validate '$'
+        if self._inNMEA[0] != '$':
+            return NMEAErrorCode.INVALID_NMEA_STRING
+
+        # Strip off <CR>, <LF>, and <CR><LF>
+        self._inNMEA.rstrip()
+
+        # Verify that there is at least one data element to parse
+        # 0 1 2
+        #  $ X ,<end>    minimum possible NMEA string
+        try:
+            firstComma = self._inNMEA.index (',', 2)
+        except ValueError:
+            return NMEAErrorCode.INVALID_NMEA_STRING
+
+        # Strip out NMEA type code and verify it is known to this parser
+        self._nmeaType = self._inNMEA[1:firstComma]
+        if not NMEADefs.nmeaInTypes.has_key (self._nmeaType):
+            return NMEAErrorCode.UNKNOWN_NMEA_CODE
+
+        return NMEAErrorCode.OK
+
+    def IsValid (self):
+        return NMEAErrorCode.is_error (self._valid)
+
+    def GetNMEAInData (self):
+        """
+        If the NMEA string was valid, returns the parsed data.
+        @retval             Dict of GPS data, otherwise error code
+        """
+
+        if NMEAErrorCode.is_error (self._valid):
+            return self._valid
+        parsedOK = self.ParseNMEA()
+        if NMEAErrorCode.is_error (parsedOK):
+            return parsedOK
+        return self._dataOut
+
+    def ParseNMEA (self):
+        """
+        Main parsing routine for an NMEA input string.
+        @retval Dict of nmeaDefs and parsed values or error relevant code
+        """
+
+        self._dataOut = {}
+        parsed = self._inNMEA.upper().split (',')
+        nmeaType = parsed[0][1:]
+        howToParse = NMEADefs.nmeaInTypes.get (nmeaType, 'NODT')
+        if howToParse == 'NODT':
+            return NMEAErrorCode.UNKNOWN_NMEA_CODE
+
+        # Must have enough data elements to parse
+        if len (parsed) < len (howToParse):
+            return NMEAErrorCode.INVALID_DATA_ITEMS
+
+        # NMEA_CD  string  5-character NMEA data type code
+        self._dataOut['NMEA_CD'] = nmeaType
+
+        # DESC     string  Short description of the NMEA sentence
+        self._dataOut['DESC'] = howToParse[0]
+
+        for howTo in howToParse[1:]:
+
+            item = parsed[howToParse.index (howTo)]
+
+            # TARGET  string   For $PFRMO, the sentence to turn on or off
+            if howTo == 'TARGET':
+                self._dataOut['TARGET'] = item
+
+            # PGRMODE int      Target sentence mode
+            if howTo == 'PGRMODE':
+                self._dataOut['PGRMODE'] = int (item)
+
+            # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE
+            #                A  = Automatic, 3 = 3D only
+            if howTo == 'FIX_MODE':
+                self._dataOut['FIX_MODE'] = item
+
+            # E_DATUM  int  Earth datum ID number
+            if howTo == 'E_DATUM':
+                self._dataOut['E_DATUM'] = item
+
+            # SM_AXIS   Relevant only if E_DATUM == USERDEF
+            if howTo == 'SM_AXIS':
+                pass
+
+            # DATUMIFF   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUMIFF':
+                pass
+
+            # DATUM_DX   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DX':
+                pass
+
+            # DATUM_DY   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DY':
+                pass
+
+            # DATUM_DZ   Relevant only if E_DATUM == USERDEF
+            if howTo == 'DATUM_DZ':
+                pass
+
+            # DIFFMODE  char  Differential mode
+            if howTo == 'DIFFMODE':
+                self._dataOut['DIFFMODE'] = item
+
+            # BAUD_RT  int  NMEA 0183 Baud Rate
+            if howTo == 'BAUD_RT':
+                self._dataOut['BAUD_RT'] = item
+
+            # MP_OUT  int  Measurement Pulse Output
+            if howTo == 'MP_OUT':
+                self._dataOut['MP_OUT'] = item
+
+            # MP_LEN  int  Measurement Pulse Output pulse length ((n+1)* 20ms)
+            if howTo == 'MP_LEN':
+                self._dataOut['MP_LEN'] = item
+
+            # DED_REC  float  Ded. Reckoning valid time 0.2 to 30.0 sec
+            if howTo == 'DED_REC':
+                self._dataOut['DED_REC'] = item
+
+        return NMEAErrorCode.OK
+
+
 class NMEAString ():
     """
-    Representation of a single ASCII NMEA string.
+    Representation of a single ASCII NMEA string (from the NMEA device).
     """
 
     def __init__(self, nmeaString):
@@ -262,8 +440,14 @@ class NMEAString ():
         # checksum = 8-bit XOR of all chars in string
         # result is an 8-bit number (0 to 255)
         cs = ord (reduce (lambda x, y: chr (ord (x) ^ ord (y)), nmeaCS))
-        calcLow = chr (48 + (cs & 15))           # CS and 00001111
-        calcHigh = chr (48 + ((cs & 240) >> 4))  # CS and 11110000
+        low = 48 + (cs & 15)           # CS and 00001111
+        if low > 57:
+            low += 7;
+        high = 48 + ((cs & 240) >> 4)  # CS and 11110000
+        if high > 58:
+            high += 7;
+        calcLow = chr (low)
+        calcHigh = chr (high)
 
         # Validate calculated against what the NMEA string said it should be
         if (calcLow == checkL and calcHigh == checkH):
@@ -535,7 +719,6 @@ class NMEAString ():
                     dop = int (item)
                     if dop >= 0 and dop <= 359:
                         dataOut['TDOP'] = dop
-
 
             # FIX_MODE char  Combine of FIX_TYPE and GPS_MODE
             #                A  = Automatic, 3 = 3D only
