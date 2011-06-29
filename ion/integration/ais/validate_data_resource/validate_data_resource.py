@@ -6,8 +6,6 @@
 @brief The worker class that implements data source URL validation
 """
 
-import urllib
-
 from ply.lex import lex
 from ply.yacc import yacc
 
@@ -16,6 +14,7 @@ from ion.integration.ais.validate_data_resource.data_resource_parser import Lexe
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+from twisted.web.client import getPage
 
 #from ion.core.messaging.message_client import MessageClient
 #from ion.core.object import object_utils
@@ -108,7 +107,7 @@ class ValidateDataResource(object):
 
 
             #get metadata!
-            parsed_das = self._parseDas(msg.data_resource_url)
+            parsed_das = yield self._parseDas(msg.data_resource_url)
 
 
 
@@ -185,20 +184,17 @@ class ValidateDataResource(object):
             out_msg.ion_geospatial_vertical_positive  = 'True'
             # TODO add download URL?
 
-
+    @defer.inlineCallbacks
     def _parseDas(self, url):
         #prepare to parse!
         lexer = lex(module=Lexer())
         parser = yacc(module=Parser(), write_tables=0, debug=False)
 
         #fetch file
-        fullurl = url + ".das"
-        webfile = urllib.urlopen(fullurl)
-        dasfile = webfile.read()
-        webfile.close()
+        dasfile = yield getPage(url + ".das")
         
         #crunch it!
-        return parser.parse(dasfile, lexer=lexer)
+        defer.returnValue(parser.parse(dasfile, lexer=lexer))
 
 
     @defer.inlineCallbacks
