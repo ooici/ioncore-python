@@ -26,7 +26,7 @@ from twisted.internet import defer, reactor
 
 # Imports: ION Core
 from ion.core import ioninit
-from ion.core.exception import IonError, ApplicationError, ReceivedContainerError, ReceivedApplicationError
+from ion.core.exception import IonError, ApplicationError, ReceivedError
 from ion.core.object import object_utils
 from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.core.process.process import Process, ProcessFactory
@@ -420,7 +420,32 @@ class JavaAgentWrapper(ServiceProcess):
         else:
             yield self.reply_err(msg,'Java agent wrapper failed!')
 
+    class IncreaseTimeoutSubscriber(Subscriber):
+        '''
+        This Subscriber's sole purpose is to increase the timeout on the ingestion rpc call.
+        It handles the case of trying to shut down the conversation (say via an error on ingestion)
+        and the DatasetAgent is still spitting messages out.
+        '''
+        def __init__(self, rpccalldef=None, ingest_timeout=None, *args, **kwargs):
+            assert rpccalldef
+            self._rpccalldef = rpccalldef
 
+            assert ingest_timeout
+            self._ingest_timeout = ingest_timeout
+
+            Subscriber.__init__(self, *args, **kwargs)
+
+        @defer.inlineCallbacks
+        def _receive_handler(self, content, msg):
+            if hasattr(self._rpccalldef, 'rpc_call') and self._rpccalldef.rpc_call.active():
+                log.debug("Data message intercepted, increasing timeout by %d" % self._ingest_timeout)
+                self._rpccalldef.rpc_call.delay(self._ingest_timeout)
+                yield msg.ack()
+            else:
+                msg._state = "ACKED"
+
+            # don't ack if we don't have an active rpc_call, that indicates we're trying to shut down and
+            # no longer care about messages coming in here.
 
     @defer.inlineCallbacks
     def _update_request(self, dataset_id, data_source_id):
@@ -487,20 +512,11 @@ class JavaAgentWrapper(ServiceProcess):
 
 
         log.info('Create subscriber to bump timeouts...')
-        self._subscriber = Subscriber(xp_name="magnet.topic",
-                                             binding_key=dataset_id,
-                                             process=self)
-
-        def increase_timeout(data):
-            """
-            Inner method used to reset the ingestion timeout everytime we receive data
-            """
-            if hasattr(perform_ingest_deferred, 'rpc_call'):
-                log.debug("Data message intercepted, increasing timeout by %d" % ingest_timeout)
-                perform_ingest_deferred.rpc_call.delay(ingest_timeout)
-
-        self._subscriber.ondata = increase_timeout
-
+        self._subscriber = self.IncreaseTimeoutSubscriber(rpccalldef=perform_ingest_deferred,
+                                                          ingest_timeout=ingest_timeout,
+                                                          xp_name="magnet.topic",
+                                                          binding_key=dataset_id,
+                                                          process=self)
 
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
@@ -518,10 +534,7 @@ class JavaAgentWrapper(ServiceProcess):
 
         try:
             (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
-        except ReceivedContainerError, ex:
-            log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
-            defer.returnValue(False)
-        except ReceivedApplicationError, ex:
+        except ReceivedError, ex:
             log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
             defer.returnValue(False)
         finally:
