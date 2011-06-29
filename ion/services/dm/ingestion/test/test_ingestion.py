@@ -43,6 +43,9 @@ CONF = ioninit.config(__name__)
 
 class FakeDelayedCall(object):
 
+    def active(self):
+        return True
+
     def cancel(self):
         pass
 
