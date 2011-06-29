@@ -1,8 +1,6 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-import sys
-
 from twisted.internet import defer
 from ion.core.process.service_process import ServiceClient
 
@@ -13,7 +11,7 @@ class EPUControllerClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "epu_controller"
-        self.EpuControllerName = kwargs['targetname']
+        self.epu_controller_name = kwargs['targetname']
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
@@ -45,9 +43,9 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def whole_state(self):
-        ServiceExists = yield self.does_service_exist(self.EpuControllerName)
-        if not ServiceExists:
-            log.debug("%s.whole_state: Returning static list for AIS unit testing"%self.EpuControllerName)
+        service_exists = yield self.does_service_exist(self.epu_controller_name)
+        if not service_exists:
+            log.debug("%s.whole_state: Returning static list for AIS unit testing" % self.epu_controller_name)
             de_state = 'STABLE_DE'   # from epu/epucontroller/de_states.py
             # following from epu/decisionengine/impls/npreserving.py & pu/decisionengine/impls/default_engine.py
             de_conf_report = "NpreservingEngine: preserves %d instances (%d unique), sites: %s, types: %s, allocations: %s" \
@@ -67,7 +65,7 @@ class EPUControllerClient(ServiceClient):
                                "last_queuelen_size": 2,
                                "last_queuelen_time": 1293833966,   # ~ number of seconds since 1970
                                "instances": instances})
-        log.debug("%s.whole_state: sending whole_state query to epu_controller"%self.EpuControllerName)
+        log.debug("%s.whole_state: sending whole_state query to epu_controller" % self.epu_controller_name)
         (content, headers, msg) = yield self.rpc_send('whole_state', {})
         defer.returnValue(content)
 
@@ -75,26 +73,3 @@ class EPUControllerClient(ServiceClient):
     def node_error(self, node_id):
         (content, headers, msg) = yield self.rpc_send('node_error', node_id)
         defer.returnValue(content)
-
-"""
-from ion.core.process.service_process import ServiceProcess
-from twisted.internet import defer, reactor
-from ion.core.process.process import ProcessFactory
-
-class EPUControllerClientSample(ServiceProcess):
-    
-    declare = ServiceProcess.service_declare(name='epu_reconfigure_sample', version='0.1.0', dependencies=[])
-    
-    def slc_init(self, proc=None, **kwargs):
-        self.client = EPUControllerClient()
-        reactor.callLater(5, self.send_reconfigure)
-            
-    @defer.inlineCallbacks
-    def send_reconfigure(self):
-        newconf = {}
-        newconf["preserve_n"] = "%s" % self.spawn_args["preserve_n"]
-        newconf["unique_instances"] = {'b2db408e':{'some_unique_name':'some_unique_value123'}, '3633541e':{'some_unique_name':'some_other_unique_value456'}}
-        self.client.reconfigure(newconf)
-
-factory = ProcessFactory(EPUControllerClientSample)
-"""
