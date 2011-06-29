@@ -11,6 +11,7 @@ import logging.config
 import logging.handlers
 import re
 import os, os.path
+import socket
 
 from ion.util.context import ContextLocal
 from ion.util.path import adjust_dir
@@ -21,7 +22,7 @@ from ion.util.config import Config
 
 # ION has a minimum required python version
 import sys
-if not hasattr(sys, "version_info") or sys.version_info[:2] != (2,5)[:2]:
+if not hasattr(sys, "version_info") or sys.version_info[:2] < (2,5)[:2]:
     raise RuntimeError("ioncore requires Python 2.5 or later.")
 
 # The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
@@ -55,7 +56,7 @@ def use_syslog():
         syslog_handler.setLevel(logging.DEBUG)
         syslog_handler.setFormatter(syslog_formatter)
         logging.root.addHandler(syslog_handler)
-    except:
+    except socket.error:
         pass
 
 if sys.platform == 'linux2':

@@ -97,17 +97,14 @@ def construct_user_role_lists(userroledict):
         earlyadopterlist.append(role_dict);
     roledict['EARLY_ADOPTER'] = earlyadopterlist
 
-    attriblist = []
-    for attrib_entry_key in userroledict['user-attributes'].keys():
-        attrib_dict = {'subject': attrib_entry_key, 'ooi_id': None, 'attributes': userroledict['user-attributes'][attrib_entry_key]}
-        attriblist.append(attrib_dict);
-
-    return roledict, attriblist
+    return roledict
 
 userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
-user_role_dict, user_attrib_list = construct_user_role_lists(Config(userroledb_filename).getObject())
+user_role_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
 
 def subject_has_role(subject,role):
+    if role == 'ANONYMOUS':
+        return True
     for role_entry in user_role_dict[role]:
         if role_entry['subject'] == subject:
             return True
@@ -173,34 +170,6 @@ def subject_has_early_adopter_role(subject):
 
 def user_has_early_adopter_role(ooi_id):
     return user_has_role(ooi_id, 'EARLY_ADOPTER')
-
-# Attribute methods
-def get_attribute_value_for_subject(subject,attrib):
-    for dict_entry in user_attrib_list:
-        if dict_entry['subject'] == subject:
-            for attrib_entry_key in dict_entry['attributes'].keys():
-                if attrib_entry_key == attrib:
-                    return dict_entry['attributes'][attrib]
-    return None
-
-def get_attribute_value_for_user(ooi_id,attrib):
-    for dict_entry in user_attrib_list:
-        if dict_entry['ooi_id'] == ooi_id:
-            for attrib_entry_key in dict_entry['attributes'].keys():
-                if attrib_entry_key == attrib:
-                    return dict_entry['attributes'][attrib]
-    return None
-
-# Attribute convenience methods
-def subject_has_attribute(subject, attrib):
-    if get_attribute_value_for_subject(subject, attrib) is None:
-        return False
-    return True
-
-def user_has_attribute(ooi_id, attrib):
-    if get_attribute_value_for_user(ooi_id, attrib) is None:
-        return False
-    return True
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
@@ -380,7 +349,12 @@ class PolicyInterceptor(EnvelopeInterceptor):
         if isinstance(content, MessageInstance):
             wrapper = content.Message
             repo = content.Repository
-            return self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+            uuid_list = self.find_uuids_traverse_gpbs(invocation, msg, wrapper, repo, user_id, resources)
+            if len(uuid_list) == 0:
+                log.error("Policy Interceptor: Rejecting improperly defined message.  No uuids found.")
+                invocation.drop(note='Error: Expected uuids missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
+            else:
+                return uuid_list
         else:
             log.error("Policy Interceptor: Rejecting improperly defined message missing MessageInstance [%s]." % str(msg))
             invocation.drop(note='Error: MessageInstance missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
@@ -407,7 +381,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 gpbMessage = obj.GPBMessage
                 uuid = getattr(gpbMessage,resources[typeId])
                 log.info('Policy Interceptor: In check_resource_ownership_traverse_gpbs.  GPB type: %s UUID: %s' % (str(typeId),uuid))
-                if uuid is None:
+                if not uuid:
                     log.error("Policy Interceptor: Rejecting improperly defined message missing expected uuid [%s]." % str(msg))
                     invocation.drop(note='Error: Uuid missing from message payload!', code=Invocation.CODE_BAD_REQUEST)
                     return

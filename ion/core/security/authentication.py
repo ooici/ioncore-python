@@ -182,7 +182,7 @@ class Authentication(object):
         store = X509.X509_Store()
         store.add_x509(X509.load_cert(CERTIFICATE_PATH + ca_file_name))
         x509 = X509.load_cert_string(user_cert)
-        return store.verify_cert(x509)
+        return X509.X509.verify(x509)
 
     def is_certificate_valid(self, user_cert):
         """

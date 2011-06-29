@@ -60,7 +60,6 @@ setup( name = 'ioncore',
                           ],
        entry_points = {
                         'console_scripts': [
-                            'ion-admin=ion.core.env.ion_admin:main',
                             'cassandra-setup=ion.core.data.cassandra_schema_script:main',
                             'cassandra-teardown=ion.core.data.cassandra_teardown_script:main',
                             ],

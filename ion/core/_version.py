@@ -5,10 +5,35 @@
 @author Dorian Raymer
 @author Michael Meisinger
 @brief Version-handling for ION classes
+@note From twisted.python.versions
 """
 
 import os
 import sys
+
+
+class _inf(object):
+    """
+    An object that is bigger than all other objects.
+    """
+    def __cmp__(self, other):
+        """
+        @param other: Another object.
+        @type other: any
+
+        @return: 0 if other is inf, 1 otherwise.
+        @rtype: C{int}
+        """
+        if other is _inf:
+            return 0
+        return 1
+
+_inf = _inf()
+
+class IncomparableVersions(TypeError):
+    """
+    Two versions could not be compared.
+    """
 
 class Version(object):
     """look for git commit to include in the version number.

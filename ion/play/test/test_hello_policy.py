@@ -14,13 +14,34 @@ import ion.util.ionlog
 from ion.core import ioninit
 from ion.core.exception import ReceivedApplicationError
 
+from ion.core.process.cprocess import Invocation
+
+from ion.core.intercept.policy import PolicyInterceptor
+
 import time
+
+from ion.core.security.authentication import Authentication
 
 from ion.core.messaging.message_client import MessageClient
 
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
 from ion.core.object import object_utils
+
+from ion.core.intercept.policy import subject_has_role, \
+                                      user_has_role, \
+                                      subject_has_admin_role, \
+                                      user_has_admin_role, \
+                                      map_ooi_id_to_subject_admin_role, \
+                                      subject_has_early_adopter_role, \
+                                      user_has_early_adopter_role, \
+                                      map_ooi_id_to_subject_early_adopter_role, \
+                                      subject_has_data_provider_role, \
+                                      user_has_data_provider_role, \
+                                      map_ooi_id_to_subject_data_provider_role, \
+                                      subject_has_marine_operator_role, \
+                                      user_has_marine_operator_role, \
+                                      map_ooi_id_to_subject_marine_operator_role
 
 # from net.ooici.play policy_protected.proto
 PROTECTED_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=20037, version=1)
@@ -64,7 +85,7 @@ class HelloPolicyTest(IonTestCase):
         self.irc = IdentityRegistryClient(proc=sup)
         self.mc = MessageClient(proc = self.test_sup)
 
-        self.user_certificate =  """-----BEGIN CERTIFICATE-----
+        self.user1_certificate =  """-----BEGIN CERTIFICATE-----
 MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
 MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRsw
 GQYDVQQDExJDSUxvZ29uIEJhc2ljIENBIDEwHhcNMTAxMTE4MjIyNTA2WhcNMTAxMTE5MTAzMDA2
@@ -86,7 +107,7 @@ f8b270icOVgkOKRdLP/Q4r/x8skKSCRz1ZsRdR+7+B/EgksAJj7Ut3yiWoUekEMxCaTdAHPTMD/g
 Mh9xL90hfMJyoGemjJswG5g3fAdTP/Lv0I6/nWeH/cLjwwpQgIEjEAVXl7KHuzX5vPD/wqQ=
 -----END CERTIFICATE-----"""
 
-        self.user_rsa_private_key =  """-----BEGIN RSA PRIVATE KEY-----
+        self.user1_rsa_private_key =  """-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA6QhsWxhUXbIxg+1ZyEc7d+hIGvchVmtbg0kKLmivgoVsA4U7swNDRH6svW24
 2THta0oTf6crkRx7kOKg6jma2lcAC1sjOSddqX7/92ChoUPq7LWt2T6GVVA10ex5WAeB/o7br/Z4
 U8/75uCBis+ru7xEDl09PToK20mrkcz9M4HqIv1eSoPkrs3b2lUtQc6cjuHRDU4NknXaVMXTBHKP
@@ -108,6 +129,53 @@ lt1zeKu4hRCbdtaha/TMDbeV1Hy7lA4nmU1s7dwojWU+kSZVcrxLp6zxKCy6otCpA1aOccQIlxll
 Vc2vO7pUIp3kqzRd5ovijfMB5nYwygTB4FwepWY5eVfXAoGBAIqrLKhRzdpGL0Vp2jwtJJiMShKm
 WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
 c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
+-----END RSA PRIVATE KEY-----"""
+
+        self.user2_certificate =  """-----BEGIN CERTIFICATE-----
+MIIEXDCCA0SgAwIBAgICCtgwDQYJKoZIhvcNAQELBQAwazETMBEGCgmSJomT8ixkARkWA29yZzEX
+MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRww
+GgYDVQQDExNDSUxvZ29uIE9wZW5JRCBDQSAxMB4XDTExMDYyNDE3MzkwMloXDTExMDYyNTA1NDQw
+MlowaTETMBEGCgmSJomT8ixkARkTA29yZzEXMBUGCgmSJomT8ixkARkTB2NpbG9nb24xCzAJBgNV
+BAYTAlVTMQ8wDQYDVQQKEwZHb29nbGUxGzAZBgNVBAMTElRob21hcyBMZW5uYW4gQTQ3NjCCASIw
+DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAImFRROqThZSXJYiQogJE5HosyOtXJqp3T/ylI6x
+sy6yIv1BiYtm8GEgUsfIZhxy51RXdpK2Q7s7G+z+ES9dQhQX9DJ7xbZLEV3Z039rKpNsvbBxE93I
+HOeT8vrzHEhDJLuDWxCssLra5USI9Z3pA9QSOsZCZu9BHS8Ur+fTQc8xPqx1fPfRHRAMHosMFtP/
+giZ2cIojMkPA73huk32eC5mDlBG+QKuLPQQDwN8LWMjmGFrPrPuDRIOIQ3LZnEDckcn4jVXheYEt
+YJzBb0AjJ8pi7Bc7z2TG6AJXPY44iMczoT00XZjyeKksY3VmLM74ta7KYFRVUCO4yuyBPRx29rMC
+AwEAAaOCAQowggEGMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgSwMBMGA1UdJQQMMAoGCCsG
+AQUFBwMCMBgGA1UdIAQRMA8wDQYLKwYBBAGCkTYBAwMwbAYDVR0fBGUwYzAvoC2gK4YpaHR0cDov
+L2NybC5jaWxvZ29uLm9yZy9jaWxvZ29uLW9wZW5pZC5jcmwwMKAuoCyGKmh0dHA6Ly9jcmwuZG9l
+Z3JpZHMub3JnL2NpbG9nb24tb3BlbmlkLmNybDBJBgNVHREEQjBAgRZ0aG9tYXNsZW5uYW5AZ21h
+aWwuY29thiZ1cm46cHVibGljaWQ6SUROK2NpbG9nb24ub3JnK3VzZXIrQTQ3NjANBgkqhkiG9w0B
+AQsFAAOCAQEAj8DNlQAJDNlvNqlMTajEivnRcW/Ulr+cZiiO+40Zll7MQ3b3drzppLJfVxG8HFbJ
+ddnZ+JerHWKImumjYLgKas6mQ/gOlIAcWYE1FCqBBlBmPpY75QMAo9ZPEVE3QrOo8wK9D95XRm/0
+WWy8zke77Q27wg1l+uBcYvOugmqzia5o+4XI3ao15lyTisTlKbpgT0cAvQXin5L5vSFIbmyED2A6
+FiAW3A4pc9ub/KYP/dP8LEsnqsEook0eubP24MgE+08AZp0sDbbtmZteiGo1wHMlQHhss0MNbkdK
+a8jWY22kaLQUdS2tXaRQLUYo2H65m8KvNvf+im2oczqs48xG7w==
+-----END CERTIFICATE-----"""
+
+        self.user2_rsa_private_key =  """-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAiYVFE6pOFlJcliJCiAkTkeizI61cmqndP/KUjrGzLrIi/UGJi2bwYSBSx8hm
+HHLnVFd2krZDuzsb7P4RL11CFBf0MnvFtksRXdnTf2sqk2y9sHET3cgc55Py+vMcSEMku4NbEKyw
+utrlRIj1nekD1BI6xkJm70EdLxSv59NBzzE+rHV899EdEAweiwwW0/+CJnZwiiMyQ8DveG6TfZ4L
+mYOUEb5Aq4s9BAPA3wtYyOYYWs+s+4NEg4hDctmcQNyRyfiNVeF5gS1gnMFvQCMnymLsFzvPZMbo
+Alc9jjiIxzOhPTRdmPJ4qSxjdWYszvi1rspgVFVQI7jK7IE9HHb2swIDAQABAoIBABE6zEvJc50i
+Vo1M348RrA0E3aTjrI2IKLtBVlGGfA+mq/GVC3mWvRk+JoD3X6vCza7ogmehRF0p67bGojqP8Z54
+3dSRY1USlKtwhioZsCzmW+HGWRnZX524EKJWYT3Ag9Kmg3tUV5QhpsXubu+I6Tzhx9FdMm5ZdyGV
+8vAVrNIbhmygjv03/Tr7fZSkpa/ehspoWQKO/LHY8P+r6wCNpOYNcwEsk4A9biYEgGxOuxYucy0t
+E0EdA66mT1mQhQWv/yEwsh0UDPRs22g+NokkQeFYbPRU+15R1azb2qGX8XViGdQvZZT+2G+ZrTFf
++NC3rAFGj/vnXDFDidqLaMSvSTkCgYEA5RuU2aDsGq+Wgby7APAbSF1O7i+lPdgDNK8qftsDvkGs
+cCZ6w0cAFi2cOmUu1rjg+f54wU9jFYh3BOOFB1GUXSajhJD7skrn0l9Ri9eMAxj85/pmHr66sY3h
+1tpWafP9ZT36S8ySyuwsC9/OIN8j6M2KDSt03s00yJTL0pbo8g0CgYEAmamaGEs8GxIGalM4We9b
+tZAwOdZMd8cSabx8VdgdW+mdzYGVlz6qMUycI7YHjVoE46IzbU2mIRYBUAX3L7G8mP5Aco/j8Ao5
+Nuh9XS1z6W/CisbRRasnjkLGqogHkC1MRTd2348QqTQgtgUcg8Mra6tjxAof8tyeiaa0aJ3vG78C
+gYEA07yh3F+01RTh7BUYXs2I6WASyl6OQJGapN4eUA7pbrQTQbLOUhsUIWsVr4JDv34trd1YjI9p
+60SreoErOJBUpaJIDQRRGX3QscQWAT+7zkERuvLX3iI3OFEAHyi6JEGyNhcJc3QlVhTewDqerhKL
+hWQv6ev3ntHXrmiV1pJRxyECgYA6a3SeT9wmHpA51DHUX1/qg0sSchrYXuLtOC+9I1DmJMdN3jpV
+KgnifFHQceAlKVg6guwyXhcO9SLCncIAa/5b3C38YCA0nm5qJbGjvygWU9sOj8/4QL3lJBYLt3PI
+qLAakJ+tFuMqsRrOmNribU0QvjRLz92do6rSgoKMU58YWQKBgCPHZPEskyki2sMAH+BM1XK8P7io
+Lf2/eZuXBkjvRhpvYClwCIUS+8MAL0OGub/pa48WwvLvsTQIfP9kmLK6eHt67r4WHGyiFuYJNfDj
+vPAXvGpuYV5SN309JjSTpHutkckvw68mf2EYI7TV6sKdl0Ctv68eYE4yTjb8xn7AhOXl
 -----END RSA PRIVATE KEY-----"""
 
         self.admin_certificate =  """-----BEGIN CERTIFICATE-----
@@ -163,12 +231,12 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
 
     @defer.inlineCallbacks
     def test_CRUD_resource_requests(self):
-        # Preliminary test setup to get OOI ID of user with DATA_PROVIDER role
-        # and user with ADMIN role.
+        # Preliminary test setup to get OOI ID of user with DATA_PROVIDER role,
+        # user with MARINE_OPERATOR role and user with ADMIN role.
         identity_request1 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request1')
         identity_request1.configuration = identity_request1.CreateObject(IDENTITY_TYPE)
-        identity_request1.configuration.certificate = self.user_certificate
-        identity_request1.configuration.rsa_private_key = self.user_rsa_private_key
+        identity_request1.configuration.certificate = self.user1_certificate
+        identity_request1.configuration.rsa_private_key = self.user1_rsa_private_key
         
         # Register a user, this shouldn't fail
         identity_response1 = yield self.irc.register_user(identity_request1)
@@ -176,12 +244,21 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
 
         identity_request2 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request2')
         identity_request2.configuration = identity_request2.CreateObject(IDENTITY_TYPE)
-        identity_request2.configuration.certificate = self.admin_certificate
-        identity_request2.configuration.rsa_private_key = self.admin_rsa_private_key
+        identity_request2.configuration.certificate = self.user2_certificate
+        identity_request2.configuration.rsa_private_key = self.user2_rsa_private_key
         
         # Register a user, this shouldn't fail
         identity_response2 = yield self.irc.register_user(identity_request2)
-        admin_ooi_id = identity_response2.resource_reference.ooi_id
+        marine_operator_ooi_id = identity_response2.resource_reference.ooi_id
+
+        identity_request3 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request3')
+        identity_request3.configuration = identity_request3.CreateObject(IDENTITY_TYPE)
+        identity_request3.configuration.certificate = self.admin_certificate
+        identity_request3.configuration.rsa_private_key = self.admin_rsa_private_key
+        
+        # Register a user, this shouldn't fail
+        identity_response3 = yield self.irc.register_user(identity_request3)
+        admin_ooi_id = identity_response3.resource_reference.ooi_id
 
         create_request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='hello_create_resource request')
         create_request.configuration = create_request.CreateObject(PROTECTED_RESOURCE_CREATE_REQ_TYPE)
@@ -192,7 +269,6 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         sent = False
         try:
             result = yield self.hc.hello_create_resource(create_request)
-            print 'After create request anonymous'
             sent = True
         except ReceivedApplicationError, ex:
             pass
@@ -241,6 +317,53 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         sent = False
         try:
             result = yield self.hc.hello_delete_resource(delete_request)
+            sent = True
+        except ReceivedApplicationError, ex:
+            pass
+        self.assertFalse(sent)
+
+        # Should fail for non-owner
+        sent = False
+        try:
+            result = yield self.hc.hello_delete_resource(delete_request, marine_operator_ooi_id)
+            sent = True
+        except ReceivedApplicationError, ex:
+            pass
+        self.assertFalse(sent)
+        
+        # Create bad message to test error flows.
+        # Don't specify object id
+        bad_delete_request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='bad_hello_delete_resource request')
+        bad_delete_request.configuration = create_request.CreateObject(PROTECTED_RESOURCE_DELETE_REQ_TYPE)
+
+        # Should fail when object id not specified (can't look up association)
+        sent = False
+        try:
+            result = yield self.hc.hello_delete_resource(bad_delete_request, data_provider_ooi_id)
+            sent = True
+        except ReceivedApplicationError, ex:
+            pass
+        self.assertFalse(sent)
+        
+        # Specify empty object id.
+        bad_delete_request.configuration.resource_ids.append('')
+
+        # Should fail when object id not specified (can't look up association)
+        sent = False
+        try:
+            result = yield self.hc.hello_delete_resource(bad_delete_request, data_provider_ooi_id)
+            sent = True
+        except ReceivedApplicationError, ex:
+            pass
+        self.assertFalse(sent)
+        
+        # Specify bogus object id.
+        bad_delete_request.configuration.resource_ids.append('Bogus')
+
+        # Should fail when object id not specified (can't look up association)
+        sent = False
+        try:
+            result = yield self.hc.hello_delete_resource(bad_delete_request, data_provider_ooi_id)
             sent = True
         except ReceivedApplicationError, ex:
             pass
@@ -330,3 +453,107 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
             pass
         self.assertFalse(sent)
 
+    @defer.inlineCallbacks
+    def test_bad_msg_format(self):
+        # Very specific tests to validate bad message format flows.
+        # Requires calling directly into the policy interceptor because
+        # the message infrastructure won't allow it.
+        invocation = Invocation()
+        pi = PolicyInterceptor('foo')
+        
+        # Missing message header params
+        yield pi.is_authorized({'performative':'request'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+        yield pi.is_authorized({'performative':'request', 'user-id': 'ABC'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+        yield pi.is_authorized({'performative':'request', 'user-id': 'ABC', 'expiry': '0'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+        yield pi.is_authorized({'performative':'request', 'user-id': 'ABC', 'expiry': '0', 'receiver': 'foo'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+        # Malformed expiry
+        yield pi.is_authorized({'performative':'request', 'user-id': 'ABC', 'expiry': 0, 'receiver': 'foo', 'op': 'foo'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+        yield pi.is_authorized({'performative':'request', 'user-id': 'ABC', 'expiry': 'ABC', 'receiver': 'foo', 'op': 'foo'},invocation)
+        self.assertTrue(invocation.status != Invocation.STATUS_PROCESS)
+
+
+    @defer.inlineCallbacks
+    def test_user_roles(self):
+        # Register users with diffent roles
+        # Data Provider
+        identity_request1 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request1')
+        identity_request1.configuration = identity_request1.CreateObject(IDENTITY_TYPE)
+        identity_request1.configuration.certificate = self.user1_certificate
+        identity_request1.configuration.rsa_private_key = self.user1_rsa_private_key
+        
+        # Register a user, this shouldn't fail
+        identity_response1 = yield self.irc.register_user(identity_request1)
+        data_provider_ooi_id = identity_response1.resource_reference.ooi_id
+
+        authentication = Authentication()
+
+        cert_info = authentication.decode_certificate(str(self.user1_certificate))
+        data_provider_subject = cert_info['subject']
+
+        # Marine operator
+        identity_request2 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request2')
+        identity_request2.configuration = identity_request2.CreateObject(IDENTITY_TYPE)
+        identity_request2.configuration.certificate = self.user2_certificate
+        identity_request2.configuration.rsa_private_key = self.user2_rsa_private_key
+        
+        # Register a user, this shouldn't fail
+        identity_response2 = yield self.irc.register_user(identity_request2)
+        marine_operator_ooi_id = identity_response2.resource_reference.ooi_id
+
+        cert_info = authentication.decode_certificate(str(self.user2_certificate))
+        marine_operator_subject = cert_info['subject']
+
+        # Super user
+        identity_request3 = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request3')
+        identity_request3.configuration = identity_request3.CreateObject(IDENTITY_TYPE)
+        identity_request3.configuration.certificate = self.admin_certificate
+        identity_request3.configuration.rsa_private_key = self.admin_rsa_private_key
+        
+        # Register a user, this shouldn't fail
+        identity_response3 = yield self.irc.register_user(identity_request3)
+        admin_ooi_id = identity_response3.resource_reference.ooi_id
+
+        cert_info = authentication.decode_certificate(str(self.admin_certificate))
+        admin_subject = cert_info['subject']
+
+        self.assertTrue(subject_has_role(data_provider_subject, 'ANONYMOUS'))
+        self.assertTrue(user_has_role(data_provider_ooi_id, 'ANONYMOUS'))
+        self.assertTrue(subject_has_data_provider_role(data_provider_subject))
+        map_ooi_id_to_subject_data_provider_role(data_provider_subject, data_provider_ooi_id)
+        self.assertTrue(user_has_role(data_provider_ooi_id, 'DATA_PROVIDER'))
+        self.assertFalse(subject_has_role(data_provider_subject, 'MARINE_OPERATOR'))
+        self.assertTrue(subject_has_role(data_provider_subject, 'EARLY_ADOPTER'))
+        self.assertFalse(subject_has_role(data_provider_subject, 'ADMIN'))
+
+        self.assertTrue(user_has_role(marine_operator_ooi_id, 'ANONYMOUS'))
+        self.assertFalse(subject_has_role(marine_operator_subject, 'DATA_PROVIDER'))
+        self.assertTrue(subject_has_marine_operator_role(marine_operator_subject))
+        map_ooi_id_to_subject_marine_operator_role(marine_operator_subject, marine_operator_ooi_id)
+        self.assertTrue(user_has_role(marine_operator_ooi_id, 'MARINE_OPERATOR'))
+        self.assertFalse(subject_has_role(marine_operator_subject, 'EARLY_ADOPTER'))
+        self.assertFalse(subject_has_role(marine_operator_subject, 'ADMIN'))
+
+        self.assertTrue(user_has_role(admin_ooi_id, 'ANONYMOUS'))
+        self.assertTrue(subject_has_data_provider_role(admin_subject))
+        map_ooi_id_to_subject_data_provider_role(admin_subject, admin_ooi_id)
+        self.assertTrue(user_has_data_provider_role(admin_ooi_id))
+        self.assertTrue(subject_has_marine_operator_role(admin_subject))
+        map_ooi_id_to_subject_marine_operator_role(admin_subject, admin_ooi_id)
+        self.assertTrue(user_has_marine_operator_role(admin_ooi_id))
+        self.assertTrue(subject_has_early_adopter_role(admin_subject))
+        map_ooi_id_to_subject_early_adopter_role(admin_subject, admin_ooi_id)
+        self.assertTrue(user_has_early_adopter_role(admin_ooi_id))
+        self.assertTrue(subject_has_admin_role(admin_subject))
+        map_ooi_id_to_subject_admin_role(admin_subject, admin_ooi_id)
+        self.assertTrue(user_has_admin_role(admin_ooi_id))
+        

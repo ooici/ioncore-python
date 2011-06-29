@@ -14,7 +14,6 @@ except:
 
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.core.cc.shell import control
 from ion.core.process.process import Process
 
 from ion.core.object import object_utils
@@ -94,6 +93,7 @@ def start():
     # start publishing every 5 seconds
     reactor.callLater(5, publish, proc)
 
+    from ion.core.cc.shell import control
     control.add_term_name("mc", mc)
     control.add_term_name("ec", ec)
     control.add_term_name("stop_publishing", stop_publishing)
