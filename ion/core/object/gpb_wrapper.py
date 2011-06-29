@@ -435,12 +435,12 @@ class WrapperType(type):
         #--------------------------------------------------------------#
         if obj_type == LINK_TYPE:
             @_gpb_source
-            def obj_setlink(self, value):
+            def obj_setlink(self, value, ignore_copy_errors=False):
                 if self.Invalid:
                     raise OOIObjectError(
                         'Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
-                self.Repository.set_linked_object(self, value)
+                self.Repository.set_linked_object(self, value, ignore_copy_errors=ignore_copy_errors)
                 if not self.Modified:
                     self._set_parents_modified()
                 return
@@ -952,8 +952,13 @@ class Wrapper(object):
 
         self.ReadOnly = True
         for link in self.ChildLinks:
-            child = self.Repository.get_linked_object(link)
-            child.SetStructureReadOnly()
+            try:
+                child = self.Repository.get_linked_object(link)
+                child.SetStructureReadOnly()
+            except KeyError:
+                # we're just setting things read only, don't worry if we couldn't get part of it.
+                # this is intentionally happening in ingestion
+                pass
 
     @GPBSource
     def SetStructureReadWrite(self):
@@ -979,8 +984,8 @@ class Wrapper(object):
 
         self.recurse_count.count += 1
         local_cnt = self.recurse_count.count
-        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d' %
-              (local_cnt, type(self), len(self.ChildLinks), len(structure)))
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d:\n %s' %
+              (local_cnt, type(self), len(self.ChildLinks), len(structure), self.Modified))
 
         if not  self.Modified:
             # This object is already committed!
@@ -1003,25 +1008,26 @@ class Wrapper(object):
             child_se = repo.index_hash.get(link.key, structure.get(link.key, None))
             #child_se = repo.index_hash.get(link.key, None)
 
-            #print 'Setting child Link:', child_se
+            #log.debug('Setting child Link: %s' % str(child_se))
             if  child_se is not None:
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
 
             else:
-                #print 'SE for child not found - determining number of child links'
-
-                child = repo.get_linked_object(link)
-
-                # Determine whether this is a leaf node
-                if len(child.ChildLinks) == 0:
-                    link.isleaf = True
+                # if isleaf set, type set, and the key is an actual SHA1 - we don't need to recurse into it or do anything, really.
+                if link.IsFieldSet('isleaf') and link.IsFieldSet('type') and len(link.key) == 20:
+                    log.debug('Disregarding un-index-hashed link %s' % link.key)
+                    pass
                 else:
-                    link.isleaf = False
+                    child = repo.get_linked_object(link)
 
+                    # Determine whether this is a leaf node
+                    if len(child.ChildLinks) == 0:
+                        link.isleaf = True
+                    else:
+                        link.isleaf = False
 
-                #print 'Calling Recurse Commit on child'
-                child.RecurseCommit(structure)
+                    child.RecurseCommit(structure)
 
             # Save the link info as a convience for sending!
             se.ChildLinks.add(link.key)
@@ -1602,14 +1608,14 @@ class ContainerWrapper(object):
 
 
     @GPBSourceCW
-    def SetLink(self, key, value):
+    def SetLink(self, key, value, ignore_copy_errors=False):
         if not isinstance(value, Wrapper):
             raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
 
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
         if item.ObjectType == LINK_TYPE:
-            self.Repository.set_linked_object(item, value)
+            self.Repository.set_linked_object(item, value, ignore_copy_errors)
         else:
             raise OOIObjectError(
                 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
