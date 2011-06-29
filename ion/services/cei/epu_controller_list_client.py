@@ -19,8 +19,12 @@ class EPUControllerListClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "epu_controller_list"
-        ServiceClient.__init__(self, proc, **kwargs)
+        if 'force_service_exists' in kwargs and kwargs['force_service_exists']:
+            self.force_service_exists = True
+        else:
+            self.force_service_exists = False
         self.service_name = kwargs['targetname']
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def list(self):
@@ -28,7 +32,9 @@ class EPUControllerListClient(ServiceClient):
         """
         log.debug("ServiceName = " + self.service_name)
         yield self._check_init()
-        service_exists = yield self.does_service_exist(self.service_name)
+        service_exists = True
+        if not self.force_service_exists:
+            service_exists = yield self.does_service_exist(self.service_name)
         if not service_exists:
             log.debug("controller_list_client.list: Returning static list for AIS unit testing")
             defer.returnValue(['dataservices_epu_controller',

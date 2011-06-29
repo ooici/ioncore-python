@@ -11,6 +11,10 @@ class EPUControllerClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "epu_controller"
+        if 'force_service_exists' in kwargs and kwargs['force_service_exists']:
+            self.force_service_exists = True
+        else:
+            self.force_service_exists = False
         self.epu_controller_name = kwargs['targetname']
         ServiceClient.__init__(self, proc, **kwargs)
 
@@ -43,7 +47,9 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def whole_state(self):
-        service_exists = yield self.does_service_exist(self.epu_controller_name)
+        service_exists = True
+        if not self.force_service_exists:
+            service_exists = yield self.does_service_exist(self.epu_controller_name)
         if not service_exists:
             log.debug("%s.whole_state: Returning static list for AIS unit testing" % self.epu_controller_name)
             de_state = 'STABLE_DE'   # from epu/epucontroller/de_states.py
