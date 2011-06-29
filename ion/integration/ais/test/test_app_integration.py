@@ -767,8 +767,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response does not contain an OOI_ID GPB')
         if reply.message_parameters_reference[0].user_already_registered != False:
             self.fail("response does not indicate user wasn't already registered")
-        if reply.message_parameters_reference[0].user_is_admin != True:
-            self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_is_admin != False:
+            self.fail("response indicates user is administrator")
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
@@ -783,8 +783,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response does not contain an OOI_ID GPB')
         if reply.message_parameters_reference[0].user_already_registered != True:
             self.fail("response does not indicate user was already registered")
-        if reply.message_parameters_reference[0].user_is_admin != True:
-            self.fail("response does not indicate user is administrator")
+        if reply.message_parameters_reference[0].user_is_admin != False:
+            self.fail("response indicates user is administrator")
         if reply.message_parameters_reference[0].user_is_early_adopter != True:
             self.fail("response does not indicate user is an early adopter")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
@@ -1266,6 +1266,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
+        #
+        # create a user
+        #
         yield self.createUser()
 
         #
@@ -1279,7 +1282,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.info('Created Dispatcher2 ID: ' + self.dispatcherID)
             
         #
-        # Now make an association between the user and this dispatcher
+        # Now make an association between the user and the last created dispatcher
         #
         try:
             log.info('Getting user resource instance')
@@ -1292,20 +1295,34 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             if association not in self.userRes.ResourceAssociationsAsSubject:
                 self.fail('Error: subject not in association!')
             if association not in self.dispatcherRes.ResourceAssociationsAsObject:
-                self.fail('Error: object not in association')
-            
-            #
+                self.fail('Error: object not in association')           
             # Put the association in datastore
-            #
             log.debug('Storing association: ' + str(association))
             yield self.rc.put_instance(association)
-
         except AssociationClientError, ex:
             self.fail('Error creating assocation between userID: ' + self.userID + ' and dispatcherID: ' + self.dispatcherID + '. ex: ' + ex)
 
         #
-        # Add a couple of subscriptions to find later...
+        # Get the list of dataset resources and add a subscription for the first one
         #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
+        
+        log.debug('Calling findDataResources to get list of resources to do subscription on.')
+        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail("findDataResources failed: " + rspMsg.error_str)
+
+        numResReturned = len(rspMsg.message_parameters_reference[0].dataResourceSummary)
+        if numResReturned == 0:
+            self.fail('ERROR: findDataResources returned no resources.')
+        else:
+            log.debug('findDataResources returned: ' + str(numResReturned) + ' resources.')
+
+        # grab the first resource from the list
+        datasetMetadata = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata
+        dsResourceID = datasetMetadata.data_resource_id
         
         #
         # Add a subscription for this user to this data resource
@@ -1313,18 +1330,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = dsResourceID
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
 
-        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset123'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = dsResourceID
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = datasetMetadata.ion_time_coverage_start
+        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = datasetMetadata.ion_time_coverage_end
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = datasetMetadata.ion_geospatial_lat_min
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = datasetMetadata.ion_geospatial_lat_max
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = datasetMetadata.ion_geospatial_lon_min
+        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = datasetMetadata.ion_geospatial_lon_max
 
         #
         # Call AIS to create the subscription
@@ -1337,36 +1353,32 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 
         #
-        # Add another subscription for this user to this data resource
+        # Now call AIS to find the subscriptions with no bounds
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset456'
-        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
-        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES
-
-        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
-        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataset456'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -55.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -45.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 25.0
-        reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
-    
-        #
-        # Call AIS to create the subscription
-        #
-        log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
+        
+        log.debug('Calling findDataResourceSubscriptions.')
+        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            self.fail('ERROR rspMsg to createDataResourceSubscription')
+            self.fail('ERROR rspMsg to findDataResourceSubscriptions')
         else:
-            log.debug('POSITIVE rspMsg to createDataResourceSubscription')
+            log.debug('POSITIVE rspMsg to findDataResourceSubscriptions')
+            
+        numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
+        #
+        # With no bounds on the find sent (above), the subscription created above
+        # should be returned.  If it isn't it's an error, so fail test.
+        #
+        log.info('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
+        if numSubsReturned != 1:
+            errString = 'findDataResourcesSubscriptions returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 1'
+            self.fail(errString)
 
         #
-        # Now call AIS to find the subscriptions
+        # Now call AIS to find the subscriptions with bounds that should return
+        # no dataset 
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
@@ -1375,13 +1387,11 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.dataBounds.maxLatitude  = -40
         reqMsg.message_parameters_reference.dataBounds.minLongitude = 20
         reqMsg.message_parameters_reference.dataBounds.maxLongitude = 30
-        reqMsg.message_parameters_reference.dataBounds.minVertical  = 20
+        reqMsg.message_parameters_reference.dataBounds.minVertical  = 0
         reqMsg.message_parameters_reference.dataBounds.maxVertical  = 30
         reqMsg.message_parameters_reference.dataBounds.posVertical  = 'down'
         reqMsg.message_parameters_reference.dataBounds.minTime      = '2007-01-1T10:00:00Z'
         reqMsg.message_parameters_reference.dataBounds.maxTime      = '2008-08-1T11:00:00Z'
-        
-        
         
         log.debug('Calling findDataResourceSubscriptions.')
         rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
@@ -1392,17 +1402,13 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             
         numSubsReturned = len(rspMsg.message_parameters_reference[0].subscriptionListResults)
 
+        #
+        # There should no subscription returned 
+        #
         log.info('findFindDataResourceSubscriptions returned: ' + str(numSubsReturned) + ' subscriptions.')
-        if numSubsReturned != 2:
-            errString = 'findDataResourcesByUser returned ' + str(numSubsReturned) + ' subscriptions.  Should have been 2'
-            #self.fail('findDataResourcesByUser returned " + numResReturned + " subscriptions.  Should have been 2')
+        if numSubsReturned != 0:
+            errString = 'findDataResourcesSubscriptions returned ' + str(numSubsReturned) + ' subscriptions.  Should have been none'
             self.fail(errString)
-        else:
-            i = 0
-            while i < numSubsReturned:
-                log.info('Date of subscription registration: ' + str(rspMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered))
-                i = i + 1
-
 
             
     @defer.inlineCallbacks
