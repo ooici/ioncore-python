@@ -392,9 +392,6 @@ class ManageDataResource(object):
                     Response.error_str =  errtext
                     defer.returnValue(Response)
 
-            # get user resource so we can associate it later
-            user_resource = yield self.rc.get_instance(msg.user_id)
-
             # create the data source from the fields in the input message
             datasrc_resource = yield self._createDataSourceResource(msg)
             my_datasrc_id = datasrc_resource.ResourceIdentity
@@ -415,7 +412,6 @@ class ManageDataResource(object):
             self.ing.create_dataset_topics(topics_msg)
 
             #make associations
-            yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
             association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
             #build transaction
@@ -676,7 +672,7 @@ class ManageDataResource(object):
         """
 
         #this seems very un-GPB-ish, to have to check fields...
-        req_fields = ["user_id",
+        req_fields = [#"user_id", #deprecated as per OOIION-240
                       "source_type",
                       "request_type",
                       #"request_bounds_north",
