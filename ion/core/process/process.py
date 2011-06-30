@@ -20,18 +20,17 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ApplicationError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.messaging.message_client import MessageClient, MessageInstance
 
-from ion.core.process.cprocess import IContainerProcess, ContainerProcess
+from ion.core.process.cprocess import Invocation
 from ion.core.data.store import Store
 from ion.interact.conversation import ProcessConversationManager, CONV_TYPE_NONE
-from ion.interact.message import Message
 from ion.interact.request import RequestType
-from ion.interact.rpc import RpcType, GenericType
+from ion.interact.rpc import RpcType
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject, BasicStates
 
