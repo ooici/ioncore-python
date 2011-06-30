@@ -182,9 +182,9 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
  
   
     ssh_cmd = "".join(("ssh -i ", skey, " -o StrictHostKeyChecking=no "))
-    os.putenv("RSYNC_RSH", ssh_cmd)
+    os.environ["RSYNC_RSH"] =  ssh_cmd
     yield rsync_ncml(local_ncml_path, server_url)
-    os.unsetenv("RSYNC_RSH")
+    del os.environ["RSYNC_RSH"]
 
 
     # Delete the keys from the file system
