@@ -51,6 +51,8 @@ BUSINESS_STATE_MODIFICATION_EVENT_ID = 1112
 DATASET_CHANGE_EVENT_ID = 1113
 DATASOURCE_CHANGE_EVENT_ID = 1114
 INGESTION_PROCESSING_EVENT_ID = 1115
+DATASET_STREAMING_EVENT_ID = 1116           #  NOTE: There is no "Publisher" of this event - as it only comes from DatasetAgent (Java) and does not use the
+                                            #  standard Message Types for events.  Instead, expect messages of ids 10001, 2001, and 2005.
 NEW_SUBSCRIPTION_EVENT_ID = 1201
 DEL_SUBSCRIPTION_EVENT_ID = 1202
 SCHEDULE_EVENT_ID = 2001
@@ -600,6 +602,18 @@ class IngestionProcessingEventSubscriber(ResourceModifiedEventSubscriber):
     The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
     """
     event_id = INGESTION_PROCESSING_EVENT_ID
+
+class DatasetStreamingEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Streaming Event - actual mechanism for getting data from DatasetAgent
+    to Ingestion.
+
+    NOTE: There is no "Publisher" of this event - as it only comes from DatasetAgent (Java) and does not use the
+    standard Message Types for events.  Instead, expect messages of ids 10001, 2001, and 2005.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = DATASET_STREAMING_EVENT_ID
 
 class NewSubscriptionEventSubscriber(EventSubscriber):
     """
