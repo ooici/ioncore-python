@@ -226,7 +226,8 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re[0]['exception'])
+            print str(re)
+            raise ValueError('Error on URL: ' + str(re))
         defer.returnValue(content)
 
 
@@ -243,7 +244,8 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re[0]['exception'])
+            print str(re)
+            raise ValueError('Error on URL: ' + str(re))
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -255,7 +257,7 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re[0]['exception'])
+            raise ValueError('Error on URL: ' + str(re))
         defer.returnValue(content)
 
     def _rewrite_headers(self, old_headers):
