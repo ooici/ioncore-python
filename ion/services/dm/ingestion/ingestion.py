@@ -13,7 +13,7 @@ To test this with the Java CC!
 """
 
 import time, calendar
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher, DatasetChangeEventPublisher, IngestionProcessingEventPublisher
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher, DatasetChangeEventPublisher, IngestionProcessingEventPublisher, get_events_exchange_point, DatasetStreamingEventSubscriber
 import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
@@ -198,25 +198,17 @@ class IngestionService(ServiceProcess):
 
         log.info('op_create_dataset_topics - Complete')
 
-
-
-    class IngestSubscriber(Subscriber):
+    class IngestSubscriber(DatasetStreamingEventSubscriber):
         """
-        Specially derived Subscriber that routes received messages into a custom handler that is similar to
+        Specially derived EventSubscriber that routes received messages into a custom handler that is similar to
         the main Process.receive method, but eliminates problems and handles Exceptions better.
         """
-        def __init__(self, handleref=None, **kwargs):
-            """
-            Handleref must exist and must be a callable.
-            """
-            assert handleref
-            self._handleref = handleref
-
-            Subscriber.__init__(self, **kwargs)
-
         @defer.inlineCallbacks
         def _receive_handler(self, content, msg):
-            yield self._handleref(content, msg)
+            """
+            Let the ondata method handle acking the message.
+            """
+            yield self.ondata(content, msg)
 
     def _ingest_data_topic_valid(self, ingest_data_topic):
         """
@@ -281,15 +273,14 @@ class IngestionService(ServiceProcess):
             log.error("Invalid data ingestion topic (%s), allowing it for now TODO" % ingest_data_topic)
 
         log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % ingest_data_topic)
-        self._subscriber = self.IngestSubscriber(handleref=lambda payload, msg: self._handle_ingestion_msg(payload, msg, convid),
-                                                 xp_name="magnet.topic",
-                                                 binding_key=ingest_data_topic,
-                                                 process=self)
+        self._subscriber = self.IngestSubscriber(origin=ingest_data_topic, process=self)
+        self._subscriber.ondata = lambda payload, msg: self._handle_ingestion_msg(payload, msg, convid)
+
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
         log.debug('_setup_ingestion_topic - Complete')
 
-        defer.returnValue(ingest_data_topic)
+        defer.returnValue(self._subscriber._binding_key)
 
     @defer.inlineCallbacks
     def _handle_ingestion_msg(self, payload, msg, convid):
@@ -360,7 +351,7 @@ class IngestionService(ServiceProcess):
         log.info(
             'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
         irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
-        irmsg.xp_name = "magnet.topic"
+        irmsg.xp_name = get_events_exchange_point()
         irmsg.publish_topic = ingest_data_topic
 
         self.send(content.reply_to, operation='ingest_ready', content=irmsg)
