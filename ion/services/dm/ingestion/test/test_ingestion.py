@@ -6,7 +6,7 @@
 @brief test for eoi ingestion demo
 """
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-from ion.services.dm.distribution.publisher_subscriber import Subscriber
+from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publisher
 
 import ion.util.ionlog
 from ion.util.iontime import IonTime
@@ -19,8 +19,7 @@ from ion.core import ioninit
 from ion.util import procutils as pu
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, TYPE_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, ID_CFG
 
-from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber
-
+from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber, DATASET_STREAMING_EVENT_ID, get_events_exchange_point
 
 from ion.core.process import process
 from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE
@@ -577,7 +576,22 @@ class IngestionTest(IonTestCase):
 
         # now send it an incorrect message, make sure we get an error back
         badmsg = yield self.proc.message_client.create_instance(SUPPLEMENT_MSG_TYPE)
-        yield self.proc.send(new_dataset_id, 'recv_dataset', badmsg)
+
+        pub = Publisher(process=self.proc,
+                        xp_name=get_events_exchange_point(),
+                        routing_key="%s.%s" % (str(DATASET_STREAMING_EVENT_ID), new_dataset_id))
+
+        yield pub.initialize()
+        yield pub.activate()
+
+        # yuck, can't use pub.publish, it won't let us set an op
+        kwargs = { 'recipient' : pub._routing_key,
+                   'content'   : badmsg,
+                   'headers'   : {'sender-name' : self.proc.proc_name },
+                   'operation' : 'recv_dataset',
+                   'sender'    : self.proc.id.full }
+
+        yield pub._recv.send(**kwargs)
 
         yield self.failUnlessFailure(ingestdef, ReceivedApplicationError)
 

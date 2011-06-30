@@ -31,6 +31,10 @@ from ion.core.messaging.message_client import MessageClient
 from google.protobuf.internal.containers import RepeatedScalarFieldContainer
 
 CONF = ioninit.config(__name__)
+# Master set of roles and their user-friendly names
+all_roles = {'ANONYMOUS': 'Guest', 'AUTHENTICATED': 'User', 'DATA_PROVIDER': 'Data Provider',
+             'MARINE_OPERATOR': 'Marine Operator', 'EARLY_ADOPTER': 'Early Adopter',
+             'OWNER': 'Owner', 'ADMIN': 'Administrator'}
 
 def construct_policy_lists(policydb):
     thedict = {}
@@ -38,7 +42,7 @@ def construct_policy_lists(policydb):
         for policy_entry in policydb:
             role, action, resources = policy_entry
             service, opname = action.split('.', 1)
-            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'OWNER', 'ADMIN')
+            assert role in all_roles
 
             if role == 'ADMIN':
                 role_set = set(['ADMIN'])
@@ -68,75 +72,70 @@ policydb_filename = ioninit.adjust_dir(CONF.getValue('policydecisionpointdb'))
 policy_dictionary = construct_policy_lists(Config(policydb_filename).getObject())
 
 def construct_user_role_lists(userroledict):
+    roles = userroledict['roles']
+
     roledict = {}
-    adminlist = []
-    for role_entry in userroledict['roles']['ADMIN']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        adminlist.append(role_dict);
-    roledict['ADMIN'] = adminlist
-
-    dataproviderlist = []
-    for role_entry in userroledict['roles']['DATA_PROVIDER']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        dataproviderlist.append(role_dict);
-    roledict['DATA_PROVIDER'] = dataproviderlist
-
-    marineoperatorlist = []
-    for role_entry in userroledict['roles']['MARINE_OPERATOR']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        marineoperatorlist.append(role_dict);
-    roledict['MARINE_OPERATOR'] = marineoperatorlist
-
-    earlyadopterlist = []
-    for role_entry in userroledict['roles']['EARLY_ADOPTER']:
-        subject = role_entry
-        role_dict = {'subject': subject, 'ooi_id': None}
-        earlyadopterlist.append(role_dict);
-    roledict['EARLY_ADOPTER'] = earlyadopterlist
+    for role_name in ('ADMIN', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'EARLY_ADOPTER'):
+        roledict[role_name] = {'subject': set(roles[role_name]), 'ooi_id': set()}
 
     return roledict
 
 userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
-user_role_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
+role_user_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
+user_role_dict = {} # cache the current role for an ooi_id
 
-def subject_has_role(subject,role):
+def subject_has_role(subject, role):
     if role == 'ANONYMOUS':
         return True
-    for role_entry in user_role_dict[role]:
-        if role_entry['subject'] == subject:
-            return True
-    return False
+    return subject in role_user_dict[role]['subject']
 
 # Role methods
-def user_has_role(ooi_id,role):
+def user_has_role(ooi_id, role):
     if role == 'OWNER':
         # Will be special handled within the policy flow
         return False
     if role == 'ANONYMOUS':
         return True
     elif role == 'AUTHENTICATED':
-        if ooi_id != 'ANONYMOUS':
-            return True
-        else:
-            return False
+        return ooi_id != 'ANONYMOUS'
     else:
-        for role_entry in user_role_dict[role]:
-            if role_entry['ooi_id'] == ooi_id:
-                return True
-    return False
+        return ooi_id in role_user_dict[role]['ooi_id']
 
-def map_ooi_id_to_subject_role(subject,ooi_id,role):
-    for role_entry in user_role_dict[role]:
-        if role_entry['subject'] == subject:
-            role_entry['ooi_id'] = ooi_id
-            return
+def get_current_role(ooi_id):
+    roles = user_role_dict.get(ooi_id, None)
+    if roles is None:       return 'AUTHENTICATED'
+
+    # If more than one role, just grab one for now. There should be only one.
+    roles -= set(['ANONYMOUS', 'AUTHENTICATED'])
+    if len(roles) == 0:     return 'AUTHENTICATED'
+
+    if 'ADMIN' in roles:    return 'ADMIN'
+    return list(roles)[0]
+
+def map_ooi_id_to_role(ooi_id, role):
+    if not role in role_user_dict:
+        role_user_dict[role] = {'subject': set(), 'ooi_id': set()}
+    role_user_dict[role]['ooi_id'].add(ooi_id)
+
+    if not ooi_id in user_role_dict:
+        user_role_dict[ooi_id] = set()
+    user_role_dict[ooi_id].add(role)
+
+def unmap_ooi_id_from_role(ooi_id, role):
+    if role in role_user_dict:
+        if ooi_id in role_user_dict[role]['ooi_id']:
+            role_user_dict[role]['ooi_id'].remove(ooi_id)
+    if ooi_id in user_role_dict:
+        if role in user_role_dict[ooi_id]:
+            user_role_dict[ooi_id].remove(role)
+
+def map_ooi_id_to_subject_role(subject, ooi_id, role):
+    if subject in role_user_dict[role]['subject']:
+        map_ooi_id_to_role(ooi_id, role)
 
 # Role convenience methods
-def map_ooi_id_to_subject_admin_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'ADMIN')
+def map_ooi_id_to_subject_admin_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'ADMIN')
             
 def subject_has_admin_role(subject):
     return subject_has_role(subject, 'ADMIN')
@@ -144,8 +143,8 @@ def subject_has_admin_role(subject):
 def user_has_admin_role(ooi_id):
     return user_has_role(ooi_id, 'ADMIN')
 
-def map_ooi_id_to_subject_data_provider_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'DATA_PROVIDER')
+def map_ooi_id_to_subject_data_provider_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'DATA_PROVIDER')
 
 def subject_has_data_provider_role(subject):
     return subject_has_role(subject, 'DATA_PROVIDER')
@@ -153,8 +152,8 @@ def subject_has_data_provider_role(subject):
 def user_has_data_provider_role(ooi_id):
     return user_has_role(ooi_id, 'DATA_PROVIDER')
 
-def map_ooi_id_to_subject_marine_operator_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'MARINE_OPERATOR')
+def map_ooi_id_to_subject_marine_operator_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'MARINE_OPERATOR')
 
 def subject_has_marine_operator_role(subject):
     return subject_has_role(subject, 'MARINE_OPERATOR')
@@ -162,8 +161,8 @@ def subject_has_marine_operator_role(subject):
 def user_has_marine_operator_role(ooi_id):
     return user_has_role(ooi_id, 'MARINE_OPERATOR')
 
-def map_ooi_id_to_subject_early_adopter_role(subject,ooi_id):
-    map_ooi_id_to_subject_role(subject,ooi_id,'EARLY_ADOPTER')
+def map_ooi_id_to_subject_early_adopter_role(subject, ooi_id):
+    map_ooi_id_to_subject_role(subject, ooi_id, 'EARLY_ADOPTER')
 
 def subject_has_early_adopter_role(subject):
     return subject_has_role(subject, 'EARLY_ADOPTER')

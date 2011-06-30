@@ -5,6 +5,8 @@
 """
 
 import os, sys, tty, termios
+import rlcompleter
+import re
 
 from twisted.internet import stdio
 from twisted.conch.insults import insults
