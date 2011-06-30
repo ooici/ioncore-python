@@ -31,6 +31,10 @@ from ion.core.messaging.message_client import MessageClient
 from google.protobuf.internal.containers import RepeatedScalarFieldContainer
 
 CONF = ioninit.config(__name__)
+# Master set of roles and their user-friendly names
+all_roles = {'ANONYMOUS': 'Guest', 'AUTHENTICATED': 'User', 'DATA_PROVIDER': 'Data Provider',
+             'MARINE_OPERATOR': 'Marine Operator', 'EARLY_ADOPTER': 'Early Adopter',
+             'OWNER': 'Owner', 'ADMIN': 'Administrator'}
 
 def construct_policy_lists(policydb):
     thedict = {}
@@ -38,7 +42,7 @@ def construct_policy_lists(policydb):
         for policy_entry in policydb:
             role, action, resources = policy_entry
             service, opname = action.split('.', 1)
-            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'DATA_PROVIDER', 'MARINE_OPERATOR', 'OWNER', 'ADMIN')
+            assert role in all_roles
 
             if role == 'ADMIN':
                 role_set = set(['ADMIN'])
@@ -77,12 +81,13 @@ def construct_user_role_lists(userroledict):
     return roledict
 
 userroledb_filename = ioninit.adjust_dir(CONF.getValue('userroledb'))
-user_role_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
+role_user_dict = construct_user_role_lists(Config(userroledb_filename).getObject())
+user_role_dict = {} # cache the current role for an ooi_id
 
 def subject_has_role(subject, role):
     if role == 'ANONYMOUS':
         return True
-    return subject in user_role_dict[role]['subject']
+    return subject in role_user_dict[role]['subject']
 
 # Role methods
 def user_has_role(ooi_id, role):
@@ -94,21 +99,39 @@ def user_has_role(ooi_id, role):
     elif role == 'AUTHENTICATED':
         return ooi_id != 'ANONYMOUS'
     else:
-        return ooi_id in user_role_dict[role]['ooi_id']
+        return ooi_id in role_user_dict[role]['ooi_id']
+
+def get_current_role(ooi_id):
+    roles = user_role_dict.get(ooi_id, None)
+    if roles is None:       return 'AUTHENTICATED'
+
+    # If more than one role, just grab one for now. There should be only one.
+    roles -= set(['ANONYMOUS', 'AUTHENTICATED'])
+    if len(roles) == 0:     return 'AUTHENTICATED'
+
+    if 'ADMIN' in roles:    return 'ADMIN'
+    return list(roles)[0]
 
 def map_ooi_id_to_role(ooi_id, role):
-    if not role in user_role_dict:
-        user_role_dict[role] = {'subject': set(), 'ooi_id': set()}
-    user_role_dict[role]['ooi_id'].add(ooi_id)
+    if not role in role_user_dict:
+        role_user_dict[role] = {'subject': set(), 'ooi_id': set()}
+    role_user_dict[role]['ooi_id'].add(ooi_id)
+
+    if not ooi_id in user_role_dict:
+        user_role_dict[ooi_id] = set()
+    user_role_dict[ooi_id].add(role)
 
 def unmap_ooi_id_from_role(ooi_id, role):
-    if role in user_role_dict:
-        if ooi_id in user_role_dict[role]['ooi_id']:
-            user_role_dict[role]['ooi_id'].remove(ooi_id)
+    if role in role_user_dict:
+        if ooi_id in role_user_dict[role]['ooi_id']:
+            role_user_dict[role]['ooi_id'].remove(ooi_id)
+    if ooi_id in user_role_dict:
+        if role in user_role_dict[ooi_id]:
+            user_role_dict[ooi_id].remove(role)
 
 def map_ooi_id_to_subject_role(subject, ooi_id, role):
-    if subject in user_role_dict[role]['subject']:
-        user_role_dict[role]['ooi_id'].add(ooi_id)
+    if subject in role_user_dict[role]['subject']:
+        map_ooi_id_to_role(ooi_id, role)
 
 # Role convenience methods
 def map_ooi_id_to_subject_admin_role(subject, ooi_id):
