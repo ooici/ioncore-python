@@ -19,10 +19,7 @@ class EPUControllerListClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "epu_controller_list"
-        if 'force_service_exists' in kwargs and kwargs['force_service_exists']:
-            self.force_service_exists = True
-        else:
-            self.force_service_exists = False
+        self.force_service_exists = bool(kwargs.get('force_service_exists', False))
         self.service_name = kwargs['targetname']
         ServiceClient.__init__(self, proc, **kwargs)
 
