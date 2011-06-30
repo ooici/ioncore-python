@@ -279,6 +279,19 @@ message GetUserProfileResponse {
 }
 """
 
+MANAGE_USER_ROLE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9106, version=1)
+"""
+message ManageUserRoleRequest {
+   enum _MessageTypeIdentifier {
+       _ID = 9106;
+       _VERSION = 1;
+   }
+
+   optional string user_ooi_id=1;
+   optional string role=2;
+}
+"""
+
 # ManageResources GPBs from ion-object-definitions/net/ooici/integration/ais/manageResources/manage_resources.proto
 GET_RESOURCE_TYPES_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9120, version=1)
 """
