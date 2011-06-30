@@ -246,35 +246,27 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
-
-        ##
-        ## NEW CODE START
-        ##
-        
         #
-        # iterate through the cache getting the datasets
-        #
-        numDatasets = self.metadataCache.getNumDatasets()
-        log.info('>>>>>>>>>>>>>>>>> NUM DATASETS is %d <<<<<<<<<<<<<<<<<<<<<' %(numDatasets))
-
-        i = self.metadataCache.getNumDatasources()
-        log.info('>>>>>>>>>>>>>>>>> NUM DATASOURCES is %d <<<<<<<<<<<<<<<<<<<<<' %(i))
-        
-        #
-        # Can I get a list of datasets only?
+        # Iterate through the cache getting the datasets
+        # TODO: This next few sets of code build up a list of metadata -
+        # not just datasetIDs, but the whole metadata.  This is not a huge
+        # deal, but if it stays this way, it might be a good idea to take
+        # advantage of that fact by not getting the metadata again in
+        # the private __getDataResources() method.  Or, just store the IDs
+        # of the datasets here instead of the metadata.
         #
         dSetList = self.metadataCache.getDatasets()
-        log.info('>>>>>>>>>>>>>>>>>> getDatasets() returned list %d long of datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
+        log.debug('>>>>>>>>>>>>>>>>>> cache contains %d datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
         
         #
-        # iterate through this list getting those owned by the userID
+        # Iterate through this list getting those owned by the userID
         #
         ownedByList = []
         for ds in dSetList:
             if ds['OwnerID'] == userID:
                 ownedByList.append(ds)
                 
-        log.info('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
+        log.debug('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
 
                        
         #
@@ -290,22 +282,16 @@ class FindDataResources(object):
                 #
                 # If the visibility is false, this is private, so add it to the list
                 #
-                log.info('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
+                log.debug('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
                 if dSource['visibility'] == False:
-                    log.info('>>>>>>>>>>>>>>>>>>>>> adding ds %s to ownedByAndPrivateList' %(ds['ResourceIdentity']))
+                    log.debug('>>>>>>>>>>>>>>>>>>>>> adding ds %s to ownedByAndPrivateList' %(ds['ResourceIdentity']))
                     ownedByAndPrivateList.append(ds)
             
-        log.info('>>>>>>>>>>>>>>>>>> ownedByAndPrivateList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByAndPrivateList))
-
-        #
-        # THE ABOVE LIST IS 0 LENGTH: IS THIS TRUE?
-        #
+        log.debug('>>>>>>>>>>>>>>>>>> ownedByAndPrivateList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByAndPrivateList))
 
         #
         # We now have the list of owned by and private: now get the public datasets 
         #
-
-
         publicList = []
         for ds in dSetList:
             dSourceID = ds['DSourceID']
@@ -316,100 +302,19 @@ class FindDataResources(object):
                 #
                 # If the visibility is true, this is public, so add it to the list
                 #
-                log.info('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
+                log.debug('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
                 if dSource['visibility'] == True:
-                    log.info('>>>>>>>>>>>>>>>>>>>>> adding ds %s to publicList' %(ds['ResourceIdentity']))
+                    log.debug('>>>>>>>>>>>>>>>>>>>>> adding ds %s to publicList' %(ds['ResourceIdentity']))
                     publicList.append(ds)
             
-        log.info('>>>>>>>>>>>>>>>>>> publicList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(publicList))
+        log.debug('>>>>>>>>>>>>>>>>>> publicList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(publicList))
 
         #
         # Now add the two lists together
         #
         finalList = ownedByAndPrivateList + publicList
-        log.info('>>>>>>>>>>>>>>>>>> finalList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(finalList))
+        log.debug('>>>>>>>>>>>>>>>>>> finalList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(finalList))
         
-        ##
-        ## NEW CODE END
-        ##
-
-        ##
-        ## Get rid of this block
-        ## 
-        
-        """
-        # 
-        # Get the list of dataset resource IDs by owner, then include only
-        # those that private (is_public is FALSE)
-        #
-        dSetResults = yield self.__findDatasetResourcesByOwner(userID)
-        if dSetResults == None:
-            log.error('Error finding resources.')
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                  MessageName='AIS findDataResources error response')
-            Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "AIS.findDataResources: No DatasetIDs were found."
-            defer.returnValue(Response)
-            
-        dSetList = dSetResults.idrefs
-        log.debug('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by ' + str(userID))
-
-        #
-        # Delete the public datasets from the list
-        #
-        i = len(dSetList)
-        j = 0
-        while (j < i):
-            # get the datasource for this dataset
-            dSetID = dSetList[j].key
-            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetID)
-            if dSetMetadata is None:
-                log.error('>>>>>>>>>>>>>>>>>> NONE!!!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-                continue
-            else:
-                #
-                # Get the associated datasource to determine if is_public
-                #
-                dSourceID = dSetMetadata['DSourceID']
-                log.info('>>>>>>>>>>>>>>>>>DSOURCE ID for index %d is %s <<<<<<<<<<<<<<<<<<<<<' %(j, dSourceID))
-            j = j + 1    
-            
-                        
-        # Get the entire list of dataset resource IDs
-        #
-        # Find all datasets that are active, then only include those
-        # that have the is_public attribute set.  
-        #
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
-        if dSetResults == None:
-            log.error('Error finding resources.')
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                  MessageName='AIS findDataResources error response')
-            Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "AIS.findDataResources: No DatasetIDs were found."
-            defer.returnValue(Response)
-
-        log.debug('Dataset list contains ' + str(len(dSetResults.idrefs)) + ' public datasets.')
-
-        #
-        # Add the PUBLIC datasets to the list of private datasets
-        #
-        i = len(dSetList)
-        j = 0
-        for dSetID in dSetResults.idrefs:
-            dSetList.add()
-            dSetList[i] = dSetResults.idrefs[j]
-            i = i + 1
-            j = j + 1
-
-        log.debug('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
-
-        ##
-        ## End of get RID OF BLOCK
-        ##
-        """
-
-        #response = yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
         response = yield self.__getDataResources(msg, finalList, rspMsg, typeFlag = self.ALL)
 
         defer.returnValue(response)
@@ -450,19 +355,29 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE)
 
-        # Get the list of dataset resource IDs
-        dSetResults = yield self.__findResourcesOfTypeAndOwner(DATASET_RESOURCE_TYPE_ID, userID)
-        if dSetResults == None:
-            log.error('Error finding resources.')
-            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                  MessageName='AIS findDataResources error response')
-            Response.error_num = Response.ResponseCodes.NOT_FOUND
-            Response.error_str = "AIS.findDataResourcesByUser: No DatasetIDs were found."
-            defer.returnValue(Response)
+        #
+        # Iterate through the cache getting the datasets
+        # TODO: This next few sets of code build up a list of metadata -
+        # not just datasetIDs, but the whole metadata.  This is not a huge
+        # deal, but if it stays this way, it might be a good idea to take
+        # advantage of that fact by not getting the metadata again in
+        # the private __getDataResources() method.  Or, just store the IDs
+        # of the datasets here instead of the metadata.
+        #
+        dSetList = self.metadataCache.getDatasets()
+        log.debug('>>>>>>>>>>>>>>>>>> cache contains %d datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
         
-        log.debug('Found ' + str(len(dSetResults.idrefs)) + ' datasets.')
+        #
+        # iterate through this list getting those owned by the userID
+        #
+        ownedByList = []
+        for ds in dSetList:
+            if ds['OwnerID'] == userID:
+                ownedByList.append(ds)
+                
+        log.debug('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
 
-        response = yield self.__getDataResources(msg, dSetResults.idrefs, rspMsg, typeFlag = self.BY_USER)
+        response = yield self.__getDataResources(msg, ownedByList, rspMsg, typeFlag = self.BY_USER)
         
         defer.returnValue(response)
 
