@@ -140,6 +140,8 @@ class IngestionService(ServiceProcess):
         self.dataset = None
         self.data_source = None
 
+        self._ingestion_terminating = False
+
         log.info('IngestionService.__init__()')
 
     @defer.inlineCallbacks
@@ -296,6 +298,12 @@ class IngestionService(ServiceProcess):
         triggers one, it will error out of the op_ingest call appropriately.
         """
 
+        if self._ingestion_terminating:
+            log.debug("Attempting to route received data message while ingestion subscriber terminating, discarding the message!")
+            # set msg._state to anything to prevent auto-acking
+            msg._state = "ACKED"
+            defer.returnValue(False)
+
         try:
             opname = payload.get('op', '')
             content = payload.get('content', '')    # should be None, but this is how Process' receive does it
@@ -311,7 +319,10 @@ class IngestionService(ServiceProcess):
 
         except Exception, ex:
 
-            # ack the message to make the receiver stack happy
+            # set flag to prevent routing while in process of termination
+            self._ingestion_terminating = True
+
+            # ack the message to make the receiver stack happy (subscriber still active here, so this is ok)
             yield msg.ack()
 
             # all error handling goes back to op_ingest
@@ -393,6 +404,10 @@ class IngestionService(ServiceProcess):
             yield self._subscriber.terminate()
             self._subscriber = None
 
+            # reset terminating flag after shutting down Subscriber
+            # WARNING: MESSAGES MAY STILL ROUTE, CHECK STATE OF TIMEOUTCB IN EACH HANDLER
+            self._ingestion_terminating = False
+
         data_details = self.get_data_details(content)
 
         if isinstance(ingest_res, dict):
@@ -405,7 +420,7 @@ class IngestionService(ServiceProcess):
         resources = []
 
         if ingest_res.has_key(EM_ERROR):
-            log.info("Ingest Failed!")
+            log.info("Ingest Failed! %s" % str(ingest_res))
 
             # Don't change life cycle state - yet...
             #data_source.ResourceLifeCycleState = data_source.INACTIVE
@@ -512,6 +527,12 @@ class IngestionService(ServiceProcess):
 
         log.info('_ingest_op_recv_dataset - Start')
 
+        if self._ingestion_terminating or not self.timeoutcb.active():
+            log.debug("_ingest_op_recv_dataset received a routed message AFTER shutdown occured (probably during an ApplicationError). Discarding this message!")
+            # set msg._state to anything to prevent auto-ack
+            msg._state = "ACKED"
+            defer.returnValue(None)
+
         log.info('Adding 30 seconds to timeout')
         self.timeoutcb.delay(30)
 
@@ -559,6 +580,12 @@ class IngestionService(ServiceProcess):
     def _ingest_op_recv_chunk(self, content, headers, msg):
 
         log.info('_ingest_op_recv_chunk - Start')
+
+        if self._ingestion_terminating or not self.timeoutcb.active():
+            log.debug("_ingest_op_recv_chunk received a routed message AFTER shutdown occured (probably during an ApplicationError). Discarding this message!")
+            # set msg._state to anything to prevent auto-ack
+            msg._state = "ACKED"
+            defer.returnValue(None)
 
         log.info('Adding 30 seconds to timeout')
         self.timeoutcb.delay(30)
@@ -624,6 +651,12 @@ class IngestionService(ServiceProcess):
         """
 
         log.info('_ingest_op_recv_done - Start')
+
+        if self._ingestion_terminating or not self.timeoutcb.active():
+            log.debug("_ingest_op_recv_done received a routed message AFTER shutdown occured (probably during an ApplicationError). Discarding this message!")
+            # set msg._state to anything to prevent auto-ack
+            msg._state = "ACKED"
+            defer.returnValue(None)
 
         log.info('Cancelling timeout!')
         self.timeoutcb.cancel()
@@ -852,7 +885,7 @@ class IngestionService(ServiceProcess):
                 log.info('Variable %s does not yet exist in the dataset!' % var_name)
 
                 v_link = root.variables.add()
-                v_link.SetLink(merge_var)
+                v_link.SetLink(merge_var, ignore_copy_errors=True)
 
                 log.info('Copied Variable %s into the dataset!' % var_name)
                 continue # Go to next variable...

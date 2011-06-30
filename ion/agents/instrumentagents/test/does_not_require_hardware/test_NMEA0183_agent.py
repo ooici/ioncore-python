@@ -7,18 +7,11 @@
 @author Alon Yaari
 """
 
-import uuid
-import re
-import os
-
 from twisted.internet import defer
-from ion.agents.instrumentagents.agent_shell_api import driver_config
 from ion.test.iontest import IonTestCase
-from twisted.trial import unittest
 
 import ion.util.ionlog
 import ion.util.procutils as pu
-from ion.core.exception import ReceivedError
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -36,9 +29,12 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceCommand
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
+import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 
-from ion.agents.instrumentagents.simulators.sim_NMEA0183 import NMEA0183Simulator as SIM
-
+from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
+    import NMEA0183SimPrePlanned as sim
+from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
+    import SERPORTSLAVE, OFF, ON
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -46,19 +42,6 @@ log = ion.util.ionlog.getLogger(__name__)
     These tests requires that a simulator (or real NMEA GPS device!) is attached to:
             /dev/slave
 """
-
-
-
-# It is useful to be able to easily turn tests on and off
-# during development. Also this will ensure tests do not run
-# automatically. 
-SKIP_TESTS  = [
-                                'test_execute_instrument',
-                                #'test_state_transitions',
-                                'test_get_capabilities',
-                                'dummy'
-]    
-
 
 class TestNMEA0183Agent (IonTestCase):
 
@@ -68,17 +51,20 @@ class TestNMEA0183Agent (IonTestCase):
 
     @defer.inlineCallbacks
     def setUp (self):
-        raise unittest.SkipTest('Not working yet')
 
-        print "\n||||||| TestNMEA0183Agent.setUp\n"     #DEBUG
+        log.info("TestNMEA0183Agent.setUp")
 
-
+        self._sim = sim()
+        if self._sim.IsSimOK():
+            log.info ('----- Simulator launched.')
+        self.assertEqual (self._sim.IsSimulatorRunning(), 1)
+        
         yield self._start_container()
 
         # Driver and agent configuration. Configuration data will ultimately be accessed via
         # some persistence mechanism: platform filesystem or a device registry.
         # For now, we pass all configuration data that would be read this way as process arguments.
-        device_port             = "/dev/slave"
+        device_port             = SERPORTSLAVE
         device_baud             = 19200
         device_bytesize         = 8
         device_parity           = 'N'
@@ -132,10 +118,9 @@ class TestNMEA0183Agent (IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown (self):
+        log.info("TestNMEA0183Agent.tearDown")
 
-        print "\n||||||| TestNMEA0183Agent.tearDown\n"     #DEBUG
-
-        pu.asleep           (1)
+        yield self._sim.StopSimulator()
         yield self._stop_container()
 
 
@@ -144,33 +129,24 @@ class TestNMEA0183Agent (IonTestCase):
         """
         Test cases for executing device commands through the instrument agent.
         """
-
-        print "\n||||||| TestNMEA0183Agent.test_state_transitions\n"     #DEBUG
-
-        if 'test_state_transitions' in SKIP_TESTS:
-            raise unittest.SkipTest     ('Skipping during development.')
-
         # Check agent state upon creation. No transaction needed for get operation.
-        params                          = [AgentStatus.AGENT_STATE]
-        reply                           = yield self.ia_client.get_observatory_status (params)
-        success                         = reply['success']
-        result                          = reply['result']
-        agent_state                     = result[AgentStatus.AGENT_STATE][1]
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assert_                    (agent_state == AgentState.UNINITIALIZED)
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
 
         # Check that the driver and client descriptions were set by spawnargs, and save them for later restore.
 
         # Begin an explicit transaciton.
-        reply                           = yield self.ia_client.start_transaction (0)
-        success                         = reply['success']
-        tid                             = reply['transaction_id']
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assertEqual                (type (tid), str)
-        self.assertEqual                (len (tid), 36)
-
-        # Initialize with a bad process desc. value.
-        # This should fail and leave us in the uninitialized state with null driver and client.
+        reply = yield self.ia_client.start_transaction()
+        success = reply['success']
+        tid = reply['transaction_id']
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assertEqual(type (tid), str)
+        self.assertEqual(len (tid), 36)
 
         # Initialize with a bad client desc. value.
         # This should fail and leave us in the uninitialized state with null driver and client.
@@ -178,52 +154,52 @@ class TestNMEA0183Agent (IonTestCase):
         # Restore the good process and client desc. values.
 
         # Initialize the agent to bring up the driver and client.
-        cmd                             = [AgentCommand.TRANSITION, AgentEvent.INITIALIZE]
-        reply                           = yield self.ia_client.execute_observatory (cmd, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        self.assert_                    (InstErrorCode.is_ok (success))
+        cmd = [AgentCommand.TRANSITION, AgentEvent.INITIALIZE]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
 
         # Check agent state.
-        params                          = [AgentStatus.AGENT_STATE]
-        reply                           = yield self.ia_client.get_observatory_status (params, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        agent_state                     = result[AgentStatus.AGENT_STATE][1]
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assert_                    (agent_state == AgentState.INACTIVE)
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.INACTIVE)
 
         # Connect to the driver.
-        cmd                             = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
-        reply                           = yield self.ia_client.execute_observatory (cmd, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        self.assert_                    (InstErrorCode.is_ok (success))
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
 
         # Check agent state.
-        params                          = [AgentStatus.AGENT_STATE]
-        reply                           = yield self.ia_client.get_observatory_status (params, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        agent_state                     = result[AgentStatus.AGENT_STATE][1]
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assert_                    (agent_state == AgentState.IDLE)
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.IDLE)
         
         # Enter observatory mode.
-        cmd                             = [AgentCommand.TRANSITION, AgentEvent.RUN]
-        reply                           = yield self.ia_client.execute_observatory (cmd, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        self.assert_                    (InstErrorCode.is_ok (success))
+        cmd = [AgentCommand.TRANSITION, AgentEvent.RUN]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
     
         # Check agent state.
-        params                          = [AgentStatus.AGENT_STATE]
-        reply                           = yield self.ia_client.get_observatory_status (params, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        agent_state                     = result[AgentStatus.AGENT_STATE][1]
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assert_                    (agent_state == AgentState.OBSERVATORY_MODE)
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
         
         """
         # Discnnect from the driver.
@@ -244,25 +220,25 @@ class TestNMEA0183Agent (IonTestCase):
         """
         
         # Reset the agent to disconnect and bring down the driver and client.
-        cmd                             = [AgentCommand.TRANSITION, AgentEvent.RESET]
-        reply                           = yield self.ia_client.execute_observatory (cmd, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        self.assert_                    (InstErrorCode.is_ok (success))
+        cmd = [AgentCommand.TRANSITION, AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
 
         # Check agent state.
-        params                          = [AgentStatus.AGENT_STATE]
-        reply                           = yield self.ia_client.get_observatory_status (params, tid)
-        success                         = reply['success']
-        result                          = reply['result']
-        agent_state                     = result[AgentStatus.AGENT_STATE][1]
-        self.assert_                    (InstErrorCode.is_ok (success))
-        self.assert_                    (agent_state == AgentState.UNINITIALIZED)
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
 
         # End the transaction.
-        reply                           = yield self.ia_client.end_transaction (tid)
-        success                         = reply['success']
-        self.assert_                    (InstErrorCode.is_ok (success))
+        reply = yield self.ia_client.end_transaction (tid)
+        success = reply['success']
+        self.assert_(InstErrorCode.is_ok (success))
         
         
     @defer.inlineCallbacks
@@ -270,13 +246,10 @@ class TestNMEA0183Agent (IonTestCase):
         """
         Test cases for exectuing device commands through the instrument agent.
         """
-
-        print "\n||||||| TestNMEA0183Agent.test_execute_instrument\n"     #DEBUG
-
-        if 'test_execute_instrument' in SKIP_TESTS:
-            raise unittest.SkipTest     ('Skipping during development.')
+        log.info("TestNMEA0183Agent.test_execute_instrument\n")
 
         # Check agent state upon creation. No transaction needed for get operation.
+        log.debug('+++++ Check agent state upon creation.')
         params = [AgentStatus.AGENT_STATE]
         reply = yield self.ia_client.get_observatory_status(params)
         success = reply['success']
@@ -286,6 +259,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(agent_state == AgentState.UNINITIALIZED)
 
         # Begin an explicit transaciton.
+        log.debug('+++++ Begin an explicit transaciton.')
         reply = yield self.ia_client.start_transaction(0)
         success = reply['success']
         tid = reply['transaction_id']
@@ -294,6 +268,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assertEqual(len(tid),36)
         
         # Initialize the agent to bring up the driver and client.
+        log.debug('+++++ Initialize the agent to bring up the driver and client.')
         cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
         reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
@@ -301,6 +276,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
 
         # Check agent state.
+        log.debug('+++++ Check agent state.')
         params = [AgentStatus.AGENT_STATE]
         reply = yield self.ia_client.get_observatory_status(params,tid)
         success = reply['success']
@@ -310,6 +286,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(agent_state == AgentState.INACTIVE)
 
         # Connect to the driver.
+        log.debug('+++++ Connect to the driver.')
         cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
         reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
@@ -317,6 +294,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
 
         # Check agent state.
+        log.debug('+++++ Check agent state.')
         params = [AgentStatus.AGENT_STATE]
         reply = yield self.ia_client.get_observatory_status(params,tid)
         success = reply['success']
@@ -326,6 +304,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(agent_state == AgentState.IDLE)
         
         # Enter observatory mode.
+        log.debug('+++++ Enter observatory mode.')
         cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
         reply = yield self.ia_client.execute_observatory(cmd,tid) 
         success = reply['success']
@@ -333,6 +312,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))        
     
         # Check agent state.
+        log.debug('+++++ Check agent state.')
         params = [AgentStatus.AGENT_STATE]
         reply = yield self.ia_client.get_observatory_status(params,tid)
         success = reply['success']
@@ -342,6 +322,7 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
         
         # Get driver parameters.
+        log.debug('+++++ Get driver parameters.')
         params = [(DriverChannel.ALL,DriverParameter.ALL)]
         reply = yield self.ia_client.get_device(params,tid)
         success = reply['success']
@@ -354,80 +335,69 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok(success))
 
         # Set a few parameters. This will test the device set functions
-        # and set up the driver for sampling commands. 
+        # and set up the driver for sampling commands.
+        log.debug('+++++ Set a few parameters.')
+        chan = DriverChannel.GPS
         params = {}
-        params[(DriverChannel.INSTRUMENT,'NAVG')] = 1
-        params[(DriverChannel.INSTRUMENT,'INTERVAL')] = 5
-        params[(DriverChannel.INSTRUMENT,'OUTPUTSV')] = True
-        params[(DriverChannel.INSTRUMENT,'OUTPUTSAL')] = True
-        params[(DriverChannel.INSTRUMENT,'TXREALTIME')] = True
-        params[(DriverChannel.INSTRUMENT,'STORETIME')] = True
+        params[(chan, 'GPGGA')] = ON
+        params[(chan, 'GPGLL')] = OFF
+        params[(chan, 'GPRMC')] = OFF
+        params[(chan, 'PGRMF')] = OFF
+        params[(chan, 'ALT_MSL')] = 7.7
+        params[(chan, 'DED_REC')] = 11
         
         reply = yield self.ia_client.set_device(params,tid)
         success = reply['success']
         result = reply['result']
         setparams = params
-        
         self.assert_(InstErrorCode.is_ok(success))
 
         # Verify the set changes were made.
+        log.debug('+++++ Verify the set changes were made.')
         params = [(DriverChannel.ALL,DriverParameter.ALL)]
-        reply = yield self.ia_client.get_device(params,tid)
+        reply = yield self.ia_client.get_device(params, tid)
         success = reply['success']
         result = reply['result']
 
         self.assert_(InstErrorCode.is_ok(success))
-
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'NAVG')],
-                         result[(DriverChannel.INSTRUMENT,'NAVG')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'INTERVAL')],
-                         result[(DriverChannel.INSTRUMENT,'INTERVAL')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSV')],
-                         result[(DriverChannel.INSTRUMENT,'OUTPUTSV')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'OUTPUTSAL')],
-                         result[(DriverChannel.INSTRUMENT,'OUTPUTSAL')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'TXREALTIME')],
-                         result[(DriverChannel.INSTRUMENT,'TXREALTIME')][1])
-        self.assertEqual(setparams[(DriverChannel.INSTRUMENT,'STORETIME')],
-                         result[(DriverChannel.INSTRUMENT,'STORETIME')][1])
+        self.assertEqual(setparams[(chan, 'GPGGA')], result[(chan, 'GPGGA')][1])
+        self.assertEqual(setparams[(chan, 'GPGLL')], result[(chan, 'GPGLL')][1])
+        self.assertEqual(setparams[(chan, 'GPRMC')], result[(chan, 'GPRMC')][1])
+        self.assertEqual(setparams[(chan, 'PGRMF')], result[(chan, 'PGRMF')][1])
+        self.assertEqual(setparams[(chan, 'ALT_MSL')], result[(chan, 'ALT_MSL')][1])
+        self.assertEqual(setparams[(chan, 'DED_REC')], result[(chan, 'DED_REC')][1])
         
-        #print 'acquisition parameters successfully set'
+        """ TODO Needs more work!
         
         # Acquire sample.
-        chans = [DriverChannel.INSTRUMENT]
+        log.debug('+++++ Acquire sample.')
+        chans = [DriverChannel.GPS]
         cmd = [DriverCommand.ACQUIRE_SAMPLE]
         reply = yield self.ia_client.execute_device(chans,cmd,tid)
         success = reply['success']
-        result = reply['result']        
-
-        #print 'acquisition result'
-        #print result
-
+        result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
-        self.assertIsInstance(result.get('temperature',None),float)
-        self.assertIsInstance(result.get('salinity',None),float)
-        self.assertIsInstance(result.get('sound_velocity',None),float)
-        self.assertIsInstance(result.get('pressure',None),float)
-        self.assertIsInstance(result.get('conductivity',None),float)
-        self.assertIsInstance(result.get('time',None),str)
-        self.assertIsInstance(result.get('date',None),str)
+        self.assertIsInstance(result[0].get('GPS_LAT', None), float)
+        self.assertIsInstance(result[0].get('GPS_LON', None), float)
+        self.assertIsInstance(result[0].get('NMEA_CD', None), str)
         
         # Start autosampling.
-        chans = [DriverChannel.INSTRUMENT]
+        log.debug('+++++ Start autosampling.')
+        chans = [DriverChannel.GPS]
         cmd = [DriverCommand.START_AUTO_SAMPLING]
         reply = yield self.ia_client.execute_device(chans,cmd,tid)
         success = reply['success']
         result = reply['result']
         
         self.assert_(InstErrorCode.is_ok(success))
-
-        #print 'autosampling started'
         
         # Wait for a few samples to arrive.
-        yield pu.asleep(30)
+        #log.debug('+++++ Wait for a few samples to arrive.')
+        #yield pu.asleep(3)
         
         # Stop autosampling.
-        chans = [DriverChannel.INSTRUMENT]
+        log.debug('+++++ Stop autosampling.')
+        chans = [DriverChannel.GPS]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
             reply = yield self.ia_client.execute_device(chans,cmd,tid)
@@ -436,73 +406,86 @@ class TestNMEA0183Agent (IonTestCase):
             
             if InstErrorCode.is_ok(success):
                 break
-            
-            #elif success == InstErrorCode.TIMEOUT:
+
             elif InstErrorCode.is_equal(success,InstErrorCode.TIMEOUT):
                 pass
             
             else:
                 self.fail('Stop autosample failed with error: '+str(success))
-            
-        #print 'autosample result'
-        #print result
         
         self.assert_(InstErrorCode.is_ok(success))
-        for sample in result:
-            self.assertIsInstance(sample.get('temperature'),float)
-            self.assertIsInstance(sample.get('salinity'),float)
-            self.assertIsInstance(sample.get('pressure',None),float)
-            self.assertIsInstance(sample.get('sound_velocity',None),float)
-            self.assertIsInstance(sample.get('conductivity',None),float)
-            self.assertIsInstance(sample.get('time',None),str)
-            self.assertIsInstance(sample.get('date',None),str)
+        log.debug('+++++ type: %s  %s' % (type(result), result))
         
         # Restore original configuration.
+        log.debug('+++++ Restore original configuration.')
         reply = yield self.ia_client.set_device(orig_config,tid)
         success = reply['success']
         result = reply['result']
-
         self.assert_(InstErrorCode.is_ok(success))
+        """
 
-        # Verify the original configuration was restored.    
-        params = [(DriverChannel.ALL,DriverParameter.ALL)]
-        reply = yield self.ia_client.get_device(params,tid)
-        success = reply['success']
-        result = reply['result']
+    def test_NMEAParser (self):
+        """
+        Verify NMEA parsing routines.
+        """
+        # Verify parsing of known VALID GPGGA string
+        log.debug('+++++ Verify parsing of known VALID GPGGA string')
+        testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*52'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
-        # Strip off individual success vals to create a set params to
-        # restore original config later.
-        final_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
+        # Verify parsing of known INVALID GPGGA string (has bad checksum)
+        log.debug('+++++ Verify parsing of known INVALID GPGGA string (has bad checksum)')
+        testNMEA = '$GPGGA,051950.00,3532.2080,N,12348.0348,W,1,09,07.9,0005.9,M,0042.9,M,0.0,0000*F2'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
-        self.assert_(InstErrorCode.is_ok(success))
-        for (key,val) in orig_config.iteritems():
-            if isinstance(val,float):
-                self.assertAlmostEqual(val,final_config[key],4)
-            else:
-                self.assertEqual(val,final_config[key])
-                
-        # Reset the agent to disconnect and bring down the driver and client.
-        cmd = [AgentCommand.TRANSITION,AgentEvent.RESET]
-        reply = yield self.ia_client.execute_observatory(cmd,tid)
-        success = reply['success']
-        result = reply['result']
-        self.assert_(InstErrorCode.is_ok(success))
+        # Verify parsing of known VALID dummy string
+        log.debug('+++++ Verify parsing of known VALID dummy string')
+        testNMEA = '$XXXXX,0'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
-        # Check agent state.
-        params = [AgentStatus.AGENT_STATE]
-        reply = yield self.ia_client.get_observatory_status(params,tid)
-        success = reply['success']
-        result = reply['result']
-        agent_state = result[AgentStatus.AGENT_STATE][1]
-        self.assert_(InstErrorCode.is_ok(success))        
-        self.assert_(agent_state == AgentState.UNINITIALIZED)        
+        # Verify line endings: <LF>, <CR>, <CR><LF>, and <LF><CR>
+        log.debug('+++++ Verify line endings: <LF>, <CR>, <CR><LF>, and <LF><CR>')
+        testNMEA = '$XXXXX,0\r'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\n'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\r\n'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+        testNMEA = '$XXXXX,0\n\r'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
-        # End the transaction.
-        reply = yield self.ia_client.end_transaction(tid)
-        success = reply['success']
-        self.assert_(InstErrorCode.is_ok(success))
+        # Verify parsing of known VALID GPRMC string with checksum
+        log.debug('+++++ Verify parsing of known VALID GPRMC string with checksum')
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
+        # Verify parsing of known VALID GPRMC string without checksum
+        log.debug('+++++ Verify parsing of known VALID GPRMC string without checksum')
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
 
+        # Verify parsing of known INVALID GPRMC (not enough fields)
+        log.debug('+++++ Verify parsing of known INVALID GPRMC (not enough fields)')
+        testNMEA = '$GPRMC,225446,A,4916.45,N,12311.12,W,000.5'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        # Verify reporting of status (PGRMC command)
+        log.debug('+++++ Verify reporting of status (PGRMC command)')
+        testNMEA = '$PGRMC'
+        parseNMEA = NMEA.NMEAString (testNMEA)
+        self.assertTrue (parseNMEA.IsValid())
+
+        log.debug ('test_NMEAParser complete')
 
     @defer.inlineCallbacks
     def test_get_capabilities(self):
@@ -510,14 +493,7 @@ class TestNMEA0183Agent (IonTestCase):
         Test cases for querying the device and observatory capabilities.
         """
 
-        print "\n||||||| TestNMEA0183Agent.test_get_capabilities\n"     #DEBUG
-
-        if not RUN_TESTS:
-            raise unittest.SkipTest("Do not run this test automatically.")
-        
-        if 'test_get_capabilities' in SKIP_TESTS:
-            raise unittest.SkipTest('Skipping during development.')
-
+        log.debug("+++++ TestNMEA0183Agent.test_get_capabilities")
 
         # Check agent state upon creation. No transaction needed for
         # get operation.
