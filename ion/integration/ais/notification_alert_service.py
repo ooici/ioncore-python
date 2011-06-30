@@ -44,6 +44,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 
+ION_DATA_ALERTS_EMAIL_ADDRESS = 'data_alerts@oceanobservatories.org'
+
 
 class NotificationAlertError(ApplicationError):
     """
@@ -95,21 +97,24 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.handle_offline_event content   : %s', content)
         msg = content['content'];
 
+        # build the email from the event content
+        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        BODY = string.join(("This data resource is currently unavailable.",
+                            "",
+                            "Explanation: %s" %  msg.additional_data.error_explanation,
+                            "",
+                            "You received this notification from ION because you asked to be notified about changes to this data resource. ",
+                            "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
+
+        # get the list of subscriptions for this datasource
         query = Query()
         query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_offline_event  Rows returned %s " % (rows,))
 
         subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
 
-        BODY = string.join(("This data resource is currently unavailable.",
-                            "",
-                            "Explanation: %s" %  msg.additional_data.error_explanation,
-                            "",
-                            "You received this notification form ION because you asked to be notified about changes to this data resource. ",
-                            "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
-        #add each result row into the response message
+        # send notification email to each user that is monitoring this dataset
         for key, row in rows.iteritems ( ) :
             log.info("NotificationAlertService.handle_offline_event  First row data set id %s", rows[key]['data_src_id'] )
 
@@ -124,18 +129,16 @@ class NotificationAlertService(ServiceProcess):
                 # Send the message via our own SMTP server, but don't include the envelope header.
                 # Create the container (outer) email message.
                 log.info('NotificationAlertService.handle_offline_event CREATE EMAIL')
-                FROM = 'OOI@ucsd.edu'
+                FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
                 body = string.join((
-
 
                     "From: %s" % FROM,
                     "To: %s" % TO,
                     "Subject: %s" % SUBJECT,
                     "",
                     BODY), "\r\n")
-
 
                 try:
                    smtpObj = smtplib.SMTP('mail.oceanobservatories.org', 25, 'localhost')
@@ -147,74 +150,74 @@ class NotificationAlertService(ServiceProcess):
                     log.warning('NotificationAlertService.handle_offline_event Error: %s' %str(ex))
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
+    
     @defer.inlineCallbacks
     def handle_update_event(self, content):
-            log.info('NotificationAlertService.handle_update_event notification event received')
-            #Check that the item is in the store
-            log.info('NotificationAlertService.handle_update_event content   : %s', content)
+        log.info('NotificationAlertService.handle_update_event notification event received')
+        log.info('NotificationAlertService.handle_update_event content   : %s', content)
 
-            msg = content['content']
+        # build the email from the event content
+        msg = content['content']
+        startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
+        enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
+        steps =  str(msg.additional_data.number_of_timesteps)
+        log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
+        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
 
-            query = Query()
-            query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
-            rows = yield self.index_store.query(query)
-            log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
-
-            subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
-
-            startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
-            enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
-            steps =  str(msg.additional_data.number_of_timesteps)
-            log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
-            SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
-
-            BODY = string.join((
-                            "Additional data have been received.",
-                            "",
-                            "Data Source Title: %s" %  msg.additional_data.title,
-                            "Data Source URL: %s" %  msg.additional_data.url,
-                            "Start time: %s" % startdt,
-                            "End time: %s" % enddt,
-                            "Number of time steps: %s" % steps,
-                            "",
-                            "You received this notification form ION because you asked to be notified about changes to this data resource. ",
-                            "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
-
-            #add each result row into the response message
-            for key, row in rows.iteritems ( ) :
-                log.info("NotificationAlertService.handle_update_event  First row data set id %s", rows[key]['data_src_id'] )
-
-                tempTbl = {}
-                # get the user information from the Identity Registry
-                yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
-                log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
-
-                if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
-                    and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATES  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
-                    # Send the message via our own SMTP server, but don't include the envelope header.
-                    # Create the container (outer) email message.
-                    log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
-                    FROM = 'OOI@ucsd.edu'
-                    TO = tempTbl['user_email']
-
-                    body = string.join((
-
-                        "From: %s" % FROM,
-                        "To: %s" % TO,
-                        "Subject: %s" % SUBJECT,
+        BODY = string.join((
+                        "Additional data have been received.",
                         "",
-                        BODY), "\r\n")
+                        "Data Source Title: %s" %  msg.additional_data.title,
+                        "Data Source URL: %s" %  msg.additional_data.url,
+                        "Start time: %s" % startdt,
+                        "End time: %s" % enddt,
+                        "Number of time steps: %s" % steps,
+                        "",
+                        "You received this notification from ION because you asked to be notified about changes to this data resource. ",
+                        "To modify or remove notifications about this data resource, please access My Notifications Settings in the ION Web UI."  ), "\r\n")
 
+        # get the list of subscriptions for this datasource
+        query = Query()
+        query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        rows = yield self.index_store.query(query)
+        log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
 
-                    try:
-                       smtpObj = smtplib.SMTP('mail.oceanobservatories.org', 25, 'localhost')
-                       smtpObj.sendmail(FROM, [TO], body)
-                       log.info('NotificationAlertService.handle_update_event Successfully sent email' )
-                    except smtplib.SMTPException:
-                        log.info('NotificationAlertService.handle_update_event Error: unable to send email')
-                    except Exception, ex:
-                        log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
-                    log.info('NotificationAlertService.handle_update_event completed ')
+        subscriptionInfo = yield self.mc.create_instance(SUBSCRIPTION_INFO_TYPE)
+
+        # send notification email to each user that is monitoring this dataset
+        for key, row in rows.iteritems ( ) :
+            log.info("NotificationAlertService.handle_update_event  First row data set id %s", rows[key]['data_src_id'] )
+
+            tempTbl = {}
+            # get the user information from the Identity Registry
+            yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
+            log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
+
+            if (rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAIL  or rows[key]['subscription_type'] == subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) \
+                and (rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATES  or  rows[key]['email_alerts_filter'] == subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ) :
+                # Send the message via our own SMTP server, but don't include the envelope header.
+                # Create the container (outer) email message.
+                log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
+                FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
+                TO = tempTbl['user_email']
+
+                body = string.join((
+
+                    "From: %s" % FROM,
+                    "To: %s" % TO,
+                    "Subject: %s" % SUBJECT,
+                    "",
+                    BODY), "\r\n")
+
+                try:
+                   smtpObj = smtplib.SMTP('mail.oceanobservatories.org', 25, 'localhost')
+                   smtpObj.sendmail(FROM, [TO], body)
+                   log.info('NotificationAlertService.handle_update_event Successfully sent email' )
+                except smtplib.SMTPException:
+                    log.info('NotificationAlertService.handle_update_event Error: unable to send email')
+                except Exception, ex:
+                    log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
+                log.info('NotificationAlertService.handle_update_event completed ')
 
 
     @defer.inlineCallbacks
