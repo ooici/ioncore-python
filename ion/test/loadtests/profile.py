@@ -77,24 +77,26 @@ elif memoryOrCpu == 'memory-heapy':
         hh = hh.more
 
 elif memoryOrCpu == 'cpu':
+    filename = 'brokerload.pstats'
+    
     #threads.deferToThread(dumpHeap)
     #reactor.callLater(5, showHeap)
-    cProfile.run('run()', 'brokerload')
+    cProfile.run('run()', filename)
 
-    pstats.Stats('brokerload').sort_stats('time').print_stats(100)
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_callers('ListFields')
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats(100)
-    #pstats.Stats('brokerload').sort_stats('time').print_stats('google/protobuf')
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_callers('isinstance')
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('(gpb_wrapper|object_utils)')
-    #pstats.Stats('brokerload').sort_stats('cumulative').print_stats('cache.py')
+    pstats.Stats(filename).sort_stats('time').print_stats(100)
+    #pstats.Stats(filename).sort_stats('cumulative').print_callers('ListFields')
+    #pstats.Stats(filename).sort_stats('cumulative').print_stats(100)
+    #pstats.Stats(filename).sort_stats('time').print_stats('google/protobuf')
+    #pstats.Stats(filename).sort_stats('cumulative').print_stats('cache.py')
+    #pstats.Stats(filename).sort_stats('cumulative').print_callers('isinstance')
+    #pstats.Stats(filename).sort_stats('cumulative').print_stats('(gpb_wrapper|object_utils)')
+    #pstats.Stats(filename).sort_stats('cumulative').print_stats('cache.py')
 
 
-    #percentTime('brokerload', 'gpb_wrapper', printResult=True)
-    percentTime('brokerload', 'protobuf', printResult=True)
-    #percentTime('brokerload', 'twisted', printResult=True)
-    #percentTime('brokerload', '{isinstance}', printResult=True)
-    #percentTime('brokerload', '{select.select}', printResult=True)
+    #percentTime(filename, 'gpb_wrapper', printResult=True)
+    percentTime(filename, 'protobuf', printResult=True)
+    #percentTime(filename, 'twisted', printResult=True)
+    #percentTime(filename, '{isinstance}', printResult=True)
+    #percentTime(filename, '{select.select}', printResult=True)
 else:
     run()

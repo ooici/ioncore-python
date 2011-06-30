@@ -635,7 +635,41 @@ class AssociationService(ServiceProcess):
 
         yield self.reply_ok(msg, response)
 
+    def association_query_from_request(self, asc_query):
+        q = store.Query()
+        # Get only the latest version of the association!
+        q.add_predicate_gt(BRANCH_NAME,'')
 
+        if 'subject' in asc_query:      q.add_predicate_eq(SUBJECT_KEY, asc_query['subject'])
+        if 'predicate' in asc_query:    q.add_predicate_eq(PREDICATE_KEY, asc_query['predicate'])
+        if 'object' in asc_query:       q.add_predicate_eq(OBJECT_KEY, asc_query['object'])
+
+        return self.index_store.query(q)
+
+    @defer.inlineCallbacks
+    def op_get_associations_map(self, asc_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_associations
+        """
+        log.info('op_get_associations_map: ')
+
+        rows = yield self.association_query_from_request(asc_query)
+
+        role_map = dict((row[SUBJECT_KEY], row[OBJECT_KEY]) for key,row in rows.iteritems())
+        yield self.reply_ok(msg, role_map)
+
+    @defer.inlineCallbacks
+    def op_get_associations_list(self, asc_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_associations
+        """
+        log.info('op_get_associations_list: ')
+
+        rows = yield self.association_query_from_request(asc_query)
+
+        role_list = [{'id': row[REPOSITORY_KEY], 'user_id': row[SUBJECT_KEY], 'role_id': row[OBJECT_KEY]}
+                      for key,row in rows.iteritems()]
+        yield self.reply_ok(msg, role_list)
 
 
 class AssociationServiceClient(ServiceClient):
@@ -739,6 +773,30 @@ class AssociationServiceClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('get_associations', msg)
 
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations_map(self, msg):
+        """
+        @brief Get the associations between any of subject, predicate and object. Becareful - you can ask very big questions with this method!
+        @param params msg, a dictionary with keys for each of the subject, predicate and object
+        @retval Query Results as a dict
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations_map', msg)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_associations_list(self, msg):
+        """
+        @brief Get the associations between any of subject, predicate and object. Becareful - you can ask very big questions with this method!
+        @param params msg, a dictionary with keys for each of the subject, predicate and object
+        @retval Query Results as a list
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_associations_list', msg)
         defer.returnValue(content)
 
 

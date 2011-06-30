@@ -222,6 +222,12 @@ class IonTestCase(unittest.TestCase):
         process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
         return process
 
+    def _get_service_by_name(self, name):
+        ''' Testcase utility to get directly to a ServiceProcess for monkey-patching, etc. '''
+        pid = self.procRegistry.kvs.get(name)
+        proc = self.test_sup.get_child_def(name)
+        return proc.container.proc_manager.process_registry.kvs.get(pid, None)
+
     def run(self, result):
         # TODO This is where we can inject user id and expiry into test case
         # stack to allow running of tests within the policy enforcement environment

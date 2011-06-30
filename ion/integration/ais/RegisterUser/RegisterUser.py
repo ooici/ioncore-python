@@ -335,6 +335,38 @@ class RegisterUser(object):
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 
+   @defer.inlineCallbacks
+   def setUserRole(self, msg):
+      # check that the GPB is correct type & has a payload
+      result = yield self._CheckRequest(msg)
+      if result != None:
+         result.error_str = "AIS.setUserRole: " + result.error_str
+         defer.returnValue(result)
+
+      # check that required fields are present in GPB
+      for fieldName in ('user_ooi_id', 'role'):
+         if not msg.message_parameters_reference.IsFieldSet(fieldName):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "AIS.updateUserProfile: Required field [%s] not found in message" % (fieldName)
+            defer.returnValue(Response)
+
+      user_id, role = msg.message_parameters_reference.user_ooi_id, msg.message_parameters_reference.role
+      try:
+          yield self.irc.set_role(user_id, role)
+      except ReceivedApplicationError, ex:
+         # build AIS error response
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS setUserRole error response')
+         Response.error_num = ex.msg_content.MessageResponseCode
+         Response.error_str = 'AIS.setUserRole: Error calling IR.set_role: '+ex.msg_content.MessageResponseBody
+         defer.returnValue(Response)
+
+      # build AIS response
+      Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS setUserRole response')
+      Response.result = Response.ResponseCodes.OK
+      defer.returnValue(Response)
+
 
    @defer.inlineCallbacks
    def _CheckRequest(self, request):

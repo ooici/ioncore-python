@@ -47,6 +47,7 @@ from ion.core.ioninit import request
 CONF = ioninit.config(__name__)
 CF_fail_fast = CONF['fail_fast']
 CF_rpc_timeout = CONF['rpc_timeout']
+EMPTY_LIST = []
 
 # @todo CHANGE: Dict of "name" to process (service) declaration
 processes = {}
@@ -191,8 +192,42 @@ class Process(BasicLifecycleObject):
         self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
         self.add_life_cycle_object(self._plcc_pub)
 
+        # Callbacks before and after ops (handy for unittests)
+        self.op_cbs_before = {}
+        self.op_cbs_after = {}
+
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
+
+    def _sanitize_opname(self, opname):
+        if opname.startswith('op_'): opname = opname[3:]
+        return opname
+
+    def add_op_callback_before(self, opname, cb):
+        """ Register a callback for before this operation is invoked. Supports "op_thing" and "thing" syntax. """
+        self.op_cbs_before.setdefault(self._sanitize_opname(opname), []).append(cb)
+
+    def add_op_callback_after(self, opname, cb):
+        """ Register a callback for after this operation is invoked. Supports "op_thing" and "thing" syntax. """
+        self.op_cbs_after.setdefault(self._sanitize_opname(opname), []).append(cb)
+
+    def remove_op_callback_before(self, opname, cb):
+        self.op_cbs_before.setdefault(self._sanitize_opname(opname), []).remove(cb)
+
+    def remove_op_callback_after(self, opname, cb):
+        self.op_cbs_after.setdefault(self._sanitize_opname(opname), []).remove(cb)
+
+    def defer_next_op(self, opname):
+        """ Get a deferred that will callback when the given op completes the next time (once). """
+
+        op_d = defer.Deferred()
+        def callback(cb_opname, content, payload, msg, result):
+            log.info('in callback for defer_next_op')
+            op_d.callback(result)
+            self.remove_op_callback_after(opname, callback)
+
+        self.add_op_callback_after(opname, callback)
+        return op_d
 
     # --- Life cycle management
     # Categories:
@@ -729,7 +764,15 @@ class Process(BasicLifecycleObject):
         # dynamically invoke the operation in the given class
         if hasattr(self, opname):
             opf = getattr(self, opname)
-            yield defer.maybeDeferred(opf, content, payload, msg)
+
+            cb_opname = self._sanitize_opname(opname)
+            for cb in self.op_cbs_before.get(cb_opname, EMPTY_LIST):
+                cb(cb_opname, content, payload, msg)
+
+            result = yield defer.maybeDeferred(opf, content, payload, msg)
+
+            for cb in self.op_cbs_after.get(cb_opname, EMPTY_LIST):
+                cb(cb_opname, content, payload, msg, result)
         elif hasattr(self,'op_none'):
             yield defer.maybeDeferred(self.op_none, content, payload, msg)
         else:

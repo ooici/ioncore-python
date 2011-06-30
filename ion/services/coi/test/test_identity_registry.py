@@ -12,6 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest
+import random
 
 from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
@@ -22,7 +23,8 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RE
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-
+from ion.core.intercept.policy import userroledb_filename, user_has_role
+from ion.util.config import Config
 from ion.core.security.authentication import Authentication
 
 CONF = ioninit.config(__name__)
@@ -404,10 +406,33 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         log.info('user2 = '+str(user2.resource_reference.profile))
         self.assertEqual(user2.resource_reference.profile.__len__(), 1)
         self.assertEqual(user2.resource_reference.profile[0].name, "profile item 3 name")
-        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value") 
+        self.assertEqual(user2.resource_reference.profile[0].value, "profile item 3 value")
 
         authentication = Authentication()
         self.assertFalse(authentication.is_certificate_valid(self.user1_certificate))
         self.assertEqual(authentication.get_certificate_level(self.user1_certificate),'Invalid')
         self.assertFalse(authentication.is_certificate_within_date_range(self.user1_certificate))
-                
+
+    @defer.inlineCallbacks
+    def test_broadcast(self):
+        irs = self._get_service_by_name('identity_registry')
+        self.failUnlessEqual(irs.broadcast_count, 0)
+
+        self.irc.broadcast({'body': 'I am a broadcast.'})
+        yield irs.defer_next_op('broadcast')
+
+        self.failUnlessEqual(irs.broadcast_count, 1)
+
+    @defer.inlineCallbacks
+    def test_set_role(self):
+        role = 'ADMIN'
+        user_id = self.user2_ooi_id
+        log.info('test user id: %s to get role: %s' % (user_id, role))
+        self.failIf(user_has_role(user_id, role))
+
+        yield self.irc.set_role(user_id, role)
+        self.failUnless(user_has_role(user_id, role))
+
+        yield self.irc.unset_role(user_id, role)
+        self.failIf(user_has_role(user_id, role))
+
