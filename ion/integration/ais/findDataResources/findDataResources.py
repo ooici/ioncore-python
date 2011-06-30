@@ -275,7 +275,59 @@ class FindDataResources(object):
                 ownedByList.append(ds)
                 
         log.info('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
-                        
+
+                       
+        #
+        # Now trim the list to only those that are private
+        #
+        ownedByAndPrivateList = []
+        for ds in ownedByList:
+            dSourceID = ds['DSourceID']
+            dSource = yield self.metadataCache.getDSourceMetadata(dSourceID)
+            if dSource is None:
+                log.error('No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
+            else:
+                #
+                # If the visibility is false, this is private, so add it to the list
+                #
+                log.info('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
+                if dSource['visibility'] == False:
+                    log.info('>>>>>>>>>>>>>>>>>>>>> adding ds %s to ownedByAndPrivateList' %(ds['ResourceIdentity']))
+                    ownedByAndPrivateList.append(ds)
+            
+        log.info('>>>>>>>>>>>>>>>>>> ownedByAndPrivateList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByAndPrivateList))
+
+        #
+        # THE ABOVE LIST IS 0 LENGTH: IS THIS TRUE?
+        #
+
+        #
+        # We now have the list of owned by and private: now get the public datasets 
+        #
+
+
+        publicList = []
+        for ds in dSetList:
+            dSourceID = ds['DSourceID']
+            dSource = yield self.metadataCache.getDSourceMetadata(dSourceID)
+            if dSource is None:
+                log.error('No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
+            else:
+                #
+                # If the visibility is true, this is public, so add it to the list
+                #
+                log.info('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
+                if dSource['visibility'] == True:
+                    log.info('>>>>>>>>>>>>>>>>>>>>> adding ds %s to publicList' %(ds['ResourceIdentity']))
+                    publicList.append(ds)
+            
+        log.info('>>>>>>>>>>>>>>>>>> publicList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(publicList))
+
+        #
+        # Now add the two lists together
+        #
+        finalList = ownedByAndPrivateList + publicList
+        log.info('>>>>>>>>>>>>>>>>>> finalList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(finalList))
         
         ##
         ## NEW CODE END
@@ -284,7 +336,8 @@ class FindDataResources(object):
         ##
         ## Get rid of this block
         ## 
-
+        
+        """
         # 
         # Get the list of dataset resource IDs by owner, then include only
         # those that private (is_public is FALSE)
@@ -354,8 +407,10 @@ class FindDataResources(object):
         ##
         ## End of get RID OF BLOCK
         ##
+        """
 
-        response = yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
+        #response = yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
+        response = yield self.__getDataResources(msg, finalList, rspMsg, typeFlag = self.ALL)
 
         defer.returnValue(response)
 
@@ -491,7 +546,9 @@ class FindDataResources(object):
         i = 0
         j = 0
         while i < len(dSetList):
-            dSetResID = dSetList[i].key
+            # New way!!!!
+            #dSetResID = dSetList[i].key
+            dSetResID = dSetList[i]['ResourceIdentity']
             log.debug('Working on dataset: ' + dSetResID)
 
             if self.bUseMetadataCache:            
