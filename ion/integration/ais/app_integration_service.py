@@ -30,7 +30,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
 # import working classes for AIS
 from ion.integration.ais.common.metadata_cache import  MetadataCache
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources, \
-    DataResourceUpdateEventSubscriber
+                                                                    DatasetUpdateEventSubscriber, \
+                                                                    DatasourceUpdateEventSubscriber
 from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetDataResourceDetail
 from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
@@ -88,9 +89,13 @@ class AppIntegrationService(ServiceProcess):
         yield self.metadataCache.loadDataSets()
         yield self.metadataCache.loadDataSources()
 
-        log.debug('instantiating DataResourceUpdateEventSubscriber')
-        self.subscriber = DataResourceUpdateEventSubscriber(self, process = self)
-        self.register_life_cycle_object(self.subscriber)
+        log.info('instantiating DatasetUpdateEventSubscriber')
+        self.dataset_subscriber = DatasetUpdateEventSubscriber(self, process = self)
+        self.register_life_cycle_object(self.dataset_subscriber)
+        
+        log.info('instantiating DatasourceUpdateEventSubscriber')
+        self.datasource_subscriber = DatasourceUpdateEventSubscriber(self, process = self)
+        self.register_life_cycle_object(self.datasource_subscriber)
         
         # create worker instances
         self.FindDataResourcesWorker = FindDataResources(self)

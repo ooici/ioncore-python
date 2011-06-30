@@ -22,7 +22,8 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber
+from ion.services.dm.distribution.events import DatasourceChangeEventSubscriber, \
+                                                DatasetChangeEventSubscriber
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             DATASET_RESOURCE_TYPE_ID
@@ -46,24 +47,58 @@ DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
 DNLD_DIR_PATH = '/dodsC/ooiciData/'
 DNLD_FILE_TYPE = '.ncml.html'
 
-class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
+class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
         self.msgs = []
         self.metadataCache = ais.getMetadataCache()
-        DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
+        DatasetChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+
+    @defer.inlineCallbacks
+    def ondata(self, data):
+        log.debug("DatasetUpdateEventSubscriber received an event:\n")
+
+        dSetResID = data['content'].additional_data.dataset_id
+
+        #
+        # If the dataset is cached, delete it.  In any case, cache the dataset.
+        #
+        
+        #
+        # Check the cache to see if there's currently metadata for this
+        # datasetID
+        #
+        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
+
+        #
+        # If dataset does not exist, this must be a new dataset; skip the
+        # delete step.
+        #
+        if dSetMetadata is not None:
+            #
+            # Delete the dataset
+            #
+            log.debug('DatasetUpdateEventSubscriber deleting %s' \
+                      %(dSetResID))
+            yield self.metadataCache.deleteDSetMetadata(dSetResID)
+
+        #
+        # Now  reload the dataset and datasource metadata
+        #
+        log.debug('DatasetUpdateEventSubscriber putting new metadata in cache')
+        yield self.metadataCache.putDSetMetadata(dSetResID)
 
                 
     @defer.inlineCallbacks
-    def ondata(self, data):
-        log.debug("DataResourceUpdateEventSubscriber received an event:\n")
+    def old_ondata(self, data):
+        log.debug("DatasetUpdateEventSubscriber received an event:\n")
 
         dSetResID = data['content'].additional_data.dataset_id
 
         #
         # Get the associated source for the dataset (whether the dataset is
-        # cached or not).  If the dataset is cached, delete it and the
-        # associated source. In any case, add the dataset and the datasource
-        # to the cache.
+        # cached or not).  If the dataset is cached, delete it.  If the dataset
+        # and the datasource are both active, cache the dataset.
         #
         
         #dSourceResID = data['content'].additional_data.datasource_id
@@ -90,7 +125,7 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
             #
             # Delete the dataset and datasource metadata
             #
-            log.debug('DataResourceUpdateEventSubscriber deleting %s, %s from metadataCache' \
+            log.debug('DatasetUpdateEventSubscriber deleting %s, %s from metadataCache' \
                       %(dSetResID, dSourceResID))
             yield self.metadataCache.deleteDSetMetadata(dSetResID)
             yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
@@ -98,8 +133,51 @@ class DataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
         #
         # Now  reload the dataset and datasource metadata
         #
-        log.debug('DataResourceUpdateEventSubscriber putting new metadata in cache')
+        log.debug('DatasetUpdateEventSubscriber putting new metadata in cache')
         yield self.metadataCache.putDSetMetadata(dSetResID)
+        yield self.metadataCache.putDSourceMetadata(dSourceResID)
+
+
+class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
+    def __init__(self, ais, *args, **kwargs):
+        self.msgs = []
+        self.metadataCache = ais.getMetadataCache()
+        DatasourceChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+
+    @defer.inlineCallbacks
+    def ondata(self, data):
+        log.debug("DatasourceUpdateEventSubscriber received an event:\n")
+
+        dSourceResID = data['content'].additional_data.datasource_id
+
+        #
+        # If the datasource is cached, delete it.  In any case, cache the
+        # datasource.
+        #
+        
+        #
+        # Check the cache to see if there's currently metadata for this
+        # datasourceID
+        #
+        dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
+
+        #
+        # If datasource does not exist, this must be a new datasource; skip the
+        # delete step.
+        #
+        if dSourceMetadata is not None:
+            #
+            # Delete the datasource
+            #
+            log.debug('DatasourceUpdateEventSubscriber deleting %s' \
+                      %(dSourceResID))
+            yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
+
+        #
+        # Now  reload the datasource metadata
+        #
+        log.debug('DatasourceUpdateEventSubscriber putting new metadata in cache')
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
 
     
@@ -134,8 +212,10 @@ class FindDataResources(object):
     def findDataResources(self, msg):
         """
         Worker class method called by app_integration_service to implement
-        findDataResources.  Finds all dataset resources that are "published"
-        and returns their IDs along with a load of metadata.
+        findDataResources.  Finds all dataset resources that are public,
+        regardless of who owns them, as well as all dataset resources that
+        are private and are owned by the calling user, and returns a list
+        of their IDs along with a load of metadata.
         """
 
         log.debug('findDataResources Worker Class Method')
@@ -166,8 +246,50 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
-        # Get the list of PRIVATE dataset resource IDs by owner
-        dSetResults = yield self.__findPrivateDatasetResourcesByOwner(userID)
+
+        ##
+        ## NEW CODE START
+        ##
+        
+        #
+        # iterate through the cache getting the datasets
+        #
+        numDatasets = self.metadataCache.getNumDatasets()
+        log.info('>>>>>>>>>>>>>>>>> NUM DATASETS is %d <<<<<<<<<<<<<<<<<<<<<' %(numDatasets))
+
+        i = self.metadataCache.getNumDatasources()
+        log.info('>>>>>>>>>>>>>>>>> NUM DATASOURCES is %d <<<<<<<<<<<<<<<<<<<<<' %(i))
+        
+        #
+        # Can I get a list of datasets only?
+        #
+        dSetList = self.metadataCache.getDatasets()
+        log.info('>>>>>>>>>>>>>>>>>> getDatasets() returned list %d long of datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
+        
+        #
+        # iterate through this list getting those owned by the userID
+        #
+        ownedByList = []
+        for ds in dSetList:
+            if ds['OwnerID'] == userID:
+                ownedByList.append(ds)
+                
+        log.info('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
+                        
+        
+        ##
+        ## NEW CODE END
+        ##
+
+        ##
+        ## Get rid of this block
+        ## 
+
+        # 
+        # Get the list of dataset resource IDs by owner, then include only
+        # those that private (is_public is FALSE)
+        #
+        dSetResults = yield self.__findDatasetResourcesByOwner(userID)
         if dSetResults == None:
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -177,16 +299,35 @@ class FindDataResources(object):
             defer.returnValue(Response)
             
         dSetList = dSetResults.idrefs
-        
         log.debug('Dataset list contains ' + str(len(dSetList)) + ' private datasets owned by ' + str(userID))
 
-        # Get the list of PUBLIC dataset resource IDs
         #
-        # We can't find by PUBLIC any more...need to find all active, then only include those
-        # that have the is_public() attribute set.  This self.PRIVATE & self.PUBLIC goes away
+        # Delete the public datasets from the list
         #
-        #dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PUBLIC)
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID, self.PRIVATE)
+        i = len(dSetList)
+        j = 0
+        while (j < i):
+            # get the datasource for this dataset
+            dSetID = dSetList[j].key
+            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetID)
+            if dSetMetadata is None:
+                log.error('>>>>>>>>>>>>>>>>>> NONE!!!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                continue
+            else:
+                #
+                # Get the associated datasource to determine if is_public
+                #
+                dSourceID = dSetMetadata['DSourceID']
+                log.info('>>>>>>>>>>>>>>>>>DSOURCE ID for index %d is %s <<<<<<<<<<<<<<<<<<<<<' %(j, dSourceID))
+            j = j + 1    
+            
+                        
+        # Get the entire list of dataset resource IDs
+        #
+        # Find all datasets that are active, then only include those
+        # that have the is_public attribute set.  
+        #
+        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         if dSetResults == None:
             log.error('Error finding resources.')
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
@@ -209,6 +350,10 @@ class FindDataResources(object):
             j = j + 1
 
         log.debug('Dataset list contains ' + str(len(dSetList)) + ' total datasets.')
+
+        ##
+        ## End of get RID OF BLOCK
+        ##
 
         response = yield self.__getDataResources(msg, dSetList, rspMsg, typeFlag = self.ALL)
 
@@ -470,7 +615,7 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType, resourceState):
+    def __findResourcesOfType(self, resourceType):
 
         log.debug('__findResourcesOfType() entry')
         
@@ -497,7 +642,7 @@ class FindDataResources(object):
         # 
         # Set up a search term using:
         # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to given resourceState as object
+        # - LCS_REFERENCE_TYPE object set to ACTIVE
         #
         pair = request.pairs.add()
 
@@ -509,10 +654,7 @@ class FindDataResources(object):
 
         # ..(object)
         state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        if resourceState == self.PRIVATE:
-            state_ref.lcs = state_ref.LifeCycleState.ACTIVE
-        else:
-            state_ref.lcs = state_ref.LifeCycleState.COMMISSIONED
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
         pair.object = state_ref
 
         log.debug('Getting resources of type: %s' % (resourceType))
@@ -574,7 +716,7 @@ class FindDataResources(object):
         # 
         # Set up a search term using:
         # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to given resourceState as object
+        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
         #
         pair = request.pairs.add()
 
@@ -602,7 +744,7 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def __findPrivateDatasetResourcesByOwner(self, owner):
+    def __findDatasetResourcesByOwner(self, owner):
 
         request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 

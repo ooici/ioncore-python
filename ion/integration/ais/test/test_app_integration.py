@@ -25,15 +25,15 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, \
-    DatasetSupplementAddedEventSubscriber
+from ion.services.dm.distribution.events import DatasetChangeEventPublisher, \
+    DatasetChangeEventSubscriber
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
 from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
-#from ion.integration.ais.findDataResources import DataResourceUpdateEventSubscriber
+#from ion.integration.ais.findDataResources import DatasetUpdateEventSubscriber
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -75,13 +75,13 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
 DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 
-class TestDataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscriber):
+class TestDatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
     def __init__(self, *args, **kwargs):
         self.msgs = []
-        DatasetSupplementAddedEventSubscriber.__init__(self, *args, **kwargs)
+        DatasetChangeEventSubscriber.__init__(self, *args, **kwargs)
                 
     def ondata(self, data):
-        log.error("DatasetSupplementAddedEventSubscriber received a message with name: %s",
+        log.error("TestDatasetUpdateEventSubscriber received a message with name: %s",
                   data['content'].name)
         content = data['content']
 
@@ -89,7 +89,6 @@ class TestDataResourceUpdateEventSubscriber(DatasetSupplementAddedEventSubscribe
             content.Repository.persistent = True
 
         self.msgs.append(data)
-                
 
 
 class AppIntegrationTest(IonTestCase):
@@ -1669,10 +1668,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         subproc = Process()
         yield subproc.spawn()
-        #test_origin = "%s.%s" % ("chan1", str(subproc.id))
-        #testsub = TestDataResourceUpdateEventSubscriber(origin=test_origin,
-        #                              process=subproc)
-        testsub = TestDataResourceUpdateEventSubscriber(process=subproc)
+        testsub = TestDatasetUpdateEventSubscriber(process=subproc)
         yield testsub.initialize()
         yield testsub.activate()
 
