@@ -577,19 +577,12 @@ class IngestionTest(IonTestCase):
         # now send it an incorrect message, make sure we get an error back
         badmsg = yield self.proc.message_client.create_instance(SUPPLEMENT_MSG_TYPE)
 
-        log.info("HI I AMDE IT HERE")
-
         pub = Publisher(process=self.proc,
                         xp_name=get_events_exchange_point(),
                         routing_key="%s.%s" % (str(DATASET_STREAMING_EVENT_ID), new_dataset_id))
 
-        log.info("HI I AMDE IT HERE 2")
-
-
         yield pub.initialize()
         yield pub.activate()
-
-        log.info("HI I AMDE IT HERE 3")
 
         # yuck, can't use pub.publish, it won't let us set an op
         kwargs = { 'recipient' : pub._routing_key,
@@ -599,8 +592,6 @@ class IngestionTest(IonTestCase):
                    'sender'    : self.proc.id.full }
 
         yield pub._recv.send(**kwargs)
-
-        log.info("HI I AMDE IT HERE 4")
 
         yield self.failUnlessFailure(ingestdef, ReceivedApplicationError)
 
