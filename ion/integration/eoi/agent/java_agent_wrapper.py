@@ -438,8 +438,12 @@ class JavaAgentWrapper(ServiceProcess):
         @defer.inlineCallbacks
         def _receive_handler(self, content, msg):
             if hasattr(self._rpccalldef, 'rpc_call') and self._rpccalldef.rpc_call.active():
-                log.debug("Data message intercepted, increasing timeout by %d" % self._ingest_timeout)
-                self._rpccalldef.rpc_call.delay(self._ingest_timeout)
+                log.debug("Data message intercepted, increasing timeout by %d from now" % self._ingest_timeout)
+
+                callable = self._rpccalldef.rpc_call.func   # extract the old callable, as cancel() deletes it
+                self._rpccalldef.rpc_call.cancel()          # this is just the timeout, not the actual rpc call
+                self._rpccalldef.rpc_call = reactor.callLater(self._ingest_timeout, callable)
+
                 yield msg.ack()
             else:
                 msg._state = "ACKED"
