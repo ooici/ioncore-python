@@ -304,6 +304,11 @@ class ManageDataResource(object):
             yield self.rc.put_resource_transaction(delete_resources)
             log.info("Success!")
 
+            log.info("creating event to signal caching service")
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
+
         except ReceivedApplicationError, ex:
             log.info('AIS.ManageDataResource.delete: Error: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
