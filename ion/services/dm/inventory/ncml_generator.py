@@ -111,7 +111,7 @@ def rsync_ncml(local_filepath, server_url):
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
     
-    args = ['-r', '--perms', '--include', '"*.ncml"', '--exclude="*"'
+    args = ['-r', '--perms', '--include="*.ncml"', '--exclude="*"'
             '-v', '-h', '--delete', local_filepath + '/', server_url]
 
 
