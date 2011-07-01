@@ -91,7 +91,10 @@ class NDArrayWrap(object):
         self._getblobs = getblobs
 
         self._ndarray = None
-        self._size = reduce(lambda x,y:x*y, [x.size for x in bounds]) * itembytes
+        if len(bounds) == 0:
+            self._size = itembytes      # scalar value, just one itembytes size
+        else:
+            self._size = reduce(lambda x,y:x*y, [x.size for x in bounds]) * itembytes
 
     def __sizeof__(self):
         """
