@@ -606,6 +606,9 @@ class ManageDataResource(object):
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
+        # Set the lifecycle state to active
+        datasrc_resource.ResourceLifeCycleState        = datasrc_resource.ACTIVE
+
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
         log.info("created data source ") # + str(datasrc_resource))
