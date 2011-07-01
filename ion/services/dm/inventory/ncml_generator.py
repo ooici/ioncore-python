@@ -15,7 +15,7 @@ exit with a deferred.
 file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
-from os import path, environ, chmod, unlink, listdir, remove
+from os import path, environ, listdir, remove
 import fnmatch
 import os
 
@@ -122,74 +122,24 @@ def rsync_ncml(local_filepath, server_url):
     return rp.spawn()
     
 
-def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
-    """
-    @brief Another hack. Take an RSA key, save it as an ssh-formatted file into
-    the .ssh directory for use by rsync.
-    @param private_key RSA private key, as returned from 'ssh-keygen -t rsa'
-    @param public_key Public half of same, used for ssh-add -d
-    @retval Tuple of filenames - private and public key
-    @note Raises IOError if necessary
-    """
-
-    ssh_dir = path.join(path.expanduser('~'), '.ssh')
-    rsa_filename = path.join(ssh_dir, 'rsync_ncml.rsa')
-    pubkey_filename = path.join(ssh_dir, 'rsync_ncml.pub')
-
-    if not path.exists(ssh_dir):
-        log.error('ssh directory "%s" not found, cannot continue' % ssh_dir)
-        return None
-
-    if path.exists(rsa_filename):
-        if not delete_old:
-            log.warn('RSA keyfile found, skipping')
-            return None
-
-    try:
-        # Write out public and private keys
-        fh = open(rsa_filename, 'w')
-        fh.write(private_key)
-        fh.close()
-        chmod(rsa_filename, 0600)
-
-        fh = open(pubkey_filename, 'w')
-        fh.write(public_key)
-        fh.close()
-        
-        log.debug('Wrote keys OK')
-    except IOError:
-        log.exception('Error writing ssh keys')
-        raise
-
-    return rsa_filename, pubkey_filename
-
-
 
 @defer.inlineCallbacks
-def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
+def do_complete_rsync(local_ncml_path, server_url):
     """
     Orchestration routine to tie it all together plus cleanup at the end.
     Needs the inlineCallbacks to serialise.
     """
-    #print private_key
-    #log.debug("private_key is %s" % (private_key,))
-    if not private_key or not public_key:
-        log.error('Missing required RSA key for NCML RSYNC in Dataset Controller!')
-        defer.returnValue(None)
-        
-    # Generate a private key
-    skey, pkey  = rsa_to_dot_ssh(private_key, public_key)
  
   
-    ssh_cmd = "".join(("ssh -i ", skey, " -o StrictHostKeyChecking=no "))
+    ssh_cmd = "".join(("ssh -o StrictHostKeyChecking=no "))
     os.environ["RSYNC_RSH"] =  ssh_cmd
     yield rsync_ncml(local_ncml_path, server_url)
     del os.environ["RSYNC_RSH"]
 
 
     # Delete the keys from the file system
-    unlink(skey)
-    unlink(pkey)
+    #unlink(skey)
+    #unlink(pkey)
 
 
 
