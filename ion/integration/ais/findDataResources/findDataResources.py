@@ -297,7 +297,7 @@ class FindDataResources(object):
             dSourceID = ds['DSourceID']
             dSource = yield self.metadataCache.getDSourceMetadata(dSourceID)
             if dSource is None:
-                log.error('No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
+                log.error('FindDataResources: No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
             else:
                 #
                 # If the visibility is true, this is public, so add it to the list
@@ -372,8 +372,13 @@ class FindDataResources(object):
         #
         ownedByList = []
         for ds in dSetList:
-            if ds['OwnerID'] == userID:
-                ownedByList.append(ds)
+            dSourceID = ds['DSourceID']
+            dSource = yield self.metadataCache.getDSourceMetadata(dSourceID)
+            if dSource is None:
+                log.error('findDataResourcesByUser: No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
+            else:
+                if ds['OwnerID'] == userID:
+                    ownedByList.append(ds)
                 
         log.debug('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
 
