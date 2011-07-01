@@ -500,6 +500,10 @@ class ManageDataResource(object):
 
         yield self.pub_schd.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
 
+        log.info("creating event to signal caching service")
+        yield self.pub_dsrc.create_and_publish_event(origin=datasource_id, datasource_id=datasource_id)
+
+
 
     @defer.inlineCallbacks
     def _createScheduledEvent(self, interval, start_time, dataset_id, datasource_id):
