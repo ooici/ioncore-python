@@ -563,6 +563,7 @@ class IngestionService(ServiceProcess):
                     while i < len(content.bounded_arrays):
                         ba = content.bounded_arrays[i]
 
+                        # Clear empty bounded arrays that may be sent by dac
                         if not ba.IsFieldSet('ndarray'):
                             del content.bounded_arrays[i]
 
@@ -1095,6 +1096,28 @@ class IngestionService(ServiceProcess):
         log.debug('_merge_overlapping_supplement - Complete')
 
         defer.returnValue(result)
+
+    def _find_time_var(self, group):
+
+        time_vars = []
+
+        for var in group.variables:
+
+            #Parse the atts - try to short cut logic to identify time...
+            for att in var.attributes:
+
+                if att.name == 'standard_name' and att.GetValue() == 'time':
+                    log.debug('Found standard name "time" in variable named: %s' % var.name)
+
+                    time_vars.append(var)
+
+                elif att.name == 'units' and att.GetValue().find(' since '):
+                    log.debug('Found units att with "since" in variable named: %s' % var.name)
+
+                    time_vars.append(var)
+
+                    
+
 
 
 class IngestionClient(ServiceClient):
