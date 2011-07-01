@@ -17,6 +17,7 @@ file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http:/
 
 from os import path, environ, chmod, unlink, listdir, remove
 import fnmatch
+import os
 
 from twisted.internet import defer
 from ion.util.os_process import OSProcess
@@ -99,7 +100,7 @@ def clear_ncml_files(local_filepath):
 
 
 
-def rsync_ncml(local_filepath, server_url, ssh_key_filename):
+def rsync_ncml(local_filepath, server_url):
     """
     @brief Method to perform a bidirectional sync with a remote server,
     probably via rsync, unison or similar. Should be called after generating all
@@ -109,8 +110,8 @@ def rsync_ncml(local_filepath, server_url, ssh_key_filename):
     @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    ssh_cmd = "".join(("-e ", "ssh -i ", ssh_key_filename ))
-    args = ['-r', '--perms', ssh_cmd, '--include', '"*.ncml"',
+    
+    args = ['-r', '--perms', '--include', '"*.ncml"',
             '-v', '-h', '--delete', local_filepath + '/', server_url]
 
 
@@ -179,8 +180,11 @@ def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
     # Generate a private key
     skey, pkey  = rsa_to_dot_ssh(private_key, public_key)
  
-    # Run rsync, which should use the key in the agent
-    yield rsync_ncml(local_ncml_path, server_url, skey)
+  
+    ssh_cmd = "".join(("ssh -i ", skey, " -o StrictHostKeyChecking=no "))
+    os.environ["RSYNC_RSH"] =  ssh_cmd
+    yield rsync_ncml(local_ncml_path, server_url)
+    del os.environ["RSYNC_RSH"]
 
 
     # Delete the keys from the file system
