@@ -1550,12 +1550,16 @@ class NMEADeviceDriver(InstrumentDriver):
         result = {}
         set_errors = False
 
+        log.debug("*** params to handle: %s", params)
         for (chan, param) in params.keys():
             val = params[(chan, param)]
+            if (val == None) or (val == ''):
+                continue
             if self._device_NMEA_config.defParams.get(param):
                 if param in self._device_NMEA_config.validSet:
                     # Do PGRMO stuff here
                     if val in [ON, OFF]:
+                        log.debug("*** on/off val: %s", val)
                         self._device_NMEA_config.SetSentences({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
@@ -1565,6 +1569,7 @@ class NMEADeviceDriver(InstrumentDriver):
                 else:
                     # Doing PGRMC stuff here
                     if param in self._device_NMEA_config.cfgParams.keys():
+                        log.debug("*** PGRMC stuff param: %s", param)
                         self._device_NMEA_config.SendConfigToDevice({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
