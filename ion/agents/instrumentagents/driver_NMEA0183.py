@@ -224,7 +224,7 @@ class CfgNMEADevice(object):
 
     # 1 --- Fix Mode ------------------------------------
         x = 'FIX_MODE'
-        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))
         if 'A23'.find(c) > -1:
             str.append(c)
         else:
@@ -282,7 +282,7 @@ class CfgNMEADevice(object):
 
     # 9 --- Differential mode ---------------------------
         x = 'DIFFMODE'
-        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))[0]
+        c = toSet.get(x, self.cfgParams.get(x, self.defParams[x]))
         if 'AD'.find(c) > -1:
             str.append(c)
         else:
