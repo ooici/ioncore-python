@@ -407,11 +407,10 @@ class CdmValidationService(ServiceProcess):
         cdm_output  = kwargs.get('cdm_output', '')
         cdm_result  = kwargs.get('cdm_result', False)
         cf_output   = kwargs.get('cf_output', '')
-        cf_exitcode = kwargs.get('cf_exitcode', 0) 
         cf_errors   = kwargs.get('cf_errors', 0)
         cf_warnings = kwargs.get('cf_warnings', 0)
         cf_information = kwargs.get('cf_information', 0)
-        cf_exitcode = kwargs.get('cf_exitcode', -1)
+        cf_exitcode = kwargs.get('cf_exitcode', 0)
         
         
         # Build the response object
@@ -426,7 +425,7 @@ class CdmValidationService(ServiceProcess):
         response.cf_error_count   = cf_errors
         response.cf_warning_count = cf_warnings
         response.cf_info_count    = cf_information
-        response.err_msg          = exception or ''
+        response.err_msg          = exception or ('CfChecks exited with return code %s' % str(cf_exitcode) if cf_exitcode != 0 else '')
 
         defer.returnValue(response)
         

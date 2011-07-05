@@ -406,7 +406,7 @@ class DispatcherProcess(Process):
         # Dig through the message wrappers...
         content = data and data.get('content', None)
         res_evt = content and content.additional_data
-        chg_evt = res_evt and chg_evt.resource
+        chg_evt = res_evt and res_evt.resource
         
         # Keep digging...
         dataset_id     = chg_evt and str(chg_evt.dataset_id)

@@ -9,11 +9,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
-
 
 from ion.test.iontest import IonTestCase
-from ion.core.object.object_utils import *
+from ion.core.object.object_utils import create_type_identifier
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 
@@ -331,7 +329,7 @@ class CdmAttributeTest(IonTestCase):
         
         self._do_test_MergeAttGreater_double_against_numeric(lesser, greater, self.group1.DataType.DOUBLE, self.group1.DataType.STRING)
         
-    def test_MergeAttLesser_long_and_string_long(self):
+    def test_MergeAttGreater_long_and_string_long(self):
         lesser = -4294967296
         greater = '-4294967295'
         
@@ -521,12 +519,6 @@ class CdmAttributeTest(IonTestCase):
         
         self._do_test_MergeAttLesser_double_against_numeric(lesser, greater, self.group1.DataType.CHAR, self.group1.DataType.DOUBLE)
     
-    def test_MergeAttLesser_double_and_string_int(self):
-        lesser = '123'
-        greater = 123.456
-        
-        self._do_test_MergeAttLesser_double_against_numeric(lesser, greater, self.group1.DataType.STRING, self.group1.DataType.DOUBLE)
-
     def test_MergeAttLesser_double_and_string_int(self):
         lesser = '123'
         greater = 123.456
