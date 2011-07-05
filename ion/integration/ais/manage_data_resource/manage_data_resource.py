@@ -87,6 +87,8 @@ class ManageDataResource(object):
         @GPB{Returns,9216,1}
         @retval success
         """
+        log.debug('update worker class method')
+
         # check that the GPB is correct type & has a payload
         result = yield self._CheckRequest(msg_wrapped)
         if result != None:
@@ -201,10 +203,8 @@ class ManageDataResource(object):
 
             if msg.IsFieldSet("is_public"):
                 datasrc_resource.is_public = msg.is_public
-                if not msg.is_public:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-                else:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
+
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
                 datasrc_resource.visualization_url = msg.visualization_url
@@ -645,6 +645,7 @@ class ManageDataResource(object):
 
         #this is an error case!
         if None is association:
+            log.info('getOneAssociateionObject: NO association found')
             defer.returnValue(None)
 
         the_resource = yield self.rc.get_associated_resource_object(association)

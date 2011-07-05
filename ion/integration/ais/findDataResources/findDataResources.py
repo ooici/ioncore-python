@@ -928,7 +928,11 @@ class FindDataResources(object):
         #
         # Set the activate state based on the resource lcs
         #
-        rspPayload.activation_state = dSource['lcs']
+        if dSource['visibility'] == 'True':
+            rspPayload.activation_state = 'Public'
+        else:
+            rspPayload.activation_state = 'Private'
+            
         rspPayload.update_interval_seconds = dSource['update_interval_seconds']
 
     @defer.inlineCallbacks
