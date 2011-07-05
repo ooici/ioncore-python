@@ -9,12 +9,10 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
-
 
 from ion.test.iontest import IonTestCase
-from ion.core.object.object_utils import *
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
+from ion.core.object.object_utils import create_type_identifier
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 
 CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
