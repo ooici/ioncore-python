@@ -77,7 +77,9 @@ def start(container, starttype, app_definition, *args, **kwargs):
     curtest = klass()
 
     if hasattr(curtest, 'setup'):
+        print "uyeah setup"
         yield defer.maybeDeferred(curtest.setup)
+        print "uyeah setuip odne"
 
     # pull out test steps
     rtestmethod = re.compile(r'^s\d+_')
@@ -99,5 +101,11 @@ def start(container, starttype, app_definition, *args, **kwargs):
     defer.returnValue(('nosupid', 'nostate'))
 
 def stop(container, state):
-    pass
+    global curtest
 
+    print "Tearing down test..."
+
+    if hasattr(curtest, 'teardown'):
+        yield defer.maybeDeferred(curtest.teardown)
+
+    print "Test torn down, exiting"

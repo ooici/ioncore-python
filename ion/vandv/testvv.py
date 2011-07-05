@@ -1,14 +1,16 @@
 from twisted.internet import defer
 
 from ion.util import procutils as pu
+from ion.vandv.vandvbase import VVBase
 
-class TestVV(object):
+class TestVV(VVBase):
     """
     This is where I describe what this test does.
     """
 
+    @defer.inlineCallbacks
     def setup(self):
-        pass
+        yield self._start_itv(files=["itv_start_files/boot_level_4.itv"])
 
     def s1_broheim(self):
         """
