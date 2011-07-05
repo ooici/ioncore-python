@@ -219,7 +219,8 @@ class FindDataResources(object):
                 
         log.debug('findDataResources: ownedByList has %d datasets' %len(ownedByList))
 
-                       
+        """
+        Comment out in favor of selecting on datasets that are not already in the public list
         #
         # Now trim the list to only those that are private
         #
@@ -238,6 +239,7 @@ class FindDataResources(object):
                     ownedByAndPrivateList.append(ds)
             
         log.debug('findDataResources: ownedByAndPrivateList has %d datasets' %len(ownedByAndPrivateList))
+        """
 
         #
         # We now have the list of owned by and private: now get the public datasets 
@@ -261,7 +263,14 @@ class FindDataResources(object):
         #
         # Now add the two lists together
         #
-        finalList = ownedByAndPrivateList + publicList
+
+        #finalList = ownedByAndPrivateList + publicList
+
+        finalList = publicList
+        for item in ownedByList:
+            if item not in finalList:
+                finalList.append(item)
+
         log.debug('findDataResources: finalList has %d datasets' %len(finalList))
         
         response = yield self.__getDataResources(msg, finalList, rspMsg, typeFlag = self.ALL)
