@@ -256,7 +256,7 @@ class FindDataResources(object):
         # of the datasets here instead of the metadata.
         #
         dSetList = self.metadataCache.getDatasets()
-        log.debug('>>>>>>>>>>>>>>>>>> cache contains %d datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
+        log.debug('findDataResources: cache contains %d datasets' %len(dSetList))
         
         #
         # Iterate through this list getting those owned by the userID
@@ -266,7 +266,7 @@ class FindDataResources(object):
             if ds['OwnerID'] == userID:
                 ownedByList.append(ds)
                 
-        log.debug('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
+        log.debug('findDataResources: ownedByList has %d datasets' %len(ownedByList))
 
                        
         #
@@ -282,12 +282,11 @@ class FindDataResources(object):
                 #
                 # If the visibility is false, this is private, so add it to the list
                 #
-                log.debug('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
                 if dSource['visibility'] == False:
-                    log.debug('>>>>>>>>>>>>>>>>>>>>> adding ds %s to ownedByAndPrivateList' %(ds['ResourceIdentity']))
+                    log.debug('findDataResources: adding ds %s to ownedByAndPrivateList' %(ds['ResourceIdentity']))
                     ownedByAndPrivateList.append(ds)
             
-        log.debug('>>>>>>>>>>>>>>>>>> ownedByAndPrivateList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByAndPrivateList))
+        log.debug('findDataResources: ownedByAndPrivateList has %d datasets' %len(ownedByAndPrivateList))
 
         #
         # We now have the list of owned by and private: now get the public datasets 
@@ -302,18 +301,17 @@ class FindDataResources(object):
                 #
                 # If the visibility is true, this is public, so add it to the list
                 #
-                log.debug('>>>>>>>>>>>>>> visibility is: %s <<<<<<<<<<<<<<<<<' %(dSource['visibility']))
                 if dSource['visibility'] == True:
-                    log.debug('>>>>>>>>>>>>>>>>>>>>> adding ds %s to publicList' %(ds['ResourceIdentity']))
+                    log.debug('findDataResources: adding ds %s to publicList' %(ds['ResourceIdentity']))
                     publicList.append(ds)
             
-        log.debug('>>>>>>>>>>>>>>>>>> publicList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(publicList))
+        log.debug('findDataResources: publicList has %d datasets' %len(publicList))
 
         #
         # Now add the two lists together
         #
         finalList = ownedByAndPrivateList + publicList
-        log.debug('>>>>>>>>>>>>>>>>>> finalList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(finalList))
+        log.debug('findDataResources: finalList has %d datasets' %len(finalList))
         
         response = yield self.__getDataResources(msg, finalList, rspMsg, typeFlag = self.ALL)
 
@@ -365,7 +363,7 @@ class FindDataResources(object):
         # of the datasets here instead of the metadata.
         #
         dSetList = self.metadataCache.getDatasets()
-        log.debug('>>>>>>>>>>>>>>>>>> cache contains %d datasets <<<<<<<<<<<<<<<<<<<<' %len(dSetList))
+        log.debug('findDataResourcesByUser: cache contains %d datasets' %len(dSetList))
         
         #
         # iterate through this list getting those owned by the userID
@@ -380,7 +378,7 @@ class FindDataResources(object):
                 if ds['OwnerID'] == userID:
                     ownedByList.append(ds)
                 
-        log.debug('>>>>>>>>>>>>>>>>>> ownedByList has %d datasets <<<<<<<<<<<<<<<<<<<<' %len(ownedByList))
+        log.debug('findDataResourcesByUser: ownedByList has %d datasets' %len(ownedByList))
 
         response = yield self.__getDataResources(msg, ownedByList, rspMsg, typeFlag = self.BY_USER)
         
@@ -928,7 +926,7 @@ class FindDataResources(object):
         #
         # Set the activate state based on the resource lcs
         #
-        if dSource['visibility'] == 'True':
+        if dSource['visibility'] == True:
             rspPayload.activation_state = 'Public'
         else:
             rspPayload.activation_state = 'Private'
