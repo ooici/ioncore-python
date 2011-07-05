@@ -4,7 +4,7 @@ from ion.util import procutils as pu
 
 class TestVV(object):
     """
-    Docstring
+    This is where I describe what this test does.
     """
 
     def setup(self):
@@ -27,5 +27,5 @@ class TestVV(object):
         print "german burger"
 
         yield pu.asleep(3)
-        return
+        defer.returnValue(None)
 
