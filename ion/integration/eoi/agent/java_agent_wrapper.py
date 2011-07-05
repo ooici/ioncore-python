@@ -29,7 +29,7 @@ from ion.core import ioninit
 from ion.core.exception import IonError, ApplicationError, ReceivedError
 from ion.core.object import object_utils
 from ion.core.object.gpb_wrapper import OOIObjectError
-from ion.core.process.process import Process, ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
@@ -42,7 +42,6 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 # Imports: ION Messages and Events
 from ion.services.dm.distribution.events import ScheduleEventSubscriber, IngestionProcessingEventSubscriber
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 
 # Imports: Resources and Associations
@@ -60,14 +59,14 @@ DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 # Imports: Utils/Config/Logging
 import logging
 import ion.util.ionlog
-from ion.util.os_process import OSProcess
+from ion.util.os_process import OSProcess, OSProcessError
 from ion.util.state_object import BasicStates
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 
-class OSProcess130Friendly(ion.util.os_process.OSProcess):
+class OSProcess130Friendly(OSProcess):
     """
     When a script is terminated in an interactive console by Control-C the fatal signal causes the process
     to die with a 130 exit code.  This version of OSProcess interprets Control-C termination as a valid
@@ -103,7 +102,21 @@ class OSProcess130Friendly(ion.util.os_process.OSProcess):
 
         self.deferred_exited.callback(cba)
         
-        
+    def outReceived(self, data):
+        """
+        Output on stdout has been received.
+        Stores the output in a list.
+        """
+        log.debug("SO: %s" % str(data).strip())
+        self.outlines.append(data)
+
+    def errReceived(self, data):
+        """
+        Output on stderr has been received.
+        Stores the output in a list.
+        """
+        log.debug("SE: %s" % data)
+        self.errlines.append(data)
 
 class JavaAgentWrapperException(ApplicationError):
     """
@@ -186,7 +199,7 @@ class JavaAgentWrapper(ServiceProcess):
         self._asc = None   # Access using the property self.asc
         
         # Step 2: Spawn the associated external child process (if not already done)
-        res = yield defer.maybeDeferred(self._spawn_dataset_agent)
+        yield defer.maybeDeferred(self._spawn_dataset_agent)
 
         # Step 3: Setup schedule event subscriber
         log.debug('Creating new message receiver for scheduled updates')
@@ -218,7 +231,6 @@ class JavaAgentWrapper(ServiceProcess):
                 self.__binding_key_deferred = d
             return d
         
-        d = defer.Deferred()
         
         reactor.callLater(0, lambda: _recieve_binding_key(self))
 
