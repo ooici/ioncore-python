@@ -1692,7 +1692,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     def test_updateDataResourceCache(self):
         log.debug('Testing updateDataResourceCache.')
 
-
+        #
+        # This test doesn't much other than sending an event to the cache;
+        # there should be a more rigorous test that actually makes a modification
+        # and sends it to manage data resources, but that test would be an
+        # integration test.
+        #
         subproc = Process()
         yield subproc.spawn()
         testsub = TestDatasetUpdateEventSubscriber(process=subproc)
@@ -1710,8 +1715,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # create a request message 
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
-        #reqMsg.message_parameters_reference.user_ooi_id  = MYOOICI_USER_ID
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         rspMsg = yield self.aisc.findDataResources(reqMsg)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
@@ -1727,7 +1730,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             dsID = rspMsg.message_parameters_reference[0].dataResourceSummary[0].datasetMetadata.data_resource_id
 
             # Setup the publisher
-            pub1 = DatasetSupplementAddedEventPublisher(process=self._proc)
+            pub1 = DatasetChangeEventPublisher(process=self._proc)
             yield pub1.initialize()
             yield pub1.activate()
             
@@ -1737,12 +1740,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
                 name = "TestUpdateDataResourceCache",
                 origin = "SOME DATASET RESOURCE ID",
                 dataset_id = dsID,
-                datasource_id = "no way to get this!",
-                title = "TODO",
-                url = "TODO",
-                start_datetime_millis = 10000,
-                end_datetime_millis = 11000,
-                number_of_timesteps = 7
                 )
     
             # Pause to make sure we catch the message
