@@ -190,15 +190,17 @@ def MergeAttDstOver(self, attname, src):
 def _get_attribs(src, dst, attname):
     src_att = None
     dst_att = None
-    try:
-        src_att = src.FindAttributeByName(attname)
-    except OOIObjectError, ex:
-        pass
+    if src.HasAttribute(attname):
+        try:
+            src_att = src.FindAttributeByName(attname)
+        except OOIObjectError, ex:
+            log.warn("Error finding attribute by name.  Cause: %s" % str(ex))
 
-    try:
-        dst_att = dst.FindAttributeByName(attname)
-    except OOIObjectError, ex:
-        pass
+    if dst.HasAttribute(attname):
+        try:
+            dst_att = dst.FindAttributeByName(attname)
+        except OOIObjectError, ex:
+            log.warn("Error finding attribute by name.  Cause: %s" % str(ex))
     
     return (src_att, dst_att)
 

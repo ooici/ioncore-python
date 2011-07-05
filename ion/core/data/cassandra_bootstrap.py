@@ -65,7 +65,7 @@ class CassandraIndexedStoreBootstrap(CassandraIndexedStore):
     def __init__(self, username, password, storage_provider, keyspace, column_family):
 
         log.info("CassandraIndexedStoreBootstrap: username - %s, password - %s, storage_provider - %s, keyspace - %s, column_family - %s" %
-        (username, password, storage_provider, keyspace, column_family))
+        (username, '******', storage_provider, keyspace, column_family))
 
         host, port, manager = parse_cassandra_config(username, password, storage_provider, keyspace)
 
@@ -87,7 +87,7 @@ class CassandraStoreBootstrap(CassandraStore):
     def __init__(self, username, password, storage_provider, keyspace, column_family):
 
         log.info("CassandraStoreBootstrap: username - %s, password - %s, storage_provider - %s, keyspace - %s, column_family - %s" %
-        (username, password, storage_provider, keyspace, column_family))
+        (username, '******', storage_provider, keyspace, column_family))
 
         host, port, manager = parse_cassandra_config(username, password, storage_provider, keyspace)
 

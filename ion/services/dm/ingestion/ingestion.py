@@ -13,7 +13,7 @@ To test this with the Java CC!
 """
 
 import time, calendar
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher, DatasetChangeEventPublisher
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher, DatasetChangeEventPublisher, IngestionProcessingEventPublisher, get_events_exchange_point, DatasetStreamingEventSubscriber
 import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
@@ -42,7 +42,7 @@ from ion.core.exception import ReceivedApplicationError, ReceivedError, Received
 from ion.core.object.gpb_wrapper import OOIObjectError
 
 from ion.core import ioninit
-from ion.core.object import object_utils
+from ion.core.object import object_utils, gpb_wrapper
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -142,6 +142,9 @@ class IngestionService(ServiceProcess):
 
         self._ingestion_terminating = False
 
+        self._ingestion_processing_publisher = IngestionProcessingEventPublisher(process=self)
+        self.add_life_cycle_object(self._ingestion_processing_publisher)        # will move through lifecycle states as appropriate
+
         log.info('IngestionService.__init__()')
 
     @defer.inlineCallbacks
@@ -195,25 +198,17 @@ class IngestionService(ServiceProcess):
 
         log.info('op_create_dataset_topics - Complete')
 
-
-
-    class IngestSubscriber(Subscriber):
+    class IngestSubscriber(DatasetStreamingEventSubscriber):
         """
-        Specially derived Subscriber that routes received messages into a custom handler that is similar to
+        Specially derived EventSubscriber that routes received messages into a custom handler that is similar to
         the main Process.receive method, but eliminates problems and handles Exceptions better.
         """
-        def __init__(self, handleref=None, **kwargs):
-            """
-            Handleref must exist and must be a callable.
-            """
-            assert handleref
-            self._handleref = handleref
-
-            Subscriber.__init__(self, **kwargs)
-
         @defer.inlineCallbacks
         def _receive_handler(self, content, msg):
-            yield self._handleref(content, msg)
+            """
+            Let the ondata method handle acking the message.
+            """
+            yield self.ondata(content, msg)
 
     def _ingest_data_topic_valid(self, ingest_data_topic):
         """
@@ -265,7 +260,7 @@ class IngestionService(ServiceProcess):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def _setup_ingestion_topic(self, content):
+    def _setup_ingestion_topic(self, content, convid):
 
         log.debug('_setup_ingestion_topic - Start')
 
@@ -278,18 +273,17 @@ class IngestionService(ServiceProcess):
             log.error("Invalid data ingestion topic (%s), allowing it for now TODO" % ingest_data_topic)
 
         log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % ingest_data_topic)
-        self._subscriber = self.IngestSubscriber(handleref=self._handle_ingestion_msg,
-                                                 xp_name="magnet.topic",
-                                                 binding_key=ingest_data_topic,
-                                                 process=self)
+        self._subscriber = self.IngestSubscriber(origin=ingest_data_topic, process=self)
+        self._subscriber.ondata = lambda payload, msg: self._handle_ingestion_msg(payload, msg, convid)
+
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
         log.debug('_setup_ingestion_topic - Complete')
 
-        defer.returnValue(ingest_data_topic)
+        defer.returnValue(self._subscriber._binding_key)
 
     @defer.inlineCallbacks
-    def _handle_ingestion_msg(self, payload, msg):
+    def _handle_ingestion_msg(self, payload, msg, convid):
         """
         Handles recv_dataset, recv_chunk, recv_done
 
@@ -309,11 +303,11 @@ class IngestionService(ServiceProcess):
             content = payload.get('content', '')    # should be None, but this is how Process' receive does it
 
             if opname == 'recv_dataset':
-                yield self._ingest_op_recv_dataset(content, payload, msg)
+                yield self._ingest_op_recv_dataset(content, payload, msg, convid)
             elif opname == 'recv_chunk':
-                yield self._ingest_op_recv_chunk(content, payload, msg)
+                yield self._ingest_op_recv_chunk(content, payload, msg, convid)
             elif opname == 'recv_done':
-                yield self._ingest_op_recv_done(content, payload, msg)
+                yield self._ingest_op_recv_done(content, payload, msg, convid)
             else:
                 raise IngestionError('Unknown operation specified')
 
@@ -344,7 +338,7 @@ class IngestionService(ServiceProcess):
 
         log.info('Created dataset details, Now setup subscriber...')
 
-        ingest_data_topic = yield self._setup_ingestion_topic(content)
+        ingest_data_topic = yield self._setup_ingestion_topic(content, headers.get('conv-id', "no-conv-id"))
 
 
         def _timeout():
@@ -357,7 +351,7 @@ class IngestionService(ServiceProcess):
         log.info(
             'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
         irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
-        irmsg.xp_name = "magnet.topic"
+        irmsg.xp_name = get_events_exchange_point()
         irmsg.publish_topic = ingest_data_topic
 
         self.send(content.reply_to, operation='ingest_ready', content=irmsg)
@@ -422,9 +416,7 @@ class IngestionService(ServiceProcess):
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed! %s" % str(ingest_res))
 
-            # Don't change life cycle state - yet...
-            #data_source.ResourceLifeCycleState = data_source.INACTIVE
-            #self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
+            self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
 
         else:
             log.info("Ingest succeeded!")
@@ -432,29 +424,17 @@ class IngestionService(ServiceProcess):
             resources.append(self.dataset)
 
             # If the dataset / source is new 
-            if self.dataset.ResourceLifeCycleState == self.dataset.NEW:
+            if self.dataset.ResourceLifeCycleState != self.dataset.ACTIVE:
 
-                log.info('Fetching datasource id - %s - to set life cycle state' % content.datasource_id)
-                data_source = yield self.rc.get_instance(content.datasource_id)
-
-                if self.data_source.is_public == True:
-
-                    data_source.ResourceLifeCycleState = data_source.COMMISSIONED
-                    self.dataset.ResourceLifeCycleState = self.dataset.COMMISSIONED
-
-                else:
-
-                    data_source.ResourceLifeCycleState = data_source.ACTIVE
-                    self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
-
-                resources.append(self.data_source)
+                self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
 
 
+        try:
+            yield self.rc.put_instance(self.dataset)
+        except ResourceClientError, rce:
+            ingest_res[EM_ERROR] = 'Ingestion put_instance operation failed!'
+            log.exception('Ingestion put_instance operation failed!')
 
-        for res in resources:
-            log.info('Resource %s life cycle state is %s' % (res.ResourceName, res.ResourceLifeCycleState))
-
-        yield self.rc.put_resource_transaction(resources)
 
         yield self._notify_ingest(ingest_res)
 
@@ -510,11 +490,24 @@ class IngestionService(ServiceProcess):
         if ingest_res.has_key(EM_ERROR):
             # Report an error with the data source
             datasource_id = ingest_res[EM_DATA_SOURCE]
-            yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
+
+            # Don't use **kw args - it may fail depending on what is in the dict...
+            #yield self._notify_unavailable_publisher.create_and_publish_event(origin=datasource_id, **ingest_res)
+
+            msg = yield self._notify_unavailable_publisher.create_event(origin=datasource_id)
+            self._notify_unavailable_publisher._set_msg_fields(msg.additional_data, ingest_res.copy())
+            yield self._notify_unavailable_publisher.publish_event(msg,origin=datasource_id)
+
         else:
             # Report a successful update to the dataset
             dataset_id = ingest_res[EM_DATASET]
-            yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+            # Don't use **kw args - it may fail depending on what is in the dict...
+            #yield self._notify_ingest_publisher.create_and_publish_event(origin=dataset_id, **ingest_res)
+
+            msg = yield self._notify_ingest_publisher.create_event(origin=dataset_id)
+            self._notify_ingest_publisher._set_msg_fields(msg.additional_data, ingest_res.copy())
+            yield self._notify_ingest_publisher.publish_event(msg, origin=dataset_id)
 
             yield self._notify_dataset_change_publisher.create_and_publish_event(origin=dataset_id, dataset_id=dataset_id)
 
@@ -523,7 +516,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def _ingest_op_recv_dataset(self, content, headers, msg):
+    def _ingest_op_recv_dataset(self, content, headers, msg, convid="unknown"):
 
         log.info('_ingest_op_recv_dataset - Start')
 
@@ -535,6 +528,13 @@ class IngestionService(ServiceProcess):
 
         log.info('Adding 30 seconds to timeout')
         self.timeoutcb.delay(30)
+
+        # notify JAW and others via event that we are still processing
+        yield self._ingestion_processing_publisher.create_and_publish_event(origin=self.dataset.ResourceIdentity,
+                                                                            dataset_id=self.dataset.ResourceIdentity,
+                                                                            ingestion_process_id=self.id.full,
+                                                                            conv_id=convid,
+                                                                            processing_step="dataset")
 
         log.info(headers)
 
@@ -562,6 +562,7 @@ class IngestionService(ServiceProcess):
                     while i < len(content.bounded_arrays):
                         ba = content.bounded_arrays[i]
 
+                        # Clear empty bounded arrays that may be sent by dac
                         if not ba.IsFieldSet('ndarray'):
                             del content.bounded_arrays[i]
 
@@ -577,7 +578,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def _ingest_op_recv_chunk(self, content, headers, msg):
+    def _ingest_op_recv_chunk(self, content, headers, msg, convid="unknown"):
 
         log.info('_ingest_op_recv_chunk - Start')
 
@@ -604,6 +605,12 @@ class IngestionService(ServiceProcess):
         #if content.dataset_id != self.dataset.ResourceIdentity:
         #    raise IngestionError('Calling recv_chunk with a dataset that does not match the received chunk!.')
 
+        # notify JAW and others via event that we are still processing
+        yield self._ingestion_processing_publisher.create_and_publish_event(origin=self.dataset.ResourceIdentity,
+                                                                            dataset_id=self.dataset.ResourceIdentity,
+                                                                            ingestion_process_id=self.id.full,
+                                                                            conv_id=convid,
+                                                                            processing_step="chunk")
 
         # Get the group out of the datset
         group = self.dataset.root_group
@@ -645,7 +652,7 @@ class IngestionService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def _ingest_op_recv_done(self, content, headers, msg):
+    def _ingest_op_recv_done(self, content, headers, msg, convid="unknown"):
         """
         @TODO deal with FMRC datasets and supplements
         """
@@ -657,6 +664,13 @@ class IngestionService(ServiceProcess):
             # set msg._state to anything to prevent auto-ack
             msg._state = "ACKED"
             defer.returnValue(None)
+
+        # notify JAW and others via event that we are still processing
+        yield self._ingestion_processing_publisher.create_and_publish_event(origin=self.dataset.ResourceIdentity,
+                                                                            dataset_id=self.dataset.ResourceIdentity,
+                                                                            ingestion_process_id=self.id.full,
+                                                                            conv_id=convid,
+                                                                            processing_step="done")
 
         log.info('Cancelling timeout!')
         self.timeoutcb.cancel()
@@ -774,9 +788,15 @@ class IngestionService(ServiceProcess):
 
         log.info('Starting Find Dimension LooP')
 
+        time_vars = self._find_time_var(merge_root)
+
+        if len(time_vars) is 0:
+            result={EM_ERROR:'Error during ingestion: No Time variable found!'}
+            defer.returnValue(result)
+
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []
-        for merge_var in merge_root.variables:
+        for merge_var in time_vars:
 
             # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
             for merge_dim in reversed(merge_var.shape):
@@ -1081,6 +1101,28 @@ class IngestionService(ServiceProcess):
         log.debug('_merge_overlapping_supplement - Complete')
 
         defer.returnValue(result)
+
+    def _find_time_var(self, group):
+
+        time_vars = []
+
+        for var in group.variables:
+
+            #Parse the atts - try to short cut logic to identify time...
+            for att in var.attributes:
+
+                if att.name == 'standard_name' and att.GetValue() == 'time':
+                    log.debug('Found standard name "time" in variable named: %s' % var.name)
+
+                    time_vars.append(var)
+
+                elif att.name == 'units' and att.GetValue().find(' since '):
+                    log.debug('Found units att with "since" in variable named: %s' % var.name)
+
+                    time_vars.append(var)
+
+        return time_vars
+
 
 
 class IngestionClient(ServiceClient):

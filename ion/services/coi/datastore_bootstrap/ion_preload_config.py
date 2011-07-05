@@ -281,6 +281,7 @@ is_a_name = 'is_a'
 type_of_name = 'type_of'
 owned_by_name = 'owned_by'
 has_life_cycle_state_name = 'has_life_cycle_state'
+has_role_name = 'has_role'
 
 TERMINOLOGY_TYPE = create_type_identifier(object_id=14, version=1)
 
@@ -306,6 +307,10 @@ has_life_cycle_state_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
             TYPE_CFG:TERMINOLOGY_TYPE,
             PREDICATE_CFG:has_life_cycle_state_name},
 
+has_role_name:{ID_CFG:'eed4b68d-58b5-493b-b409-1291d97cb1d8',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:has_role_name},
+
 }
 
 
@@ -317,6 +322,7 @@ OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID_CFG]
 
 HAS_LIFE_CYCLE_STATE_ID = ION_PREDICATES[has_life_cycle_state_name][ID_CFG]
 
+HAS_ROLE_ID = ION_PREDICATES[has_role_name][ID_CFG]
 
 ##### Define Identities #####:
 
@@ -416,6 +422,67 @@ ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
 MYOOICI_USER_ID = ION_IDENTITIES[myooici_name][ID_CFG]
 
 
+###### Define Roles ##########
+
+admin_name = 'Administrator'
+data_provider_name = 'Data Provider'
+marine_operator_name = 'Marine Operator'
+early_adopter_name = 'Early Adopter'
+authenticated_name = 'Authenticated'
+
+# Anonymous name is already defined
+
+role_type = create_type_identifier(object_id=1404, version=1)
+
+ION_ROLES = {
+admin_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D0',
+                          TYPE_CFG:role_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % admin_name,
+                          DESCRIPTION_CFG:'The Admin Role for administrator users.',
+                          CONTENT_CFG:{'role':admin_name}
+                        },
+
+data_provider_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D1',
+                          TYPE_CFG:role_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % data_provider_name,
+                          DESCRIPTION_CFG:'The data provider role for a owner of data sources.',
+                          CONTENT_CFG:{'role':data_provider_name}
+                        },
+
+marine_operator_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D2',
+                          TYPE_CFG:role_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % marine_operator_name,
+                          DESCRIPTION_CFG:'The marine operator role for marine IO facilities.',
+                          CONTENT_CFG:{'role':marine_operator_name}
+                        },
+
+early_adopter_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D3',
+                          TYPE_CFG:role_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % early_adopter_name,
+                          DESCRIPTION_CFG:'The early adopter role for IOOS science beta users.',
+                          CONTENT_CFG:{'role':early_adopter_name}
+                        },
+
+authenticated_name:{ID_CFG:'A3D5E5B1-83786-4EF2-C1BE-3CE2DC7252D4',
+                          TYPE_CFG:role_type,
+                          NAME_CFG:'OOI User Role Resource: %s' % authenticated_name,
+                          DESCRIPTION_CFG:'The authenticated role for registered users.',
+                          CONTENT_CFG:{'role':authenticated_name}
+                        },
+
+
+    }
+
+ADMIN_ROLE_ID = ION_ROLES[admin_name][ID_CFG]
+DATA_PROVIDER_ROLE_ID = ION_ROLES[data_provider_name][ID_CFG]
+MARINE_OPERATOR_ROLE_ID = ION_ROLES[marine_operator_name][ID_CFG]
+EARLY_ADOPTER_ROLE_ID = ION_ROLES[early_adopter_name][ID_CFG]
+AUTHENTICATED_ROLE_ID = ION_ROLES[authenticated_name][ID_CFG]
+
+ROLE_IDS_BY_NAME = {'ADMIN': ADMIN_ROLE_ID, 'DATA_PROVIDER': DATA_PROVIDER_ROLE_ID,
+                    'MARINE_OPERATOR': MARINE_OPERATOR_ROLE_ID, 'EARLY_ADOPTER': EARLY_ADOPTER_ROLE_ID,
+                    'AUTHENTICATED': AUTHENTICATED_ROLE_ID}
+ROLE_NAMES_BY_ID = dict((v,k) for k,v in ROLE_IDS_BY_NAME.iteritems())
 
 ##### Define Datasets and data sources #####:
 
@@ -496,7 +563,7 @@ traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
                       DESCRIPTION_CFG:'An example of a trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':trj_dataset_loc},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
@@ -505,7 +572,7 @@ station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
                       DESCRIPTION_CFG:'An example of a station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_dataset_name:{
@@ -548,7 +615,7 @@ ntas2_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':ntas2_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 whots1_dataset_name:{
@@ -569,7 +636,7 @@ whots2_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':whots2_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_dataset_name:{
@@ -580,7 +647,7 @@ moanalua_rain_dataset_name:{
                       CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
                       CONTENT_ARGS_CFG:{'filename':moanalua_rain_dataset_loc},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_dataset_name:{
@@ -623,7 +690,7 @@ traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F5'
                       DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[traj_dataset_name][ID_CFG]},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047F6',
@@ -632,7 +699,7 @@ station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E047
                       DESCRIPTION_CFG:'An example of a data source for the station dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[station_dataset_name][ID_CFG]},
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 hycom_split_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04800',
@@ -669,7 +736,7 @@ ntas2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04803
                       CONTENT_CFG:dataset_bootstrap.bootstrap_ntas2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[ntas2_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 whots1_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04804',
@@ -688,7 +755,7 @@ whots2_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E0480
                       CONTENT_CFG:dataset_bootstrap.bootstrap_whots2_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[whots2_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04806',
@@ -698,7 +765,7 @@ moanalua_rain_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28
                       CONTENT_CFG:dataset_bootstrap.bootstrap_moanalua_data_source,
                       CONTENT_ARGS_CFG:{'associated_dataset_id':ION_DATASETS[moanalua_rain_dataset_name][ID_CFG]},
                       OWNER_ID : ION_IDENTITIES[myooici_name][ID_CFG],
-                      LCS_CFG : COMMISSIONED
+                      #LCS_CFG : COMMISSIONED
                       },
 
 choptank_river_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-91F3-424F-8E69-4F28C4E04807',

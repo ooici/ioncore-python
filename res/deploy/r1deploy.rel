@@ -49,10 +49,10 @@
                                         'processapp':('exchange_management','ion.services.coi.exchange.exchange_management','ExchangeManagementService'),
         },
 
-        {'name':'preservation_manager',  'version':'0.1',
-                                        'processapp':('resource_registry','ion.services.dm.preservation.cassandra_manager_agent','CassandraManagerService'),
-                                        'config':{}
-        },
+        #{'name':'preservation_manager',  'version':'0.1',
+        #                                'processapp':('cassandra_manager_agent','ion.services.dm.preservation.cassandra_manager_agent','CassandraManagerService'),
+        #                                'config':{}
+        #},
 
 #-------------#
 # Bootlevel 6 #

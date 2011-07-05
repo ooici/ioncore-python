@@ -41,7 +41,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID
                                                                     DATASET_RESOURCE_TYPE_ID, \
                                                                     IDENTITY_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID
-                                                                    
+from ion.core.intercept.policy import get_current_role, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
@@ -198,6 +198,7 @@ class ManageResources(object):
       To.column_names.append('Email')
       To.column_names.append('Institution')
       To.column_names.append('Subject')
+      To.column_names.append('Role')
 
 
    def __LoadDatasourceColumnHeadrers(self, To):
@@ -222,22 +223,25 @@ class ManageResources(object):
    def __LoadIdentityColumnData(self, To, From, Id):
       try:
          To.attribute.append(Id)
-         if not From.IsFieldSet('name'):            
+         if not From.IsFieldSet('name'):
             To.attribute.append("")
          else:
             To.attribute.append(From.name)
-         if not From.IsFieldSet('email'):            
+         if not From.IsFieldSet('email'):
             To.attribute.append("")
          else:
             To.attribute.append(From.email)
-         if not From.IsFieldSet('institution'):            
+         if not From.IsFieldSet('institution'):
             To.attribute.append("")
          else:
             To.attribute.append(From.institution)
-         if not From.IsFieldSet('subject'):            
+         if not From.IsFieldSet('subject'):
             To.attribute.append("")
          else:
             To.attribute.append(From.subject)
+
+         Role = all_roles[get_current_role(Id)]
+         To.attribute.append(Role)
       
       except:
          estr = 'Object ERROR!'

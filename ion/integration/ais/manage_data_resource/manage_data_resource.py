@@ -21,7 +21,8 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
-from ion.services.dm.distribution.events import ScheduleEventPublisher
+from ion.services.dm.distribution.events import ScheduleEventPublisher, \
+                                                DatasourceChangeEventPublisher
 
 from ion.util.iontime import IonTime
 import time
@@ -74,8 +75,8 @@ class ManageDataResource(object):
         self.ing   = IngestionClient(proc=ais)
         
         #necessary to receive events i think
-        self.pub   = ScheduleEventPublisher(process=ais)
-
+        self.pub_schd   = ScheduleEventPublisher(process=ais)
+        self.pub_dsrc   = DatasourceChangeEventPublisher(process=ais)
 
     @defer.inlineCallbacks
     def update(self, msg_wrapped):
@@ -86,6 +87,8 @@ class ManageDataResource(object):
         @GPB{Returns,9216,1}
         @retval success
         """
+        log.debug('update worker class method')
+
         # check that the GPB is correct type & has a payload
         result = yield self._CheckRequest(msg_wrapped)
         if result != None:
@@ -200,18 +203,18 @@ class ManageDataResource(object):
 
             if msg.IsFieldSet("is_public"):
                 datasrc_resource.is_public = msg.is_public
-                if not msg.is_public:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
-                else:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
                 datasrc_resource.visualization_url = msg.visualization_url
 
             # This could be cleaned up to go faster - only call put if it is modified!
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
+
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
 
         except ReceivedApplicationError, ex:
             log.info('AIS.ManageDataResource.update: Error: %s' %ex)
@@ -300,6 +303,11 @@ class ManageDataResource(object):
                          + str(len(delete_resources)))
             yield self.rc.put_resource_transaction(delete_resources)
             log.info("Success!")
+
+            log.info("creating event to signal caching service")
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
 
         except ReceivedApplicationError, ex:
             log.info('AIS.ManageDataResource.delete: Error: %s' %ex)
@@ -392,9 +400,6 @@ class ManageDataResource(object):
                     Response.error_str =  errtext
                     defer.returnValue(Response)
 
-            # get user resource so we can associate it later
-            user_resource = yield self.rc.get_instance(msg.user_id)
-
             # create the data source from the fields in the input message
             datasrc_resource = yield self._createDataSourceResource(msg)
             my_datasrc_id = datasrc_resource.ResourceIdentity
@@ -415,7 +420,6 @@ class ManageDataResource(object):
             self.ing.create_dataset_topics(topics_msg)
 
             #make associations
-            yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
             association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
             #build transaction
@@ -444,8 +448,8 @@ class ManageDataResource(object):
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
-            #these start new, and get set on the first ingest event
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
+            #resource lifecycle states as per 6/27/11 call with dstuebe
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
             yield self.rc.put_resource_transaction(resource_transaction)
@@ -483,14 +487,18 @@ class ManageDataResource(object):
         @brief create a single ingest event trigger and send it
         """
         log.info("triggering an immediate ingest event")
-        msg = yield self.pub.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
-                                          task_id="manage_data_resource_FAKED_TASK_ID")
+        msg = yield self.pub_schd.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                               task_id="manage_data_resource_FAKED_TASK_ID")
         
         msg.additional_data.payload = msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         msg.additional_data.payload.dataset_id     = dataset_id
         msg.additional_data.payload.datasource_id  = datasource_id
 
-        yield self.pub.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+        yield self.pub_schd.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+
+        log.info("creating event to signal caching service")
+        yield self.pub_dsrc.create_and_publish_event(origin=datasource_id, datasource_id=datasource_id)
+
 
 
     @defer.inlineCallbacks
@@ -598,6 +606,9 @@ class ManageDataResource(object):
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
+        # Set the lifecycle state to active
+        datasrc_resource.ResourceLifeCycleState        = datasrc_resource.ACTIVE
+
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
         log.info("created data source ") # + str(datasrc_resource))
@@ -630,6 +641,7 @@ class ManageDataResource(object):
 
         #this is an error case!
         if None is association:
+            log.info('getOneAssociateionObject: NO association found')
             defer.returnValue(None)
 
         the_resource = yield self.rc.get_associated_resource_object(association)
@@ -676,7 +688,7 @@ class ManageDataResource(object):
         """
 
         #this seems very un-GPB-ish, to have to check fields...
-        req_fields = ["user_id",
+        req_fields = [#"user_id", #deprecated as per OOIION-240
                       "source_type",
                       "request_type",
                       #"request_bounds_north",

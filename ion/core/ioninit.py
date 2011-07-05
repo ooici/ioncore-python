@@ -11,7 +11,6 @@ import logging.config
 import logging.handlers
 import re
 import os, os.path
-import socket
 
 from ion.util.context import ContextLocal
 from ion.util.path import adjust_dir
@@ -22,8 +21,10 @@ from ion.util.config import Config
 
 # ION has a minimum required python version
 import sys
-if not hasattr(sys, "version_info") or sys.version_info[:2] < (2,5)[:2]:
+if not hasattr(sys, "version_info") or sys.version_info < (2,5):
     raise RuntimeError("ioncore requires Python 2.5 or later.")
+if sys.version_info > (3,0):
+    raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
 
 # The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
 # variable can go away with the new ion environment directories 
@@ -31,36 +32,24 @@ if not hasattr(sys, "version_info") or sys.version_info[:2] < (2,5)[:2]:
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
 logconf = adjust_dir(ic.LOGCONF_FILENAME)
-
-def use_alternate_logging(path):
+if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
     # make sure that path exists
-    altpath = adjust_dir(path)
+    altpath = adjust_dir(os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF))
     if os.path.exists(altpath):
         logconf = altpath
     else:
         print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
 
-if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
-    # make sure that path exists
-    use_alternate_logging(os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF))
-
 logging.config.fileConfig(logconf)
-    
-def use_syslog():
+if sys.platform == 'linux2':
     c_pid = os.getpid()
     syslog_formatter = logging.Formatter(str(c_pid) + " [%(module)-15s:%(lineno)3d] %(levelname)-5s:%(message)s")
     syslog_address = '/dev/log'
     syslog_facility = 'local0'
-    try:
-        syslog_handler = logging.handlers.SysLogHandler(syslog_address, syslog_facility) 
-        syslog_handler.setLevel(logging.DEBUG)
-        syslog_handler.setFormatter(syslog_formatter)
-        logging.root.addHandler(syslog_handler)
-    except socket.error:
-        pass
-
-if sys.platform == 'linux2':
-    use_syslog()
+    syslog_handler = logging.handlers.SysLogHandler(syslog_address, syslog_facility) 
+    syslog_handler.setLevel(logging.DEBUG)
+    syslog_handler.setFormatter(syslog_formatter)
+    logging.root.addHandler(syslog_handler)
 
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
@@ -101,7 +90,7 @@ def get_config(confname, conf=None):
     """
     if conf == None:
         conf = ion_config
-    return conf.getValue(confname)
+    return Config(conf.getValue(confname)).getObject()
 
 def install_msgpacker():
     from ion.core.messaging.serialization import registry
@@ -132,6 +121,8 @@ def set_log_levels(levelfilekey=None):
             levellist = eval(filecontent, logging.__dict__)
         except IOError, ioe:
             pass
+        except Exception, ex:
+            print ex
         if not levellist:
             return
         assert type(levellist) is list
@@ -164,23 +155,23 @@ def clean_twisted_logging():
     if not hasattr(obs0.im_self,'write'):
         # In case of trial testcases this hack does not work.
         return
-    
-    #fdwrite = obs0.im_self.write
-    #fdflush = obs0.im_self.flush
-    #def log_emit(eventDict):
-    #    text = log.textFromEventDict(eventDict)
-    #    if text is None:
-    #        return
-    #    util.untilConcludes(fdwrite, text + "\n")
-    #    util.untilConcludes(fdflush)
-    #def remove_nop(obs):
-    #    if obs != obs0:
-    #        ro(obs)
-    #log.theLogPublisher.removeObserver(obs0)
-    #log.theLogPublisher.addObserver(log_emit)
-    #log.removeObserver = remove_nop
+    fdwrite = obs0.im_self.write
+    fdflush = obs0.im_self.flush
+    def log_emit(eventDict):
+        text = log.textFromEventDict(eventDict)
+        if text is None:
+            return
+        util.untilConcludes(fdwrite, text + "\n")
+        util.untilConcludes(fdflush)
+    def remove_nop(obs):
+        if obs != obs0:
+            ro(obs)
+    log.theLogPublisher.removeObserver(obs0)
+    log.theLogPublisher.addObserver(log_emit)
+    log.removeObserver = remove_nop
 
 clean_twisted_logging()
+
 
 # SIGQUIT stack trace based on:
 # http://stackoverflow.com/questions/132058/getting-stack-trace-from-a-running-python-application/133384#133384
@@ -200,3 +191,4 @@ try:
 except ValueError, ex:
     # You're on Windows, no fancy debugging for you!!
     pass
+

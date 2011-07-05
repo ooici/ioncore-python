@@ -29,7 +29,7 @@ from ion.core import ioninit
 from ion.core.exception import IonError, ApplicationError, ReceivedError
 from ion.core.object import object_utils
 from ion.core.object.gpb_wrapper import OOIObjectError
-from ion.core.process.process import Process, ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
@@ -40,9 +40,8 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 
 # Imports: ION Messages and Events
-from ion.services.dm.distribution.events import ScheduleEventSubscriber
+from ion.services.dm.distribution.events import ScheduleEventSubscriber, IngestionProcessingEventSubscriber
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 
 # Imports: Resources and Associations
@@ -60,14 +59,14 @@ DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 # Imports: Utils/Config/Logging
 import logging
 import ion.util.ionlog
-from ion.util.os_process import OSProcess
+from ion.util.os_process import OSProcess, OSProcessError
 from ion.util.state_object import BasicStates
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 
-class OSProcess130Friendly(ion.util.os_process.OSProcess):
+class OSProcess130Friendly(OSProcess):
     """
     When a script is terminated in an interactive console by Control-C the fatal signal causes the process
     to die with a 130 exit code.  This version of OSProcess interprets Control-C termination as a valid
@@ -103,7 +102,21 @@ class OSProcess130Friendly(ion.util.os_process.OSProcess):
 
         self.deferred_exited.callback(cba)
         
-        
+    def outReceived(self, data):
+        """
+        Output on stdout has been received.
+        Stores the output in a list.
+        """
+        log.debug("SO: %s" % str(data).strip())
+        self.outlines.append(data)
+
+    def errReceived(self, data):
+        """
+        Output on stderr has been received.
+        Stores the output in a list.
+        """
+        log.debug("SE: %s" % data)
+        self.errlines.append(data)
 
 class JavaAgentWrapperException(ApplicationError):
     """
@@ -186,7 +199,7 @@ class JavaAgentWrapper(ServiceProcess):
         self._asc = None   # Access using the property self.asc
         
         # Step 2: Spawn the associated external child process (if not already done)
-        res = yield defer.maybeDeferred(self._spawn_dataset_agent)
+        yield defer.maybeDeferred(self._spawn_dataset_agent)
 
         # Step 3: Setup schedule event subscriber
         log.debug('Creating new message receiver for scheduled updates')
@@ -218,7 +231,6 @@ class JavaAgentWrapper(ServiceProcess):
                 self.__binding_key_deferred = d
             return d
         
-        d = defer.Deferred()
         
         reactor.callLater(0, lambda: _recieve_binding_key(self))
 
@@ -420,37 +432,6 @@ class JavaAgentWrapper(ServiceProcess):
         else:
             yield self.reply_err(msg,'Java agent wrapper failed!')
 
-    class IncreaseTimeoutSubscriber(Subscriber):
-        '''
-        This Subscriber's sole purpose is to increase the timeout on the ingestion rpc call.
-        It handles the case of trying to shut down the conversation (say via an error on ingestion)
-        and the DatasetAgent is still spitting messages out.
-        '''
-        def __init__(self, rpccalldef=None, ingest_timeout=None, *args, **kwargs):
-            assert rpccalldef
-            self._rpccalldef = rpccalldef
-
-            assert ingest_timeout
-            self._ingest_timeout = ingest_timeout
-
-            Subscriber.__init__(self, *args, **kwargs)
-
-        @defer.inlineCallbacks
-        def _receive_handler(self, content, msg):
-            if hasattr(self._rpccalldef, 'rpc_call') and self._rpccalldef.rpc_call.active():
-                log.debug("Data message intercepted, increasing timeout by %d from now" % self._ingest_timeout)
-
-                callable = self._rpccalldef.rpc_call.func   # extract the old callable, as cancel() deletes it
-                self._rpccalldef.rpc_call.cancel()          # this is just the timeout, not the actual rpc call
-                self._rpccalldef.rpc_call = reactor.callLater(self._ingest_timeout, callable)
-
-                yield msg.ack()
-            else:
-                msg._state = "ACKED"
-
-            # don't ack if we don't have an active rpc_call, that indicates we're trying to shut down and
-            # no longer care about messages coming in here.
-
     @defer.inlineCallbacks
     def _update_request(self, dataset_id, data_source_id):
         """
@@ -516,14 +497,18 @@ class JavaAgentWrapper(ServiceProcess):
 
 
         log.info('Create subscriber to bump timeouts...')
-        self._subscriber = self.IncreaseTimeoutSubscriber(rpccalldef=perform_ingest_deferred,
-                                                          ingest_timeout=ingest_timeout,
-                                                          xp_name="magnet.topic",
-                                                          binding_key=dataset_id,
-                                                          process=self)
+        self._subscriber = IngestionProcessingEventSubscriber(origin=dataset_id, process=self)
+        def _increase_timeout(data):
+            if hasattr(perform_ingest_deferred, 'rpc_call') and perform_ingest_deferred.rpc_call.active():
+                log.debug("Ingestion (%s/%s) notified it is processing still (step: %s), increasing timeout by %d from now" % (data['content'].additional_data.ingestion_process_id, data['content'].additional_data.conv_id, data['content'].additional_data.processing_step, ingest_timeout))
+
+                callable = perform_ingest_deferred.rpc_call.func   # extract the old callable, as cancel() deletes it
+                perform_ingest_deferred.rpc_call.cancel()          # this is just the timeout, not the actual rpc call
+                perform_ingest_deferred.rpc_call = reactor.callLater(ingest_timeout, callable)
+
+        self._subscriber.ondata = _increase_timeout
 
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
-
 
         if log.getEffectiveLevel() == logging.INFO:
             log.info("@@@--->>> Sending update request to Dataset Agent with context...")
