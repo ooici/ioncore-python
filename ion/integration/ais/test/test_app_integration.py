@@ -53,7 +53,8 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYP
                                                        GET_RESOURCE_RESPONSE_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE
+                                                       DELETE_SUBSCRIPTION_REQ_TYPE, \
+                                                       MANAGE_USER_ROLE_REQUEST_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -986,6 +987,32 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reply = yield self.aisc.updateUserProfile(msg)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
+    @defer.inlineCallbacks
+    def test_setUserRole(self):
+        log.debug('Testing setUserRole')
+
+        valid_ooi_id = 'A7B44115-34BC-4553-B51E-1D87617F12E0'
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(MANAGE_USER_ROLE_REQUEST_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
+
+        rspMsg = yield self.aisc.setUserRole(reqMsg)
+        if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('rspMsg to GPB w/missing role is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(MANAGE_USER_ROLE_REQUEST_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
+        reqMsg.message_parameters_reference.role = 'AUTHENTICATED'
+
+        rspMsg = yield self.aisc.setUserRole(reqMsg)
+        if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
+            self.fail('rspMsg to GPB w/ valid data is an AIS_RESPONSE_ERROR_TYPE GPB')
 
     @defer.inlineCallbacks
     def test_getResourceTypes(self):

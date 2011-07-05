@@ -6,7 +6,8 @@
 @author Ian Katz
 """
 
-#from twisted.trial import unittest
+from twisted.trial import unittest
+import os
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -15,7 +16,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.test.iontest import IonTestCase
 
-from ion.integration.ais.validate_data_resource.parse_url_tester import validateUrl
+from ion.integration.ais.validate_data_resource.parse_url_tester import validateUrl, parseText
 
 
 class AISDataResourceParserTest(IonTestCase):
@@ -31,11 +32,24 @@ class AISDataResourceParserTest(IonTestCase):
         pass
 
     def test_parserOnlyPositive(self):
+        raise unittest.SkipTest("Not fetching a URL until we can put this file on an internal webserver.  For now, possibly moving test to ion-integration.")
 
         toparse = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc" + ".das"
 
         log.info("parsing %s", toparse)
         res = validateUrl(toparse)
+
+        self._doParse(validateUrl(toparse))
+
+
+    def test_parserOnlyPositiveLocal(self):
+        f = open(os.path.abspath(os.path.dirname(__file__)) + os.sep + 'OS_NTAS_2010_R_M-1.nc.das', 'r')
+        contents = f.read()
+        f.close()
+        
+        self._doParse(parseText(contents))
+
+    def _doParse(self, res):
 
         self.failUnlessEqual(True, res.has_key("NC_GLOBAL"), "NC global section not found, but we know its there")
 

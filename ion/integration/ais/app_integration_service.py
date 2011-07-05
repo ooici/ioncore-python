@@ -183,6 +183,13 @@ class AppIntegrationService(ServiceProcess):
             log.debug('op_getUser: \n'+str(content))
         response = yield self.RegisterUserWorker.getUser(content);
         yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_setUserRole(self, content, headers, msg):
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('op_setUserRole: \n'+str(content))
+        response = yield self.RegisterUserWorker.setUserRole(content)
+        yield self.reply_ok(msg, response)
         
     def getTestDatasetID(self):
         return self.dsID
@@ -413,6 +420,16 @@ class AppIntegrationServiceClient(ServiceClient):
                                                                     "0")
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.getUser: IR Service reply:\n' + str(content))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def setUserRole(self, message):
+        yield self._check_init()
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug("AIS_client.setUserRole: sending following message to setUserRole:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('setUserRole', message)
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('AIS_client.setUserRole: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks

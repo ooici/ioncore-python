@@ -35,6 +35,7 @@ DATASET_SUPPLEMENT_ADDED_EVENT_MESSAGE_TYPE = object_utils.create_type_identifie
 INSTRUMENT_SAMPLE_DATA_EVENT_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=4303, version=1)
 DATASET_CHANGE_EVENT_MESSAGE_TYPE           = object_utils.create_type_identifier(object_id=2341, version=1)
 DATASOURCE_CHANGE_EVENT_MESSAGE_TYPE        = object_utils.create_type_identifier(object_id=2342, version=1)
+INGESTION_PROCESSING_EVENT_MESSAGE_TYPE     = object_utils.create_type_identifier(object_id=2343, version=1)
 
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
@@ -49,6 +50,9 @@ DATASET_SUPPLEMENT_ADDED_EVENT_ID = 1111
 BUSINESS_STATE_MODIFICATION_EVENT_ID = 1112
 DATASET_CHANGE_EVENT_ID = 1113
 DATASOURCE_CHANGE_EVENT_ID = 1114
+INGESTION_PROCESSING_EVENT_ID = 1115
+DATASET_STREAMING_EVENT_ID = 1116           #  NOTE: There is no "Publisher" of this event - as it only comes from DatasetAgent (Java) and does not use the
+                                            #  standard Message Types for events.  Instead, expect messages of ids 10001, 2001, and 2005.
 NEW_SUBSCRIPTION_EVENT_ID = 1201
 DEL_SUBSCRIPTION_EVENT_ID = 1202
 SCHEDULE_EVENT_ID = 2001
@@ -342,11 +346,20 @@ class DatasourceChangeEventPublisher(ResourceModifiedEventPublisher):
     """
     Event Notification Publisher for Datasource Change Event - Will Cause AIS to clear the cache for this UUID.
 
-    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
     """
     event_id = DATASOURCE_CHANGE_EVENT_ID
     msg_type = DATASOURCE_CHANGE_EVENT_MESSAGE_TYPE
 
+class IngestionProcessingEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Ingestion Processing Event - Ingestion telling JAW that it is still working,
+    and increase its delay.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = INGESTION_PROCESSING_EVENT_ID
+    msg_type = INGESTION_PROCESSING_EVENT_MESSAGE_TYPE
     
 class NewSubscriptionEventPublisher(EventPublisher):
     """
@@ -577,9 +590,30 @@ class DatasourceChangeEventSubscriber(ResourceModifiedEventSubscriber):
     """
     Event Notification Subscriber for Datasource Change Event.
 
-    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
     """
     event_id = DATASOURCE_CHANGE_EVENT_ID
+
+class IngestionProcessingEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Ingestion Processing Event - Ingestion telling JAW that it is still working,
+    and increase its delay.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = INGESTION_PROCESSING_EVENT_ID
+
+class DatasetStreamingEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Streaming Event - actual mechanism for getting data from DatasetAgent
+    to Ingestion.
+
+    NOTE: There is no "Publisher" of this event - as it only comes from DatasetAgent (Java) and does not use the
+    standard Message Types for events.  Instead, expect messages of ids 10001, 2001, and 2005.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = DATASET_STREAMING_EVENT_ID
 
 class NewSubscriptionEventSubscriber(EventSubscriber):
     """
