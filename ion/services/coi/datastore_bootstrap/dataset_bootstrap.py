@@ -609,6 +609,8 @@ def bootstrap_profile_data_source_resource(datasource, *args, **kwargs):
     datasource.ion_title = "Profile Data Source"
     datasource.ion_description = "Data Profile"
 
+    datasource.is_public = True
+
     return True
 
 def bootstrap_traj_data_source(datasource, *args, **kwargs):
@@ -647,6 +649,10 @@ def bootstrap_traj_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "Traj Data Source"
     datasource.ion_description = "Data Traj"
+
+
+    datasource.is_public = True
+
 
     return True
 
@@ -691,6 +697,10 @@ def bootstrap_station_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "Station Data Source"
     datasource.ion_description = "Data Station"
+
+
+    datasource.is_public = True
+
 
     return True
 
@@ -739,7 +749,10 @@ def bootstrap_hycom_data_source(datasource, *args, **kwargs):
     search_pattern.join_name = "time"
     
     datasource.search_pattern = search_pattern
-    
+
+    datasource.is_public = True
+
+
     return True
 
 
@@ -780,6 +793,9 @@ def bootstrap_ntas1_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "NTAS1 Data Source"
     datasource.ion_description = "Data NTAS1"
+
+
+    datasource.is_public = False
 
     return True
 
@@ -823,6 +839,9 @@ def bootstrap_ntas2_data_source(datasource, *args, **kwargs):
     datasource.ion_title = "NTAS2 Data Source"
     datasource.ion_description = "Data NTAS2"
 
+    datasource.is_public = True
+
+
     return True
 
 
@@ -864,6 +883,9 @@ def bootstrap_whots1_data_source(datasource, *args, **kwargs):
     datasource.ion_title = "WHOTS1 Data Source"
     datasource.ion_description = "Data WHOTS1"
 
+    datasource.is_public = False
+
+
     return True
 
 
@@ -903,6 +925,9 @@ def bootstrap_whots2_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "WHOTS2 Data Source"
     datasource.ion_description = "Data WHOTS2"
+
+
+    datasource.is_public = True
 
     return True
 
@@ -945,6 +970,10 @@ def bootstrap_moanalua_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "Moana Loa Data Source"
     datasource.ion_description = "Data from Moana Loa"
+
+
+    datasource.is_public = True
+
 
     return True
 
@@ -989,6 +1018,9 @@ def bootstrap_choptank_river_data_source(datasource, *args, **kwargs):
     datasource.ion_title = "Choptank River Data Source"
     datasource.ion_description = "Data from Choptank River"
 
+    datasource.is_public = False
+
+
     return True
 
 
@@ -1031,6 +1063,9 @@ def bootstrap_connecticut_river_data_source(datasource, *args, **kwargs):
     
     datasource.ion_title = "Connecticut River Data Source"
     datasource.ion_description = "Data from Connecticut River"
+
+    datasource.is_public = False
+
 
     return True
 
