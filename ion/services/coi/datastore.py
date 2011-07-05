@@ -9,6 +9,7 @@
 there but resource types are not...
 
 """
+import logging
 import math
 from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
 from ion.util.cache import LRUDict
@@ -1113,6 +1114,52 @@ class DataStoreWorkbench(WorkBench):
             compressed_striplist.append(accumstrip)
 
         log.debug("Number of compressed strips: %d" % len(compressed_striplist))
+
+        # ===================================================================
+        # STEP 5b: find overlapping strips and omit them.
+        # ===================================================================
+
+        # @TODO this is extremely naive and would benefit from better BA analysis/compression in step 1 or 2
+        # it's also O(n^2) which is crap.
+
+        non_overlap_striplist = []
+
+        # rule: if its in the striplist already, it wins.
+        for stripitem in compressed_striplist:
+            ba, targetslice, srcslice, leng, laststridelen = stripitem
+
+            # check to see if this targetslice has been taken care of already
+            for existing_stripitem in non_overlap_striplist:
+                nba, ntargetslice, nsrcslice, nleng, nlaststridelen = existing_stripitem
+                log.debug("starting slice analysis")
+
+                # since we're going linearly, we really only have to check the start of this new targetslice
+                if targetslice[0] >= ntargetslice[0] and targetslice[0] < ntargetslice[1]:
+                    # we have an intersection, figure out length of intersection
+                    intlen = ntargetslice[1] - targetslice[0]
+                    log.debug("intersection: %d, %d in %d, %d, len of %d" % (targetslice[0], targetslice[1], ntargetslice[0], ntargetslice[1], intlen))
+
+                    # decision point: if the whole intersection is covered already, throw it out
+                    if targetslice[0] + intlen >= targetslice[1]:
+                        log.debug("whole strip covered, not adding it")
+                        break # skips else clause of for
+                    else:
+                        # split the current strip item up
+                        targetslice = (targetslice[0] + intlen, targetslice[1])
+                        log.debug("split slice into %d, %d" % (targetslice[0], targetslice[1]))
+            else:
+                # no break, means we either don't intersect at all, or we split up to not intersect
+                log.debug("adding slice")
+                newstripitem = (ba, targetslice, srcslice, leng, laststridelen)
+                non_overlap_striplist.append(newstripitem)
+
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            lennonoverlap = len(non_overlap_striplist)
+            lencstriplist = len(compressed_striplist)
+            log.debug("Number of non-overlapping strips: %d (%d eliminated)" % (lennonoverlap, lencstriplist - lennonoverlap))
+
+        # replace compressed striplist to work below
+        compressed_striplist = non_overlap_striplist
 
         # ===================================================================
         # STEP 6: Generate a list of extractions using heuristics, an "extraction plan"
