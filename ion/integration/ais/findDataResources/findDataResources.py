@@ -89,55 +89,6 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
         yield self.metadataCache.putDSetMetadata(dSetResID)
 
                 
-    @defer.inlineCallbacks
-    def old_ondata(self, data):
-        log.debug("DatasetUpdateEventSubscriber received an event:\n")
-
-        dSetResID = data['content'].additional_data.dataset_id
-
-        #
-        # Get the associated source for the dataset (whether the dataset is
-        # cached or not).  If the dataset is cached, delete it.  If the dataset
-        # and the datasource are both active, cache the dataset.
-        #
-        
-        #dSourceResID = data['content'].additional_data.datasource_id
-        #
-        # The above line is commented out for the following reason:
-        # Do not use the dataSourceID that is passed in with the event; rather
-        # get the dataSourceID from the association client.  The reason is that
-        # the the association is the final authority, rendering the passed in
-        # parameter as superfluous. 
-        #
-        dSourceResID = yield self.metadataCache.getAssociatedSource(dSetResID)
-
-        #
-        # Now check the cache to see if there's currently metadata for this
-        # datasetID
-        #
-        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-
-        #
-        # If dataset does not exist, this must be a new dataset; skip the
-        # delete step.
-        #
-        if dSetMetadata is not None:
-            #
-            # Delete the dataset and datasource metadata
-            #
-            log.debug('DatasetUpdateEventSubscriber deleting %s, %s from metadataCache' \
-                      %(dSetResID, dSourceResID))
-            yield self.metadataCache.deleteDSetMetadata(dSetResID)
-            yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
-
-        #
-        # Now  reload the dataset and datasource metadata
-        #
-        log.debug('DatasetUpdateEventSubscriber putting new metadata in cache')
-        yield self.metadataCache.putDSetMetadata(dSetResID)
-        yield self.metadataCache.putDSourceMetadata(dSourceResID)
-
-
 class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
         self.msgs = []
