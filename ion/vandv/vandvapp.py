@@ -71,7 +71,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     # construct an instance of the test class, setup and init it
     vvtmod, vvtclass = vvtest.rsplit('.', 1)
-    vandvmod = __import__("ion.vandv.%s" % vvtmod, fromlist=[vvtclass])
+    vandvmod = __import__(vvtmod, fromlist=[vvtclass])
 
     klass = getattr(vandvmod, vvtclass)
     curtest = klass()
