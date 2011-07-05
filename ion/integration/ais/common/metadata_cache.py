@@ -111,12 +111,8 @@ class MetadataCache(object):
     def getDatasets(self):
         dSetList = []                
         for ds in self.__metadata.keys():
-            log.info('>>>>>>>>>>>>>>> Metadata Key: %s <<<<<<<<<<<<<<<<' %(ds))
             if (self.__metadata[ds][TYPE] is DSET):
-                log.info('  is a >>>>>>>>>>>>>>> dataset <<<<<<<<<<<<<<<<')
                 dSetList.append(self.__metadata[ds])
-            else:                
-                log.info('  is a >>>>>>>>>>>>>>> datasource <<<<<<<<<<<<<<<<')
         return dSetList                
 
     @defer.inlineCallbacks
