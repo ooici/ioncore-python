@@ -321,13 +321,8 @@ class FindDataResources(object):
         #
         ownedByList = []
         for ds in dSetList:
-            dSourceID = ds['DSourceID']
-            dSource = yield self.metadataCache.getDSourceMetadata(dSourceID)
-            if dSource is None:
-                log.error('findDataResourcesByUser: No corresponding datasource for datasetID: %s' %(ds['ResourceIdentity']))
-            else:
-                if ds['OwnerID'] == userID:
-                    ownedByList.append(ds)
+            if ds['OwnerID'] == userID:
+                ownedByList.append(ds)
                 
         log.debug('findDataResourcesByUser: ownedByList has %d datasets' %len(ownedByList))
 
