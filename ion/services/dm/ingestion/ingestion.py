@@ -789,9 +789,15 @@ class IngestionService(ServiceProcess):
 
         log.info('Starting Find Dimension LooP')
 
+        time_vars = self._find_time_var(merge_root)
+
+        if len(time_vars) is 0:
+            result={EM_ERROR:'Error during ingestion: No Time variable found!'}
+            defer.returnValue(result)
+
         # Determine the inner most dimension on which we are aggregating
         dimension_order = []
-        for merge_var in merge_root.variables:
+        for merge_var in time_vars:
 
             # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
             for merge_dim in reversed(merge_var.shape):
@@ -1116,7 +1122,7 @@ class IngestionService(ServiceProcess):
 
                     time_vars.append(var)
 
-                    
+        return time_vars
 
 
 
