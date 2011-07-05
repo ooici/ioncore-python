@@ -7,6 +7,9 @@ class TestVV(object):
     Docstring
     """
 
+    def setup(self):
+        pass
+
     def s1_broheim(self):
         """
         1. Setup a broheim shindig

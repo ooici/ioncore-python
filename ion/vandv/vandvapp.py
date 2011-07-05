@@ -14,7 +14,6 @@ from twisted.internet import defer
 #from ion.core.ioninit import ion_config
 from ion.core import ioninit
 from ion.core.cc.shell import control
-from ion.util.procutils import get_class
 
 #-- CC Application interface
 
@@ -40,11 +39,15 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     # construct an instance of the test class, setup and init it
     print vvtest
-    klass = get_class(vvtest)
+    vvtmod, vvtclass = vvtest.rsplit('.', 1)
+    vandvmod = __import__("ion.vandv.%s" % vvtmod, fromlist=[vvtclass])
+
+    klass = getattr(vandvmod, vvtclass)
     print klass
     curtest = klass()
 
-    yield defer.maybeDeferred(curtest.setup)
+    if hasattr(curtest, 'setup'):
+        yield defer.maybeDeferred(curtest.setup)
 
     # add items to 
     control.add_term_name('test_info', test_info)
@@ -57,7 +60,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     print "V+V app\n\nMethods available: test_info(), next(), step(n)\nVars available: curtest, curstep\n\n"
 
-    defer.returnValue(True)
+    defer.returnValue(('nosupid', 'nostate'))
 
 def stop(container, state):
     pass
