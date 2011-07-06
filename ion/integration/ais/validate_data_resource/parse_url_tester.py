@@ -16,25 +16,30 @@ from ply.yacc import yacc
 
 from data_resource_parser import Lexer, Parser, ParseException
 
+def parseText(text):
+
+    #prepare to parse!
+    lexer = lex(module=Lexer())
+    parser = yacc(module=Parser(), write_tables=0, debug=False)
+        
+    #crunch it!
+    return parser.parse(text, lexer=lexer)
+
+
 def parseUrl(das_resource_url):
     """
     @brief validate a data resource
     @retval big table
     """
 
-    #prepare to parse!
-    lexer = lex(module=Lexer())
-    parser = yacc(module=Parser(), write_tables=0, debug=False)
-        
 
     #fetch file
     fullurl = das_resource_url
     webfile = urllib.urlopen(fullurl)
     dasfile = webfile.read()
     webfile.close()
-    
-    #crunch it!
-    return parser.parse(dasfile, lexer=lexer)
+
+    return parseText(dasfile)
 
 
 def validateUrl(data_resource_url):

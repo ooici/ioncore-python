@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/inventory/ncml_generator.py
 @author Paul Hubbard
+@author Matt Rodriguez
 @date 4/29/11
 @brief For each dataset in the inventory, create a corresponding NcML file and
 sync with remove server. Some tricky code for running a process and noting its
@@ -14,10 +15,11 @@ exit with a deferred.
 file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
 """
 
-from os import path, environ, chmod, unlink, listdir, remove
+from os import path, environ, listdir, remove
 import fnmatch
+import os
 
-from twisted.internet import reactor, defer, error
+from twisted.internet import defer
 from ion.util.os_process import OSProcess
 
 import ion.util.ionlog
@@ -27,7 +29,6 @@ from ion.core import ioninit
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 RSYNC_CMD = CONF['rsync']
-SSH_ADD_CMD = CONF['ssh-add']
 
 def create_ncml(id_ref, filepath=""):
     """
@@ -106,104 +107,39 @@ def rsync_ncml(local_filepath, server_url):
     local ncml files.
     @param local_filepath Local directory for writing ncml file(s)
     @param server_url rsync URL of the server
+    @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    args = ['-r', '--perms', '--include', '"*.ncml"',
-            '-v', '-h', '--delete', local_filepath + '/', server_url]
+    arg1 = " ".join([ 'rsync', '-r', '--perms', '--include=*.ncml', '--exclude=*',
+            '-v', '-h', '--delete-excluded', local_filepath , server_url])
+    args = ['-c', arg1 ]
+
+    
+    log.debug("rsync command %s " % (RSYNC_CMD,))
+    
     rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
     log.debug('Command is "%s"'% ' '.join(args))
-
     return rp.spawn()
     
 
-def rsa_to_dot_ssh(private_key, public_key, delete_old=True):
-    """
-    @brief Another hack. Take an RSA key, save it as an ssh-formatted file into
-    the .ssh directory for use by rsync.
-    @param private_key RSA private key, as returned from 'ssh-keygen -t rsa'
-    @param public_key Public half of same, used for ssh-add -d
-    @retval Tuple of filenames - private and public key
-    @note Raises IOError if necessary
-    """
-
-    ssh_dir = path.join(path.expanduser('~'), '.ssh')
-    rsa_filename = path.join(ssh_dir, 'rsync_ncml.rsa')
-    pubkey_filename = path.join(ssh_dir, 'rsync_ncml.pub')
-
-    if not path.exists(ssh_dir):
-        log.error('ssh directory "%s" not found, cannot continue' % ssh_dir)
-        return None
-
-    if path.exists(rsa_filename):
-        if not delete_old:
-            log.warn('RSA keyfile found, skipping')
-            return None
-
-    try:
-        # Write out public and private keys
-        fh = open(rsa_filename, 'w')
-        fh.write(private_key)
-        fh.close()
-        chmod(rsa_filename, 0600)
-
-        fh = open(pubkey_filename, 'w')
-        fh.write(public_key)
-        fh.close()
-        
-        log.debug('Wrote keys OK')
-    except IOError:
-        log.exception('Error writing ssh keys')
-        raise
-
-    return rsa_filename, pubkey_filename
-
-def ssh_add(filename, remove=False):
-    """
-    Reuse async protocol class to run ssh-add as a subprocess.
-    Adds or removes a key by filename.
-
-    @retval Returns a deferred that fires when the ssh-add completes.
-
-    @bug Deleting the key fails -
-    @see https://bugs.launchpad.net/ubuntu/+source/openssh/+bug/58162
-    @note You need to have the public key present in the ssh directory for
-    delete to work.
-    """
-    if remove:
-        args = ['-d', filename]
-    else:
-        args = [filename]
-
-    log.debug('Command is %s' % args)
-
-    sap = OSProcess(binary=SSH_ADD_CMD, spawnargs=args, env=environ.data)
-    return sap.spawn()
-
 
 @defer.inlineCallbacks
-def do_complete_rsync(local_ncml_path, server_url, private_key, public_key):
+def do_complete_rsync(local_ncml_path, server_url):
     """
     Orchestration routine to tie it all together plus cleanup at the end.
     Needs the inlineCallbacks to serialise.
     """
-
-    if not private_key or not public_key:
-        log.error('Missing required RSA key for NCML RSYNC in Dataset Controller!')
-        defer.returnValue(None)
-        
-    # Generate a private key, add to ssh agent
-    skey, pkey  = rsa_to_dot_ssh(private_key, public_key)
-    yield ssh_add(skey)
-
-    # Run rsync, which should use the key in the agent
+ 
+  
+    ssh_cmd = "".join(("ssh -o StrictHostKeyChecking=no "))
+    os.environ["RSYNC_RSH"] =  ssh_cmd
     yield rsync_ncml(local_ncml_path, server_url)
+    del os.environ["RSYNC_RSH"]
 
-    # Remove the key from the agent and then delete the keys for good measure.
-    yield ssh_add(pkey, remove=True)
 
     # Delete the keys from the file system
-    unlink(skey)
-    unlink(pkey)
+    #unlink(skey)
+    #unlink(pkey)
 
 
 

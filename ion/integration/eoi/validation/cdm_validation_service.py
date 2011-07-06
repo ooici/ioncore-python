@@ -16,6 +16,7 @@ import re, urllib
 
 # Imports: Twisted
 from twisted.internet import defer
+from twisted.web.client import getPage
 
 
 # Imports: ION core
@@ -113,7 +114,7 @@ class CdmValidationService(ServiceProcess):
 
         # Step 2: Validate the URL against the CDM Validator WebService
         try:
-            cdm_output = self.validate_cdm(data_url)
+            cdm_output = yield self.validate_cdm(data_url)
             cdm_resp = yield self.process_cdm_validation_output(cdm_output)
         except Exception, ex:
             log.warn('CDM Validation or validation output processing failed:  Cause: %s' % str(ex))
@@ -140,6 +141,7 @@ class CdmValidationService(ServiceProcess):
         yield self.reply_ok(msg, response)
     
     
+    @defer.inlineCallbacks
     def validate_cdm(self, data_url):
         """
         @brief: Validates the given data_url against the CDM Validation Webservice
@@ -153,18 +155,10 @@ class CdmValidationService(ServiceProcess):
         
         full_url = '%s/%s?URL=%s&xml=true' % (base_url, command, urllib.quote(data_url))
         
-        f = None
-        try:
-            log.debug('validate_cdm(): Requesting validation from CDMValidator WS: \n\n"%s"\n\n' % full_url)
-            f = urllib.urlopen(full_url)
-            result = f.readlines()
-            if isinstance(result, list):
-                result = "".join(result)
-        finally:
-            if f:
-                f.close()
+        log.debug('validate_cdm(): Requesting validation from CDMValidator WS: \n\n"%s"\n\n' % full_url)
+        result = yield getPage(full_url)
 
-        return result
+        defer.returnValue(result)
 
 
     @defer.inlineCallbacks
@@ -186,7 +180,13 @@ class CdmValidationService(ServiceProcess):
             # @todo:  Error if binary is None
             if None == binary or not os.path.exists(binary):
                 raise OSError("CfChecks binary (given by configuration as 'cfchecks_binary' does not specify a valid filepath: '%s'" % binary)
-            proc = OSProcess(binary, args)
+
+            newenv = os.environ.copy()
+            ld_library_path = CONF.getValue('LD_LIBRARY_PATH', None)
+            if ld_library_path:
+                newenv['LD_LIBRARY_PATH'] = ld_library_path
+
+            proc = OSProcess(binary, args, env=newenv)
             
             # Start the process
             if log.getEffectiveLevel() <= logging.DEBUG:
@@ -407,11 +407,10 @@ class CdmValidationService(ServiceProcess):
         cdm_output  = kwargs.get('cdm_output', '')
         cdm_result  = kwargs.get('cdm_result', False)
         cf_output   = kwargs.get('cf_output', '')
-        cf_exitcode = kwargs.get('cf_exitcode', 0) 
         cf_errors   = kwargs.get('cf_errors', 0)
         cf_warnings = kwargs.get('cf_warnings', 0)
         cf_information = kwargs.get('cf_information', 0)
-        cf_exitcode = kwargs.get('cf_exitcode', -1)
+        cf_exitcode = kwargs.get('cf_exitcode', 0)
         
         
         # Build the response object
@@ -426,7 +425,7 @@ class CdmValidationService(ServiceProcess):
         response.cf_error_count   = cf_errors
         response.cf_warning_count = cf_warnings
         response.cf_info_count    = cf_information
-        response.err_msg          = exception or ''
+        response.err_msg          = exception or ('CfChecks exited with return code %s' % str(cf_exitcode) if cf_exitcode != 0 else '')
 
         defer.returnValue(response)
         

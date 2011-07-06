@@ -26,10 +26,10 @@ from twisted.internet import defer, reactor
 
 # Imports: ION Core
 from ion.core import ioninit
-from ion.core.exception import IonError, ApplicationError
+from ion.core.exception import IonError, ApplicationError, ReceivedError
 from ion.core.object import object_utils
 from ion.core.object.gpb_wrapper import OOIObjectError
-from ion.core.process.process import Process, ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
@@ -40,9 +40,8 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 
 # Imports: ION Messages and Events
-from ion.services.dm.distribution.events import ScheduleEventSubscriber
+from ion.services.dm.distribution.events import ScheduleEventSubscriber, IngestionProcessingEventSubscriber
 from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
-from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 
 # Imports: Resources and Associations
@@ -60,12 +59,64 @@ DATASET_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 # Imports: Utils/Config/Logging
 import logging
 import ion.util.ionlog
-from ion.util.os_process import OSProcess
+from ion.util.os_process import OSProcess, OSProcessError
 from ion.util.state_object import BasicStates
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
+
+class OSProcess130Friendly(OSProcess):
+    """
+    When a script is terminated in an interactive console by Control-C the fatal signal causes the process
+    to die with a 130 exit code.  This version of OSProcess interprets Control-C termination as a valid
+    termination mechanism; it will not error-out when receiving an error code of 130.
+    """
+    
+    def processEnded(self, reason):
+        """
+        Notice that the process has ended.
+        Will callback the deferred returned by spawn with a dict containing
+        the exit code, the lines produced on stdout, and the lines on stderr.
+        If the exit code is non zero, the errback is raised.
+        """
+        ec = 0
+        if hasattr(reason, 'value') and hasattr(reason.value, 'exitCode') and reason.value.exitCode != None:
+            ec = reason.value.exitCode
+
+        log.debug("OSProcess: process ended (exitcode: %d)" % ec)
+
+        # if this was called as a result of a close() call, we need to cancel the timeout so
+        # it won't try to kill again
+        if self.close_timeout != None and self.close_timeout.active():
+            self.close_timeout.cancel()
+
+        # form a dict of status to be passed as the result
+        cba = { 'exitcode' : ec,
+                'outlines' : self.outlines,
+                'errlines' : self.errlines }
+
+        if ec != 0 and ec != 130:
+            self.deferred_exited.errback(OSProcessError(cba))
+            return
+
+        self.deferred_exited.callback(cba)
+        
+    def outReceived(self, data):
+        """
+        Output on stdout has been received.
+        Stores the output in a list.
+        """
+        log.debug("SO: %s" % str(data).strip())
+        self.outlines.append(data)
+
+    def errReceived(self, data):
+        """
+        Output on stderr has been received.
+        Stores the output in a list.
+        """
+        log.debug("SE: %s" % data)
+        self.errlines.append(data)
 
 class JavaAgentWrapperException(ApplicationError):
     """
@@ -148,7 +199,7 @@ class JavaAgentWrapper(ServiceProcess):
         self._asc = None   # Access using the property self.asc
         
         # Step 2: Spawn the associated external child process (if not already done)
-        res = yield defer.maybeDeferred(self._spawn_dataset_agent)
+        yield defer.maybeDeferred(self._spawn_dataset_agent)
 
         # Step 3: Setup schedule event subscriber
         log.debug('Creating new message receiver for scheduled updates')
@@ -180,7 +231,6 @@ class JavaAgentWrapper(ServiceProcess):
                 self.__binding_key_deferred = d
             return d
         
-        d = defer.Deferred()
         
         reactor.callLater(0, lambda: _recieve_binding_key(self))
 
@@ -271,7 +321,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 2: Start the Dataset Agent (java) passing necessary spawn arguments
         try:
-            proc = OSProcess(binary, args)
+            proc = OSProcess130Friendly(binary, args)
             proc.spawn()
             proc.deferred_exited.addBoth(self._osp_terminate_callback)
         except ValueError, ex:
@@ -382,8 +432,6 @@ class JavaAgentWrapper(ServiceProcess):
         else:
             yield self.reply_err(msg,'Java agent wrapper failed!')
 
-
-
     @defer.inlineCallbacks
     def _update_request(self, dataset_id, data_source_id):
         """
@@ -400,6 +448,14 @@ class JavaAgentWrapper(ServiceProcess):
         @param dataset_id: The OOI Resource ID of the Dataset which has been updated
         @param data_source_id: The OOI Resource ID of the Data Source which has been updated
         """
+
+        # Step 0: retrieve the dataset_id from the data_source_id if it is not provided -- and vise versa
+        if dataset_id and not data_source_id:
+            data_source_id = yield self._get_associated_data_source_id(dataset_id)
+        elif data_source_id and not dataset_id:
+            dataset_id = yield self._get_associated_dataset_id(data_source_id)
+        elif not dataset_id and not data_source_id:
+            raise JavaAgentWrapperException('Must provide data source or dataset ID!')
     
         # Step 1: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
@@ -418,7 +474,7 @@ class JavaAgentWrapper(ServiceProcess):
         ingest_timeout  = context.max_ingest_millis/1000
 
         if log.getEffectiveLevel() <= logging.DEBUG:        
-            log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (dataset_id, reply_to, ingest_timeout))
+            log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:\t%i' % (dataset_id, reply_to, ingest_timeout))
 
         # Create the PerformIngestMessage
         begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
@@ -441,23 +497,18 @@ class JavaAgentWrapper(ServiceProcess):
 
 
         log.info('Create subscriber to bump timeouts...')
-        self._subscriber = Subscriber(xp_name="magnet.topic",
-                                             binding_key=dataset_id,
-                                             process=self)
+        self._subscriber = IngestionProcessingEventSubscriber(origin=dataset_id, process=self)
+        def _increase_timeout(data):
+            if hasattr(perform_ingest_deferred, 'rpc_call') and perform_ingest_deferred.rpc_call.active():
+                log.debug("Ingestion (%s/%s) notified it is processing still (step: %s), increasing timeout by %d from now" % (data['content'].additional_data.ingestion_process_id, data['content'].additional_data.conv_id, data['content'].additional_data.processing_step, ingest_timeout))
 
-        def increase_timeout(data):
-            """
-            Inner method used to reset the ingestion timeout everytime we receive data
-            """
-            if hasattr(perform_ingest_deferred, 'rpc_call'):
-                log.debug("INCREASING TIMEOUT")
-                perform_ingest_deferred.rpc_call.delay(ingest_timeout/1000)
+                callable = perform_ingest_deferred.rpc_call.func   # extract the old callable, as cancel() deletes it
+                perform_ingest_deferred.rpc_call.cancel()          # this is just the timeout, not the actual rpc call
+                perform_ingest_deferred.rpc_call = reactor.callLater(ingest_timeout, callable)
 
-        self._subscriber.ondata = increase_timeout
-
+        self._subscriber.ondata = _increase_timeout
 
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
-
 
         if log.getEffectiveLevel() == logging.INFO:
             log.info("@@@--->>> Sending update request to Dataset Agent with context...")
@@ -470,12 +521,23 @@ class JavaAgentWrapper(ServiceProcess):
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
 
+        try:
+            (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
+        except ReceivedError, ex:
+            log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
 
-        (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
+            # tell dataset agent to stop doing its thing
+            nonemsg = yield self.mc.create_instance(None)
+            yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
 
-        self._registered_life_cycle_objects.remove(self._subscriber)
-        yield self._subscriber.terminate()
-        self._subscriber = None
+            defer.returnValue(False)
+
+        finally:
+            # cleanup timeout-increasing subscriber
+            self._registered_life_cycle_objects.remove(self._subscriber)
+            yield self._subscriber.terminate()
+            self._subscriber = None
+
 
         log.debug('Ingestion is complete on the ingestion services side...')
 
@@ -536,12 +598,7 @@ class JavaAgentWrapper(ServiceProcess):
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-        # Retreive the datasetID from the dataSourceID if it is not provided -- and vise versa
-        if datasetID and not dataSourceID:
-            dataSourceID = yield self._get_associated_data_source_id(datasetID)
-        elif dataSourceID and not datasetID:
-            datasetID = yield self._get_associated_dataset_id(dataSourceID)
-        elif not datasetID and not dataSourceID:
+        if not datasetID and not dataSourceID:
             raise JavaAgentWrapperException('Must provide data source or dataset ID!')
 
         

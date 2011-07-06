@@ -21,12 +21,13 @@ from ion.services.dm.ingestion.ingestion import IngestionClient
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient, \
                                                         SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE
 
-from ion.services.dm.distribution.events import ScheduleEventPublisher
+from ion.services.dm.distribution.events import ScheduleEventPublisher, \
+                                                DatasourceChangeEventPublisher
 
 from ion.util.iontime import IonTime
 import time
 
-import re
+from ion.util.url import urlRe
 
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
@@ -37,6 +38,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
 
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
                                                        CREATE_DATA_RESOURCE_REQ_TYPE, \
                                                        CREATE_DATA_RESOURCE_RSP_TYPE, \
@@ -73,7 +75,8 @@ class ManageDataResource(object):
         self.ing   = IngestionClient(proc=ais)
         
         #necessary to receive events i think
-        self.pub   = ScheduleEventPublisher(process=ais)
+        self.pub_schd   = ScheduleEventPublisher(process=ais)
+        self.pub_dsrc   = DatasourceChangeEventPublisher(process=ais)
 
     @defer.inlineCallbacks
     def update(self, msg_wrapped):
@@ -84,12 +87,20 @@ class ManageDataResource(object):
         @GPB{Returns,9216,1}
         @retval success
         """
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        log.debug('update worker class method')
+
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.update: " + result.error_str
+            defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, UPDATE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.update(): " + \
+                errtext = "AIS.ManageDataResource.update: " + \
                     "Expected DataResourceUpdateRequest type, got " + str(msg)
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -98,19 +109,15 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
             if not (msg.IsFieldSet("data_set_resource_id")):
-
-                errtext = "ManageDataResource.update(): " + \
+                errtext = "AIS.ManageDataResource.update: " + \
                     "required fields not provided (data_set_resource_id)"
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
-                urlRe = re.compile("([a-z](?:[-a-z0-9\+\.])*):(?:\/\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:])*@)?(\[(?:(?:(?:[0-9a-f]{1,4}:){6}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|::(?:[0-9a-f]{1,4}:){5}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:[0-9a-f]{1,4}:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|v[0-9a-f]+[-a-z0-9\._~!\$&'\(\)\*\+,;=:]+)\]|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3}|(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=@])*)(?::[0-9]*)?(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*|\/(?:(?:(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))+)(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*)?|(?:(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))+)(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*|(?!(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])))(?:\?(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])|[\uE000-\uF8FF\uF0000-\uFFFFD|\u100000-\u10FFFD\/\?])*)?(?:\#(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])|[\/\?])*)?", re.IGNORECASE)
-
                 visualization_url = msg.visualization_url
                 if (urlRe.match(visualization_url) is None):
                     errtext = "ManageDataResource.update(): " + \
@@ -185,8 +192,6 @@ class ManageDataResource(object):
                     sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                     yield self.rc.put_instance(sched_task_rsrc)
                     
-
-
             if msg.IsFieldSet("ion_title"):
                 datasrc_resource.ion_title = msg.ion_title
 
@@ -198,33 +203,26 @@ class ManageDataResource(object):
 
             if msg.IsFieldSet("is_public"):
                 datasrc_resource.is_public = msg.is_public
-                if not msg.is_public:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.ACTIVE
-                else:
-                    datasrc_resource.ResourceLifeCycleState = datasrc_resource.COMMISSIONED
-                    dataset_resource.ResourceLifeCycleState = dataset_resource.COMMISSIONED
+
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
                 datasrc_resource.visualization_url = msg.visualization_url
 
-
             # This could be cleaned up to go faster - only call put if it is modified!
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource])
 
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
 
         except ReceivedApplicationError, ex:
-            log.error('ManageDataResource.update(): Error: %s' %ex)
-
+            log.info('AIS.ManageDataResource.update: Error: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.update(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.update: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
-
             defer.returnValue(Response)
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -243,12 +241,18 @@ class ManageDataResource(object):
         @GPB{Returns,9214,1}
         @retval success
         """
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.delete: " + result.error_str
+            defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, DELETE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.delete(): " + \
+                errtext = "AIS.ManageDataResource.delete: " + \
                     "Expected DataResourceDeleteRequest type, got " + str(msg)
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -257,12 +261,10 @@ class ManageDataResource(object):
                 defer.returnValue(Response)
 
             if not (msg.IsFieldSet("data_set_resource_id")):
-
-                errtext = "ManageDataResource.delete(): " + \
+                errtext = "AIS.ManageDataResource.delete: " + \
                     "required fields not provided (data_set_resource_id)"
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
@@ -295,26 +297,25 @@ class ManageDataResource(object):
                     dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
                     delete_resources.append(dataset_resource)
 
-
                 deletions.append(data_set_resource_id)
-
 
             log.info("putting all resource changes in one big transaction, " \
                          + str(len(delete_resources)))
             yield self.rc.put_resource_transaction(delete_resources)
             log.info("Success!")
 
+            log.info("creating event to signal caching service")
+            yield self.pub_dsrc.create_and_publish_event(origin=datasrc_resource.ResourceIdentity,
+                                                         datasource_id=datasrc_resource.ResourceIdentity)
+
 
         except ReceivedApplicationError, ex:
-            log.error('ManageDataResource.delete(): Error: %s' %ex)
-
+            log.info('AIS.ManageDataResource.delete: Error: %s' %ex)
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.delete(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.delete: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -324,8 +325,6 @@ class ManageDataResource(object):
             Response.message_parameters_reference[0].successfully_deleted_id.append(d)
 
         defer.returnValue(Response)
-
-
 
     
     @defer.inlineCallbacks
@@ -345,12 +344,18 @@ class ManageDataResource(object):
         datasrc_resource      = None
         dataset_resource      = None
 
-        msg = msg_wrapped.message_parameters_reference # checking was taken care of by client
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg_wrapped)
+        if result != None:
+            result.error_str = "AIS.ManageDataResource.create: " + result.error_str
+            defer.returnValue(result)
+
+        msg = msg_wrapped.message_parameters_reference 
         try:
             # Check only the type received and linked object types. All fields are
             #strongly typed in google protocol buffers!
             if not self._equalInputTypes(msg_wrapped, msg, CREATE_DATA_RESOURCE_REQ_TYPE):
-                errtext = "ManageDataResource.create(): " + \
+                errtext = "AIS.ManageDataResource.create: " + \
                     "Expected DataResourceCreateRequest type, got " + str(msg)
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
@@ -362,14 +367,13 @@ class ManageDataResource(object):
             missing = self._missingResourceRequestFields(msg)
             # unless nothing is missing, error.
             if "" != missing:
-                errtext = "ManageDataResource.create(): " + \
+                errtext = "AIS.ManageDataResource.create: " + \
                     "Missing/incorrect required fields in DataResourceCreateRequest: " + missing
                 log.error(errtext)
                 Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
                 Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                 Response.error_str =  errtext
                 defer.returnValue(Response)
-
 
             #max_ingest_millis: default to 30000 (30 seconds before ingest timeout)
             #FIXME: find out what that default should really be.
@@ -385,8 +389,6 @@ class ManageDataResource(object):
                 defer.returnValue(dateproblem)
 
             if msg.IsFieldSet("visualization_url") and msg.visualization_url != '':
-                urlRe = re.compile("([a-z](?:[-a-z0-9\+\.])*):(?:\/\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:])*@)?(\[(?:(?:(?:[0-9a-f]{1,4}:){6}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|::(?:[0-9a-f]{1,4}:){5}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:[0-9a-f]{1,4}:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3})|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|v[0-9a-f]+[-a-z0-9\._~!\$&'\(\)\*\+,;=:]+)\]|(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(?:\.(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3}|(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=@])*)(?::[0-9]*)?(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*|\/(?:(?:(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))+)(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*)?|(?:(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))+)(?:\/(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@]))*)*|(?!(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])))(?:\?(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])|[\uE000-\uF8FF\uF0000-\uFFFFD|\u100000-\u10FFFD\/\?])*)?(?:\#(?:(?:%[0-9a-f][0-9a-f]|[-a-z0-9\._~\uA0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD\uD0000-\uDFFFD\uE1000-\uEFFFD!\$&'\(\)\*\+,;=:@])|[\/\?])*)?", re.IGNORECASE)
-
                 visualization_url = msg.visualization_url
                 if (urlRe.match(visualization_url) is None):
                     errtext = "ManageDataResource.create(): " + \
@@ -397,10 +399,6 @@ class ManageDataResource(object):
                     Response.error_num =  Response.ResponseCodes.BAD_REQUEST
                     Response.error_str =  errtext
                     defer.returnValue(Response)
-
-
-            # get user resource so we can associate it later
-            user_resource = yield self.rc.get_instance(msg.user_id)
 
             # create the data source from the fields in the input message
             datasrc_resource = yield self._createDataSourceResource(msg)
@@ -422,7 +420,6 @@ class ManageDataResource(object):
             self.ing.create_dataset_topics(topics_msg)
 
             #make associations
-            yield self.ac.create_association(user_resource,    HAS_A_ID, datasrc_resource)
             association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
             #build transaction
@@ -435,7 +432,6 @@ class ManageDataResource(object):
                 #record values
                 datasrc_resource.update_interval_seconds       = msg.update_interval_seconds
                 datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
-
 
                 # set up the scheduled task
                 sched_task = yield self._createScheduledEvent(msg.update_interval_seconds,
@@ -452,19 +448,16 @@ class ManageDataResource(object):
                 sched_task_rsrc.ResourceLifeCycleState  = sched_task_rsrc.ACTIVE
                 resource_transaction.append(sched_task_rsrc)
 
-
-            #these start new, and get set on the first ingest event
-            datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
+            #resource lifecycle states as per 6/27/11 call with dstuebe
+            datasrc_resource.ResourceLifeCycleState = datasrc_resource.ACTIVE
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
-
 
             yield self.rc.put_resource_transaction(resource_transaction)
 
             yield self._createEvent(my_dataset_id, my_datasrc_id)
 
-
         except ReceivedApplicationError, ex:
-            log.error('ManageDataResource.create(): Error from a lower-level service: %s' %ex)
+            log.info('AIS.ManageDataResource.create: Error from a lower-level service: %s' %ex)
 
             #mark lifecycle states
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
@@ -473,13 +466,10 @@ class ManageDataResource(object):
             yield self.rc.put_resource_transaction([datasrc_resource, dataset_resource, sched_task_rsrc])
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
-
             Response.error_num =  ex.msg_content.MessageResponseCode
-            Response.error_str =  "ManageDataResource.create(): Error from lower-level service: " + \
+            Response.error_str =  "AIS.ManageDataResource.create: Error from lower-level service: " + \
                 ex.msg_content.MessageResponseBody
             defer.returnValue(Response)
-
-
 
         Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         Response.result = 200
@@ -491,21 +481,24 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
-
     @defer.inlineCallbacks
     def _createEvent(self, dataset_id, datasource_id):
         """
         @brief create a single ingest event trigger and send it
         """
         log.info("triggering an immediate ingest event")
-        msg = yield self.pub.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
-                                          task_id="manage_data_resource_FAKED_TASK_ID")
+        msg = yield self.pub_schd.create_event(origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                               task_id="manage_data_resource_FAKED_TASK_ID")
         
         msg.additional_data.payload = msg.CreateObject(SCHEDULER_PERFORM_INGEST)
         msg.additional_data.payload.dataset_id     = dataset_id
         msg.additional_data.payload.datasource_id  = datasource_id
 
-        yield self.pub.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+        yield self.pub_schd.publish_event(msg, origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE)
+
+        log.info("creating event to signal caching service")
+        yield self.pub_dsrc.create_and_publish_event(origin=datasource_id, datasource_id=datasource_id)
+
 
 
     @defer.inlineCallbacks
@@ -549,7 +542,6 @@ class ManageDataResource(object):
                 log.info("No scheduled ingest events found")
                 defer.returnValue(None)
             
-
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
             response = yield self.sc.rm_task(req_msg)
@@ -604,7 +596,6 @@ class ManageDataResource(object):
             s.start_index = r.start_index
             s.end_index   = r.end_index
 
-
         if msg.IsFieldSet('authentication'):
             log.info("Setting datasource: authentication")
             datasrc_resource.authentication                = msg.authentication
@@ -615,13 +606,14 @@ class ManageDataResource(object):
 
         datasrc_resource.registration_datetime_millis  = IonTime().time_ms
 
+        # Set the lifecycle state to active
+        datasrc_resource.ResourceLifeCycleState        = datasrc_resource.ACTIVE
 
         #put it with the others
         yield self.rc.put_instance(datasrc_resource)
         log.info("created data source ") # + str(datasrc_resource))
 
         defer.returnValue(datasrc_resource)
-
 
 
     @defer.inlineCallbacks
@@ -649,11 +641,12 @@ class ManageDataResource(object):
 
         #this is an error case!
         if None is association:
+            log.info('getOneAssociateionObject: NO association found')
             defer.returnValue(None)
-
 
         the_resource = yield self.rc.get_associated_resource_object(association)
         defer.returnValue(the_resource)
+
 
     @defer.inlineCallbacks
     def _getOneAssociationSubject(self, the_object, the_predicate, the_subject_type):
@@ -684,10 +677,8 @@ class ManageDataResource(object):
         if None is association:
             defer.returnValue(None)
 
-
         the_resource = yield self.rc.get_associated_resource_subject(association)
         defer.returnValue(the_resource)
-
 
 
     def _missingResourceRequestFields(self, msg):
@@ -697,7 +688,7 @@ class ManageDataResource(object):
         """
 
         #this seems very un-GPB-ish, to have to check fields...
-        req_fields = ["user_id",
+        req_fields = [#"user_id", #deprecated as per OOIION-240
                       "source_type",
                       "request_type",
                       #"request_bounds_north",
@@ -713,7 +704,6 @@ class ManageDataResource(object):
                       #"update_start_datetime_millis",
                       "is_public",
                       ]
-
 
         #these repeated fields don't need to be set either
         #repeated string property = 3;
@@ -736,9 +726,31 @@ class ManageDataResource(object):
 
         return ret
 
+
     def _equalInputTypes(self, ais_req_msg, some_casref, desired_type):
         test_msg = ais_req_msg.CreateObject(desired_type)
         return (type(test_msg) == type(some_casref))
+        
+
+    @defer.inlineCallbacks
+    def _CheckRequest(self, request):
+       # Check for correct request protocol buffer type
+       if request.MessageType != AIS_REQUEST_MSG_TYPE:
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = 'Bad message type receieved, ignoring'
+          defer.returnValue(Response)
+ 
+       # Check payload in message
+       if not request.IsFieldSet('message_parameters_reference'):
+          # build AIS error response
+          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+          Response.error_num = Response.ResponseCodes.BAD_REQUEST
+          Response.error_str = "Required field [message_parameters_reference] not found in message"
+          defer.returnValue(Response)
+   
+       defer.returnValue(None)
 
 
     #OOIION-164: check that the start date is less than a year from now

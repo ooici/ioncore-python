@@ -5,7 +5,7 @@
 @author Michael Meisinger
 @brief Abstracts from any form of logging in ION
 """
-
+import logging
 from ion.core import ioninit
 
 class LogFactory(object):
@@ -60,69 +60,6 @@ def getLogger(loggername=__name__):
     logger instance. Currently it just delegates to Python logging.
     """
     return log_factory.get_logger(loggername)
-
-import logging
-class IonLogger(object):
-    """
-    Simple wrapper around a python logger.
-
-    Currently unused.
-    """
-    def __init__(self, loggername):
-        self.logger = logging.getLogger(loggername)
-
-    def debug(self, msg, *args):
-        self.logger.debug(msg, *args)
-
-    def info(self, msg, *args):
-        self.logger.info(msg, *args)
-
-    def warn(self, msg, *args):
-        self.logger.warn(msg, *args)
-
-    def error(self, msg, *args):
-        self.logger.error(msg, *args)
-
-    def critical(self, msg, *args):
-        self.logger.critical(msg, *args)
-
-    def exception(self, msg, *args):
-        self.logger.exception(msg, *args)
-
-    warning = warn
-
-"""
-class LoggerAdapter:
-    def __init__(self, logger, args):
-        self.logger = logger
-        self.args = args
-
-    def debug(self, msg, *args, **kwargs):
-        self.logger.debug(msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self.logger.info(msg, *args, extra=self.extra())
-
-    def warning(self, msg, *args, **kwargs):
-        self.logger.warning(msg, *args, **kwargs)
-    warn = warning
-
-    def error(self, msg, *args, **kwargs):
-        self.logger.error(msg, *args, **kwargs)
-
-    def exception(self, msg, *args):
-        self.logger.exception(msg, *args, **kwargs)
-
-    def critical(self, msg, *args, **kwargs):
-        self.logger.critical(msg, *args, **kwargs)
-    fatal = critical
-
-    def extra(self):
-        extra = {}
-        for k in self.args:
-            extra[k] = self.args[k]
-        return extra
-"""
 
 class ProcessInfo:
     """

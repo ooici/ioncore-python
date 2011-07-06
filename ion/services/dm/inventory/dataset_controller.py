@@ -12,7 +12,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync, check_for_ncml_files
+from ion.services.dm.inventory.ncml_generator import create_ncml, do_complete_rsync
 from ion.core import ioninit
 
 from ion.core.process.process import ProcessFactory
@@ -247,8 +247,7 @@ class DatasetController(ServiceProcess):
         log.debug('NcML files found, invoking rsync')
         self.cwd = getcwd()
         chdir(self.ncml_path)
-        yield do_complete_rsync(self.ncml_path, self.server_url,
-                                    self.private_key, self.public_key)
+        yield do_complete_rsync(self.ncml_path, self.server_url)
 
         chdir(self.cwd)
         log.debug('rsync complete')

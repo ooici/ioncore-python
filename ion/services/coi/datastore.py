@@ -9,6 +9,7 @@
 there but resource types are not...
 
 """
+import logging
 import math
 from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
 from ion.util.cache import LRUDict
@@ -46,11 +47,11 @@ from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANC
 from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE, get_cassandra_configuration
 
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_DATA_SOURCES, ION_ROLES, AUTHENTICATED_ROLE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG, LCS_CFG, COMMISSIONED
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG, root_name, HAS_A_ID, ADMIN_ROLE_ID
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap, ANONYMOUS_USER_ID, ROOT_USER_ID, OWNED_BY_ID, ION_AIS_RESOURCES, ION_AIS_RESOURCES_CFG, OWNER_ID, HAS_ROLE_ID
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -91,7 +92,10 @@ class NDArrayWrap(object):
         self._getblobs = getblobs
 
         self._ndarray = None
-        self._size = reduce(lambda x,y:x*y, [x.size for x in bounds]) * itembytes
+        if len(bounds) == 0:
+            self._size = itembytes      # scalar value, just one itembytes size
+        else:
+            self._size = reduce(lambda x,y:x*y, [x.size for x in bounds]) * itembytes
 
     def __sizeof__(self):
         """
@@ -1112,6 +1116,52 @@ class DataStoreWorkbench(WorkBench):
         log.debug("Number of compressed strips: %d" % len(compressed_striplist))
 
         # ===================================================================
+        # STEP 5b: find overlapping strips and omit them.
+        # ===================================================================
+
+        # @TODO this is extremely naive and would benefit from better BA analysis/compression in step 1 or 2
+        # it's also O(n^2) which is crap.
+
+        non_overlap_striplist = []
+
+        # rule: if its in the striplist already, it wins.
+        for stripitem in compressed_striplist:
+            ba, targetslice, srcslice, leng, laststridelen = stripitem
+
+            # check to see if this targetslice has been taken care of already
+            for existing_stripitem in non_overlap_striplist:
+                nba, ntargetslice, nsrcslice, nleng, nlaststridelen = existing_stripitem
+                log.debug("starting slice analysis")
+
+                # since we're going linearly, we really only have to check the start of this new targetslice
+                if targetslice[0] >= ntargetslice[0] and targetslice[0] < ntargetslice[1]:
+                    # we have an intersection, figure out length of intersection
+                    intlen = ntargetslice[1] - targetslice[0]
+                    log.debug("intersection: %d, %d in %d, %d, len of %d" % (targetslice[0], targetslice[1], ntargetslice[0], ntargetslice[1], intlen))
+
+                    # decision point: if the whole intersection is covered already, throw it out
+                    if targetslice[0] + intlen >= targetslice[1]:
+                        log.debug("whole strip covered, not adding it")
+                        break # skips else clause of for
+                    else:
+                        # split the current strip item up
+                        targetslice = (targetslice[0] + intlen, targetslice[1])
+                        log.debug("split slice into %d, %d" % (targetslice[0], targetslice[1]))
+            else:
+                # no break, means we either don't intersect at all, or we split up to not intersect
+                log.debug("adding slice")
+                newstripitem = (ba, targetslice, srcslice, leng, laststridelen)
+                non_overlap_striplist.append(newstripitem)
+
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            lennonoverlap = len(non_overlap_striplist)
+            lencstriplist = len(compressed_striplist)
+            log.debug("Number of non-overlapping strips: %d (%d eliminated)" % (lennonoverlap, lencstriplist - lennonoverlap))
+
+        # replace compressed striplist to work below
+        compressed_striplist = non_overlap_striplist
+
+        # ===================================================================
         # STEP 6: Generate a list of extractions using heuristics, an "extraction plan"
         # ===================================================================
 
@@ -1556,17 +1606,37 @@ class DataStoreService(ServiceProcess):
 
         # Load the Root User!
         if self.preload[ION_IDENTITIES_CFG]:
-            log.info('Preloading Identities')
+
+
+            log.info('Preloading Identities and Roles')
 
             root_description = ION_IDENTITIES.get(root_name)
-            exists = yield self.workbench.test_existence(ROOT_USER_ID)
-            if not exists:
+            root_exists = yield self.workbench.test_existence(ROOT_USER_ID)
+            if not root_exists:
                 log.info('Preloading ROOT USER')
 
                 resource_instance = self._create_resource(root_description)
                 if resource_instance is None:
                     raise DataStoreError('Failed to create Identity Resource: %s' % str(root_description))
                 self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
+
+
+            log.info('Preloading Roles')
+
+            for key, value in ION_ROLES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    log.info('Preloading Role Resources:' + str(value.get(NAME_CFG)))
+
+                    resource_instance = self._create_resource(value)
+                    if resource_instance is None:
+                        raise DataStoreError('Failed to create AIS Resource: %s' % str(value))
+                    self._create_ownership_association(resource_instance.Repository, ROOT_USER_ID)
+
+            # Root was just created - need to give it a role
+            if not root_exists:
+                create_role_association(self.workbench, ROOT_USER_ID, ADMIN_ROLE_ID)
+
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
             log.info('Preloading Resource Types')
@@ -1587,6 +1657,10 @@ class DataStoreService(ServiceProcess):
             log.info('Preloading Identities')
 
             for key, value in ION_IDENTITIES.items():
+                if key is root_name:
+                    # Don't load root twice...
+                    continue
+
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     log.info('Preloading Identity:' + str(value.get(NAME_CFG)))
@@ -1595,6 +1669,10 @@ class DataStoreService(ServiceProcess):
                     if resource_instance is None:
                         raise DataStoreError('Failed to create Identity Resource: %s' % str(value))
                     self._create_ownership_association(resource_instance.Repository, value[ID_CFG])
+
+                    # Add the authenticated role for each user....
+                    create_role_association(self.workbench, ROOT_USER_ID, AUTHENTICATED_ROLE_ID)
+
                     
         if self.preload[ION_DATASETS_CFG]:
             log.info('Preloading Data Sets: %d' % len(ION_DATASETS))
@@ -1807,6 +1885,7 @@ class DataStoreService(ServiceProcess):
 
         return association_repo
 
+
 class DataStoreClient(ServiceClient):
     """
     Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
@@ -1883,6 +1962,40 @@ class DataStoreClient(ServiceClient):
 ##        defer.returnValue(content)
 #        yield
 #        defer.returnValue({})
+
+def create_role_association(workbench, user_id, role_id):
+   association_repo = workbench.create_repository(ASSOCIATION_TYPE)
+
+   # Set the subject
+   id_ref = association_repo.create_object(IDREF_TYPE)
+   user_repo = workbench.get_repository(user_id)
+   if user_repo is None:
+       raise DataStoreError('User Repository not found during preload.')
+   user_repo.set_repository_reference(id_ref, current_state=True)
+   association_repo.root_object.subject = id_ref
+
+   # Set the predicate
+   id_ref = association_repo.create_object(IDREF_TYPE)
+   has_role_repo = workbench.get_repository(HAS_ROLE_ID)
+   if has_role_repo is None:
+       raise DataStoreError('Has_Role predicate not found during preload.')
+   has_role_repo.set_repository_reference(id_ref, current_state=True)
+
+   association_repo.root_object.predicate = id_ref
+
+   # Set the Object
+   id_ref = association_repo.create_object(IDREF_TYPE)
+   role_repo = workbench.get_repository(role_id)
+   if role_repo is None:
+       raise DataStoreError('Role resource not found during preload.')
+   role_repo.set_repository_reference(id_ref, current_state=True)
+
+   association_repo.root_object.object = id_ref
+
+   association_repo.commit('Ownership association created for preloaded object.')
+
+
+   return association_repo
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)

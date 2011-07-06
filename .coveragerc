@@ -1,5 +1,7 @@
 [run]
 branch = True
+source =
+    ion
 
 [report]
 # Regexes for lines to exclude from consideration
@@ -22,16 +24,14 @@ exclude_lines =
     ^ *pass *$
 
 omit =
-    # omit eggs unrelated to our code
-    eggs/*
-    # omit coverage file
-    *test_extra_coverage*
     # omit __init__.py file
     *__init__*
     # omit tests
     */test/*
-    # omit sandbox from buildbot
-    /*/sandbox/*
+    # omit per S&A
+    /*/utilities/SBE37_util*
+    /*/utilities/client_*
+    /*/utilities/inst_*
 
 [html]
 directory = coverage_results

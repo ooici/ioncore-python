@@ -167,6 +167,8 @@ def get_cassandra_configuration(sysname=None):
 
     # update the sysname
     sysname = sysname or ioninit.sys_name
+    #Keyspaces cannot have hyphens in their name. Replace hyphens with underscores. 
+    sysname = sysname.replace("-", "_")
     if sysname is None:
         raise StorageConfigurationError("storage_configuration_utility.py: no ioninit.sysname or sysname provided to get_cassandra_configuration")
 

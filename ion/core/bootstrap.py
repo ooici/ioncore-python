@@ -54,7 +54,7 @@ def init_ioncore():
     _set_container_args(Container.args)
 
     # Collect all service declarations in local code modules
-    ModuleLoader().load_modules()
+    #ModuleLoader().load_modules()
 
 
     # @todo Service registry call for local service/version registration

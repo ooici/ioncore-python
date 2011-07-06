@@ -33,7 +33,7 @@ class Store(object):
         return [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
 
     def delete(self, key):
-        return defer.maybeDeferred(self.delete, key)
+        return defer.maybeDeferred(self._delete, key)
 
     def _delete(self, key):
         """

@@ -56,11 +56,10 @@ setup( name = 'ioncore',
            'ply==3.4',
            'pysnmp==4.1.16a',
            'pyserial==2.5',
-           'ionproto>=0.3.27',
+           'ionproto>=0.3.33',
                           ],
        entry_points = {
                         'console_scripts': [
-                            'ion-admin=ion.core.env.ion_admin:main',
                             'cassandra-setup=ion.core.data.cassandra_schema_script:main',
                             'cassandra-teardown=ion.core.data.cassandra_teardown_script:main',
                             ],

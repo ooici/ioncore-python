@@ -25,6 +25,11 @@ asa.get_device()
 asa.start()
 asa.stop()
 asa.reset()
+
+In order to see stdio prints of state transitions and other activity
+in the driver and agent, add this line to your shell setup script:
+export DEBUG_PRINT=True
+otherwise, only the message replies will appear in the shell.
 """
 
 from twisted.internet import defer
