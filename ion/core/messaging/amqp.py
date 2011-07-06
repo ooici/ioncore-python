@@ -22,26 +22,72 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import messaging
 SPEC_PATH = os.path.join(messaging.__path__[0], 'amqp0-8.xml')
 
+class IDPool(object):
+    """
+    Create a pool of IDs to allow reuse. The "new_id" function generates the next
+    valid ID from the previous one. If not given, defaults to incrementing an integer.
+    """
+
+    def __init__(self, new_id=None):
+        if new_id is None: new_id = lambda x: x + 1
+
+        self.ids_in_use = set()
+        self.ids_free = set()
+        self.new_id = new_id
+        self.last_id = 0
+
+    def get_id(self):
+        if len(self.ids_free) > 0:
+            return self.ids_free.pop()
+
+        self.last_id = id_ = self.new_id(self.last_id)
+        self.ids_in_use.add(id_)
+        return id_
+
+    def release_id(self, the_id):
+        if the_id in self.ids_in_use:
+            self.ids_in_use.remove(the_id)
+            self.ids_free.add(the_id)
+
+
 class HeartbeatExpired(Exception):
     """
     """
 
 class ChannelWithCallback(AMQChannel):
 
-    def __init__(self, *args):
-        AMQChannel.__init__(self, *args)
+    def __init__(self, id, outgoing, client):
+        AMQChannel.__init__(self, id, outgoing)
         self.deliver_callback = lambda dev_null: dev_null
+        self.client = client
     
     def set_consumer_callback(self, callback):
         self.deliver_callback = callback
+
+    def close(self, reason):
+        AMQChannel.close(self, reason)
+        self.client._channel_closed(self.id)
+
+    def channel_close(self):
+        def close_cb(r):
+            self.close(r)
+            return r
+        d = super(ChannelWithCallback, self).channel_close()
+        d.addCallback(close_cb)
+        return d
+
 
 class AMQPProtocol(AMQClient):
     """ Improvements to the txamqp implementation.
     """
 
     channelClass=ChannelWithCallback
-    next_channel_id = 0
+    #next_channel_id = 0
     closed = True
+
+    def __init__(self, *args, **kwargs):
+        AMQClient.__init__(self, *args, **kwargs)
+        self.id_pool = IDPool()
 
     def channel(self, id=None):
         """Overrides AMQClient. Changes: 
@@ -53,14 +99,20 @@ class AMQPProtocol(AMQClient):
                buffer(list)
         """
         if id is None:
-            self.next_channel_id += 1
-            id = self.next_channel_id
+            #self.next_channel_id += 1
+            #id = self.next_channel_id
+            id = self.id_pool.get_id()
         try:
             ch = self.channels[id]
         except KeyError:
-            ch = self.channelFactory(id, self.outgoing)
+            ch = self.channelFactory(id, self.outgoing, self)
             self.channels[id] = ch
         return ch
+
+    def _channel_closed(self, id):
+        if self.channels.has_key(id):
+            del self.channels[id]
+            self.id_pool.release_id(id)
 
     def queue(self, key):
         """ This is the channel basic_deliver queue
