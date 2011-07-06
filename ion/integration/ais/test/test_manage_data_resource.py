@@ -31,6 +31,9 @@ from ion.integration.ais.app_integration_service import AppIntegrationServiceCli
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
+from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID
+import ion.util.procutils as pu
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
@@ -462,7 +465,7 @@ class AISManageDataResourceTest(IonTestCase):
         yield self._checkCreateFieldAcceptance(ais_req_msg)
 
         #test full field set but no URLs
-        create_req_msg.user_id                       = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"
+        create_req_msg.user_id                       = MYOOICI_USER_ID
         create_req_msg.source_type                   = create_req_msg.SourceType.NETCDF_S
         create_req_msg.request_type                  = create_req_msg.RequestType.DAP
         create_req_msg.ion_description               = "FIXME: description"
@@ -538,6 +541,32 @@ class AISManageDataResourceTest(IonTestCase):
 
         yield self._checkAssociatedQuantities(dr, DATASET_RESOURCE_TYPE_ID, "data set", 1)
         yield self._checkAssociatedQuantities(dr, DATARESOURCE_SCHEDULE_TYPE_ID, "scheduled task", 1)
+        
+        # generate ingestion event to test auto-subscription creation
+        pubSupplementAdded = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSupplementAdded.initialize()
+        yield pubSupplementAdded.activate()
+
+        pubSourceOffline = DatasourceUnavailableEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSourceOffline.initialize()
+        yield pubSourceOffline.activate()
+
+        # creates the event notification for us and sends it
+        yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
+                                           dataset_id=result.data_set_id,
+                                           datasource_id=result.data_source_id,
+                                           title="Unit Testing",
+                                           url="Unit Testing",
+                                           start_datetime_millis = 10000,
+                                           end_datetime_millis = 11000,
+                                           number_of_timesteps = 7
+                                     )
+        """
+        yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
+                                           datasource_id=result.data_source_id,
+                                           error_explanation="Unit Testing")
+        """
+        yield pu.asleep(3.0)
 
         defer.returnValue(result)
 

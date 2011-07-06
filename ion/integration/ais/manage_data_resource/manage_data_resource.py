@@ -28,6 +28,8 @@ import time
 
 from ion.util.url import urlRe
 
+from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
+
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
@@ -45,6 +47,7 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        UPDATE_DATA_RESOURCE_RSP_TYPE, \
                                                        DELETE_DATA_RESOURCE_REQ_TYPE, \
                                                        DELETE_DATA_RESOURCE_RSP_TYPE, \
+                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        DATA_RESOURCE_SCHEDULED_TASK_TYPE
 
 INGESTER_CREATETOPICS_REQ_MSG  = object_utils.create_type_identifier(object_id=2003, version=1)
@@ -72,7 +75,8 @@ class ManageDataResource(object):
         self.ac    = AssociationClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
         self.ing   = IngestionClient(proc=ais)
-        
+        self.nac   = NotificationAlertServiceClient(proc=ais)
+         
         #necessary to receive events i think
         self.pub   = ScheduleEventPublisher(process=ais)
 
@@ -448,6 +452,9 @@ class ManageDataResource(object):
             datasrc_resource.ResourceLifeCycleState = datasrc_resource.NEW
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
+            # create subscription to catch the ingestion-complete or failure events
+            yield self._createSubscription(my_datasrc_id, msg.user_id)
+            
             yield self.rc.put_resource_transaction(resource_transaction)
 
             yield self._createEvent(my_dataset_id, my_datasrc_id)
@@ -477,6 +484,33 @@ class ManageDataResource(object):
         defer.returnValue(Response)
 
 
+    @defer.inlineCallbacks
+    def _createSubscription(self, datasrc_id, user_id):
+        log.info("AIS.ManageDataResource._createSubscription: ")
+        #
+        # Add a subscription for this user to this dataset resource
+        #
+        reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
+        reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = user_id
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = datasrc_id
+        reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
+
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = user_id
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = datasrc_id
+        reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
+        # indicate to the NAS that this is an automatically created email subscription that should be deleted after the initial
+        # ingestion event is received
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path = "AutomaticallyCreatedInitialIngestionSubscription"
+        
+        try:
+            log.debug("AIS.ManageDataResource._createSubscription: calling notification alert service addSubscription()")
+            reply = yield self.nac.addSubscription(reqMsg)
+        except ReceivedApplicationError, ex:
+            log.info('AIS.ManageDataResource._createSubscription(): Error attempting to addSubscription(): %s' %ex)
+       
+        
     @defer.inlineCallbacks
     def _createEvent(self, dataset_id, datasource_id):
         """

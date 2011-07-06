@@ -148,6 +148,13 @@ class NotificationAlertService(ServiceProcess):
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
                 except Exception, ex:
                     log.warning('NotificationAlertService.handle_offline_event Error: %s' %str(ex))
+
+                # delete subscription if it was automatically created by the AIS for an initial ingestion at
+                # dataset creation
+                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
+                    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
+
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
     
@@ -163,6 +170,7 @@ class NotificationAlertService(ServiceProcess):
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
         SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
         BODY = string.join((
                         "Additional data have been received.",
@@ -217,6 +225,13 @@ class NotificationAlertService(ServiceProcess):
                     log.info('NotificationAlertService.handle_update_event Error: unable to send email')
                 except Exception, ex:
                     log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
+
+                # delete subscription if it was automatically created by the AIS for an initial ingestion at
+                # dataset creation
+                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
+                    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
+
                 log.info('NotificationAlertService.handle_update_event completed ')
 
 
