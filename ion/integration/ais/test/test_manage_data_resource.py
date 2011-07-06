@@ -21,9 +21,11 @@ from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 
 import time
 
+from ion.util import procutils as pu
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
+from ion.core.process.process import Process
 from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
@@ -65,18 +67,14 @@ class AISManageDataResourceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
+        #store.Store.kvs.clear()
+        #store.IndexStore.kvs.clear()
+        #store.IndexStore.indices.clear()
 
         self.dispatcher_id = None
 
         services = [
-            {
-                'name':'pubsub_service',
-                'module':'ion.services.dm.distribution.pubsub_service',
-                'class':'PubSubService'
-            },
+
             {
                 'name':'ds1',
                 'module':'ion.services.coi.datastore',
@@ -98,16 +96,17 @@ class AISManageDataResourceTest(IonTestCase):
                 'spawnargs':
                     {
                         'datastore_service':'datastore'}
-                    },
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
             },
+
             {
                 'name':'association_service',
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
+            },
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
             },
             {
                 'name':'attributestore',
@@ -125,14 +124,9 @@ class AISManageDataResourceTest(IonTestCase):
                 'class':'StoreService'
             },
             {
-                'name':'app_integration',
-                'module':'ion.integration.ais.app_integration_service',
-                'class':'AppIntegrationService'
-            },
-            {
-                'name':'notification_alert',
-                'module':'ion.integration.ais.notification_alert_service',
-                'class':'NotificationAlertService'
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
             },
             {
                 'name':'dataset_controller',
@@ -144,6 +138,17 @@ class AISManageDataResourceTest(IonTestCase):
                 'module':'ion.services.dm.scheduler.scheduler_service',
                 'class':'SchedulerServiceClient'
             },
+            {
+                'name':'app_integration',
+                'module':'ion.integration.ais.app_integration_service',
+                'class':'AppIntegrationService'
+            },
+            {
+                'name':'notification_alert',
+                'module':'ion.integration.ais.notification_alert_service',
+                'class':'NotificationAlertService'
+            },
+
 
             ]
 
@@ -153,27 +158,31 @@ class AISManageDataResourceTest(IonTestCase):
 
         self.sup = sup
 
-        self.aisc = AppIntegrationServiceClient(proc=sup)
+        proc = Process()
+        yield proc.spawn()
 
-        self.rc    = ResourceClient(proc=sup)
-        self.mc    = MessageClient(proc=sup)
-        self.ac    = AssociationClient(proc=sup)
+        self.aisc = AppIntegrationServiceClient(proc=proc)
+
+        self.rc    = ResourceClient(proc=proc)
+        self.mc    = MessageClient(proc=proc)
+        self.ac    = AssociationClient(proc=proc)
 
 
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
 
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
+        #store.Store.kvs.clear()
+        #store.IndexStore.kvs.clear()
+        #store.IndexStore.indices.clear()
 
         yield self._shutdown_processes()
         yield self._stop_container()
         log.info("Successfully tore down test container")
 
-
-
+    @defer.inlineCallbacks
+    def test_instantiate(self):
+        yield pu.asleep(1)
 
     @defer.inlineCallbacks
     def test_createDataResource(self):
@@ -348,10 +357,8 @@ class AISManageDataResourceTest(IonTestCase):
         # jira bug OOIION-15
         self.failUnlessEqual(fr_is_public                     , updated_resource.is_public)
 
-        if fr_is_public:
-            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.COMMISSIONED)
-        else:
-            self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.ACTIVE)
+
+        self.failUnlessEqual(updated_resource.ResourceLifeCycleState, updated_resource.ACTIVE)
 
 
     @defer.inlineCallbacks

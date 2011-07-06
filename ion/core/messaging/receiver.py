@@ -304,7 +304,9 @@ class Receiver(BasicLifecycleObject):
                     current_context.append( convid)
                     request.workbench_context = current_context
 
-                # if it is an RPC result message - do not set the context!
+                else:
+                    #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
+                    log.info('Dont set context if it is not a request: %s, in Proc: %s ' % (convid, self.process))
 
 
                 # If this is a GPB message add it to the process workbench
@@ -338,7 +340,7 @@ class Receiver(BasicLifecycleObject):
                         self.completion_deferred = None
 
                     # Cleanup the workbench after an op...
-
+                    workbench_context = 'Not a real context - never remove during inform result!'
                     if protocol != 'rpc':
                         # if it is not an rpc conversation - set the context
                         workbench_context = current_context.pop()
@@ -353,11 +355,9 @@ class Receiver(BasicLifecycleObject):
                         # if it is an RPC result message - do not set the context!
 
                     else:
-                        # @TODO - SHOULD THIS BE HERE?
-                        workbench_context = pu.get_last_or_default(current_context, 'No Context Set!')
-                        log.info('Using last workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
-                        #print 'CONVID:', convid
-                        #print 'CONTEXT:', workbench_context
+
+                        #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
+                        log.info('Dont use context if it is not a request: %s, in Proc: %s ' % (workbench_context, self.process))
 
 
                     if hasattr(self.process, 'workbench'):
