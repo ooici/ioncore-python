@@ -400,7 +400,7 @@ class MetadataCache(object):
         # return None.  
         #
         if len(results) != 1:
-            log.error('Dataset %s has %d associated sources.' %(len(results)))
+            log.error('Dataset %s has %d associated sources.' %(dSetID, len(results)))
             defer.returnValue(None)
         else:
             for association in results:
