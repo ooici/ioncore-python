@@ -494,9 +494,12 @@ class ManageDataResource(object):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = datasrc_id
+        # set up subscription for email notification only
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL
+        # set up subscription to catch both successful and failed ingestions
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
 
+        # set up the meta data so that the NAS is happy
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = datasrc_id
         reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms

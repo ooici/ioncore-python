@@ -542,7 +542,13 @@ class AISManageDataResourceTest(IonTestCase):
         yield self._checkAssociatedQuantities(dr, DATASET_RESOURCE_TYPE_ID, "data set", 1)
         yield self._checkAssociatedQuantities(dr, DATARESOURCE_SCHEDULE_TYPE_ID, "scheduled task", 1)
         
-        # generate ingestion event to test auto-subscription creation
+        """
+        # The following tests are for manually testing of the 'initial-ingestion subscription' creation/deletion.  
+        # These subscriptions are automatically created in ManageDataResource.create() and
+        # automatically deleted in NotificationAlertService.handle_update_event() and
+        # NotificationAlertService.handle_offline_event().  These subscriptions are set up for email notification only.
+        #
+        # generate ingestion events to test auto-subscription creation
         pubSupplementAdded = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
         yield pubSupplementAdded.initialize()
         yield pubSupplementAdded.activate()
@@ -551,7 +557,7 @@ class AISManageDataResourceTest(IonTestCase):
         yield pubSourceOffline.initialize()
         yield pubSourceOffline.activate()
 
-        # creates the event notification for us and sends it
+        # creates the 'successful-ingestion' event notification for us and sends it
         yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
                                            dataset_id=result.data_set_id,
                                            datasource_id=result.data_source_id,
@@ -561,12 +567,12 @@ class AISManageDataResourceTest(IonTestCase):
                                            end_datetime_millis = 11000,
                                            number_of_timesteps = 7
                                      )
-        """
+        # creates the 'failed-ingestion' event notification for us and sends it
         yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
                                            datasource_id=result.data_source_id,
                                            error_explanation="Unit Testing")
-        """
         yield pu.asleep(3.0)
+        """
 
         defer.returnValue(result)
 

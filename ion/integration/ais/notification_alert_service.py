@@ -673,7 +673,7 @@ class NotificationAlertServiceClient(ServiceClient):
         yield self._check_init()
         log.debug('NAS_client.addSubscription: sendin g following message to addSubscription:\n%s' % str(message))
         (content, headers, payload) = yield self.rpc_send('addSubscription', message)
-        log.debug('NAS_client.addSubscription: repl y:\n' + str(content))
+        log.debug('NAS_client.addSubscription: reply:\n' + str(content))
         defer.returnValue(content)
 
     @defer.inlineCallbacks
