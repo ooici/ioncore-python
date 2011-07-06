@@ -227,7 +227,7 @@ class ResourceRegistryClient(ServiceClient):
 
         content, headers, msg = yield self.rpc_send('register_resource_instance', RESOURCE_TYPE)
 
-        log.info('Resource Registry Service reply with new resource ID: '+str(content))
+        #log.info('Resource Registry Service reply with new resource ID: '+str(content))
         defer.returnValue(content)
 
 
