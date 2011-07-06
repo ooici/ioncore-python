@@ -423,6 +423,8 @@ class TestNMEADevice(IonTestCase):
                       (NMEADeviceChannel.GPS, 'GPRMC'),
                       (NMEADeviceChannel.GPS, 'PGRMF'),
                       (NMEADeviceChannel.GPS, 'PGRMC'),
+                      (NMEADeviceChannel.GPS, 'FIX_MODE'),
+                      (NMEADeviceChannel.GPS, 'DIFFMODE'),
                       (NMEADeviceChannel.GPS, 'ALT_MSL'),
                       (NMEADeviceChannel.GPS, 'E_DATUM'),
                       (NMEADeviceChannel.GPS, 'DED_REC')]
@@ -432,6 +434,8 @@ class TestNMEADevice(IonTestCase):
                     (NMEADeviceChannel.GPS, 'GPRMC'): ON,
                     (NMEADeviceChannel.GPS, 'PGRMF'): OFF,
                     (NMEADeviceChannel.GPS, 'PGRMC'): ON,
+                    (NMEADeviceChannel.GPS, 'FIX_MODE'): '2',
+                    (NMEADeviceChannel.GPS, 'DIFFMODE'): 'D',                   
                     (NMEADeviceChannel.GPS, 'ALT_MSL'): 10.2,
                     (NMEADeviceChannel.GPS, 'E_DATUM'): 88,
                     (NMEADeviceChannel.GPS, 'DED_REC'): 8}
@@ -441,6 +445,8 @@ class TestNMEADevice(IonTestCase):
                     (NMEADeviceChannel.GPS, 'GPRMC'): OFF,
                     (NMEADeviceChannel.GPS, 'PGRMF'): ON,
                     (NMEADeviceChannel.GPS, 'PGRMC'): OFF,
+                    (NMEADeviceChannel.GPS, 'FIX_MODE'): '3',
+                    (NMEADeviceChannel.GPS, 'DIFFMODE'): 'A',
                     (NMEADeviceChannel.GPS, 'ALT_MSL'): 11.2,
                     (NMEADeviceChannel.GPS, 'E_DATUM'): 99,
                     (NMEADeviceChannel.GPS, 'DED_REC'): 9}
@@ -449,7 +455,6 @@ class TestNMEADevice(IonTestCase):
         self.assert_(InstErrorCode.is_ok (reply['success']))
 
         reply = yield self.driver_client.get(param_list, 10)
-        log.debug(reply)
         self.assert_(InstErrorCode.is_ok (reply['success']))
         
         # Make sure we got config 1 back out
