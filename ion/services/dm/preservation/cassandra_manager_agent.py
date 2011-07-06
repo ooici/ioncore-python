@@ -72,8 +72,8 @@ class CassandraManagerService(ServiceProcess):
         
         self._host = self.spawn_args.get('bootstrap_args',  CONF.getValue('host'))
         self._port = self.spawn_args.get('bootstrap_args', CONF.getValue('port'))
-        self._username = self.spawn_args.get('bootstrap_args', CONF.getValue('username'))
-        self._password = self.spawn_args.get('bootstrap_args',CONF.getValue('password'))
+        self._username = self.spawn_args.get('bootstrap_args', CONF.getValue('cassandra_username'))
+        self._password = self.spawn_args.get('bootstrap_args',CONF.getValue('cassandra_password'))
         # Create a Resource Client 
         self.rc = ResourceClient(proc=self)    
         self.mc = MessageClient(proc=self)    
