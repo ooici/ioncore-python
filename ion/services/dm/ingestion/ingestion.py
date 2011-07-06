@@ -1116,7 +1116,7 @@ class IngestionService(ServiceProcess):
 
                     time_vars.append(var)
 
-                elif att.name == 'units' and att.GetValue().find(' since '):
+                elif att.name == 'units' and att.GetValue().find(' since ') != -1:
                     log.debug('Found units att with "since" in variable named: %s' % var.name)
 
                     time_vars.append(var)
