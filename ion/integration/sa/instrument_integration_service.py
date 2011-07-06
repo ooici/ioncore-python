@@ -34,11 +34,13 @@ from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
-from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
+#from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
 from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import INSTRUMENT_RES_TYPE_ID, TYPE_OF_ID
+from ion.agents.instrumentagents.simulators.sim_NMEA0183 import SERPORTSLAVE
+from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 
 from ion.core.process.process import Process
 from ion.core.process.process import ProcessDesc
@@ -71,7 +73,6 @@ SET_INSTRUMENT_STATE_REQUEST_MSG_TYPE = object_utils.create_type_identifier(obje
 SET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9312, version=1)
 GET_INSTRUMENT_LIST_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9313, version=1)
 GET_INSTRUMENT_LIST_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9314, version=1)
-
 
 """
 class InstrumentDataEventSubscriber(DataEventSubscriber):
@@ -228,8 +229,6 @@ class InstrumentIntegrationService(ServiceProcess):
         type_ref.key = INSTRUMENT_RES_TYPE_ID
         pair.object = type_ref
 
-        log.info("IIService op_getInstrumentList call assoc service")
-
         result = yield self.asc.get_subjects(request)
 
         log.info("IIService op_getInstrumentList size: %s", str(len(result.idrefs)))
@@ -260,31 +259,17 @@ class InstrumentIntegrationService(ServiceProcess):
         Service operation: Accepts a dictionary containing user inputs.
         Updates the instrument registry.
         """
-        log.info('In createNewInstrument')
-        name = content.message_parameters_reference.name
-        log.info('name: %s'%name)
-        description = content.message_parameters_reference.description
-        log.info('description: %s'%description)
-        manufacturer = content.message_parameters_reference.manufacturer
-        log.info('manufacturer: %s'%manufacturer)
-        model = content.message_parameters_reference.model
-        log.info('model: %s'%model)
-        serial_num = content.message_parameters_reference.serial_num
-        log.info('serial_num: %s'%serial_num)
-        fw_version = content.message_parameters_reference.fw_version
-        log.info('fw_version: %s'%fw_version)
-
-        resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Test Instrument Resource', ResourceDescription='A test instrument resource')
-
         log.info("IIService op_create_new_instrument created resource")
 
+        resource = yield self.rc.create_instance(INSTRUMENT_TYPE, ResourceName='Instrument Resource', ResourceDescription='A test instrument resource')
+
         # Set the attributes
-        resource.name = name
-        resource.description = description
-        resource.manufacturer = manufacturer
-        resource.model = model
-        resource.serial_num = serial_num
-        resource.fw_version = fw_version
+        resource.name = content.message_parameters_reference.name
+        resource.description = content.message_parameters_reference.description
+        resource.manufacturer = content.message_parameters_reference.manufacturer
+        resource.model = content.message_parameters_reference.model
+        resource.serial_num = content.message_parameters_reference.serial_num
+        resource.fw_version = content.message_parameters_reference.fw_version
 
         yield self.rc.put_instance(resource, 'Save instrument resource')
         res_id = resource.ResourceIdentity
@@ -295,7 +280,6 @@ class InstrumentIntegrationService(ServiceProcess):
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(CREATE_INSTRUMENT_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference[0].instrument_resource_id = res_id
 
-        log.info('Replying')
         yield self.reply_ok(msg, rspMsg)
 
 
@@ -319,7 +303,7 @@ class InstrumentIntegrationService(ServiceProcess):
         transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
 
         # Start autosampling.
-        chans = [DriverChannel.INSTRUMENT]
+        chans = [DriverChannel.GPS]
         cmd = [DriverCommand.START_AUTO_SAMPLING]
         reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         log.info('startAutoSampling success: %s',str(reply['success']))
@@ -361,7 +345,7 @@ class InstrumentIntegrationService(ServiceProcess):
         transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
 
         # Stop autosampling.
-        chans = [DriverChannel.INSTRUMENT]
+        chans = [DriverChannel.GPS]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
             reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
@@ -424,19 +408,29 @@ class InstrumentIntegrationService(ServiceProcess):
         #  Put the instrument back into passive mode
         reply = yield self.op_cleanupInstrument(transaction_id)
 
+        
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(GET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE)
-        log.info('DriverChannel.INSTRUMENT:  %s',DriverChannel.INSTRUMENT)
-        log.info('SBE37Parameter.NAVG:  %s',SBE37Parameter.NAVG)
-        log.info('contents:  %s',result[(DriverChannel.INSTRUMENT,SBE37Parameter.NAVG)])
-        rspMsg.message_parameters_reference[0].properties.navg = result[(DriverChannel.INSTRUMENT,SBE37Parameter.NAVG)][1]
-        rspMsg.message_parameters_reference[0].properties.interval = result[(DriverChannel.INSTRUMENT,SBE37Parameter.INTERVAL)][1]
-        rspMsg.message_parameters_reference[0].properties.outputsv = result[(DriverChannel.INSTRUMENT,SBE37Parameter.OUTPUTSV)][1]
-        rspMsg.message_parameters_reference[0].properties.outputsal = result[(DriverChannel.INSTRUMENT,SBE37Parameter.OUTPUTSAL)][1]
-        rspMsg.message_parameters_reference[0].properties.txrealtime = result[(DriverChannel.INSTRUMENT,SBE37Parameter.TXREALTIME)][1]
-        rspMsg.message_parameters_reference[0].properties.storetime = result[(DriverChannel.INSTRUMENT,SBE37Parameter.STORETIME)][1]
 
+        if (result.keys()[0][0] == DriverChannel.GPS):
+            log.info('Creating response message DriverChannel.INSTRUMENT:  %s ', DriverChannel.GPS)
+            rspMsg.message_parameters_reference[0].properties.gpgll = result[(DriverChannel.GPS, NMEADeviceParam.GPGLL)][1]
+            rspMsg.message_parameters_reference[0].properties.pgrmf = result[(DriverChannel.GPS, NMEADeviceParam.PGRMF)][1]
+            rspMsg.message_parameters_reference[0].properties.pgrmc = result[(DriverChannel.GPS, NMEADeviceParam.PGRMC)][1]
+            rspMsg.message_parameters_reference[0].properties.fix_mode = result[(DriverChannel.GPS, NMEADeviceParam.FIX_MODE)][1]
+            rspMsg.message_parameters_reference[0].properties.alt_msl = float(result[(DriverChannel.GPS, NMEADeviceParam.ALT_MSL)][1])
+            rspMsg.message_parameters_reference[0].properties.earth_datum = int(result[(DriverChannel.GPS, NMEADeviceParam.E_DATUM)][1])
+            rspMsg.message_parameters_reference[0].properties.diffmode = result[(DriverChannel.GPS, NMEADeviceParam.DIFFMODE)][1]
+        else:
+            log.info('Creating response message DriverChannel.INSTRUMENT:  %s ', DriverChannel.INSTRUMENT)
+            rspMsg.message_parameters_reference[0].properties.navg = result[(DriverChannel.INSTRUMENT,'NAVG')][1]
+            rspMsg.message_parameters_reference[0].properties.interval = result[(DriverChannel.INSTRUMENT,'INTERVAL')][1]
+            rspMsg.message_parameters_reference[0].properties.outputsv = result[(DriverChannel.INSTRUMENT,'OUTPUTSV')][1]
+            rspMsg.message_parameters_reference[0].properties.outputsal = result[(DriverChannel.INSTRUMENT,'OUTPUTSAL')][1]
+            rspMsg.message_parameters_reference[0].properties.txrealtime = result[(DriverChannel.INSTRUMENT,'TXREALTIME')][1]
+            rspMsg.message_parameters_reference[0].properties.storetime = result[(DriverChannel.INSTRUMENT,'STORETIME')][1]
+        
         log.info('Replying')
         yield self.reply_ok(msg, rspMsg)
 
@@ -452,12 +446,13 @@ class InstrumentIntegrationService(ServiceProcess):
 
         log.info("IIService op_setInstrumentState  inst id: %s   parameters: %s", instrument_id, parameters)
 
-        paramDict = {(DriverChannel.INSTRUMENT,SBE37Parameter.NAVG): parameters.navg,
-                     (DriverChannel.INSTRUMENT,SBE37Parameter.INTERVAL): parameters.interval,
-                     (DriverChannel.INSTRUMENT,SBE37Parameter.OUTPUTSV): parameters.outputsv,
-                     (DriverChannel.INSTRUMENT,SBE37Parameter.OUTPUTSAL): parameters.outputsal,
-                     (DriverChannel.INSTRUMENT,SBE37Parameter.TXREALTIME): parameters.txrealtime,
-                     (DriverChannel.INSTRUMENT,SBE37Parameter.STORETIME): parameters.storetime
+        paramDict = {(DriverChannel.GPS, NMEADeviceParam.GPGLL): parameters.gpgll,
+                     (DriverChannel.GPS, NMEADeviceParam.PGRMF): parameters.pgrmf,
+                     (DriverChannel.GPS, NMEADeviceParam.PGRMC): parameters.pgrmc,
+                     (DriverChannel.GPS, NMEADeviceParam.FIX_MODE): parameters.fix_mode,
+                     (DriverChannel.GPS, NMEADeviceParam.ALT_MSL): parameters.alt_msl,
+                     (DriverChannel.GPS, NMEADeviceParam.E_DATUM): parameters.earth_datum,
+                     (DriverChannel.GPS, NMEADeviceParam.DIFFMODE): parameters.diffmode
                 }
 
         # get the agent resource for this instrument
@@ -497,51 +492,76 @@ class InstrumentIntegrationService(ServiceProcess):
         """
         log.info('In startInstrumentAgent')
         inst_id = content.message_parameters_reference.name
-        log.info('name: %s'%inst_id)
         model = content.message_parameters_reference.model
-        log.info('model: %s'%model)
         inst_resource_id = content.message_parameters_reference.instrument_resource_id
-        log.info('instrument_resource_id: %s'%inst_resource_id)
-
-        if model != 'SBE37':
-            raise ValueError("Only SBE37 supported!")
-        log.info("IIService op_start_instrument_agent good input")
+        log.info('name: %s   model: %s   instrument_resource_id: %s' %(inst_id, model, inst_resource_id))
 
         # Driver and agent configuration. Configuration data will ultimately be
         # accessed via some persistence mechanism: platform filesystem
         # or a device registry. For now, we pass all configuration data
         # that would be read this way as process arguments.
-        sbe_host = '137.110.112.119'
-        sbe_port = 4001
-        driver_config = {
-            'ipport':sbe_port,
-            'ipaddr':sbe_host
-        }
-        agent_config = {}
+        if model == 'SBE37':
+            sbe_host = '137.110.112.119'
+            sbe_port = 4001
+            driver_config = {
+                'ipport':sbe_port,
+                'ipaddr':sbe_host
+            }
+            agent_config = {}
 
-        # Process description for the SBE37 driver.
-        driver_desc = {
-            'name':'SBE37_driver',
-            'module':'ion.agents.instrumentagents.SBE37_driver',
-            'class':'SBE37Driver',
-            'spawnargs':{'config':driver_config}
-        }
+            # Process description for the SBE37 driver.
+            driver_desc = {
+                'name':'SBE37_driver',
+                'module':'ion.agents.instrumentagents.SBE37_driver',
+                'class':'SBE37Driver',
+                'spawnargs':{'config':driver_config}
+            }
 
-        # Process description for the SBE37 driver client.
-        driver_client_desc = {
-            'name':'SBE37_client',
-            'module':'ion.agents.instrumentagents.SBE37_driver',
-            'class':'SBE37DriverClient',
-            'spawnargs':{}
-        }
+            # Process description for the SBE37 driver client.
+            driver_client_desc = {
+                'name':'SBE37_client',
+                'module':'ion.agents.instrumentagents.SBE37_driver',
+                'class':'SBE37DriverClient',
+                'spawnargs':{}
+            }
+
+        else:
+            device_port             = SERPORTSLAVE
+            device_baud             = 19200
+            device_bytesize         = 8
+            device_parity           = 'N'
+            device_stopbits         = 1
+            device_timeout          = 0
+            device_xonxoff          = 0
+            device_rtscts           = 0
+
+            driver_config       = { 'port':         device_port,
+                                    'baudrate':     device_baud,
+                                    'bytesize':     device_bytesize,
+                                    'parity':       device_parity,
+                                    'stopbits':     device_stopbits,
+                                    'timeout':      device_timeout,
+                                    'xonxoff':      device_xonxoff,
+                                    'rtscts':       device_rtscts }
+            agent_config        = {}
+
+            # Process description for the instrument driver.
+            driver_desc         = { 'name':         'NMEA0183_Driver',
+                                    'module':       'ion.agents.instrumentagents.driver_NMEA0183',
+                                    'class':        'NMEADeviceDriver',
+                                    'spawnargs':  { 'config': driver_config } }
+
+            # Process description for the instrument driver client.
+            driver_client_desc  = { 'name':         'NMEA0813_Client',
+                                    'module':       'ion.agents.instrumentagents.driver_NMEA0183',
+                                    'class':        'NMEADeviceDriverClient',
+                                    'spawnargs':    {} }
 
         # Spawnargs for the instrument agent.
-        spawnargs = {
-            'driver-desc':driver_desc,
-            'client-desc':driver_client_desc,
-            'driver-config':driver_config,
-            'agent-config':agent_config
-        }
+        spawnargs           = { 'driver-desc':  driver_desc,
+                                'client-desc':  driver_client_desc,
+                                'driver-config':driver_config,
+                                'agent-config': agent_config }
 
         # Process description for the instrument agent.
         agent_desc = {
@@ -565,25 +585,20 @@ class InstrumentIntegrationService(ServiceProcess):
         self.ia_client = instrument_agent.InstrumentAgentClient(proc=self, target=self.svc_id)
         log.info("IIService op_start_instrument_agent get ia_client")
 
-        #self.ia_client.register_resource(content['instrumentResourceID'])
-
-        """
-        reply_1 = yield self.ia_client.start_transaction(0)
-        log.info("IIService op_start_instrument_agent start trans %s", reply_1)
-        transaction_id_1 = reply_1['transaction_id']
-        reply_3 = yield self.ia_client.end_transaction(transaction_id_1)
-        log.info("IIService op_start_instrument_agent end trans %s", reply_3)
-        """
 
         log.info("IIService op_start_instrument_agent register resource")
         #store the new instrument agent in the resource registry
-        instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Test Instrument Agent Resource', ResourceDescription='A test instrument resource')
+        instrumentAgentResource = yield self.rc.create_instance(INSTRUMENT_AGENT_TYPE, ResourceName='Instrument Agent Resource', ResourceDescription='An instrument resource for testing')
 
         # Set the attributes
         instrumentAgentResource.name = model
         instrumentAgentResource.description = model
-        instrumentAgentResource.class_name = 'SBE37InstrumentAgent'
-        instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE37_IA'
+        if model == 'SBE37':
+            instrumentAgentResource.class_name = 'SBE37InstrumentAgent'
+            instrumentAgentResource.module = 'ion.agents.instrumentagents.SBE37_IA'
+        else:
+            instrumentAgentResource.class_name = 'NMEA0183InstrumentAgent'
+            instrumentAgentResource.module = 'ion.agents.instrumentagents.driver_NMEA0183'
         instrumentAgentResource.process_id = str(self.svc_id)
 
         #Store the resource in the registry
@@ -619,7 +634,6 @@ class InstrumentIntegrationService(ServiceProcess):
         rspMsg.message_parameters_reference[0].instrument_agent_resource_id = inst_agnt_id
         rspMsg.message_parameters_reference[0].instrument_agent_process_id = str(self.svc_id)
 
-        log.info('Replying')
         yield self.reply_ok(msg, rspMsg)
 
     @defer.inlineCallbacks
@@ -647,22 +661,16 @@ class InstrumentIntegrationService(ServiceProcess):
     @defer.inlineCallbacks
     def getAgentDescForInstrument(self, instrument_id):
         log.info("get_agent_desc_for_instrument() instrument_id="+str(instrument_id))
-        """
-        int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
-        agent_query = InstrumentAgentResourceInstance()
-        agent_query.instrument_ref = int_ref
+        yield self.reply_err(msg, "Not yet implemented")
 
-
-        if not agent_res:
-            defer.returnValue(None)
-        agent_pid = agent_res.proc_id
-        log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
-        defer.returnValue(agent_pid)
-        """
 
     @defer.inlineCallbacks
     def getAgentForInstrument(self, inst_resource_id):
 
+        """
+        This method makes the assumption that the only has_a association on an instrument will be the Instrument Agent.
+        THIS IS PROBABLY NOT VALID PAST R1.0
+        """
         result = None
         instrument_resource = yield self.rc.get_instance(inst_resource_id)
         try:

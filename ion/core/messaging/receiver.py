@@ -352,10 +352,14 @@ class Receiver(BasicLifecycleObject):
 
                         # if it is an RPC result message - do not set the context!
 
+                    elif performative == 'inform_result':
+                         workbench_context = 'Not a real context - never remove during inform result!'
+                         log.info('Dont set context in inform result: %s, in Proc: %s ' % (workbench_context, self.process))
+
                     else:
                         # @TODO - SHOULD THIS BE HERE?
                         workbench_context = pu.get_last_or_default(current_context, 'No Context Set!')
-                        log.info('Using last workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
+                        log.warn('Using last workbench_context in unknown Conversation Type: %s, in Proc: %s ' % (workbench_context, self.process))
                         #print 'CONVID:', convid
                         #print 'CONTEXT:', workbench_context
 
