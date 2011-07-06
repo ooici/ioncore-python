@@ -117,6 +117,8 @@ class InteractionObserver(Process):
             sid = msg.get('sender', '??')
             rec = msg.get('receiver')
             sname = msg.get('sender-name', sid)
+            if "DatasetAgent" in sname:
+                sname = "%s_%s" % (sname, sid[0:5])
 
             # map sender to process name
             if not sid in proc_alias:
@@ -187,7 +189,31 @@ class InteractionObserver(Process):
 
             if msgtup[2]:
                 # this is an EVENT, show it as a box!
-                evlabel = "%s" % (rname)
+
+                # this table pulled from https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
+                # on 6 July 2011
+                evtable = { "1001" : "Resource Life Cycle",
+                            "1051" : "Container Life Cycle",
+                            "1052" : "Process Life Cycle",
+                            "1075" : "Application start/stop",
+                            "1076" : "Container Startup",
+                            "1101" : "Data Source Update",
+                            "1102" : "Data Source Unavailable",
+                            "1111" : "Dataset Supplement Added",
+                            "1112" : "Business State Modification",
+                            "1113" : "Dataset Change",
+                            "1114" : "Datasource Change",
+                            "1115" : "Ingestion Processing Notice",
+                            "1116" : "Dataset Streaming",
+                            "1201" : "Subscription New/Modification",
+                            "2001" : "Scheduled Event",
+                            "3003" : "Log (info)",
+                            "3002" : "Log (error)",
+                            "3001" : "Log (critical)",
+                            "4001" : "Data block" }
+
+                evid, evorigin = rec.split(".", 1)
+                evlabel = "E: %s (%s)\\nOrigin: %s" % (evtable[evid], evid, evorigin)
 
                 msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, evlabel)
             else:
