@@ -116,8 +116,13 @@ def rsync_ncml(local_filepath, server_url):
 
     
     log.debug("rsync command %s " % (RSYNC_CMD,))
-    
-    rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=environ.data)
+
+    env_data = environ.copy()
+
+    ssh_cmd = "".join(("ssh -o StrictHostKeyChecking=no "))
+    env_data["RSYNC_RSH"] =  ssh_cmd
+
+    rp = OSProcess(binary=RSYNC_CMD, spawnargs=args, env=env_data)
     log.debug('Command is "%s"'% ' '.join(args))
     return rp.spawn()
     
@@ -128,14 +133,11 @@ def do_complete_rsync(local_ncml_path, server_url):
     """
     Orchestration routine to tie it all together plus cleanup at the end.
     Needs the inlineCallbacks to serialise.
-    """
- 
-  
-    ssh_cmd = "".join(("ssh -o StrictHostKeyChecking=no "))
-    os.environ["RSYNC_RSH"] =  ssh_cmd
-    yield rsync_ncml(local_ncml_path, server_url)
-    del os.environ["RSYNC_RSH"]
 
+    @TODO remove this now useless method...
+    """
+
+    yield rsync_ncml(local_ncml_path, server_url)
 
     # Delete the keys from the file system
     #unlink(skey)
