@@ -77,9 +77,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     curtest = klass()
 
     if hasattr(curtest, 'setup'):
-        print "uyeah setup"
         yield defer.maybeDeferred(curtest.setup)
-        print "uyeah setuip odne"
 
     # pull out test steps
     rtestmethod = re.compile(r'^s\d+_')
