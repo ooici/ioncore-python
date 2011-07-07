@@ -48,7 +48,7 @@ class ITVOSProcess(OSProcess):
         self._ready_deferred = defer.Deferred()
 
         # install timeout
-        self._timeout_calllater = reactor.callLater(30, self._timeout)
+        self._timeout_calllater = reactor.callLater(120, self._timeout)
 
         def cancel_timeout(res):
             if self._timeout_calllater.active():
