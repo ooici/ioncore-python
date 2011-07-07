@@ -46,7 +46,7 @@ are available via buildout scripts or from the OOI package server:
 Dependencies
 ============
 
-ioncore-python is compatible with Python 2.5 and higher, but not Python 3.x.
+ioncore-python is compatible with Python 2.5 only.
 This project has several dependencies on libraries and packages. Most of these
 dependencies are resolved automatically using the provided buildout scripts.
 
