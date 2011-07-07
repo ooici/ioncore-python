@@ -6,6 +6,7 @@
 @brief test for eoi ingestion demo
 """
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publisher
 
 import ion.util.ionlog
@@ -14,6 +15,7 @@ from ion.util.iontime import IonTime
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
+import random
 
 from ion.core import ioninit
 from ion.util import procutils as pu
@@ -29,7 +31,7 @@ from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_pro
 
 from ion.services.dm.ingestion.ingestion import CREATE_DATASET_TOPICS_MSG_TYPE
 
-from ion.core.object.object_utils import create_type_identifier
+from ion.core.object.object_utils import create_type_identifier, ARRAY_STRUCTURE_TYPE
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
@@ -116,6 +118,8 @@ class IngestionTest(IonTestCase):
         ds1 = yield self.sup.get_child_id('ds1')
         log.debug('Process ID:' + str(ds1))
         self.datastore= self._get_procinstance(ds1)
+
+        self.rc = ResourceClient(proc=self.proc)
 
 
     class fake_msg(object):
@@ -309,15 +313,8 @@ class IngestionTest(IonTestCase):
         complete_msg.status = complete_msg.StatusCode.OK
         yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
 
-
-
     @defer.inlineCallbacks
-    def test_ingest_on_new_dataset(self):
-        """
-        This is a test method for the recv dataset operation of the ingestion service
-        """
-
-        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+    def _create_datasource_and_set(self, new_dataset_id, new_datasource_id):
 
         def create_dataset(dataset, *args, **kwargs):
             """
@@ -340,7 +337,6 @@ class IngestionTest(IonTestCase):
 
         log.info('Created Dataset Resource for test.')
 
-        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
         def create_datasource(datasource, *args, **kwargs):
             """
             Create an empty dataset
@@ -379,7 +375,18 @@ class IngestionTest(IonTestCase):
         yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
 
         log.info('Data resources flushed to backend')
+        defer.returnValue((dset_res, dsource_res))
 
+
+    @defer.inlineCallbacks
+    def test_ingest_on_new_dataset(self):
+        """
+        This is a test method for the recv dataset operation of the ingestion service
+        """
+
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        yield self._create_datasource_and_set(new_dataset_id, new_datasource_id)
 
         # Receive a dataset to get setup...
         content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
@@ -483,69 +490,8 @@ class IngestionTest(IonTestCase):
         """
 
         new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
-
-        def create_dataset(dataset, *args, **kwargs):
-            """
-            Create an empty dataset
-            """
-            group = dataset.CreateObject(GROUP_TYPE)
-            dataset.root_group = group
-            return True
-
-        data_set_description = {ID_CFG:new_dataset_id,
-                      TYPE_CFG:DATASET_TYPE,
-                      NAME_CFG:'Blank dataset for testing ingestion',
-                      DESCRIPTION_CFG:'An example of a station dataset',
-                      CONTENT_CFG:create_dataset,
-                      }
-
-        self.datastore._create_resource(data_set_description)
-
-        dset_res = self.datastore.workbench.get_repository(new_dataset_id)
-
-        log.info('Created Dataset Resource for test.')
-
         new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
-        def create_datasource(datasource, *args, **kwargs):
-            """
-            Create an empty dataset
-            """
-            datasource.source_type = datasource.SourceType.NETCDF_S
-            datasource.request_type = datasource.RequestType.DAP
-
-            datasource.base_url = "http://not_a_real_url.edu"
-
-            datasource.max_ingest_millis = 6000
-
-            datasource.registration_datetime_millis = IonTime().time_ms
-
-            datasource.ion_title = "NTAS1 Data Source"
-            datasource.ion_description = "Data NTAS1"
-
-            datasource.aggregation_rule = datasource.AggregationRule.OVERLAP
-
-            return True
-
-
-        data_source_description = {ID_CFG:new_datasource_id,
-                      TYPE_CFG:DATASOURCE_TYPE,
-                      NAME_CFG:'datasource for testing ingestion',
-                      DESCRIPTION_CFG:'An example of a station datasource',
-                      CONTENT_CFG:create_datasource,
-                      }
-
-        self.datastore._create_resource(data_source_description)
-
-        dsource_res = self.datastore.workbench.get_repository(new_datasource_id)
-
-        log.info('Created Datasource Resource for test.')
-
-        yield self.datastore.workbench.flush_repo_to_backend(dset_res)
-        yield self.datastore.workbench.flush_repo_to_backend(dsource_res)
-
-        log.info('Data resources flushed to backend')
-
-
+        yield self._create_datasource_and_set(new_dataset_id, new_datasource_id)
 
         # now, start ingestion on this fake dataset
         msg = yield self.proc.message_client.create_instance(PERFORM_INGEST_MSG_TYPE)
@@ -598,3 +544,80 @@ class IngestionTest(IonTestCase):
         # check called back thing
         self.failUnless("Expected message type" in ingestdef.result.msg_content.MessageResponseBody)
         self.failUnless(ingestdef.result.msg_content.MessageResponseCode, msg.ResponseCodes.BAD_REQUEST)
+
+    @defer.inlineCallbacks
+    def test_recv_random_order(self):
+        """
+        Tests a variable in a dataset can be sent in many chunks in any order and it assembles properly.
+        """
+        new_dataset_id = 'C37A2796-E44C-47BF-BBFB-637339CE81D0'
+        new_datasource_id = '0B1B4D49-6C64-452F-989A-2CDB02561BBE'
+        yield self._create_datasource_and_set(new_dataset_id, new_datasource_id)
+
+        dataset = yield self.rc.get_instance(new_dataset_id)
+        #datasource = yield self.rc.get_instance(content.datasource_id)
+
+        # add our variable
+        var_name = "depth"
+        float_type = dataset.root_group.DataType.FLOAT
+        ddim = dataset.root_group.AddDimension(var_name, 100, False)
+        var = dataset.root_group.AddVariable(var_name, float_type, [ddim])
+        var.content = dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
+
+        # push this back
+        yield self.rc.put_instance(dataset, "Added depth variable")
+
+        # boilerplate for starting ingestion
+        content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id = new_dataset_id
+        content.datasource_id = new_datasource_id
+
+        yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = FakeDelayedCall()
+
+        self.ingest.dataset.CreateUpdateBranch()
+
+        # swap out our reference to var to be the one ingest is working with (so we don't have to pull again)
+        group = self.ingest.dataset.root_group
+        var = group.FindVariableByName(var_name)
+
+        # start creating chunks of the same variable!
+        starting_bounded_arrays  = var.content.bounded_arrays[:]
+
+        log.debug("num bas %d" % len(starting_bounded_arrays))
+
+        shuflist = [x for x in xrange(10)]
+        random.shuffle(shuflist)
+        for x in shuflist:
+            log.debug("Creating depth chunk %d" % x)
+            supplement_msg = yield self.ingest.mc.create_instance(SUPPLEMENT_MSG_TYPE)
+            supplement_msg.dataset_id = SAMPLE_PROFILE_DATASET_ID
+            supplement_msg.variable_name = var_name
+
+            supplement_msg.bounded_array = supplement_msg.CreateObject(BOUNDED_ARRAY_TYPE)
+            supplement_msg.bounded_array.ndarray = supplement_msg.CreateObject(FLOAT32ARRAY_TYPE)
+
+            # set bounds
+            supplement_msg.bounded_array.bounds.add()
+            supplement_msg.bounded_array.bounds[0].origin = x * 10
+            supplement_msg.bounded_array.bounds[0].size = 10
+
+            # set data
+            supplement_msg.bounded_array.ndarray.value.extend([y/10.0 for y in range(x*10, x*10+10)])
+
+            # commit!
+            supplement_msg.Repository.commit("committing round %d" % x)
+
+            # Call the op of the ingest process directly
+            yield self.ingest._ingest_op_recv_chunk(supplement_msg, '', self.fake_msg())
+
+        updated_bounded_arrays = var.content.bounded_arrays[:]
+
+        # should add 10 bounded arrays
+        self.failUnlessEqual(len(updated_bounded_arrays), len(starting_bounded_arrays)+10)
+
+        # should be able to iterate linearly using GetValue
+        for x in xrange(100):
+            self.failUnlessApproximates(x/10.0, var.GetValue(x), 0.01)  # precision may be an issue here?
+            log.debug("Value %d: %f" % (x, var.GetValue(x)))

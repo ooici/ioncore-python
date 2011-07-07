@@ -110,8 +110,14 @@ def rsync_ncml(local_filepath, server_url):
     @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
+
+    # Use /bin/bash to execute this:
+
+    # Set up the rsync command:
     arg1 = " ".join([ 'rsync', '-r', '--perms', '--include=*.ncml', '--exclude=*',
             '-v', '-h', '--delete-excluded', local_filepath , server_url])
+
+    # Execute via /bin/bash -c to get terminal like behavior
     args = ['-c', arg1 ]
 
     
