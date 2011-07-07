@@ -21,7 +21,7 @@ from twisted.internet import defer
 from ion.core.process import service_process
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
-from ion.core.exception import ReceivedContainerError, ReceivedApplicationError, ApplicationError
+from ion.core.exception import ReceivedContainerError, ReceivedApplicationError, ApplicationError, ReceivedError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
@@ -449,18 +449,14 @@ class EchoProcess(Process):
     @defer.inlineCallbacks
     def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        raise RuntimeError("I'm supposed to fail")
+        raise RuntimeError("I'm supposed to fail: Cause a container Error")
 
-        # This is never reached!
-        yield self.reply_ok(msg, content=content)
 
     @defer.inlineCallbacks
     def op_echo_apperror(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        raise ApplicationError("I'm supposed to fail", self.BAD_REQUEST)
+        raise ApplicationError("I'm supposed to fail: Cause an application error", self.BAD_REQUEST)
 
-        # This is never reached!
-        yield self.reply_ok(msg, content=content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)
@@ -503,3 +499,107 @@ class ServiceClientTest(IonTestCase):
         yield self._stop_container()
 
 
+class ProcessContextTest(IonTestCase):
+    """
+    Test the threaded context model
+
+    Consider expanding test to use a version of echo that allows inspection while handling the message... ie yield on
+    a defered that is fired by the test case...
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_rpc_ok(self):
+        processes = [
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+        ]
+        sup = yield self._spawn_processes(processes)
+        pid = sup.get_child_id('echo1')
+
+        proc = Process()
+        yield proc.spawn()
+
+        mc = proc.message_client
+
+        message = yield mc.create_instance(None) # empty message - keep it simple
+
+        log.info('Request Message Repo before send: %s' % message.Repository)
+        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+
+        (response, headers, msg) = yield proc.rpc_send(pid, 'echo', message)
+
+        log.info('Request Message Repo after send: %s' % message.Repository)
+        log.info('Response Message Repo after send: %s' % response.Repository)
+
+        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+        self.assertEqual(response.Repository.convid_context, 'Test runner context!')
+
+
+    @defer.inlineCallbacks
+    def test_rpc_apperror(self):
+        processes = [
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+        ]
+        sup = yield self._spawn_processes(processes)
+        pid = sup.get_child_id('echo1')
+
+
+        proc = Process()
+        yield proc.spawn()
+
+        mc = proc.message_client
+
+        message = yield mc.create_instance(None) # empty message - keep it simple
+
+        log.info('Request Message Repo before send: %s' % message.Repository)
+        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+
+        try:
+            (response, headers, msg) = yield proc.rpc_send(pid, 'echo_apperror', message)
+
+        except ReceivedError, re:
+
+            log.info('Request Message Repo after send: %s' % message.Repository)
+            log.info('Response Message Repo after send: %s' % re.msg_content.Repository)
+
+            self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+            self.assertEqual(re.msg_content.Repository.convid_context, 'Test runner context!')
+
+
+    @defer.inlineCallbacks
+    def test_rpc_container_error(self):
+        processes = [
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+        ]
+        sup = yield self._spawn_processes(processes)
+        pid = sup.get_child_id('echo1')
+
+
+        proc = Process()
+        yield proc.spawn()
+
+        mc = proc.message_client
+
+        message = yield mc.create_instance(None) # empty message - keep it simple
+
+        log.info('Request Message Repo before send: %s' % message.Repository)
+        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+
+        try:
+            (response, headers, msg) = yield proc.rpc_send(pid, 'echo_exception', message)
+
+        except ReceivedError, re:
+
+            log.info('Request Message Repo after send: %s' % message.Repository)
+            log.info('Response Message Repo after send: %s' % re.msg_content.Repository)
+
+            self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+            self.assertEqual(re.msg_content.Repository.convid_context, 'Test runner context!')

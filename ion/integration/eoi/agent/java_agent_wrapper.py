@@ -869,7 +869,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         parent_host_name = self.container.exchange_manager.message_space.hostname
         parent_xp_name = self.container.exchange_manager.exchange_space.name
-        parent_scoped_name = self.get_scoped_name("system", str(self.declare['name']))      # @todo: validate that 'system' is the correct scope
+        parent_scoped_name = self.receiver.xname
         parent_callback_op = "binding_key_callback"
 
 

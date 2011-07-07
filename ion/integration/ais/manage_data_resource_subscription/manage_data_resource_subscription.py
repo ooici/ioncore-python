@@ -268,7 +268,7 @@ class ManageDataResourceSubscription(object):
             defer.returnValue(Response)
 
         except ReceivedApplicationError, ex:
-            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to addSubscription(): %s' %ex)
+            log.info('ManageDataResourceSubscription.createDataResourceSubscription(): Error attempting to addSubscription(): %s' %ex.msg_content.MessageResponseBody)
 
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE)
 
@@ -616,18 +616,63 @@ class ManageDataResourceSubscription(object):
         bounds = SpatialTemporalBounds()
         bounds.loadBounds(msg.message_parameters_reference.dataBounds)
 
+        # create response message
+        respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+        respMsg.message_parameters_reference.add()
+        respMsg.message_parameters_reference[0] = respMsg.CreateObject(GET_SUBSCRIPTION_LIST_RESP_TYPE)
+
         #
-        # Now iterate through the list, filtering by the bounds
+        # Now iterate through the list, filtering by the bounds.  If no metadata
+        # is found, log an error (shouldn't happen)
         #
+        j = 0
         for result in reply.message_parameters_reference[0].subscriptionListResults:
             dSetResID = result.datasetMetadata.data_resource_id
             dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-            if not dSetMetadata is None:
-                if bounds.isInBounds(dSetMetadata) == False:                
-                    del result
-   
-        defer.returnValue(reply)
+            if dSetMetadata is None:
+                log.error('Metadata not found for dataset: %s' %(dSetResID))
+            else:
+                log.debug('Metadata found for dataset: %s' %(dSetResID))
+                if bounds.isInBounds(dSetMetadata):
+                    respMsg.message_parameters_reference[0].subscriptionListResults.add()
+                    self.__loadSubscriptionListResultsMsg(respMsg.message_parameters_reference[0].subscriptionListResults[j], result)
+                    j = j + 1
+                
+        defer.returnValue(respMsg)
 
+
+    def __loadSubscriptionListResultsMsg(self, respMsg, result):
+        #
+        # Private utility method to build a subscription list response message.
+        # 
+        respMsg.subscriptionInfo.user_ooi_id = result.subscriptionInfo.user_ooi_id
+        respMsg.subscriptionInfo.data_src_id = result.subscriptionInfo.data_src_id
+        respMsg.subscriptionInfo.subscription_type = result.subscriptionInfo.subscription_type
+        respMsg.subscriptionInfo.email_alerts_filter = result.subscriptionInfo.email_alerts_filter
+        respMsg.subscriptionInfo.dispatcher_alerts_filter = result.subscriptionInfo.dispatcher_alerts_filter
+        respMsg.subscriptionInfo.dispatcher_script_path = result.subscriptionInfo.dispatcher_script_path
+        respMsg.subscriptionInfo.date_registered = result.subscriptionInfo.date_registered
+
+        respMsg.datasetMetadata.user_ooi_id = result.datasetMetadata.user_ooi_id
+        respMsg.datasetMetadata.data_resource_id = result.datasetMetadata.data_resource_id
+        respMsg.datasetMetadata.title = result.datasetMetadata.title
+        respMsg.datasetMetadata.institution = result.datasetMetadata.institution
+        respMsg.datasetMetadata.source = result.datasetMetadata.source
+        respMsg.datasetMetadata.references = result.datasetMetadata.references
+        respMsg.datasetMetadata.summary = result.datasetMetadata.summary
+        respMsg.datasetMetadata.conventions = result.datasetMetadata.conventions
+        respMsg.datasetMetadata.comment = result.datasetMetadata.comment
+        respMsg.datasetMetadata.ion_time_coverage_start = result.datasetMetadata.ion_time_coverage_start
+        respMsg.datasetMetadata.ion_time_coverage_end = result.datasetMetadata.ion_time_coverage_end
+        respMsg.datasetMetadata.ion_geospatial_lat_min = result.datasetMetadata.ion_geospatial_lat_min
+        respMsg.datasetMetadata.ion_geospatial_lat_max = result.datasetMetadata.ion_geospatial_lat_max
+        respMsg.datasetMetadata.ion_geospatial_lon_min = result.datasetMetadata.ion_geospatial_lon_min
+        respMsg.datasetMetadata.ion_geospatial_lon_max = result.datasetMetadata.ion_geospatial_lon_max
+        respMsg.datasetMetadata.ion_geospatial_vertical_min = result.datasetMetadata.ion_geospatial_vertical_min
+        respMsg.datasetMetadata.ion_geospatial_vertical_max = result.datasetMetadata.ion_geospatial_vertical_max
+        respMsg.datasetMetadata.ion_geospatial_vertical_positive = result.datasetMetadata.ion_geospatial_vertical_positive
+        respMsg.datasetMetadata.download_url = result.datasetMetadata.download_url
+        
 
     @defer.inlineCallbacks
     def _CheckRequest(self, request):
