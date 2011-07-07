@@ -110,10 +110,15 @@ def rsync_ncml(local_filepath, server_url):
     @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
-    arg1 = " ".join([ 'rsync', '-r', '--perms', '--include=*.ncml', '--exclude=*',
-            '-v', '-h', '--delete-excluded', local_filepath , server_url])
-    args = ['-c', arg1 ]
+    ### This appears to be wrong?
+    #arg1 = " ".join([ 'rsync', '-r', '--perms', '--include=*.ncml', '--exclude=*',
+    #        '-v', '-h', '--delete-excluded', local_filepath , server_url])
+    #
+    ### Not sure what this was for?
+    #args = ['-c', arg1 ]
 
+    args = " ".join(['-r', '--perms', '--include=*.ncml',
+            '-v', '-h', '--delete-excluded', local_filepath , server_url])
     
     log.debug("rsync command %s " % (RSYNC_CMD,))
 
