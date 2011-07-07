@@ -1115,11 +1115,18 @@ class IngestionService(ServiceProcess):
                     log.debug('Found standard name "time" in variable named: %s' % var.name)
 
                     time_vars.append(var)
+                    break # Don't continue to iterate attributes
 
                 elif att.name == 'units' and att.GetValue().find(' since ') != -1:
                     log.debug('Found units att with "since" in variable named: %s' % var.name)
 
                     time_vars.append(var)
+                    break # Don't continue to iterate attributes
+
+            else:
+                log.debug('Variable named "%s" does not appear to be a time variable.' % var.name)
+
+        # Do not raise an exception here if none are found - let the ingestion method handle the issue based on the return
 
         return time_vars
 
