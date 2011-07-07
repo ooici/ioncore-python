@@ -15,6 +15,7 @@ from twisted.internet import defer
 
 from google.protobuf import message
 
+from ion.core.object.object_utils import sha1_to_hex
 
 from ion.core.object import object_utils
 from ion.core.object import repository
@@ -1015,6 +1016,10 @@ class WorkBench(object):
         log.debug('_merge_repo_heads: merging the state of repository heads!')
         log.debug('existing repository head:\n' + existing_head.Debug())
         log.debug('new head:\n' + new_head.Debug())
+        repo = existing_head.Repository
+        log.debug('Number of commits: %d' % len(repo._commit_index))
+        log.debug('Number of hashed objects: %d' % len(repo.index_hash))
+
 
         # examine all the branches in new and merge them into existing
         for new_branch in new_head.branches:
@@ -1075,7 +1080,10 @@ class WorkBench(object):
                 # Look in the commit index of the new repo to see if the existing link is an old commit in new repository
                 else:
 
+                    log.debug('Loading all commits in the repository')
                     self._load_commits(new_link) # Load the new ancestors!
+                    log.debug('Loaded all commits!')
+
                     existing_cref = repo.get_linked_object(existing_link)
                     new_cref = repo.get_linked_object(new_link)
 
@@ -1125,8 +1133,8 @@ class WorkBench(object):
 
     def _load_commits(self, link):
                 
-        log.debug('_load_commits: Loading all commits in the repository')
 
+        log.debug('_load_commits - Key: %s' % sha1_to_hex(link.key))
         repo = link.Repository
 
         try:
@@ -1144,5 +1152,4 @@ class WorkBench(object):
             # Call this method recursively for each link
             self._load_commits(link)
         
-        log.debug('_load_commits: Loaded all commits!')
 
