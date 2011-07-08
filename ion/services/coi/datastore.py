@@ -1131,7 +1131,6 @@ class DataStoreWorkbench(WorkBench):
             # check to see if this targetslice has been taken care of already
             for existing_stripitem in non_overlap_striplist:
                 nba, ntargetslice, nsrcslice, nleng, nlaststridelen = existing_stripitem
-                log.debug("starting slice analysis")
 
                 # since we're going linearly, we really only have to check the start of this new targetslice
                 if targetslice[0] >= ntargetslice[0] and targetslice[0] < ntargetslice[1]:
@@ -1146,10 +1145,13 @@ class DataStoreWorkbench(WorkBench):
                     else:
                         # split the current strip item up
                         targetslice = (targetslice[0] + intlen, targetslice[1])
-                        log.debug("split slice into %d, %d" % (targetslice[0], targetslice[1]))
+                        srcslice = (srcslice[0] + intlen, srcslice[1])
+                        leng = targetslice[1] - targetslice[0]
+
+                        log.debug("split slice into %d,%d -> %d,%d length %d" % (targetslice[0], targetslice[1], srcslice[0], srcslice[1], leng))
             else:
                 # no break, means we either don't intersect at all, or we split up to not intersect
-                log.debug("adding slice")
+                #log.debug("adding slice")
                 newstripitem = (ba, targetslice, srcslice, leng, laststridelen)
                 non_overlap_striplist.append(newstripitem)
 
@@ -1216,12 +1218,9 @@ class DataStoreWorkbench(WorkBench):
                 log.debug("Extraction step %d, # strips: %d, element count: %d, start index: %d" % (exidx, len(curstrips), elemcount, targetstartidx))
 
                 # ok, now we can perform the extractions on this step
-                for csidx, curstrip in enumerate(curstrips):
+                targetoffset = 0
+                for curstrip in curstrips:
                     ba, targetidxs, srcidxs, leng, stride = curstrip
-
-                    # index into the current chunk data
-                    striplen = leng
-                    targetoffset = csidx * striplen
 
                     # get/possibly load from ndarray_cache
                     ndobjval = yield ndarray_cache.get_ndarray_value(ba.GetLink('ndarray').key, ba.bounds, ITEM_SIZE, self._get_blobs)
@@ -1232,11 +1231,16 @@ class DataStoreWorkbench(WorkBench):
                     else:
                         targetslice = [d for i, d in enumerate(srcslice) if i % stride == 0]
 
-                    targetndarray[targetoffset:targetoffset+striplen] = targetslice
+                    #log.debug("SETTING TNDARRAY[%d:%d]" % (targetoffset, targetoffset+leng))
+                    targetndarray[targetoffset:targetoffset+leng] = targetslice
+
+                    # add length to target offset
+                    targetoffset += leng
 
                 # ensure we filled this chunk
                 nonelist = [i for i,d in enumerate(targetndarray) if d is None]
                 if len(nonelist) > 0:
+                    log.error("extract_data: Nones found in targetndarray prior to send: %s" % str(nonelist))
                     raise DataStoreWorkBenchError("Data extraction did not properly fill in all members of response ndarray!")
 
                 # SEND THIS CHUNK
