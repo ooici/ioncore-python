@@ -58,7 +58,8 @@ def timeout(secs):
 
                         s_args = pu.pprint_to_string(args)
                         s_kwargs = pu.pprint_to_string(kwargs)
-                        log.error('Timeout error in function "%s"\nArgs: \n%s\nKWArgs: \n%s' % (func.__name__, s_args, s_kwargs ))
+                        sep = '*//////////////////////////*\n'
+                        log.error('Timeout error in function "%s"\n%sFunction Args: \n%s\nFunction KWArgs: \n%s %s' % (func.__name__, sep, s_args, s_kwargs, sep ))
 
                     raise TimeoutError("%s secs have expired in func name %s" % (secs, func.__name__))
 
