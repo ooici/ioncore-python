@@ -6,8 +6,6 @@
 @author Ian Katz
 """
 
-from twisted.trial import unittest
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -22,7 +20,6 @@ from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 import time
 
 from ion.util import procutils as pu
-from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
 from ion.core.process.process import Process
@@ -33,9 +30,7 @@ from ion.integration.ais.app_integration_service import AppIntegrationServiceCli
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
-from ion.services.dm.distribution.events import DatasetSupplementAddedEventPublisher, DatasourceUnavailableEventPublisher
 from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID
-import ion.util.procutils as pu
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
