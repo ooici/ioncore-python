@@ -1145,7 +1145,10 @@ class DataStoreWorkbench(WorkBench):
                     else:
                         # split the current strip item up
                         targetslice = (targetslice[0] + intlen, targetslice[1])
-                        srcslice = (srcslice[0] + intlen, srcslice[1])
+                        srcslice = (srcslice[0] + intlen * laststridelen, srcslice[1])  # src slice is always given without striding applied, so
+                                                                                        # when we update after a split we have to take that stride
+                                                                                        # into account.  If we've shaved off intlen items in target
+                                                                                        # coordinates, we need to shave off intlen * stride in source.
                         leng = targetslice[1] - targetslice[0]
 
                         log.debug("split slice into %d,%d -> %d,%d length %d" % (targetslice[0], targetslice[1], srcslice[0], srcslice[1], leng))
