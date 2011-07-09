@@ -1636,7 +1636,7 @@ class ContainerWrapper(object):
     def GetLink(self, key):
         link = self._gpbcontainer.__getitem__(key)
         link = self._wrapper._rewrap(link)
-        assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % linkname
+        assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % link.ObjectClass
         return link
 
     @GPBSourceCW
@@ -1645,7 +1645,7 @@ class ContainerWrapper(object):
         links = self._gpbcontainer[:] # Get all the links!
         for link in links:
             link = self._wrapper._rewrap(link)
-            assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % linkname
+            assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % link.ObjectClass
             wrapper_list.append(link)
         return wrapper_list
 

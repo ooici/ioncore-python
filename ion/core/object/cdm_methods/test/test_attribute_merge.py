@@ -17,7 +17,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG,
 
 CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 
-from ion.core.object.cdm_methods.attribute_merge import *
+from ion.core.object.cdm_methods.attribute_merge import MergeAttSrc, MergeAttDst, MergeAttGreater, MergeAttLesser
 
 class CdmAttributeTest(IonTestCase):
     """

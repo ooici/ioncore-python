@@ -17,13 +17,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 
 from ion.core.process import process
-from ion.core.object import workbench
+from ion.core.object import workbench, repository
 from ion.core.object.association_manager import AssociationInstance, AssociationManager
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
-from ion.services.coi.datastore_bootstrap import ion_preload_config
-
-from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -182,7 +179,7 @@ class AssociationClient(object):
             yield repo.checkout(branch)
         except repository.RepositoryError, ex:
             log.warn('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
-            raise ResourceClientError('Could not checkout branch during get_instance.')
+            raise AssociationClientError('Could not checkout branch during get_instance.')
 
         # Create a association instance to return
         # @TODO - Check and see if there is already one - what to do?

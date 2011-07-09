@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from ion.util import procutils
 
 import ion.util.ionlog
 import ion.util.procutils

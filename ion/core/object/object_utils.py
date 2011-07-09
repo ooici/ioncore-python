@@ -53,12 +53,14 @@ def sha1hex(val):
 def sha1bin(val):
     return hashlib.sha1(val).digest()
 
+""" This method is deprecated
 def sha1(val, bin=True):
     if isinstance(val, BaseObject):
         val = val.value
     if bin:
         return sha1bin(val)
     return sha1hex(val)
+"""
 
 def sha1_to_hex(bytes):
     """binary form (20 bytes) of sha1 digest to hex string (40 char)
