@@ -6,6 +6,7 @@
 @author David Stuebe
 @brief test service for registering resources and client classes
 """
+from ion.services.coi.resource_registry.resource_client import ResourceClientError
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)

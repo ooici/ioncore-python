@@ -50,7 +50,7 @@ class LogFactory(object):
 
 # declare global instance
 try:
-    log_factory
+    log_factory # When would this not be an exception?
 except NameError:
     log_factory = LogFactory()
 

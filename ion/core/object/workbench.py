@@ -519,7 +519,6 @@ class WorkBench(object):
             if cloning:
                 # Clear the repository that was created for the clone
                 self.clear_repository(repo)
-                del repo
 
             if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
 
@@ -533,7 +532,6 @@ class WorkBench(object):
 
         if result.IsFieldSet('blob_elements') and not get_head_content:
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
-
 
         # Add any new content to the repository:
         for se in result.commit_elements:
@@ -1056,6 +1054,7 @@ class WorkBench(object):
         """
         # Get the repositories we are working from
         repo = existing_branch.Repository
+        new_repo = new_branch.Repository
 
         log.debug('_resolve_branch_state: resolving branch state in repository heads!')
         for new_link in new_branch.commitrefs.GetLinks():
