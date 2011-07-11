@@ -5,11 +5,9 @@
 @author Dave Foster <dfoster@asascience.com>
 """
 
-from ion.core.messaging.receiver import Receiver
 from twisted.internet import defer, reactor
 from twisted.web import server, resource, static
 from twisted.web.server import NOT_DONE_YET
-from pkg_resources import resource_filename
 import os, time
 
 from ion.core.object import object_utils
