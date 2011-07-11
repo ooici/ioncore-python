@@ -187,6 +187,11 @@ class Process(BasicLifecycleObject):
         self.connectors = []
         self.listeners = []
 
+        # Set a context for the startup of the process - to be cleared after activate is finished.
+        current_context = request.get('workbench_context', [])
+        current_context.append( 'process_initialization')
+        request.workbench_context = current_context
+        
         # publisher for lifecycle change notifications
         self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
         self.add_life_cycle_object(self._plcc_pub)
@@ -340,6 +345,15 @@ class Process(BasicLifecycleObject):
 
         # publish ready -> active transition
         yield self._plcc_pub.create_and_publish_event(state=self._plcc_pub.State.ACTIVE)
+
+        # last step in activation - cleanup!
+        log.debug('Process activation complete - clearing workbench:\n%s' % str(self.workbench))
+        current_context = request.get('workbench_context', [])
+        if current_context[-1] == 'process_initialization':
+            workbench_context = current_context.pop()
+            self.workbench.manage_workbench_cache(workbench_context)
+        else:
+            log.warn('Process context is not being cleared. Context got reset or changed?')
 
 
     def plc_activate(self):
