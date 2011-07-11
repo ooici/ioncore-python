@@ -32,6 +32,7 @@ def rewrite_url(dsUrl, newHostname=CACHE_HOSTNAME):
     @todo add CACHE_PORTNUM
     """
 
+    dsUrl = str(dsUrl)
     ml = urlparse.urlsplit(dsUrl)
     # Replace the hostname with localhost
     # Remove all path components
