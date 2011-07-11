@@ -11,16 +11,11 @@ log = ion.util.ionlog.getLogger(__name__)
 import logging
 from twisted.internet import defer
 
-from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.cei.epu_controller_client import EPUControllerClient
 from ion.services.cei.epu_controller_list_client import EPUControllerListClient
-
-from ion.services.coi.datastore_bootstrap.ion_preload_config import dataset_res_type_name, \
-                                                                    identity_res_type_name, \
-                                                                    datasource_res_type_name
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -30,16 +25,9 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        GET_RESOURCE_RESPONSE_TYPE
 from ion.core.object import object_utils
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, \
-                                                                    HAS_A_ID, \
-                                                                    IDENTITY_RESOURCE_TYPE_ID, \
+from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RESOURCE_TYPE_ID, \
                                                                     TYPE_OF_ID, \
-                                                                    ANONYMOUS_USER_ID, \
-                                                                    HAS_LIFE_CYCLE_STATE_ID, \
-                                                                    OWNED_BY_ID, \
-                                                                    SAMPLE_PROFILE_DATASET_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
-                                                                    IDENTITY_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID
 from ion.core.intercept.policy import get_current_roles, all_roles
 
