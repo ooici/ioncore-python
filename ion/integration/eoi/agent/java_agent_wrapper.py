@@ -523,6 +523,15 @@ class JavaAgentWrapper(ServiceProcess):
 
         try:
             (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
+        except defer.TimeoutError:
+            log.error("JAW timed out client side and will tell DAC to cease transmission")
+
+            # tell dataset agent to stop doing its thing
+            nonemsg = yield self.mc.create_instance(None)
+            yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
+
+            defer.returnValue(False)
+
         except ReceivedError, ex:
             log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
 
