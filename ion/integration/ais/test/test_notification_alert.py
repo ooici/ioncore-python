@@ -8,7 +8,6 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
 from twisted.internet import defer
 
@@ -44,12 +43,7 @@ class NotificationAlertTest(IonTestCase):
     """
     Testing Notification Alert Service.
     """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-
-        services = [
+    services = [
             {
                 'name':'pubsub_service',
                 'module':'ion.services.dm.distribution.pubsub_service',
@@ -104,7 +98,12 @@ class NotificationAlertTest(IonTestCase):
 
             ]
 
-        sup = yield self._spawn_processes(services)
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+       
+        sup = yield self._spawn_processes(self.services)
         self.sup = sup
         self.nac = NotificationAlertServiceClient(proc=sup)
         self.aisc = AppIntegrationServiceClient(proc=sup)
@@ -114,6 +113,9 @@ class NotificationAlertTest(IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
+    def test_instantiate(self):
+        pass
+    
     @defer.inlineCallbacks
     def test_addSubscription(self):
 
@@ -160,7 +162,7 @@ class NotificationAlertTest(IonTestCase):
         if numResReturned != 1:
             self.fail('NotificationAlertTest: test_addSubscription returned incorrect subscription count.')
 
-
+        
     @defer.inlineCallbacks
     def test_removeSubscription(self):
 

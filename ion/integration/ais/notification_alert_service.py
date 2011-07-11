@@ -4,6 +4,7 @@ __author__ = 'mauricemanning'
 """
 @file ion/integration/notification_alert_service.py
 @author Maurice Manning
+@author Matt Rodriguez
 @brief Utility service to send email alerts for user subscriptions
 """
 
@@ -29,11 +30,14 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.attributestore import AttributeStoreClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.process.process import ProcessFactory
+from ion.core.data import cassandra_bootstrap
+
 
 from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.core.data.store import Query
 from ion.services.dm.distribution.events import DatasetSupplementAddedEventSubscriber, DatasourceUnavailableEventSubscriber
 
+from ion.core.data.storage_configuration_utility import STORAGE_PROVIDER, PERSISTENT_ARCHIVE, get_cassandra_configuration
 
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
@@ -75,21 +79,50 @@ class NotificationAlertService(ServiceProcess):
         #if this is a re-start, must create listeners for each data source
 
 
+        
+        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
+        
+        self.index_store_class = pu.get_class(index_store_class_name)
+        self._storage_conf = get_cassandra_configuration()
+        self.storage_provider = self._storage_conf[STORAGE_PROVIDER]
+        
+        self.username = self.spawn_args.get("cassandra_username", CONF.getValue("cassandra_username", default=None))
+        self.password = self.spawn_args.get("cassandra_password", CONF.getValue("cassandra_password", default=None))
+        self.column_family  = self.spawn_args.get("column_family", CONF.getValue("column_family", default=None))
+        
+
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+
         #initialize index store for subscription information
         SUBSCRIPTION_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path', \
                                         'date_registered', 'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
                                         'ion_time_coverage_start', 'ion_time_coverage_end', 'ion_geospatial_lat_min', 'ion_geospatial_lat_max', \
                                         'ion_geospatial_lon_min', 'ion_geospatial_lon_max', \
                                         'ion_geospatial_vertical_min', 'ion_geospatial_vertical_max', 'ion_geospatial_vertical_positive', 'download_url']
-        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
-        self.index_store_class = pu.get_class(index_store_class_name)
-        self.index_store = self.index_store_class(self, indices=SUBSCRIPTION_INDEXED_COLUMNS )
+        
+        if issubclass(self.index_store_class , cassandra_bootstrap.CassandraIndexedStoreBootstrap):
+            log.info("Instantiating CassandraStore")
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+            self.index_store = self.index_store_class(self.username, self.password, self.storage_provider, keyspace, self.column_family)
+            yield self.index_store.initialize()
+            yield self.index_store.activate()
+            
+            yield self.register_life_cycle_object(self.index_store)
+            log.info("Done with instantiating the Cassandra store")
+        else: 
+            log.info("Instatiating Memory Store")
+            self.index_store = self.index_store_class(self, indices=SUBSCRIPTION_INDEXED_COLUMNS )
 
-
-    def slc_init(self):
-        pass
-
-
+    
+    """
+    @defer.inlineCallbacks
+    def slc_deactivate(self):
+        yield self.index_store.shutdown()
+        log.info("In slc_terminate ")
+    """    
+        
     @defer.inlineCallbacks
     def handle_offline_event(self, content):
         log.info('NotificationAlertService.handle_offline_event notification event received ')
@@ -294,6 +327,7 @@ class NotificationAlertService(ServiceProcess):
         offlineSubscriptionExists = 0
 
         #Check if subscribers have already been created for these events on this data source
+        log.info("data_src_id")
         query = Query()
         query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
         rows = yield self.index_store.query(query)
@@ -314,11 +348,11 @@ class NotificationAlertService(ServiceProcess):
         log.info('NotificationAlertService.op_addSubscription add attributes\n ')
         self.attributes = {'user_ooi_id':content.message_parameters_reference.subscriptionInfo.user_ooi_id,
                    'data_src_id': content.message_parameters_reference.subscriptionInfo.data_src_id,
-                   'subscription_type':content.message_parameters_reference.subscriptionInfo.subscription_type,
-                   'email_alerts_filter': content.message_parameters_reference.subscriptionInfo.email_alerts_filter,
-                   'dispatcher_alerts_filter':content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter,
+                   'subscription_type': str(content.message_parameters_reference.subscriptionInfo.subscription_type),
+                   'email_alerts_filter': str(content.message_parameters_reference.subscriptionInfo.email_alerts_filter),
+                   'dispatcher_alerts_filter':str(content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter),
                    'dispatcher_script_path': content.message_parameters_reference.subscriptionInfo.dispatcher_script_path,
-                   'date_registered': content.message_parameters_reference.subscriptionInfo.date_registered,
+                   'date_registered': str(content.message_parameters_reference.subscriptionInfo.date_registered),
 
                    'title' : content.message_parameters_reference.datasetMetadata.title,
                    'institution' : content.message_parameters_reference.datasetMetadata.institution,
@@ -329,16 +363,17 @@ class NotificationAlertService(ServiceProcess):
                    'comment' : content.message_parameters_reference.datasetMetadata.comment,
                    'ion_time_coverage_start' : content.message_parameters_reference.datasetMetadata.ion_time_coverage_start,
                    'ion_time_coverage_end' : content.message_parameters_reference.datasetMetadata.ion_time_coverage_end,
-                   'ion_geospatial_lat_min' : content.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min,
-                   'ion_geospatial_lat_max' : content.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max,
-                   'ion_geospatial_lon_min' : content.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min,
-                   'ion_geospatial_lon_max' : content.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max,
-                   'ion_geospatial_vertical_min' : content.message_parameters_reference.datasetMetadata.ion_geospatial_vertical_min,
-                   'ion_geospatial_vertical_max' : content.message_parameters_reference.datasetMetadata.ion_geospatial_vertical_max,
+                   'ion_geospatial_lat_min' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min),
+                   'ion_geospatial_lat_max' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max),
+                   'ion_geospatial_lon_min' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min),
+                   'ion_geospatial_lon_max' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max),
+                   'ion_geospatial_vertical_min' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_vertical_min),
+                   'ion_geospatial_vertical_max' : str(content.message_parameters_reference.datasetMetadata.ion_geospatial_vertical_max),
                    'ion_geospatial_vertical_positive' : content.message_parameters_reference.datasetMetadata.ion_geospatial_vertical_positive,
                    'download_url' : content.message_parameters_reference.datasetMetadata.download_url,
                    
         }
+        
         log.info('NotificationAlertService.op_addSubscription attributes userid: %s', content.message_parameters_reference.subscriptionInfo.user_ooi_id )
         log.info('NotificationAlertService.op_addSubscription attributes datasrc id: %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
@@ -485,11 +520,11 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults.add()
             respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.data_src_id = rows[key]['data_src_id']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.subscription_type = rows[key]['subscription_type']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.email_alerts_filter = rows[key]['email_alerts_filter']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.subscription_type = int(rows[key]['subscription_type'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.email_alerts_filter = int(rows[key]['email_alerts_filter'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.dispatcher_alerts_filter = int(rows[key]['dispatcher_alerts_filter'])
             respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.date_registered = rows[key]['date_registered']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].subscriptionInfo.date_registered = long(rows[key]['date_registered'])
     
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.data_resource_id = rows[key]['data_src_id']
@@ -502,12 +537,12 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.comment = rows[key]['comment']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_time_coverage_start = rows[key]['ion_time_coverage_start']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_time_coverage_end = rows[key]['ion_time_coverage_end']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_min = rows[key]['ion_geospatial_lat_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_max = rows[key]['ion_geospatial_lat_max']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_min = rows[key]['ion_geospatial_lon_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_max = rows[key]['ion_geospatial_lon_max']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_min = rows[key]['ion_geospatial_vertical_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_max = rows[key]['ion_geospatial_vertical_max']
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_min = float(rows[key]['ion_geospatial_lat_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lat_max = float(rows[key]['ion_geospatial_lat_max'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_min = float(rows[key]['ion_geospatial_lon_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_lon_max = float(rows[key]['ion_geospatial_lon_max'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_min = float(rows[key]['ion_geospatial_vertical_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_max = float(rows[key]['ion_geospatial_vertical_max'])
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.ion_geospatial_vertical_positive = rows[key]['ion_geospatial_vertical_positive']
             respMsg.message_parameters_reference[0].subscriptionListResults[0].datasetMetadata.download_url = rows[key]['download_url']
         respMsg.result = respMsg.ResponseCodes.OK
@@ -552,11 +587,11 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults.add()
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.data_src_id = rows[key]['data_src_id']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.subscription_type = rows[key]['subscription_type']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.email_alerts_filter = rows[key]['email_alerts_filter']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_alerts_filter = rows[key]['dispatcher_alerts_filter']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.subscription_type = int(rows[key]['subscription_type'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.email_alerts_filter = int(rows[key]['email_alerts_filter'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_alerts_filter = int(rows[key]['dispatcher_alerts_filter'])
             respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.dispatcher_script_path = rows[key]['dispatcher_script_path']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered = rows[key]['date_registered']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].subscriptionInfo.date_registered = int(rows[key]['date_registered'])
 
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.user_ooi_id = rows[key]['user_ooi_id']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.data_resource_id = rows[key]['data_src_id']
@@ -569,12 +604,12 @@ class NotificationAlertService(ServiceProcess):
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.comment = rows[key]['comment']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_time_coverage_start = rows[key]['ion_time_coverage_start']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_time_coverage_end = rows[key]['ion_time_coverage_end']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lat_min = rows[key]['ion_geospatial_lat_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lat_max = rows[key]['ion_geospatial_lat_max']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lon_min = rows[key]['ion_geospatial_lon_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lon_max = rows[key]['ion_geospatial_lon_max']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_vertical_min = rows[key]['ion_geospatial_vertical_min']
-            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_vertical_max = rows[key]['ion_geospatial_vertical_max']
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lat_min = float(rows[key]['ion_geospatial_lat_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lat_max = float(rows[key]['ion_geospatial_lat_max'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lon_min = float(rows[key]['ion_geospatial_lon_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_lon_max = float(rows[key]['ion_geospatial_lon_max'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_vertical_min = float(rows[key]['ion_geospatial_vertical_min'])
+            respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_vertical_max = float(rows[key]['ion_geospatial_vertical_max'])
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.ion_geospatial_vertical_positive = rows[key]['ion_geospatial_vertical_positive']
             respMsg.message_parameters_reference[0].subscriptionListResults[i].datasetMetadata.download_url = rows[key]['download_url']
 
