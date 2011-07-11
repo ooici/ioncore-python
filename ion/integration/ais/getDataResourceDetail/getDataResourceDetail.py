@@ -27,7 +27,6 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
 
 from ion.integration.ais.ais_object_identifiers import GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import DATASOURCE_RESOURCE_TYPE_ID
 
 USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
@@ -278,7 +277,7 @@ class GetDataResourceDetail(object):
         OoiIdRequest.configuration.ooi_id = userID
         try:
             result = yield self.irc.get_user(OoiIdRequest)
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             defer.returnValue(None)
             
         defer.returnValue(result)            

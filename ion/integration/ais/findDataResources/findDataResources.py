@@ -17,7 +17,6 @@ from decimal import Decimal
 from ion.core.object import object_utils
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient
-from ion.services.coi.resource_registry.association_client import AssociationClientError
 
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
@@ -25,7 +24,7 @@ from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY
 from ion.services.dm.distribution.events import DatasourceChangeEventSubscriber, \
                                                 DatasetChangeEventSubscriber
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
             DATASET_RESOURCE_TYPE_ID
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         

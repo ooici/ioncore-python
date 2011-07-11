@@ -513,7 +513,7 @@ class ManageDataResource(object):
         
         try:
             log.debug("AIS.ManageDataResource._createSubscription: calling notification alert service addSubscription()")
-            reply = yield self.nac.addSubscription(reqMsg)
+            yield self.nac.addSubscription(reqMsg)
         except ReceivedApplicationError, ex:
             log.info('AIS.ManageDataResource._createSubscription(): Error attempting to addSubscription(): %s' %ex)
        

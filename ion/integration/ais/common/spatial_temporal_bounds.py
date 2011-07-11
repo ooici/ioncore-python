@@ -10,7 +10,6 @@ set of temporal/spatial bounds.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from ion.util.procutils import isnan
-from twisted.internet import defer
 
 import time, datetime
 from decimal import Decimal
