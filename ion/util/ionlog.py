@@ -49,8 +49,7 @@ class LogFactory(object):
         self._handlers.remove(handler)
 
 # declare global instance
-if not hasattr(__name__, 'log_factory'):
-    log_factory = LogFactory()
+log_factory = LogFactory()
 
 def getLogger(loggername=__name__):
     """
