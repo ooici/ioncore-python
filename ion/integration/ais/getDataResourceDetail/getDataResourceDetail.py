@@ -168,7 +168,7 @@ class GetDataResourceDetail(object):
 
         rspMsg.message_parameters_reference[0].data_resource_id = dSetResID
 
-        self.__loadGPBMinMetaData(rspMsg.message_parameters_reference[0].dataResourceSummary, ds)
+        self.__loadGPBMinMetaData(rspMsg.message_parameters_reference[0], ds)
         self.__loadGPBSourceMetaData(rspMsg.message_parameters_reference[0].source, dSource, userProfile)
         
         i = 0
@@ -182,6 +182,13 @@ class GetDataResourceDetail(object):
 
 
     def __loadGPBVariable(self, gpbVariable, ds, var):
+
+        gpbVariable.name = var.name
+
+        #
+        # Load up the "minimum metadata" portion of the variable, and then
+        # stick any "other_attributes" into a name/value GPB.
+        #
         i = 0
         for attrib in var.attributes:
             if attrib.name == 'standard_name':
@@ -191,13 +198,21 @@ class GetDataResourceDetail(object):
             elif attrib.name == 'units':
                 gpbVariable.units = attrib.GetValue()
             else:
-                if i > 0:
-                    tmpstr = '::'
-                else:
-                    tmpstr = ''
-                tmpstr = tmpstr + str(attrib.name) + '=' + str(attrib.GetValue())
-                gpbVariable.other_attributes.append(tmpstr)
+                gpbVariable.other_attributes.add()
+                gpbVariable.other_attributes[i].name = attrib.name
+                gpbVariable.other_attributes[i].value = str(attrib.GetValue())
                 i = i + 1
+
+        #
+        # Load up the dimensions of the variable, if there are any.
+        #
+        i = 0
+        for dim in var.shape:
+            gpbVariable.dimensions.add()
+            gpbVariable.dimensions[i].name = dim.name
+            gpbVariable.dimensions[i].length = dim.length
+                
+            i = i + 1
 
 
     def __loadGPBSourceMetaData(self, GPBSource, dSource, userProfile):
@@ -235,7 +250,14 @@ class GetDataResourceDetail(object):
         log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
         
-    def __loadGPBMinMetaData(self, rootAttributes, dSet):
+    def __loadGPBMinMetaData(self, rspGpb, dSet):
+        i = 0
+        rootAttributes = rspGpb.dataResourceSummary
+        #
+        # Load the "minimum metadata" portion of the dataset metadata into
+        # keyword fields of the GPB, then load the "other attributes" of the
+        # dataset into repeated name/value GPBs. 
+        #
         for attrib in dSet.root_group.attributes:
             #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
             #log.debug('Root Attribute: %s = %s'  % (attrib.name, attrib.GetValue()))
@@ -269,6 +291,23 @@ class GetDataResourceDetail(object):
                 rootAttributes.ion_geospatial_vertical_max = float(attrib.GetValue())
             elif attrib.name == 'ion_geospatial_vertical_positive':                
                 rootAttributes.ion_geospatial_vertical_positive = attrib.GetValue()
+            else:
+                rspGpb.other_attributes.add()
+                rspGpb.other_attributes[i].name = attrib.name
+                rspGpb.other_attributes[i].value = attrib.GetValue()
+                i = i + 1
+        
+        #
+        # Loup of the dimensions of the dataset
+        #
+        i = 0        
+        for dim in dSet.root_group.dimensions:
+            rspGpb.dimensions.add()
+            rspGpb.dimensions[i].name = dim.name
+            rspGpb.dimensions[i].length = dim.length
+            i = i + 1
+
+
 
     @defer.inlineCallbacks
     def __getUserProfile(self, userID):
