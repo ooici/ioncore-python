@@ -8,6 +8,7 @@
 """
 
 from twisted.internet import defer, reactor
+import os
 import signal
 
 import ion.util.ionlog
@@ -132,25 +133,26 @@ def reset_container():
 # Monkey-patch the reactor to count iterations, to show it's not blocked. Int overflow shouldn't break it.
 # This needs to only be done once per reactor, and not once per container, so it's package-level code.
 
-reactorStepCount = 0
-_doIteration = getattr(reactor, 'doIteration')
-def doIterationWithCount(*args, **kwargs):
-    global reactorStepCount
-    reactorStepCount += 1
-    _doIteration(*args, **kwargs)
-setattr(reactor, 'doIteration', doIterationWithCount)
+if not 'ION_NO_BUSYLOOP_DETECT' in os.environ:
+    reactorStepCount = 0
+    _doIteration = getattr(reactor, 'doIteration')
+    def doIterationWithCount(*args, **kwargs):
+        global reactorStepCount
+        reactorStepCount += 1
+        _doIteration(*args, **kwargs)
+    setattr(reactor, 'doIteration', doIterationWithCount)
 
-lastReactorStepCount = 0
-def alarm_handler(signum, frame):
-    global lastReactorStepCount
+    lastReactorStepCount = 0
+    def alarm_handler(signum, frame):
+        global lastReactorStepCount
+        signal.alarm(1)
+
+        if reactor.running and reactorStepCount == lastReactorStepCount:
+            log.critical('Busy loop detected! The reactor has not run for >= 1 sec. ' +\
+                         'Currently at %s():%d of file %s.' % (
+                         frame.f_code.co_name, frame.f_lineno, frame.f_code.co_filename))
+
+        lastReactorStepCount = reactorStepCount
+
+    signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(1)
-
-    if reactor.running and reactorStepCount == lastReactorStepCount:
-        log.critical('Busy loop detected! The reactor has not run for >= 1 sec. ' +\
-                     'Currently at %s():%d of file %s.' % (
-                     frame.f_code.co_name, frame.f_lineno, frame.f_code.co_filename))
-
-    lastReactorStepCount = reactorStepCount
-
-signal.signal(signal.SIGALRM, alarm_handler)
-signal.alarm(1)
