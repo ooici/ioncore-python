@@ -5,6 +5,7 @@
 @test ion.integration.notification_alert_service
 @author Maurice Manning
 """
+from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
