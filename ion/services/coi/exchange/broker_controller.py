@@ -1,10 +1,8 @@
 import os
-import warnings
   
-from txamqp.content import Content
 import txamqp.spec
   
-from txamqp.protocol import AMQChannel, AMQClient, TwistedDelegate
+from txamqp.protocol import AMQClient, TwistedDelegate
   
 from twisted.internet import error, protocol, reactor
 from twisted.internet.defer import inlineCallbacks, Deferred, returnValue
@@ -39,7 +37,7 @@ class BrokerController:
         """
         try:
             self.client = yield self._connect()
-        except txamqp.client.Closed, le:
+        except txamqp.client.Closed:
             log.critical(                                       
                     "failed to connect to amqp broker:\n " +    \
                     "\tusername: %s\n " +                       \

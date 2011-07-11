@@ -6,14 +6,10 @@
 @brief test cases for cc_agent
 """
 
-from ion.core import ioninit
 from ion.test.iontest import IonTestCase
 from ion.core.cc.cc_agent import CCAgent
-import ion.util.procutils as pu
 
 from twisted.internet import defer
-from twisted.trial import unittest
-from twisted.internet.task import LoopingCall
 
 class CCAgentTest(IonTestCase):
     """
@@ -32,7 +28,7 @@ class CCAgentTest(IonTestCase):
         yield self._stop_container()
         
     def test_cc_agent_init(self):
-        cca = CCAgent()
+        CCAgent()
         self.completed = True
         
     def test_cc_agent_plc_init(self):

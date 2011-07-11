@@ -1,7 +1,3 @@
-import ion.util.ionlog
-from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.core import ioninit
 from twisted.internet import defer
 
 class ExchangeTypes:

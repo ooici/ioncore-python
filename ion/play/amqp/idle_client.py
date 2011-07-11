@@ -7,12 +7,8 @@ import ion.util.procutils
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.play.hello_errors import HelloErrorsClient, HelloErrors, HelloError
 from ion.test.iontest import IonTestCase
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.core.messaging import message_client
-from ion.core.object import object_utils
 
 
 class IdleClientTest(IonTestCase):
