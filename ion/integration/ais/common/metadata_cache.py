@@ -217,7 +217,7 @@ class MetadataCache(object):
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
             returnValue = metadata
         except KeyError:
-            log.error('Metadata not found for datasetID: ' + dSetID)
+            log.info('Metadata not found for datasetID: ' + dSetID)
             returnValue = None
 
         self.__unlockCache()
@@ -315,7 +315,7 @@ class MetadataCache(object):
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
             returnValue = metadata
         except KeyError:
-            log.error('Metadata not found for datasourceID: ' + dSourceID)
+            log.info('Metadata not found for datasourceID: ' + dSourceID)
             returnValue = None
 
         self.__unlockCache()
