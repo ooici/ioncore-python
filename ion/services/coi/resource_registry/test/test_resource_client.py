@@ -296,17 +296,7 @@ class ResourceClientTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_INVALID_TYPE(self):
-
-        # Create the resource object
-        #self.assertRaises(ResourceRegistryError, self.rc.create_instance, INVALID_TYPE, name='Test AddressLink Resource', description='A test resource')
-
-        try:
-            resource = yield self.rc.create_instance(INVALID_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
-        except ReceivedApplicationError, ex:
-            log.info(ex)
-            defer.returnValue(True)
-
-        self.fail('This test should raise an exception and return in the except!')
+        yield self.failUnlessFailure(self.rc.create_instance(INVALID_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource'), ResourceClientError)
 
     def test_get_invalid(self):
 
