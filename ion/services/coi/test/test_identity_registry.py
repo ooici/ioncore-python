@@ -436,3 +436,12 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         yield self.irc.unset_role(user_id, role)
         self.failIf(user_has_role(user_id, role))
 
+        # Try multiple roles
+        role = 'EARLY_ADOPTER, MARINE_OPERATOR'
+        yield self.irc.set_role(user_id, role)
+        self.failUnless(user_has_role(user_id, 'EARLY_ADOPTER'))
+        self.failUnless(user_has_role(user_id, 'MARINE_OPERATOR'))
+
+        yield self.irc.unset_role(user_id, role)
+        self.failIf(user_has_role(user_id, 'EARLY_ADOPTER'))
+        self.failIf(user_has_role(user_id, 'MARINE_OPERATOR'))
