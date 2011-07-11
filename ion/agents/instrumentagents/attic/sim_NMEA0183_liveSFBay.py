@@ -10,12 +10,16 @@
 import os
 import signal
 import subprocess
-from sim_NMEA0183 import *
+import sim_NMEA0183
+import ion.util.procutils as pu
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 AISGPSapp = ['./simGPS0183app']
 
 
-class NMEA0183SimliveSFBay (NMEA0183SimBase):
+class NMEA0183SimliveSFBay (sim_NMEA0183.NMEA0183SimBase):
     """
     Launch NMEA0183 GPS simulator on local machine through a virtual serial port.
     """
@@ -39,12 +43,12 @@ class NMEA0183SimliveSFBay (NMEA0183SimBase):
             log.info ('Wait approximately 15 seconds...')
             self._simProcess = subprocess.Popen (AISGPSapp,
                                          stdout = self._serDesc.fileno(),
-                                         stderr = nullDesc.fileno())
+                                         stderr = sim_NMEA0183.nullDesc.fileno())
         except OSError, e:
             log.info ('Current directory: %s' % os.getcwd())
             log.info (e)
 
-        yield TwistedSleep (10)
+        yield pu.asleep (10)
         log.info ('Successfully launched SFBay AIS-based GPS simulator.')
         self._workingSim = True
 
@@ -64,7 +68,7 @@ class NMEA0183SimliveSFBay (NMEA0183SimBase):
             # (Python 2.6 and later would let us send a control-C to stop it)
             os.kill (self._simProcess.pid, signal.SIG_IGN)
             os.kill (self._vsp.pid, signal.SIG_IGN)
-            TwistedSleep (2)
+            yield pu.asleep  (2)
         log.info ('Simulator no longer running.')
 
     def IsSimulatorRunning(self):
