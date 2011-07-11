@@ -145,7 +145,7 @@ def alarm_handler(signum, frame):
     global lastReactorStepCount
     signal.alarm(1)
 
-    if reactorStepCount == lastReactorStepCount:
+    if reactor.running and reactorStepCount == lastReactorStepCount:
         log.critical('Busy loop detected! The reactor has not run for >= 1 sec. ' +\
                      'Currently at %s():%d of file %s.' % (
                      frame.f_code.co_name, frame.f_lineno, frame.f_code.co_filename))
