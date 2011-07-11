@@ -10,6 +10,7 @@ from twisted.internet import defer
 from twisted.internet import reactor
 from twisted.python import failure
 
+import logging
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 

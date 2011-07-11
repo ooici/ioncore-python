@@ -14,8 +14,6 @@ from ion.integration.ais.notification_alert_service import NotificationAlertServ
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.test.iontest import IonTestCase
-from ion.core.exception import ReceivedApplicationError
-from ion.core.process.process import Process
 from ion.util.iontime import IonTime
 
 import ion.util.procutils as pu
@@ -25,11 +23,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
-                                                       REGISTER_USER_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE
+                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE
 
 class NotificationReceiverTest(IonTestCase):
 

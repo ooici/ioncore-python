@@ -10,17 +10,10 @@ NOTIFY_EXCHANGE_SPACE = 'notify_exchange'
 NOTIFY_EXCHANGE_TYPE = 'topic'
 
 from ion.core.messaging.receiver import Receiver
-from twisted.internet import defer, reactor
-from twisted.web import server, resource
+from twisted.internet import defer
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-
-import string
-try:
-    import json
-except:
-    import simplejson as json
 
 notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
 log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)

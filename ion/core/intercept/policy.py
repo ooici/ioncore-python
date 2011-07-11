@@ -101,16 +101,15 @@ def user_has_role(ooi_id, role):
     else:
         return ooi_id in role_user_dict[role]['ooi_id']
 
-def get_current_role(ooi_id):
+def get_current_roles(ooi_id):
     roles = user_role_dict.get(ooi_id, None)
-    if roles is None:       return 'AUTHENTICATED'
+    if roles is None:       return ['AUTHENTICATED']
 
     # If more than one role, just grab one for now. There should be only one.
     roles -= set(['ANONYMOUS', 'AUTHENTICATED'])
-    if len(roles) == 0:     return 'AUTHENTICATED'
+    if len(roles) == 0:     return ['AUTHENTICATED']
 
-    if 'ADMIN' in roles:    return 'ADMIN'
-    return list(roles)[0]
+    return list(roles)
 
 def map_ooi_id_to_role(ooi_id, role):
     if not role in role_user_dict:

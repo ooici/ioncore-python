@@ -10,9 +10,8 @@ log = ion.util.ionlog.getLogger(__name__)
 import logging
 from twisted.internet import defer
 
-from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError
 from ion.core.intercept.policy import subject_has_admin_role, \
                                       subject_has_early_adopter_role, \
                                       subject_has_marine_operator_role, \

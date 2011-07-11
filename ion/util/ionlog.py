@@ -49,10 +49,7 @@ class LogFactory(object):
         self._handlers.remove(handler)
 
 # declare global instance
-try:
-    log_factory
-except NameError:
-    log_factory = LogFactory()
+log_factory = LogFactory()
 
 def getLogger(loggername=__name__):
     """

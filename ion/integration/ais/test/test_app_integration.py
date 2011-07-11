@@ -19,8 +19,7 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
-                                                                    HAS_A_ID, \
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     ANONYMOUS_USER_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
@@ -833,7 +832,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         try:
             reply = yield self.aisc.updateUserProfile(msg)
             self.fail('updateUserProfile did not raise exception for ANONYMOUS ooi_id')
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             log.info("updateUserProfile correctly raised exception for ANONYMOUS ooi_id")
             
         # create the getUser request GPBs
@@ -843,7 +842,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         try:
             reply = yield self.aisc.getUser(msg)
             self.fail('getUser did not raise exception for ANONYMOUS ooi_id')
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             log.info("getUser correctly raised exception for ANONYMOUS ooi_id")
         
         # create the register_user request GPBs
@@ -915,7 +914,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('updateUserProfile returned:\n'+str(reply))
@@ -934,7 +933,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.profile[1].value = "ProfileItem_2_Value"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('updateUserProfile returned:\n'+str(reply))
@@ -948,7 +947,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         try:
             reply = yield self.aisc.getUser(msg)
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             self.fail('getUser incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getUser returned:\n'+str(reply))
@@ -1766,7 +1765,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             if not data.IsFieldSet('data_resource_id'):
                 self.fail('FindDataResourcesByOwner response has no data_resource_id field')
             else:                
-                dsResourceID = data.data_resource_id
+                data.data_resource_id
             if not data.IsFieldSet('update_interval_seconds'):
                 self.fail('FindDataResourcesByOwner response has no update_interval_seconds field')
             else:                
@@ -1957,7 +1956,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.profile[1].value = "profile item 2 value"
         try:
             reply = yield self.aisc.updateUserProfile(msg)
-        except ReceivedApplicationError, ex:
+        except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('updateUserProfile returned:\n'+str(reply))

@@ -10,7 +10,6 @@ there but resource types are not...
 
 """
 import logging
-import math
 from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
 from ion.util.cache import LRUDict
 
@@ -29,7 +28,7 @@ from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -1131,7 +1130,6 @@ class DataStoreWorkbench(WorkBench):
             # check to see if this targetslice has been taken care of already
             for existing_stripitem in non_overlap_striplist:
                 nba, ntargetslice, nsrcslice, nleng, nlaststridelen = existing_stripitem
-                log.debug("starting slice analysis")
 
                 # since we're going linearly, we really only have to check the start of this new targetslice
                 if targetslice[0] >= ntargetslice[0] and targetslice[0] < ntargetslice[1]:
@@ -1146,10 +1144,16 @@ class DataStoreWorkbench(WorkBench):
                     else:
                         # split the current strip item up
                         targetslice = (targetslice[0] + intlen, targetslice[1])
-                        log.debug("split slice into %d, %d" % (targetslice[0], targetslice[1]))
+                        srcslice = (srcslice[0] + intlen * laststridelen, srcslice[1])  # src slice is always given without striding applied, so
+                                                                                        # when we update after a split we have to take that stride
+                                                                                        # into account.  If we've shaved off intlen items in target
+                                                                                        # coordinates, we need to shave off intlen * stride in source.
+                        leng = targetslice[1] - targetslice[0]
+
+                        log.debug("split slice into %d,%d -> %d,%d length %d" % (targetslice[0], targetslice[1], srcslice[0], srcslice[1], leng))
             else:
                 # no break, means we either don't intersect at all, or we split up to not intersect
-                log.debug("adding slice")
+                #log.debug("adding slice")
                 newstripitem = (ba, targetslice, srcslice, leng, laststridelen)
                 non_overlap_striplist.append(newstripitem)
 
@@ -1200,65 +1204,76 @@ class DataStoreWorkbench(WorkBench):
         # create a least-recently-used cache for ndarrays, using 5mb as the default max size
         ndarray_cache = NDArrayLRUDict(LRU_DICT_LIMIT, repo)
 
-        for exidx, exstep in enumerate(extraction_plan):
-            curstrips = []
-            for sidx in exstep:
-                curstrips.append(compressed_striplist[sidx])
+        try:
+            for exidx, exstep in enumerate(extraction_plan):
+                curstrips = []
+                for sidx in exstep:
+                    curstrips.append(compressed_striplist[sidx])
 
-            # get the start index.. should be in the first item
-            targetstartidx = curstrips[0][1][0]
+                # get the start index.. should be in the first item
+                targetstartidx = curstrips[0][1][0]
 
-            # calculate number of elements we are going to output in this chunk, create temp storage for it
-            elemcount = reduce(lambda x, y: x+y, [x[3] for x in curstrips])
-            targetndarray = [None] * elemcount
+                # calculate number of elements we are going to output in this chunk, create temp storage for it
+                elemcount = reduce(lambda x, y: x+y, [x[3] for x in curstrips])
+                targetndarray = [None] * elemcount
 
-            log.debug("Extraction step %d, # strips: %d, element count: %d, start index: %d" % (exidx, len(curstrips), elemcount, targetstartidx))
+                log.debug("Extraction step %d, # strips: %d, element count: %d, start index: %d" % (exidx, len(curstrips), elemcount, targetstartidx))
 
-            # ok, now we can perform the extractions on this step
-            for csidx, curstrip in enumerate(curstrips):
-                ba, targetidxs, srcidxs, leng, stride = curstrip
+                # ok, now we can perform the extractions on this step
+                targetoffset = 0
+                for curstrip in curstrips:
+                    ba, targetidxs, srcidxs, leng, stride = curstrip
 
-                # index into the current chunk data
-                striplen = leng
-                targetoffset = csidx * striplen
+                    # get/possibly load from ndarray_cache
+                    ndobjval = yield ndarray_cache.get_ndarray_value(ba.GetLink('ndarray').key, ba.bounds, ITEM_SIZE, self._get_blobs)
 
-                # get/possibly load from ndarray_cache
-                ndobjval = yield ndarray_cache.get_ndarray_value(ba.GetLink('ndarray').key, ba.bounds, ITEM_SIZE, self._get_blobs)
+                    srcslice = ndobjval[srcidxs[0]:srcidxs[1]]
+                    if stride == 1:
+                        targetslice = srcslice
+                    else:
+                        targetslice = [d for i, d in enumerate(srcslice) if i % stride == 0]
 
-                srcslice = ndobjval[srcidxs[0]:srcidxs[1]]
-                if stride == 1:
-                    targetslice = srcslice
-                else:
-                    targetslice = [d for i, d in enumerate(srcslice) if i % stride == 0]
+                    #log.debug("SETTING TNDARRAY[%d:%d]" % (targetoffset, targetoffset+leng))
+                    targetndarray[targetoffset:targetoffset+leng] = targetslice
 
-                targetndarray[targetoffset:targetoffset+striplen] = targetslice
+                    # add length to target offset
+                    targetoffset += leng
 
-            # ensure we filled this chunk
-            nonelist = [i for i,d in enumerate(targetndarray) if d is None]
-            if len(nonelist) > 0:
-                raise DataStoreWorkBenchError("Data extraction did not properly fill in all members of response ndarray!")
+                # ensure we filled this chunk
+                nonelist = [i for i,d in enumerate(targetndarray) if d is None]
+                if len(nonelist) > 0:
+                    log.error("extract_data: Nones found in targetndarray prior to send: %s" % str(nonelist))
+                    raise DataStoreWorkBenchError("Data extraction did not properly fill in all members of response ndarray!")
 
-            # SEND THIS CHUNK
+                # SEND THIS CHUNK
 
-            # create new message to send
-            chunkmsg = yield self._process.message_client.create_instance(DATA_CHUNK_MESSAGE_TYPE)
-            chunkmsg.seq_number = exidx
-            chunkmsg.seq_max = len(extraction_plan)
+                # create new message to send
+                chunkmsg = yield self._process.message_client.create_instance(DATA_CHUNK_MESSAGE_TYPE)
+                chunkmsg.seq_number = exidx
+                chunkmsg.seq_max = len(extraction_plan)
 
-            # set info in this chunk
-            chunkmsg.start_index = targetstartidx
-            chunkmsg.done = exidx == len(extraction_plan) - 1       # last chunk message?  set the done flag
+                # set info in this chunk
+                chunkmsg.start_index = targetstartidx
+                chunkmsg.done = exidx == len(extraction_plan) - 1       # last chunk message?  set the done flag
 
-            # create the ndarray in this chunk
-            chunkndarray = chunkmsg.CreateObject(curstrips[0][0].GetLink('ndarray').type)
+                # create the ndarray in this chunk
+                chunkndarray = chunkmsg.CreateObject(curstrips[0][0].GetLink('ndarray').type)
 
-            # these lines blow up with a TypeError if we screwed up the bounds and didn't fill in the targetarray fully,
-            # aka it contains Nones
-            chunkndarray.value[0:elemcount] = targetndarray[:]
-            chunkmsg.ndarray = chunkndarray
+                # these lines blow up with a TypeError if we screwed up the bounds and didn't fill in the targetarray fully,
+                # aka it contains Nones
+                chunkndarray.value[0:elemcount] = targetndarray[:]
+                chunkmsg.ndarray = chunkndarray
 
-            # send this message to the passed in routing key
-            yield self._send_data_chunk(request.data_routing_key, chunkmsg)
+                # send this message to the passed in routing key
+                yield self._send_data_chunk(request.data_routing_key, chunkmsg)
+        except Exception, ex:
+            class FakeMsg(object):
+                pass
+            fakemsg = FakeMsg()
+            fakemsg.payload = { 'reply-to': request.data_routing_key,
+                                'protocol': 'rpc'}
+            yield self._process.reply_err(fakemsg, exception=ex)
+            raise ex
             
         self._process.reply_ok(message, response)
         log.info("/op_extract_data")
@@ -1397,7 +1412,7 @@ class DataStoreWorkbench(WorkBench):
         repo.cached = True
 
         # @TODO: use first head for now
-        comms = repo.current_heads()
+        #comms = repo.current_heads()
         commit = repo.current_heads()[0]
 
         link = commit.GetLink('objectroot')

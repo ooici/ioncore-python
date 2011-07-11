@@ -7,14 +7,10 @@
 """
 
 import ion.util.ionlog
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
-from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.core import ioninit
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
-from ion.services.coi.resource_registry.resource_client import ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from twisted.internet import defer
 
 

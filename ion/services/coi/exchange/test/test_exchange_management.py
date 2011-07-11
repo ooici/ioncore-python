@@ -9,12 +9,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance
 
@@ -97,7 +94,7 @@ class ExchangeManagementTest(IonTestCase):
             if hasattr(msg.configuration,'description'):
                 msg.configuration.description = "description"
 
-            id = yield self.emc._create_object(msg)
+            yield self.emc._create_object(msg)
 
 
             #assert bp.isHash(id)
@@ -154,10 +151,10 @@ class ExchangeManagementTest(IonTestCase):
 
         # Case 3:  Fail because of duplicate name
         try:
-            id = yield self.emc.create_exchangespace("DuplicateName", "This is a test!")
-            id = yield self.emc.create_exchangespace("DuplicateName", "This is another test!")
+            yield self.emc.create_exchangespace("DuplicateName", "This is a test!")
+            yield self.emc.create_exchangespace("DuplicateName", "This is another test!")
             self.fail("EMS accepted invalid exchangespace.name")
-        except Exception, err:
+        except Exception:
             pass
 
 
@@ -198,10 +195,10 @@ class ExchangeManagementTest(IonTestCase):
 
         # Case 4:  Fail because of missing exchange space
         try:
-            id = yield self.emc.create_exchangename("TestExchangeName", "Object 3", "TestExchangeSpace_XYZZY")
-            id = yield self.emc.create_exchangename("TestExchangeName", "Object 3", "")
+            yield self.emc.create_exchangename("TestExchangeName", "Object 3", "TestExchangeSpace_XYZZY")
+            yield self.emc.create_exchangename("TestExchangeName", "Object 3", "")
             self.fail("EMS accepted invalid exchangename.exchangespace")
-        except Exception, err:
+        except Exception:
             # print err
             pass
 
@@ -220,7 +217,7 @@ class ExchangeManagementTest(IonTestCase):
         id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
 
         # Case 1:  Expect success
-        id = yield self.emc.create_queue(
+        yield self.emc.create_queue(
                             name="TestQueue",
                             description="This is a test!",
                             exchangespace="TestExchangeSpace",
@@ -243,7 +240,7 @@ class ExchangeManagementTest(IonTestCase):
         id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
 
         # Case 1:  Expect success
-        id = yield self.emc.create_binding(
+        yield self.emc.create_binding(
                             name="TestBinding",
                             description="This is a test!",
                             exchangespace="TestExchangeSpace",
@@ -252,25 +249,3 @@ class ExchangeManagementTest(IonTestCase):
                             topic="alt.humar.best-of-usenet"
                     )
 
-    @defer.inlineCallbacks
-    def xtest_create_queue(self):
-        """
-        A test that ensures we can define an exchangename.  Tests
-        for:
-            1) successful creation
-            2) failure on duplicate name
-            3) failure on no name
-            4) failure on no exchangespace
-        """
-
-        # We need an exchangespace and an exchangename
-        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
-        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
-        id = yield self.emc.create_queue(
-                            name="TestQueue",
-                            description="This is a test!",
-                            exchangespace="TestExchangeSpace",
-                            exchangename="TestExchangeName",
-                            # topic="alt.humar.best-of-usenet"
-
-                    )

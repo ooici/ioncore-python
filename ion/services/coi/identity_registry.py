@@ -524,25 +524,25 @@ class IdentityRegistryService(ServiceProcess):
 
     @defer.inlineCallbacks
     def create_role_association(self, user_id, role_id):
-       association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
+        association_repo = self.workbench.create_repository(ASSOCIATION_TYPE)
 
-       # Set the subject
-       id_ref = association_repo.create_object(IDREF_TYPE)
-       id_ref.key = user_id
-       association_repo.root_object.subject = id_ref
+        # Set the subject
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        id_ref.key = user_id
+        association_repo.root_object.subject = id_ref
 
-       # Set the predicate
-       id_ref = association_repo.create_object(IDREF_TYPE)
-       id_ref.key = HAS_ROLE_ID
-       association_repo.root_object.predicate = id_ref
+        # Set the predicate
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        id_ref.key = HAS_ROLE_ID
+        association_repo.root_object.predicate = id_ref
 
-       # Set the Object
-       id_ref = association_repo.create_object(IDREF_TYPE)
-       id_ref.key = role_id
-       association_repo.root_object.object = id_ref
+        # Set the Object
+        id_ref = association_repo.create_object(IDREF_TYPE)
+        id_ref.key = role_id
+        association_repo.root_object.object = id_ref
 
-       association_repo.commit('Ownership association created for identity object.')
-       yield self.workbench.push('datastore', association_repo)
+        association_repo.commit('Ownership association created for identity object.')
+        yield self.workbench.push('datastore', association_repo)
 
     @defer.inlineCallbacks
     def _unset_roles(self, user_id, role_id=None):
@@ -565,17 +565,20 @@ class IdentityRegistryService(ServiceProcess):
     @defer.inlineCallbacks
     def op_set_role(self, content, headers, msg):
         # First remove existing roles
-        user_id, role = content['user-id'], content['role']
-        role_id = ROLE_IDS_BY_NAME[role]
+        user_id, roles = content['user-id'], content['role'].replace(' ', '').split(',')
+        role_ids = [ROLE_IDS_BY_NAME[role] for role in roles]
         yield self._unset_roles(user_id)
 
         # Next setup new role association and policy cache
         try:
-            yield self.create_role_association(user_id, role_id)
+            for role_id in role_ids:
+                yield self.create_role_association(user_id, role_id)
         except DataStoreError, ex:
             log.error('Failed to create role association: %s' % (ex))
             raise
-        map_ooi_id_to_role(user_id, role)
+
+        for role in roles:
+            map_ooi_id_to_role(user_id, role)
 
         # Tell all the other identity registry services to update the policy cache
         yield self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
@@ -585,9 +588,10 @@ class IdentityRegistryService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_unset_role(self, content, headers, msg):
-        user_id, role = content['user-id'], content['role']
-        role_id = ROLE_IDS_BY_NAME[role]
-        yield self._unset_roles(user_id, role_id)
+        user_id, roles = content['user-id'], content['role'].replace(' ', '').split(',')
+        role_ids = [ROLE_IDS_BY_NAME[role] for role in roles]
+        for role_id in role_ids:
+            yield self._unset_roles(user_id, role_id)
 
         response = True
         yield self.reply_ok(msg, response)

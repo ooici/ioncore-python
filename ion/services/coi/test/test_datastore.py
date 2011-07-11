@@ -6,7 +6,6 @@
 @author David Foster
 @author Matt Rodriguez
 """
-import base64
 from twisted.trial import unittest
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
@@ -340,7 +339,6 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_get_object(self):
-        from ion.core.process.process import Process
         p = Process(proc_name='test_anon')
         yield p.spawn()
 
@@ -860,6 +858,7 @@ class DataStoreExtractDataTest(IonTestCase):
         yield self.setup_array_structure()
         yield self.setup_data_listener()
 
+        self.dsc = DataStoreClient(proc=self.proc)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -968,12 +967,31 @@ class DataStoreExtractDataTest(IonTestCase):
         dsc = DataStoreClient(proc=self.proc)
         yield dsc.put_blobs(msg)
 
-    @defer.inlineCallbacks
     def setup_data_listener(self):
+        '''
+        Monkey patches Datastore's workbench's _send_data_chunk method so that we don't have to test via the
+        entire messaging stack.
+        '''
 
         self._recv_data = []
         self._def_done = defer.Deferred()   # this is called back in the handler when the "done" message comes through
 
+        # patch up datastore's _send_data_chunk method
+        def fake_send_chunk(data_routing_key, chunkmsg):
+            self._recv_data.append({'ndarray':      chunkmsg.ndarray.value[:],
+                                    'start_index':  chunkmsg.start_index,
+                                    'seq_number':   chunkmsg.seq_number,
+                                    'seq_max':      chunkmsg.seq_max})
+            if chunkmsg.done:
+                self._def_done.callback(True)
+
+        self._old_send_chunk = self.ds1.workbench._send_data_chunk
+        self.ds1.workbench._send_data_chunk = fake_send_chunk
+
+    @defer.inlineCallbacks
+    def test_full_one_ba_with_messaging(self):
+
+        # setup a messaging listener here (self._recv_data and self._def_done exist due to call to setup_data_listener)
         @defer.inlineCallbacks
         def datahandler(data, msg):
             self._recv_data.append({'ndarray': data['content'].ndarray.value[:],
@@ -1000,7 +1018,45 @@ class DataStoreExtractDataTest(IonTestCase):
         datarec = WorkerReceiver('data_listener', process=self.proc, scope=Receiver.SCOPE_GLOBAL, handler=datahandler, consumer_config=consumer_config)
         yield datarec.attach()
 
-        self.dsc = DataStoreClient(proc=self.proc)
+        # re-patch workbench back to old send method
+        self.ds1.workbench._send_data_chunk = self._old_send_chunk
+
+        msg = yield self.dsc.proc.message_client.create_instance(DATA_REQUEST_MESSAGE_TYPE)
+        msg.structure_array_ref = self.first_struct_as_key
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 15
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 40
+
+        bounds = msg.request_bounds.add()
+        bounds.origin = 0
+        bounds.size = 200
+
+        msg.data_routing_key = "data_listener"
+
+        yield self.dsc.extract_data(msg)
+        yield self._def_done
+
+        # should have some data now
+        self.failUnless(len(self._recv_data) > 0)       # unable to predict exact as we may change chunk size
+
+        # did we get the right amount of data?
+        totalelems = reduce(lambda x, y: x+y, (len(x['ndarray']) for x in self._recv_data))
+        self.failUnlessEquals(totalelems, 200*40*15)
+
+        # should be contiguous too
+        counter = 0
+        for ndarray in (x['ndarray'] for x in self._recv_data):
+            for data in ndarray:
+                self.failUnlessEqual(int(data), counter)
+                counter += 1
+
+        # tear down datarec
+        yield datarec.terminate()
 
     @defer.inlineCallbacks
     def test_full_one_ba(self):
@@ -1022,7 +1078,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1058,7 +1114,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1098,7 +1154,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1140,7 +1196,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1173,7 +1229,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1206,7 +1262,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1250,7 +1306,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now

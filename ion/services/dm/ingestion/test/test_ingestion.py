@@ -5,7 +5,7 @@
 @author David Stuebe
 @brief test for eoi ingestion demo
 """
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publisher
 

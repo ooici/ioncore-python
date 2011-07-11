@@ -9,11 +9,7 @@
 Caching mechanisms are now in place. Consider changing the cache size test to look at the size of the _workbench_cache
 but throw out repositories from the _repo_cache to clear it - that would be better!
 """
-import base64
-
 from twisted.internet import defer
-
-from google.protobuf import message
 
 from ion.core.object.object_utils import sha1_to_hex
 
@@ -26,7 +22,7 @@ from ion.util import procutils as pu
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
+from ion.core.exception import ReceivedApplicationError, ApplicationError
 
 import weakref
 
@@ -519,7 +515,6 @@ class WorkBench(object):
             if cloning:
                 # Clear the repository that was created for the clone
                 self.clear_repository(repo)
-                del repo
 
             if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
 
@@ -533,7 +528,6 @@ class WorkBench(object):
 
         if result.IsFieldSet('blob_elements') and not get_head_content:
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
-
 
         # Add any new content to the repository:
         for se in result.commit_elements:
@@ -1056,6 +1050,7 @@ class WorkBench(object):
         """
         # Get the repositories we are working from
         repo = existing_branch.Repository
+        new_repo = new_branch.Repository
 
         log.debug('_resolve_branch_state: resolving branch state in repository heads!')
         for new_link in new_branch.commitrefs.GetLinks():

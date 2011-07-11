@@ -13,7 +13,7 @@ from twisted.internet import defer, reactor
 from ion.core.process.process import Process
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
-import os, tempfile, sys
+import os, tempfile
 from uuid import uuid4
 
 class Subcontainer(Process):
