@@ -49,9 +49,7 @@ class LogFactory(object):
         self._handlers.remove(handler)
 
 # declare global instance
-try:
-    log_factory # When would this not be an exception?
-except NameError:
+if not hasattr(__name__, 'log_factory'):
     log_factory = LogFactory()
 
 def getLogger(loggername=__name__):

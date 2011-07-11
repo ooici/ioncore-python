@@ -28,11 +28,10 @@ from ion.core.intercept.interceptor_system import InterceptorSystem
 from ion.core.messaging.exchange import ExchangeManager
 from ion.core.pack.application import AppLoader
 from ion.core.pack.app_manager import AppManager
-from ion.core.process.proc_manager import ProcessManager, Process
+from ion.core.process.proc_manager import ProcessManager
 from ion.util.state_object import BasicLifecycleObject
 from ion.util.config import Config
 from ion.util import procutils as pu
-from ion.services.dm.distribution.events import ContainerLifecycleEventPublisher
 
 CONF = ioninit.config(__name__)
 CF_is_config = Config(CONF.getValue('interceptor_system')).getObject()
