@@ -6,7 +6,6 @@
 @author Paul Hubbard
 @test ion.services.dm.scheduler Exercise the crontab
 """
-import sys
 import time
 
 from twisted.internet import defer

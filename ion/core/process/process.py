@@ -441,7 +441,7 @@ class Process(BasicLifecycleObject):
             # attempt to move all registered lcos to the terminated state cleanly!
             try:
                 yield self._advance_life_cycle_objects(BasicStates.S_TERMINATED)
-            except Exception, ex:
+            except Exception:
                 log.debug("Error terminating registered LCOs, ignoring...")
 
         if cause:

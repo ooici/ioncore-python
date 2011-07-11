@@ -14,7 +14,6 @@ from ion.core.process.process import ProcessFactory
 from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory
 from ion.services.dm.distribution.events import EventSubscriber
 from uuid import uuid4
-from ion.core.exception import ApplicationError
 import time
 
 import ion.util.ionlog

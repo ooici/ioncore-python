@@ -9,11 +9,7 @@
 Caching mechanisms are now in place. Consider changing the cache size test to look at the size of the _workbench_cache
 but throw out repositories from the _repo_cache to clear it - that would be better!
 """
-import base64
-
 from twisted.internet import defer
-
-from google.protobuf import message
 
 from ion.core.object.object_utils import sha1_to_hex
 
@@ -26,7 +22,7 @@ from ion.util import procutils as pu
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
 
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
+from ion.core.exception import ReceivedApplicationError, ApplicationError
 
 import weakref
 

@@ -34,7 +34,7 @@ from ion.core.object.cdm_methods import attribute_merge
 from ion.core.exception import ApplicationError
 
 # For testing - used in the client
-from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE, SUBSCRIBER_TYPE
+from ion.services.dm.distribution.pubsub_service import PubSubClient, XS_TYPE, XP_TYPE, TOPIC_TYPE
 from ion.services.coi import datastore
 
 from ion.core.exception import ReceivedApplicationError, ReceivedError, ReceivedContainerError

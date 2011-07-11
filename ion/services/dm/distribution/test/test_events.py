@@ -9,11 +9,9 @@
 import ion.util.ionlog
 from twisted.internet import defer
 
-from ion.services.dm.distribution.publisher_subscriber import PublisherFactory, SubscriberFactory
-
 # just a subset of the available publishers/subscribers
 from ion.services.dm.distribution.events import EventPublisher, ResourceLifecycleEventPublisher, ProcessLifecycleEventPublisher, \
-                                                EventSubscriber, ResourceLifecycleEventSubscriber, ProcessLifecycleEventSubscriber, \
+                                                EventSubscriber, ResourceLifecycleEventSubscriber, \
                                                 InfoLoggingEventPublisher, InfoLoggingEventSubscriber, \
                                                 RESOURCE_LIFECYCLE_EVENT_ID
 
@@ -21,12 +19,7 @@ from ion.test.iontest import IonTestCase
 from ion.core import ioninit
 
 from ion.core.process.process import Process
-from ion.core.messaging.receiver import Receiver
-from ion.core.messaging import messaging
 import ion.util.procutils as pu
-
-from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
-
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
