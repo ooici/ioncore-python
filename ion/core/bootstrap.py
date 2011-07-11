@@ -152,6 +152,9 @@ if not 'ION_NO_BUSYLOOP_DETECT' in os.environ:
                          'Currently at %s():%d of file %s.' % (
                          frame.f_code.co_name, frame.f_lineno, frame.f_code.co_filename))
 
+            ### uncomment to print traceback...
+            #import traceback; traceback.print_stack(frame)
+
         lastReactorStepCount = reactorStepCount
 
     signal.signal(signal.SIGALRM, alarm_handler)
