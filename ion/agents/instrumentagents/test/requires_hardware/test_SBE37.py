@@ -5,7 +5,6 @@
 @author Edward Hunter
 """
 
-import re
 import os
 
 from twisted.internet import defer
@@ -16,7 +15,6 @@ import ion.util.procutils as pu
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.SBE37_driver import SBE37DriverClient
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-from ion.agents.instrumentagents.SBE37_driver import DriverException
 from ion.agents.instrumentagents.SBE37_driver import SBE37State
 from ion.agents.instrumentagents.SBE37_driver import SBE37Channel
 from ion.agents.instrumentagents.SBE37_driver import SBE37Command
@@ -435,7 +433,6 @@ class TestSBE37(IonTestCase):
         # Get all parameters, verify the changes were made.        
         params = [(SBE37Channel.ALL,SBE37Parameter.ALL)]
         reply = yield self.driver_client.get(params,timeout)
-        get_current_state = yield self.driver_client.get_state()
         success = reply['success']
         result = reply['result']
 

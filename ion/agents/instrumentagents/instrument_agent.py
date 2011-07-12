@@ -7,7 +7,7 @@
 @brief Instrument Agent and client classes.
 """
 
-import time
+
 import os
 from uuid import uuid4
 
@@ -27,11 +27,13 @@ from ion.services.dm.distribution.events import InfoLoggingEventPublisher
 from ion.services.dm.distribution.events \
     import BusinessStateModificationEventPublisher
 from ion.services.dm.distribution.events import DataBlockEventPublisher
-from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
-from ion.agents.instrumentagents.instrument_driver \
-    import InstrumentDriverClient
 from ion.agents.instrumentagents.instrument_fsm import InstrumentFSM
-from ion.agents.instrumentagents.instrument_constants import *
+from ion.agents.instrumentagents.instrument_constants import AgentParameter, \
+    AgentConnectionState, AgentState, driver_client, publish_msg_type, \
+    DriverAnnouncement, InstErrorCode, DriverParameter, DriverChannel, \
+    ObservatoryState, DriverStatus, InstrumentCapability, DriverCapability, \
+    MetadataParameter, AgentCommand, Datatype, TimeSource, ConnectionMethod, \
+    AgentEvent, AgentStatus, ObservatoryCapability
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -410,7 +412,6 @@ class InstrumentAgent(Process):
                 result = reply['result']
                 for (key, val) in result.iteritems():
                     success_val = val[0]
-                    val_val = val[1]
                     if InstErrorCode.is_ok(success_val):
                         self._device_capabilities[key] = val
 
@@ -1118,14 +1119,14 @@ class InstrumentAgent(Process):
                     success = InstErrorCode.REQUIRED_PARAMETER
 
                 else:
-                    time = cmd[1]
-                    if not isinstance(time, int):
+                    Ltime = cmd[1]
+                    if not isinstance(Ltime, int):
                         success = InstErrorCode.INVALID_PARAM_VALUE
 
-                    elif time <= 0:
+                    elif Ltime <= 0:
                         success = InstErrorCode.INVALID_PARAM_VALUE
                     else:
-                        yield pu.asleep(time)
+                        yield pu.asleep(Ltime)
                         success = InstErrorCode.OK
 
             else:
@@ -1477,7 +1478,7 @@ class InstrumentAgent(Process):
             if set_successes:
                 origin = "agent.%s" % self.event_publisher_origin
                 config = self._get_parameters()
-                strval = self._get_data_string(config)
+                # strval = self._get_data_string(config)
                 json_val = json.dumps(config)
                 yield self._log_publisher.create_and_publish_event(origin=\
                                             origin, description=json_val)
@@ -1524,8 +1525,6 @@ class InstrumentAgent(Process):
             return
 
         reply['transaction_id'] = self.transaction_id
-        get_errors = False
-        result = {}
 
         try:
             pass
@@ -2392,7 +2391,6 @@ class InstrumentAgent(Process):
             success = reply['success']
             result = reply['result']
             obs_status = result.get(key, None)
-            strval = ''
             json_val = None
 
             # If in streaming mode, buffer data and publish at intervals.
@@ -2565,6 +2563,8 @@ class InstrumentAgent(Process):
 
                 # Client import is bad, shutdown driver and exit.
                 except ImportError, NameError:
+                    log.info('Client import was bad, shutting down driver: %s' \
+                        % NameError)
                     self._stop_driver()
 
                 # Other error, shutdown driver and raise.
