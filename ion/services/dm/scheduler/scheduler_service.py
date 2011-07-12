@@ -11,22 +11,18 @@ import time
 from ion.core.data.store import IndexStore, Query
 from ion.core.exception import ApplicationError
 from ion.core.object.gpb_wrapper import StructureElement
-from ion.core.object.repository import ObjectContainer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
-import re
 from uuid import uuid4
 
 from ion.core.data import cassandra, store
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.coi.attributestore import AttributeStoreClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
-from ion.services.dm.distribution.events import TriggerEventPublisher, ScheduleEventPublisher
-from ion.core.data.storage_configuration_utility import get_cassandra_configuration, STORAGE_PROVIDER, PERSISTENT_ARCHIVE
+from ion.services.dm.distribution.events import ScheduleEventPublisher
 
 from ion.util.iontime import IonTime
 

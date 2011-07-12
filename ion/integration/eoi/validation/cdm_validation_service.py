@@ -150,8 +150,9 @@ class CdmValidationService(ServiceProcess):
         @return: The resultant XML from the CDM Validation Service
         @see:    CdmValidationService.op_validate()
         """
-        base_url = self.cdmvalidator_base_url
-        command = self.cdmvalidator_command
+        base_url = str(self.cdmvalidator_base_url)
+        command = str(self.cdmvalidator_command)
+        data_url = str(data_url)
         
         full_url = '%s/%s?URL=%s&xml=true' % (base_url, command, urllib.quote(data_url))
         

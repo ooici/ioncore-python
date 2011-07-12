@@ -29,7 +29,7 @@ from ion.services.coi.datastore_bootstrap import ion_preload_config
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID
 
-from ion.core.exception import ApplicationError
+from ion.core.exception import ApplicationError, ReceivedError
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -134,18 +134,16 @@ class ResourceClient(object):
         resource_description.resource_type = res_type
 
         # Use the registry client to make a new resource
-        result = yield self.registry_client.register_resource_instance(resource_description)
-
-        if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
-            raise ResourceClientError(
-                'Pull from datastore failed in resource client! Requested Resource Type Not Found!')
-        #elif :
-        else:
+        try:
+            result = yield self.registry_client.register_resource_instance(resource_description)
             res_id = str(result.MessageResponseBody)
+        except ReceivedError, ex:
+            raise ResourceClientError('Pull from datastore failed in resource client! Requested Resource Type Not Found!\nInner Exception:\n%s' % str(ex))
 
-        result = yield self.workbench.pull(self.datastore_service, res_id)
-        if result.MessageResponseCode != result.ResponseCodes.OK:
-            raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
+        try:
+            yield self.workbench.pull(self.datastore_service, res_id)
+        except workbench.WorkBenchError, ex:
+            raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!\nInner Exception:\n%s' % str(ex))
 
         repo = self.workbench.get_repository(res_id)
 
@@ -239,10 +237,10 @@ class ResourceClient(object):
         if repository.status == repository.MODIFIED:
             repository.commit(comment=comment)
 
-        result = yield self.workbench.push(self.datastore_service, repository)
-
-        if not result.MessageResponseCode == result.ResponseCodes.OK:
-            raise ResourceClientError('Push to datastore failed during put_instance')
+        try:
+            yield self.workbench.push(self.datastore_service, repository)
+        except workbench.WorkBenchError, ex:
+            raise ResourceClientError('Push to datastore failed during put_instance, inner exception:\n%s' % str(ex))
 
     @defer.inlineCallbacks
     def put_resource_transaction(self, instances=None, comment=None):
@@ -282,10 +280,10 @@ class ResourceClient(object):
 
             transaction_repos.append(repo)
 
-        result = yield self.workbench.push(self.datastore_service, transaction_repos)
-
-        if not result.MessageResponseCode == result.ResponseCodes.OK:
-            raise ResourceClientError('Push to datastore failed during put_instance')
+        try:
+            yield self.workbench.push(self.datastore_service, transaction_repos)
+        except workbench.WorkBenchError, ex:
+            raise ResourceClientError('Push to datastore failed during put_resource_transaction, inner exception:\n %s' % str(ex))
 
     @defer.inlineCallbacks
     def get_associated_resource_object(self, association):

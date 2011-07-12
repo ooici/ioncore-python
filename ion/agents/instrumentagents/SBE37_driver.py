@@ -796,6 +796,7 @@ class SBE37Driver(InstrumentDriver):
                 self._instrument_connection = yield cc.connectTCP(self._ipaddr,
                                                           int(self._ipport))
             except ConnectError, ex:
+                log.info('Connect error: %s' % ex)
                 self._instrument_connection = None
                 success = InstErrorCode.DRIVER_CONNECT_FAILED
 
@@ -1019,7 +1020,7 @@ class SBE37Driver(InstrumentDriver):
             
             # Get the prompt and send start command without waiting for
             # response prompt.
-            prompt = yield self._get_prompt()
+            yield self._get_prompt()
             yield self._do_cmd_no_prompt('startnow')
                         
         elif event == SBE37Event.EXIT:            
@@ -1033,9 +1034,9 @@ class SBE37Driver(InstrumentDriver):
             # Get the autosample prompt, issue stop command, get
             # regular prompt, store results if option set, switch to
             # connected.
-            prompt = yield self._get_autosample_prompt()
-            prompt = yield self._do_cmd_no_prompt('stop')
-            prompt = yield self._get_prompt()
+            yield self._get_autosample_prompt()
+            yield self._do_cmd_no_prompt('stop')
+            yield self._get_prompt()
             if params and 'GETDATA' in params:
                 result = self._sample_buffer
             next_state = SBE37State.CONNECTED
@@ -2139,10 +2140,10 @@ class SBE37Driver(InstrumentDriver):
         self._data_lines = []
         
         # Acquire prompt.
-        prompt = yield self._get_prompt()
+        yield self._get_prompt()
         
         # Write sample command waiting for prompt return.
-        prompt = yield self._do_cmd('ts')
+        yield self._do_cmd('ts')
                     
         # Parse datalines for sample output.
         samples = self._parse_sample_output()
@@ -2173,9 +2174,9 @@ class SBE37Driver(InstrumentDriver):
         
         # Get prompt, issue device status command, issue device calibration
         # status command. Await prompt for each.
-        prompt = yield self._get_prompt()
-        prompt = yield self._do_cmd('ds')
-        prompt = yield self._do_cmd('dc')
+        yield self._get_prompt()
+        yield self._do_cmd('ds')
+        yield self._do_cmd('dc')
         
         # Parse data lines for all parameter values and update driver
         # parameters.

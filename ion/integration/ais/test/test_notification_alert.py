@@ -10,33 +10,19 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from twisted.internet import defer
-
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError
 from ion.test.iontest import IonTestCase
-from ion.core.messaging import messaging
 from ion.util.iontime import IonTime
 
-from ion.core.object import object_utils
 from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
-                                                       SUBSCRIPTION_INFO_TYPE, \
-                                                       REGISTER_USER_REQUEST_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
                                                        GET_SUBSCRIPTION_LIST_REQ_TYPE, \
-                                                       GET_SUBSCRIPTION_LIST_RESP_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_RSP_TYPE, \
-                                                       AIS_DATASET_METADATA_TYPE
+                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE
 
 
 

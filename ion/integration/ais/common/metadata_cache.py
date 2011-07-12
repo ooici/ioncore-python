@@ -326,16 +326,15 @@ class MetadataCache(object):
     @defer.inlineCallbacks
     def putDSourceMetadata(self, dSourceID):
         """
-        Get the instance of the data source represented by the given resource
-        ID (dSourceID) and call the private __loadDSourceMetadata method with the
-        data source as an argument. 
+        Put the instance of the data source represented by the given resource
+        ID (dSourceID). 
         """
         
         log.debug('putDSourceMetadata')
 
         yield self.__lockCache()
 
-        dSource = yield self.__putDSourceMetadata(dSourceID)
+        yield self.__putDSourceMetadata(dSourceID)
 
         self.__unlockCache()
 

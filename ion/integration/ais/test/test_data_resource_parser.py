@@ -37,7 +37,7 @@ class AISDataResourceParserTest(IonTestCase):
         toparse = "http://geoport.whoi.edu/thredds/dodsC/usgs/data0/rsignell/data/oceansites/OS_NTAS_2010_R_M-1.nc" + ".das"
 
         log.info("parsing %s", toparse)
-        res = validateUrl(toparse)
+        validateUrl(toparse)
 
         self._doParse(validateUrl(toparse))
 

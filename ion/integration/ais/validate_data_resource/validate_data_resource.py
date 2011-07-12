@@ -191,6 +191,7 @@ class ValidateDataResource(object):
         parser = yacc(module=Parser(), write_tables=0, debug=False)
 
         #fetch file
+        url = str(url)
         dasfile = yield getPage(url + ".das")
         
         #crunch it!

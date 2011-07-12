@@ -6,7 +6,6 @@
 @author David Foster
 @author Matt Rodriguez
 """
-import base64
 from twisted.trial import unittest
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
@@ -340,7 +339,6 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_get_object(self):
-        from ion.core.process.process import Process
         p = Process(proc_name='test_anon')
         yield p.spawn()
 
@@ -1040,7 +1038,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1080,7 +1078,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1116,7 +1114,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1156,7 +1154,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1198,7 +1196,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1231,7 +1229,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1264,7 +1262,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now
@@ -1308,7 +1306,7 @@ class DataStoreExtractDataTest(IonTestCase):
 
         msg.data_routing_key = "data_listener"
 
-        resp = yield self.dsc.extract_data(msg)
+        yield self.dsc.extract_data(msg)
         yield self._def_done
 
         # should have some data now

@@ -11,7 +11,6 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 import ion.util.ionlog
-import ion.util.procutils as pu
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -19,7 +18,6 @@ from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
-from ion.agents.instrumentagents.instrument_constants import DriverCommand
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
@@ -330,7 +328,7 @@ class TestNMEA0183Agent (IonTestCase):
 
         # Strip off individual success vals to create a set params to
         # restore original config later.
-        orig_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
+        # orig_config = dict(map(lambda x : (x[0],x[1][1]),result.items()))
 
         self.assert_(InstErrorCode.is_ok(success))
 

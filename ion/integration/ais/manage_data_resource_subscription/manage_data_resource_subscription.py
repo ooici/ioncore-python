@@ -12,46 +12,35 @@ import logging
 from twisted.internet import defer
 import time
 
-from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
+from ion.core.exception import ReceivedApplicationError, ApplicationError
 
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
-                                                                    DATASET_RESOURCE_TYPE_ID, \
                                                                     DISPATCHER_RESOURCE_TYPE_ID
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient, \
-                                                                    ResourceInstance
-from ion.services.coi.resource_registry.resource_client import ResourceClientError, \
-                                                                    ResourceInstanceError
+from ion.services.coi.resource_registry.resource_client import ResourceClientError
 
 from ion.services.dm.distribution.publisher_subscriber import PublisherFactory
 from ion.services.dm.distribution.events import NewSubscriptionEventPublisher, DelSubscriptionEventPublisher
 from ion.services.dm.inventory.association_service import AssociationServiceClient
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
 from ion.util.iontime import IonTime
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
 from ion.integration.ais.common.spatial_temporal_bounds import SpatialTemporalBounds
-from ion.integration.ais.common.metadata_cache import  MetadataCache
 
 from ion.core.object import object_utils
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       SUBSCRIPTION_INFO_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
                                                        SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
-                                                       GET_SUBSCRIPTION_LIST_REQ_TYPE, \
                                                        GET_SUBSCRIPTION_LIST_RESP_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
                                                        DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_RSP_TYPE, \
-                                                       UPDATE_SUBSCRIPTION_REQ_TYPE, \
-                                                       UPDATE_SUBSCRIPTION_RSP_TYPE
+                                                       DELETE_SUBSCRIPTION_RSP_TYPE
 
 
 #fixme, don't need all of these
@@ -204,7 +193,7 @@ class ManageDataResourceSubscription(object):
 
         try:
             log.debug("create: calling notification alert service addSubscription()")
-            reply = yield self.nac.addSubscription(msg)
+            yield self.nac.addSubscription(msg)
             if  self.ais.AnalyzeTiming != None:
                 log.warning('ManageDataResourceSubscription.create: added subscription ' + self.ais.TimeStamp())
  
@@ -438,7 +427,7 @@ class ManageDataResourceSubscription(object):
                     log.warning('ManageDataResourceSubscription.delete: got subscription ' + self.ais.TimeStamp())
     
                 log.debug("delete: calling notification alert service removeSubscription()")
-                reply = yield self.nac.removeSubscription(reqMsg)
+                yield self.nac.removeSubscription(reqMsg)
                 if  self.ais.AnalyzeTiming != None:
                     log.warning('ManageDataResourceSubscription.delete: removed subscription ' + self.ais.TimeStamp())
    
