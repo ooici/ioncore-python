@@ -17,6 +17,7 @@ Sample Dataset are configure and loaded like so:
 import tarfile
 import random
 import time
+import math
 from tarfile import ExtractError
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -246,6 +247,13 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
 
     supplement_number = kwargs.get('supplement_number', CONF.getValue('supplement_number', False))
     random_initialization = kwargs.get('random_initialization', CONF.getValue('Initialize_random_data', False))
+    supplement_overlap_count = kwargs.get('supplement_overlap_count', CONF.getValue('supplement_overlap_count', 0))
+    if supplement_overlap_count > 0 and supplement_number is False:
+        raise ValueError('Cannot use argument "supplement_overlap_count" without specifying "supplement_number')
+    
+    if supplement_number > 0 and supplement_overlap_count > 0 and (supplement_number * 2 - supplement_overlap_count) * 3:
+        raise ValueError('Argument supplement_overlap_count (%i) is too large for the given supplement_number (%i)' % (supplement_overlap_count, supplement_number))
+
 
     log.info("Random initialization of datasets is set to %s" % (random_initialization,))
     # Create all dimension and variable objects
@@ -290,7 +298,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     #-----------------------------------------------------------
     dimension_t.name = 'time'
     dimension_z.name = 'z'
-    dimension_t.length = 2
+    dimension_t.length = 2 + supplement_overlap_count
     dimension_z.length = 3
 
     variable_t.name = 'time'
@@ -333,29 +341,32 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
 
     variable_t.content.bounded_arrays[0].bounds.add()
     variable_t.content.bounded_arrays[0].bounds[0].origin = 0
-    variable_t.content.bounded_arrays[0].bounds[0].size = 2
+    variable_t.content.bounded_arrays[0].bounds[0].size = 2 + supplement_overlap_count
     variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(INT32ARRAY_TYPE)
 
 
     if supplement_number is not False:
-
         start_time = 1280102520 + 3600 * supplement_number
-        supplement_number += 1
-        end_time = 1280102520 + 3600 * supplement_number
 
     elif random_initialization:
         start_time = 1280102000 + int(round(random.random()* 360000))
-        end_time = start_time + 3600
 
     else:
         start_time = 1280102520
         # 2010-07-26T00:02:00Z
-        end_time = 1280106120
-        # 2010-07-26T01:02:00Z
 
-    log.info("start_time %s end_time %s " % (start_time, end_time))
+    end_time = start_time + 3600
 
-    variable_t.content.bounded_arrays[0].ndarray.value.extend([start_time, end_time])
+    time_list = []
+    if supplement_overlap_count > 0:
+        time_list = [start_time - (3600 * x) for x in range(supplement_overlap_count, 0, -1)]
+    
+    time_list.extend([start_time, end_time])
+
+
+    log.debug("time values for this dataset: %s " % str(time_list))
+
+    variable_t.content.bounded_arrays[0].ndarray.value.extend(time_list)
 
     variable_z.content = dataset.CreateObject(ARRAY_STRUCTURE_TYPE)
     variable_z.content.bounded_arrays.add()
@@ -445,18 +456,34 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
 
     variable_salinity.content.bounded_arrays[0].bounds.add()
     variable_salinity.content.bounded_arrays[0].bounds[0].origin = 0
-    variable_salinity.content.bounded_arrays[0].bounds[0].size = 2 # time dimension
+    variable_salinity.content.bounded_arrays[0].bounds[0].size = 2 + supplement_overlap_count # time dimension
     variable_salinity.content.bounded_arrays[0].bounds.add()
     variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
     variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
     variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(FLOAT32ARRAY_TYPE)
     
+    time_length = 2 + supplement_overlap_count
+    variable_length = (time_length) * 3
     if random_initialization:
-        l = [round(random.random()*2 +29,2) for i in range(6)]
+        l = [round(random.random()*2 +29,2) for i in range(variable_length)]
         log.info("Adding random data %s" % (l,))
         variable_salinity.content.bounded_arrays[0].ndarray.value.extend(l)
     else:
-        variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+        # Produce values in the sequence: [29.00, 29.03, 28.97, 29.06, 28.94, ...]  (calculated by 'base' +0.03, -0.06, +0.09, -0.12...)
+        sal_values = []
+        base_val = 29.00
+        # TODO: Use this calculation to determine the min number for supplement_overlap_count at the begining of this method
+        range_start = 0 if supplement_number is False else (supplement_number * 2 - supplement_overlap_count) * 3
+        range_end   = 6 if supplement_number is False else (supplement_number + 1) * 6   # 6 values per non-overlapping supplement
+        
+        for x in range(range_start, range_end):
+            sign = (x % 2) * 2 - 1                     # Alternate -1, 1, -1 for odd and even values
+            val = 0.03 * math.ceil(x / 2.0)            # Slow the pattern growth by dividing by 2.0
+            sal_values.append(round(base_val - (val * sign), 2)) # Calculate the next value
+        
+        
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend(sal_values)
+#       values used to be: [29.82, 29.74, 29.85, 30.14, 30.53, 30.85]
 
 
     # Attach variable and dimension objects to the root group
