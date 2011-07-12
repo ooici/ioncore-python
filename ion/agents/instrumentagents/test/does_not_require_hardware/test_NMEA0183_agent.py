@@ -53,6 +53,8 @@ class TestNMEA0183Agent (IonTestCase):
         log.info("TestNMEA0183Agent.setUp")
 
         self._sim = sim()
+        yield self._sim.SetupSimulator()
+
         if self._sim.IsSimOK():
             log.info ('----- Simulator launched.')
         self.assertEqual (self._sim.IsSimulatorRunning(), 1)
