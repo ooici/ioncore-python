@@ -17,7 +17,6 @@ from twisted.internet import defer, reactor, task
 from twisted.internet.protocol import ClientCreator
 
 import ion.util.ionlog
-import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
 from ion.agents.instrumentagents.instrument_driver import InstrumentDriver
@@ -1561,6 +1560,8 @@ class SBE37Driver(InstrumentDriver):
         drv_cmd = command[0]
         
         # Process acquire sample command.
+
+        sbe37_cmd_acquire_sample_args = ('TEMP VAR to stop pyflakes errors')
         if drv_cmd == SBE37Command.ACQUIRE_SAMPLE:
 
             # Create command spec and set event to fire.
@@ -2662,7 +2663,7 @@ class SBE37Driver(InstrumentDriver):
         if not isinstance(year,int) or year < 0 or year > 99:
             return None
         
-        return '%02i-%s-%02i' % (day,cls.months[month],year)
+        return '%02i-%s-%02i' % (day,months[month],year)
 
         
     @staticmethod

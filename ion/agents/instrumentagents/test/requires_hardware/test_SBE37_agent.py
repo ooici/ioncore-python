@@ -7,8 +7,6 @@
 @author Edward Hunter
 """
 
-import uuid
-import re
 import os
 
 from twisted.internet import defer
@@ -17,8 +15,6 @@ from twisted.trial import unittest
 
 import ion.util.ionlog
 import ion.util.procutils as pu
-from ion.core.process.process import Process
-from ion.core.exception import ReceivedError
 from ion.services.dm.distribution.events import DataBlockEventSubscriber
 from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
 from ion.services.dm.distribution.events \

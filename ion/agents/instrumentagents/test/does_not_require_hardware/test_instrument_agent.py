@@ -14,17 +14,14 @@ from ion.test.iontest import IonTestCase
 
 import ion.util.procutils as pu
 import uuid
-from twisted.trial import unittest
 
 from ion.core.process.process import Process
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
-from ion.core.exception import ReceivedError
 from ion.agents.instrumentagents.instrument_constants import AgentCommand    
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
 from ion.agents.instrumentagents.instrument_constants import TimeSource
 from ion.agents.instrumentagents.instrument_constants import ConnectionMethod
-from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
 from ion.agents.instrumentagents.instrument_constants import AgentState
@@ -114,7 +111,6 @@ class TestInstrumentAgent(IonTestCase):
         }
         reply = yield self.ia_client.set_observatory(params,'create')
         success = reply['success']
-        result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
 
         
@@ -151,7 +147,6 @@ class TestInstrumentAgent(IonTestCase):
         }
         reply = yield self.ia_client.set_observatory(params,'create')
         success = reply['success']
-        result = reply['result']
         self.assert_(InstErrorCode.is_ok(success))
                 
         # Start a transaction.        
@@ -315,7 +310,6 @@ class TestInstrumentAgent(IonTestCase):
         # attempted. Verify no transaction is issued.
         params_1 = AgentParameter.list()
         reply_1 = yield self.ia_client.get_observatory(params_1,'none')
-        success_1 = reply_1['success']
         result_1 = reply_1['result']
         transaction_id_1 = reply_1['transaction_id']
         # It may not be possible to retirieve all parameters during development.
@@ -326,7 +320,6 @@ class TestInstrumentAgent(IonTestCase):
         # attempted. Verify the results same as before. Verify no transaction is issued.
         params_2 = [AgentParameter.ALL]
         reply_2 = yield self.ia_client.get_observatory(params_2,'none')
-        success_2 = reply_2['success']
         result_2 = reply_2['result']
         transaction_id_2 = reply_2['transaction_id']
         # It may not be possible to retrieve all parameters during development. So do not assert success.
@@ -338,7 +331,6 @@ class TestInstrumentAgent(IonTestCase):
         # are attempted. Verify results same as before. Verify transaction ID issued.
         params_3 = [AgentParameter.ALL]
         reply_3 = yield self.ia_client.get_observatory(params_3,'create')
-        success_3 = reply_3['success']
         result_3 = reply_3['result']
         transaction_id_3 = reply_3['transaction_id']
         # It may not be possible to retrieve all parameters during development. So do not assert success.
@@ -453,7 +445,6 @@ class TestInstrumentAgent(IonTestCase):
         # transaction ID.
         params_12 = [AgentParameter.ALL]
         reply_12 = yield self.ia_client.get_observatory(params_12,transaction_id_8)
-        success_12 = reply_12['success']
         result_12 = reply_12['result']
         transaction_id_12 = reply_12['transaction_id']
         # Not all parameters can be retreived during development. So don't assert success.
@@ -511,9 +502,7 @@ class TestInstrumentAgent(IonTestCase):
         # the bad sets made it through.
         params_17 = [AgentParameter.ALL]
         reply_17 = yield self.ia_client.get_observatory(params_17,'none')
-        success_17 = reply_17['success']
         result_17 = reply_17['result']
-        transaction_id_17 = reply_17['transaction_id']
         # Not all parameters can be retreived during development. So don't assert success.
         for (key,val) in result_17.iteritems():
             if key == AgentParameter.TIME_SOURCE:
@@ -546,7 +535,6 @@ class TestInstrumentAgent(IonTestCase):
         params = [(AgentParameter.ALL,MetadataParameter.ALL)]
         reply = yield self.ia_client.get_observatory_metadata(params,'none')
         success = reply['success']
-        result = reply['result']
         tid = reply['transaction_id']
         self.assert_(InstErrorCode.is_equal(success,InstErrorCode.NOT_IMPLEMENTED))
         self.assertEqual(tid,None)
@@ -763,7 +751,6 @@ class TestInstrumentAgent(IonTestCase):
         success = reply['success']
         result = reply['result']
         transaction_id = reply['transaction_id']
-        result_3 = result
         
         self.assert_(InstErrorCode.is_error(success))
         self.assertEqual(type(result),dict)
