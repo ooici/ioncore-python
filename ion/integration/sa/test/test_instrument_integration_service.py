@@ -62,6 +62,7 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         yield self._start_container()
         
         self._sim = sim()
+        yield self._sim.SetupSimulator()
         self.assertTrue (self._sim.IsSimulatorRunning())
         
         services = [
