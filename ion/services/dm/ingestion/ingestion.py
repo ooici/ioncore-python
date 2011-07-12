@@ -17,7 +17,7 @@ from ion.services.dm.distribution.events import DatasetSupplementAddedEventPubli
 import ion.util.ionlog
 from twisted.internet import defer, reactor
 from twisted.python import reflect
-
+from ion.core.object.workbench import BLOBS_REQUSET_MESSAGE_TYPE
 import base64
 import pprint
 
@@ -44,6 +44,7 @@ from ion.core.object.gpb_wrapper import OOIObjectError
 from ion.core import ioninit
 from ion.core.object import object_utils, gpb_wrapper
 
+import logging
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -718,7 +719,6 @@ class IngestionService(ServiceProcess):
 
                 result = yield self._merge_overwrite_supplement()
 
-
             elif self.data_source.aggregation_rule == self.data_source.AggregationRule.FMRC:
 
                 result = yield self._merge_fmrc_supplement()
@@ -741,7 +741,7 @@ class IngestionService(ServiceProcess):
     def _merge_overwrite_supplement(self):
 
 
-        log.debug('_merge_overlapping_supplement - Start')
+        log.debug('_merge_overwrite_supplement - Start')
 
         raise NotImplementedError('OVERWRITE Supplement updates are not yet supported')
 
@@ -750,7 +750,7 @@ class IngestionService(ServiceProcess):
     def _merge_fmrc_supplement(self):
 
 
-        log.debug('_merge_overlapping_supplement - Start')
+        log.debug('_merge_fmrc_supplement - Start')
 
         raise NotImplementedError('FMRC Supplement updates are not yet supported')
 
@@ -799,6 +799,7 @@ class IngestionService(ServiceProcess):
         for merge_var in time_vars:
 
             # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
+            # TODO: all this effectively does is remove duplicates.. order is preserved.. is this functionality expected?
             for merge_dim in reversed(merge_var.shape):
 
                 if merge_dim not in dimension_order:
@@ -819,12 +820,14 @@ class IngestionService(ServiceProcess):
 
         agg_offset = 0
         try:
+            # ATTENTION: Since this is a coordinate var, is it safe to assume the variable holds the same name?
             agg_dim = root.FindDimensionByName(merge_agg_dim.name)
             agg_offset = agg_dim.length
             log.info('Aggregation offset from current dataset: %d' % agg_offset)
 
         except OOIObjectError, oe:
             log.debug('No Dimension found in current dataset:' + str(oe))
+            # TODO: a better msg here would be something like: ("Time Dimension of data supplement is not present in current dataset.  Dimension name: %s" % merge_agg_dim.name)
 
         # Get the start time of the supplement
         try:
@@ -838,6 +841,8 @@ class IngestionService(ServiceProcess):
                            EM_END_DATE:supplement_etime*1000})
 
         except OOIObjectError, oe:
+            # TODO: this message should be cleaned up -- the FindAtt methods should be broken out into two try/except blocks so that accurate logs may be produced
+            # TODO: this uses the "log and throw" antipattern -- if ingestionError propogates and the message is logged again, this log should be removed.
             log.debug('No start time attribute found in dataset supplement!' + str(oe))
             raise IngestionError('No start time attribute found in dataset supplement!')
             # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
@@ -854,9 +859,90 @@ class IngestionService(ServiceProcess):
 
             elif current_etime > supplement_stime:
 
-                string_time_ds_end = string_time.GetValue()
-                string_time_sup_start = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(supplement_stime))
-                raise IngestionError('Can not aggregate dataset supplements which overlap by more than one timestep.  Dataset end time: "%s"  Supplement start time: "%s"' % (string_time_ds_end, string_time_sup_start))
+#                string_time_ds_end = string_time.GetValue()
+#                string_time_sup_start = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(supplement_stime))
+#                raise IngestionError('Can not aggregate dataset supplements which overlap by more than one timestep.  Dataset end time: "%s"  Supplement start time: "%s"' % (string_time_ds_end, string_time_sup_start))
+                
+                @defer.inlineCallbacks
+                def _find_time_index(self, time_var, search_time, is_overlap):
+                    """
+                    """
+                    # Step 1: Get a handle to an array of values from the supplement's time variable
+                    # Step 1a: Gather a list of keys for blobs which need to be fetched                    
+                    log.debug('Gathering a list of keys for blobs which need to be fetched...')
+                    need_keys = self._get_ndarray_keys(time_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
+                    
+                    # Step 1b: Fetch all blobs for the ndarrays in the supplement
+                    log.debug('Fetching all blobs for the ndarrays in the supplement...')
+                    repo = self.dataset.Repository
+                    yield self._fetch_blobs(repo, need_keys)
+
+                    # Step 1c: Now, grab all the array values from the ndarrays..
+                    log.debug('Grabbing all the array values from the ndarrays...')
+                    values = self._get_ndarray_vals(time_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  ndarray values = %s' % str(values))
+
+
+                    # Step 2: Perform a binary search in the sup_time_values array for search_time --> CBM--wonder if binary search is necessary (see a below) - linear search seems like it would be more efficient most of the time...
+                    #         a) Binary search will most likely be performed nearer worse case (logN time) - since the
+                    #            overlapping region should (on average) be fairly small
+                    #            * Linear search may be optimal for average case
+                    #            ** Linear search is "required" when indexing into the current data (rather than the supplement) because we must traverse multiple bounded arrays
+                    #         b) We should not have to make accomodations for near-matches unless it is possible that
+                    #            the time value represented by search_time has been removed from the originating data
+                    
+                    
+                    # Step 2a: Perform the linear search to see wherein the set of values our search_time lies
+                    log.debug('Searching for value "%s" in ndarray list' % str(search_time))
+
+#                    index_in_time_var = values.index(search_time)
+                    THRESHOLD = 2
+                    for i in range(len(values)):
+                        value = values[i]
+                        if value is search_time or abs(value-search_time) < THRESHOLD: # TODO: should change this to using some sort of near-match function
+                            index_in_time_var = i
+                            break
+                        elif search_time < value:
+                            index_in_time_var = -(i + 1)
+                            break
+                        # else search_time > value: continue
+                    else:
+                        index_in_time_var = -len(values)
+                        
+                    log.debug('index_in_time_var = %i' % index_in_time_var)
+                    
+                    # Step 2xx: Make sure that we aren't experiencing a roundoff issue by checking how close
+                    #           our search_time is to the values before and after it in the list (floats only)
+                     
+                    # Step 2a: (overlap only) If the search time is not in the list of values our overlapping data is invalid
+                    if is_overlap:
+                        if index_in_time_var < 0:
+                            if index_in_time_var == -len(values):
+                                raise IngestionError('Current data overlaps the supplement entirely and must be overwritten!  Supplement will NOT be merged!')
+                            elif index_in_time_var == -1:
+                                raise IngestionError('Supplement data does not actualy overlap the current data!  Supplement will NOT be merged!')
+                            else:
+                                raise IngestionError('Overlapping supplement data does not match current data!  Supplement will NOT be merged!')
+                    else:
+                        pass
+                        # handle overwrite -- (use index_in_time_var to determine how to break up existing bounded arrays to insert supplement data
+                    
+                    # Step 3: agg_offset -= (index_in_time_var + 1)
+                    #         if search_result is the end of the list (or off the list) operation must be overwrite (overlap region to large)
+                    #         if search_result must use near-match functionality then the time data has been modified.  This is an error due to an invalid overlap
+                    #         overlap must check that all values from the overlapping region match between the source and supplement -- if not, error
+                    #         -- overwrite does not need to do this..
+                    defer.returnValue(index_in_time_var)
+                    
+                log.debug('************* START  _find_agg_offset_in_supplement() *************')
+                agg_var    = merge_root.FindVariableByName(merge_agg_dim.name)
+                time_index = yield _find_time_index(self, agg_var, current_etime, True)
+                agg_offset = agg_offset - (time_index + 1)
+                log.debug('*************  END   _find_agg_offset_in_supplement() *************')
+                log.debug('>> agg_offset = %i' % agg_offset)
 
             else:
                 log.info('Aggregation offset unchanged - supplement does not overlap.')
@@ -865,6 +951,7 @@ class IngestionService(ServiceProcess):
             log.debug(oe)
             log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
             # This is not an error - it is a new dataset.
+            # ATTENTION: Is there any benefit to determining if there is a gap in the sequence here?
 
         ###
         ### Add the dimensions from the supplement to the current state if they are not already there
@@ -1130,6 +1217,69 @@ class IngestionService(ServiceProcess):
 
         return time_vars
 
+
+    def _get_ndarray_keys(self, dataset_variable):
+        results = []
+        for ba in dataset_variable.content.bounded_arrays:
+            results.append(ba.GetLink('ndarray').key)
+        return results
+    
+    
+    def _get_ndarray_vals(self, time_variable):
+        results = []
+        for ba in time_variable.content.bounded_arrays:
+            results.extend(ba.ndarray.value)
+        # ATTENTION: Are these ndarrays guaranteed to be ordered or do i have to checkout offsets?
+        # ATTENTION: Since time values must be monotonic.. is sorting ok here?
+        results.sort()
+        return results
+
+
+    @defer.inlineCallbacks
+    def _fetch_blobs(self, repo, fetch_keys):
+        """
+        Helper method to fetch blobs from the Datastore
+        
+        Determines which keys in fetch_keys are not already loaded in the given repositories index_hash and then
+        fetches the blobs for those remaining keys from the datastore.  The repositories index_hash is then
+        updated as expected
+        
+        @attention: This is more of an 'exgest' facility.  Should this method be moved to a move cohesive location (datastore)?
+        @attention: Consider exposing and using datastore.DataStoreWorkbench._get_blobs() instead of this method
+        """
+        if repo is None:
+            raise IngestionError('Cannot fetch blobs for a non-existant repository')
+
+        # Find which keys are needed (those not already in the repository's index_hash)
+        repo_keys = repo.index_hash.keys()
+        need_keys = set(fetch_keys).difference(repo_keys)
+
+#                        workbench_keys = set(self._workbench_cache.keys())
+#                        local_keys = workbench_keys.intersection(need_keys)
+
+#                        for key in local_keys:
+#                        for key in need_keys:
+#                            try:
+#                                repo.index_hash.get(key)
+#                                need_keys.remove(key)
+#                            except KeyError, ke:
+#                                log.info('Key disappeared - get it from the remote after all')
+                
+        if len(need_keys) > 0:
+            blobs_request = yield self.mc.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
+            blobs_request.blob_keys.extend(need_keys)
+
+            try:
+                blobs_msg = yield self.dsc.fetch_blobs(blobs_request)
+            except ReceivedError, re:
+               log.debug('ReceivedError', str(re))
+               raise IngestionError('Could not fetch ndarray blobs from the datastore during merge!  Cause: "%s"' % re.msg_content)
+
+
+            for se in blobs_msg.blob_elements:
+                # Put the new objects in the repository
+                element = gpb_wrapper.StructureElement(se.GPBMessage)
+                repo.index_hash[element.key] = element
 
 
 class IngestionClient(ServiceClient):
