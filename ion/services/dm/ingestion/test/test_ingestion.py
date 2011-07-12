@@ -9,6 +9,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publisher
 
+import logging
 import ion.util.ionlog
 from ion.util.iontime import IonTime
 
@@ -24,7 +25,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG,
 from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber, DATASET_STREAMING_EVENT_ID, get_events_exchange_point
 
 from ion.core.process import process
-from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE
+from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE, CDM_BOUNDED_ARRAY_TYPE 
 from ion.test.iontest import IonTestCase
 
 from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE, bootstrap_byte_array_dataset
@@ -32,7 +33,7 @@ from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_pro
 from ion.services.dm.ingestion.ingestion import CREATE_DATASET_TOPICS_MSG_TYPE
 
 from ion.core.object.object_utils import create_type_identifier, ARRAY_STRUCTURE_TYPE
-
+from ion.core.messaging.message_client import MessageInstance
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 DATASOURCE_TYPE = create_type_identifier(object_id=4503, version=1)
@@ -312,6 +313,129 @@ class IngestionTest(IonTestCase):
 
         complete_msg.status = complete_msg.StatusCode.OK
         yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
+
+
+    @defer.inlineCallbacks
+    def test_merge_overlap(self):
+        """
+        This is a test method for the merge dataset operation (with overlaps) of the ingestion service
+        """
+
+        # Ingest and merge a supplement
+        dataset_id = yield self._perform_test_ingest(supplement_number=1)
+#        dataset_id = SAMPLE_PROFILE_DATASET_ID
+        
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+        self.assertNotEqual(dataset, None)
+
+        
+        ###################################################
+#        # Get the links to the bounded arrays
+#        ba_links = []
+#        for var in dataset.root_group.variables:
+#            var_links = var.content.bounded_arrays.GetLinks()
+#            ba_links.extend(var_links)
+#
+#        yield dataset.Repository.fetch_links(ba_links)
+        ###################################################
+        
+        
+        # Test the data in the datastore
+        root = dataset.root_group
+        self.assertNotEqual(root, None)
+        time = root.FindVariableByName('time')
+        self.assertNotEqual(time, None)
+
+        ba_links = self.ingest._get_ndarray_keys(time)
+        log.debug('Bounded array links for "time" variable: %s' % str(ba_links))
+        self.assertEqual(len(ba_links), 2)
+        yield self.ingest._fetch_blobs(dataset.Repository, ba_links)
+        
+        # Check the first bounded array for the original data and the second for the new (overlapping) data
+        ba_vals  = []
+        log.debug('Bounded array count: %i' % len(time.content.bounded_arrays))
+        for ba in time.content.bounded_arrays:
+            ba_vals.extend(ba.ndarray.value)
+        log.debug("\n\n\n**********************************Values for the 'time' variable: %s**********************************\n\n\n" % ba_vals)
+        
+    
+    def test_merge_overlap_mismatched_values(self):
+        pass
+        
+        
+    @defer.inlineCallbacks
+    def test_merge_overlap_scratch(self):
+        """
+        This is a test method for the merge dataset operation (with overlaps) of the ingestion service
+        """
+
+        dataset_id = yield self._perform_test_ingest()
+        # @todo: add some tests here to make sure preconditions are set for foregoing tests
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+        
+        
+        
+        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=1, supplement_overlap_count=2)
+        # @todo: add some tests here to make sure preconditions are set for foregoing tests
+        
+        
+#        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=2, supplement_overlap_count=2)
+#        # @todo: add some tests here to make sure preconditions are set for foregoing tests
+#        
+#        
+#        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=4, supplement_overlap_count=2) # Shouldn't overlap because we skipped a supplement
+#        # @todo: add some tests here to make sure preconditions are set for foregoing tests
+
+
+    @defer.inlineCallbacks
+    def _perform_test_ingest(self, *args, **kwargs):
+        """
+        @param kwargs: Key-worded arguments to be sent to bootstrap_profile_dataset() when building the sample dataset for ingestion
+        """
+        # Receive a dataset to get setup...
+        content               = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id    = SAMPLE_PROFILE_DATASET_ID
+        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
+        yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = FakeDelayedCall()
+
+
+        # Now fake the receipt of the dataset message
+        cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
+        yield bootstrap_profile_dataset(cdm_dset_msg, *args, **kwargs)
+        
+
+        # Send the dataset "chunk" message -- Call the op of the ingest process directly
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+
+
+        # Send the dataset "done" message
+        complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
+        complete_msg.status = complete_msg.StatusCode.OK
+
+        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
+
+
+        #####  This cleanup code from op_ingest must be manually invoked because since we
+        #####  are running ops directly, normal process flow does not occur.  This causes
+        #####  adverse things to happen during testing, such as, the dataset not being
+        #####  fully pushed to the datastore and the ingestion defered not being reset...
+        ############################################# 
+        self.ingest._defer_ingest = defer.Deferred()
+        
+        if self.ingest.dataset.ResourceLifeCycleState != self.ingest.dataset.ACTIVE:
+            self.ingest.dataset.ResourceLifeCycleState = self.ingest.dataset.ACTIVE
+            
+        yield self.ingest.rc.put_instance(self.ingest.dataset)
+        
+        self.ingest.dataset = None
+        self.data_source = None
+        #############################################
+        
+        
+        defer.returnValue(content.dataset_id)
+
 
     @defer.inlineCallbacks
     def _create_datasource_and_set(self, new_dataset_id, new_datasource_id):
