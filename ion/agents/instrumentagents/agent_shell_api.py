@@ -38,7 +38,9 @@ from ion.core import ioninit
 from ion.core.process.process import ProcessDesc
 
 from ion.agents.instrumentagents import instrument_agent as ia
-from ion.agents.instrumentagents.instrument_constants import *
+from ion.agents.instrumentagents.instrument_constants import \
+    DriverChannel, AgentParameter, InstrumentCapability, AgentStatus, \
+    AgentCommand, AgentEvent, DriverParameter, DriverCommand
 
 AGENT_MODULE = 'ion.agents.instrumentagents.instrument_agent'
 IAC = None
