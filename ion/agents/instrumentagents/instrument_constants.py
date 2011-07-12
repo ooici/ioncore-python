@@ -302,7 +302,6 @@ class Datatype(BaseEnum):
 """
 Used by the existing drivers...need to fix.
 """
-"""
 publish_msg_type = {
     'Error':'Error',
     'StateChange':'StateChange',
@@ -310,7 +309,8 @@ publish_msg_type = {
     'Data':'Data',
     'Event':'Event'
 }
-"""
+
+driver_client = "PLACEHOLDER"
 
 """
 Publish message types.
