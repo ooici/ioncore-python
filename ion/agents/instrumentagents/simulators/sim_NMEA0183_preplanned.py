@@ -30,6 +30,7 @@ from gpsSimPath import simPath
 from twisted.protocols import basic
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 
+import ion.util.procutils as pu
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -192,10 +193,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
             log.error ('GPS Simulator Failure: ' + e.__str__())
             return
         log.debug ('Successfuly opened  %s.' % self._serMaster)
-        log.debug ('Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
-        #yield pu.asleep (1)
-        yield sim_NMEA0183.WaitForConnect (1)
-        log.debug ('After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
+        yield pu.asleep (1)
         self._workingSim = True
         self._goodComms = True
 
@@ -256,6 +254,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
         self.s.write (toWrite)
         log.debug ('NMEA written: %s' % toWrite.rstrip())
 
+    @defer.inlineCallbacks
     def SimShutdown(self):
         """
         Stop the GPS simulator from firing every second.
@@ -263,7 +262,7 @@ class NMEA0183SimPrePlanned (sim_NMEA0183.NMEA0183SimBase):
 
         self._simRun.stop()
         log.info ('1HZ GPS output has stopped.')
-        sim_NMEA0183.WaitForConnect (1)
+        yield pu.asleep(1)
         self._workingSim = False
 
     def IsSimulatorRunning(self):

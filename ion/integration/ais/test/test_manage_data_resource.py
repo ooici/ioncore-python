@@ -166,6 +166,12 @@ class AISManageDataResourceTest(IonTestCase):
         self.ac    = AssociationClient(proc=proc)
 
 
+        #prepare to monkey patch so we don't use the cache functions
+        child_aiss = yield self.sup.get_child_id('app_integration')
+        self.aiss  = self._get_procinstance(child_aiss)
+        self.aiss.metadataCache = None
+
+
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
