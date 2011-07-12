@@ -115,10 +115,8 @@ class InteractionObserver(Process):
         for msgtup in msglog:
             msg = msgtup[1]
             sid = msg.get('sender', '??')
-            rec = msg.get('receiver')
+            rec = msg.get('receiver', None)
             sname = msg.get('sender-name', sid)
-            if "DatasetAgent" in sname:
-                sname = "%s_%s" % (sname, sid[0:5])
 
             # map sender to process name
             if not sid in proc_alias:
@@ -134,11 +132,10 @@ class InteractionObserver(Process):
                 if convid is None or performative is None:
                     log.warn('Intercepted message with no performative or convid, but says it is rpc')
                 elif performative == 'request':
-                    torec = msg.get('receiver', None)
-                    if torec is not None and torec not in proc_alias:
+                    if rec is not None and rec not in proc_alias:
                         # add to open rpc conversation maps
-                        open_rpcs[convid] = torec
-                        log.debug("Adding receiver %s to open conversations to resolve (conv id %s)" % (torec, convid))
+                        open_rpcs[convid] = rec
+                        log.debug("Adding receiver %s to open conversations to resolve (conv id %s)" % (rec, convid))
 
                 elif performative != 'timeout':     # all other items are responses, so we should be able to get info
 
@@ -157,6 +154,16 @@ class InteractionObserver(Process):
             if not rec in procs and not msgtup[2]:
                 procs.append(rec)
 
+        # morph names in proc_alias to resemble "sname/sid" for taxonomy purposes
+        new_proc_alias = {}
+        for k, v in proc_alias.iteritems():
+            if k != v:
+                newv = "%s/%s" % (v, k)
+            else:
+                newv = v
+            new_proc_alias[k] = newv
+
+        proc_alias = new_proc_alias
 
         # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
         senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
@@ -166,6 +173,9 @@ class InteractionObserver(Process):
         for rec in procs:
             if not (rec in proc_alias or rec in open_rpcs.values()):
                 senders.append(rec)
+
+        # sort senders list
+        senders = sorted(senders)
 
         def sanitize(input):
             return string.replace(string.replace(input, ".", "_"), "-", "_")
