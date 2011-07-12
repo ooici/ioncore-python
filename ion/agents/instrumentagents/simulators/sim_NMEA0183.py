@@ -6,11 +6,11 @@
 """
 import os
 import signal
-import time
 from twisted.internet import defer
 from datetime import datetime
 import subprocess
 import tempfile
+import ion.util.procutils as pu
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -26,10 +26,6 @@ ON = 'On'
 
 # Open a null stream to pipe unwanted console messages to nowhere
 nullDesc = open (os.devnull, NULLPORTMODE)
-
-
-def WaitForConnect (t):
-    time.sleep(t)
 
 def DecDegToNMEAStr (dd):
     """
@@ -450,12 +446,15 @@ class NMEA0183SimBase:
         log.info ('simBase __init__')
         self._goodComms = False
         self._workingSim = False
-        self.SerialPortSetup()       # Sets up the serial port
+        
+    @defer.inlineCallbacks
+    def SetupSimulator(self):
+        yield self.SerialPortSetup()       # Sets up the serial port
         if not self._goodComms:
             log.error ('Serial ports not configured.')
             return
         log.info ('Serial ports configured.')
-        self.SimGPSSetup()           # Inits the selected simulator
+        yield self.SimGPSSetup()           # Inits the selected simulator
 
     @defer.inlineCallbacks
     def SerialPortSetup (self):
@@ -477,10 +476,7 @@ class NMEA0183SimBase:
         except OSError, e:
             log.error ('Failure:  Could not create virtual serial port(s): %s' % e)
             return
-        log.debug ('----- Before sleep (1) %s' % datetime.now().strftime ('%H:%M:%S'))
-        #yield pu.asleep(1)
-        yield WaitForConnect (1)
-        log.debug ('----- After sleep (1)  %s' % datetime.now().strftime ('%H:%M:%S'))
+        yield pu.asleep(1) # wait just a bit for connect
         if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):
             log.error ('Failure:  Unknown reason.')
             return
@@ -491,6 +487,7 @@ class NMEA0183SimBase:
         log.debug ('Master port: %s   Slave port: %s' % (self._serMaster, self._serSlave))
         self._goodComms = True
 
+    @defer.inlineCallbacks
     def SimGPSSetup(self):
         """
         Inits the local simulator or launches external simulator

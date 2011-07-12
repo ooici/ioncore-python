@@ -86,6 +86,7 @@ class TestNMEADevice(IonTestCase):
         """
         yield self._start_container()
         self._sim = sim()
+        yield self._sim.SetupSimulator()
         self.assertTrue (self._sim.IsSimulatorRunning())
 
         services = [{'name': 'driver_NMEA0183',
@@ -102,6 +103,7 @@ class TestNMEADevice(IonTestCase):
         """
         """
         self._sim.StopSimulator()
+        yield pu.asleep(1)
         self.assertFalse(self._sim.IsSimulatorRunning())
         yield self._stop_container()
 
