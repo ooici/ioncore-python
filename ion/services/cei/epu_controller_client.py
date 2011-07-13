@@ -26,6 +26,7 @@ class EPUControllerClient(ServiceClient):
         
         @param newconf None or dict of key/value pairs
         """
+        yield self._check_init()
         log.debug("Sending reconfigure request to EPU controller: '%s'" % self.target)
         yield self.send('reconfigure', newconf)
 
@@ -33,17 +34,20 @@ class EPUControllerClient(ServiceClient):
     def reconfigure_rpc(self, newconf):
         """See reconfigure()
         """
+        yield self._check_init()
         yield self.rpc_send('reconfigure_rpc', newconf)
         defer.returnValue(None)
 
     @defer.inlineCallbacks
     def de_state(self):
+        yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('de_state', {})
         log.debug('DE state reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
     def whole_state(self):
+        yield self._check_init()
         service_exists = True
         if not self.force_service_exists:
             service_exists = yield self.does_service_exist(self.epu_controller_name)
@@ -74,5 +78,6 @@ class EPUControllerClient(ServiceClient):
 
     @defer.inlineCallbacks
     def node_error(self, node_id):
+        yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('node_error', node_id)
         defer.returnValue(content)
