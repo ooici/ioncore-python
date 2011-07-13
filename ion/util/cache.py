@@ -89,6 +89,9 @@ class LRUDict(object):
         for key, value in pairs:
             self[key] = value
 
+    def __len__(self):
+        return len(self.d)
+
     def __contains__(self, key):
         return key in self.d
 

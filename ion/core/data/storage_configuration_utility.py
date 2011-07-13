@@ -174,8 +174,8 @@ def get_cassandra_configuration(sysname=None):
 
     # Set the keyspace name to the sysname!
     ion_ks['name'] = sysname
-    my_blob_cf['keyspace'] = sysname
-    my_commit_cf['keyspace'] = sysname
+    for cf in ion_ks['cf_defs']:
+        cf['keyspace'] = sysname
 
     return confdict
 

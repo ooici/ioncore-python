@@ -1126,8 +1126,12 @@ class WorkBench(object):
 
 
 
-    def _load_commits(self, link):
+    def _load_commits(self, link, loaded=None):
                 
+
+        if loaded is None:
+            loaded = {}
+
 
         log.debug('_load_commits - Key: %s' % sha1_to_hex(link.key))
         repo = link.Repository
@@ -1138,13 +1142,16 @@ class WorkBench(object):
             log.debug(ex)
             raise WorkBenchError('Commit id not found while loding commits: \n %s' % link.key)
             # This commit ref was not actually sent!
-            
+
         if cref.ObjectType != COMMIT_TYPE:
             raise WorkBenchError('This method should only load commits!')
-            
+
+        loaded[cref.MyId] = cref
+
         for parent in cref.parentrefs:
             link = parent.GetLink('commitref')
             # Call this method recursively for each link
-            self._load_commits(link)
+            if link.key not in loaded:
+                self._load_commits(link, loaded=loaded)
         
 

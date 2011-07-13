@@ -103,11 +103,14 @@ class IndexHash(dict):
 
 
     def __setitem__(self, key, val):
+
+        if key not in self:
+            self._size += val.__sizeof__()
+
         dict.__setitem__(self, key, val)
         if self.has_cache:
             self.cache[key]=val
 
-        self._size += val.__sizeof__()
 
 
     def copy(self):
