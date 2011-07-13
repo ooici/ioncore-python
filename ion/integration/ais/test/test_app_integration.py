@@ -582,11 +582,7 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
-        #reqMsg.message_parameters_reference.minLatitude = 40.2216682434
-        #reqMsg.message_parameters_reference.maxLatitude = 40.2216682434
-        #reqMsg.message_parameters_reference.minLongitude = -74.13
-        #reqMsg.message_parameters_reference.maxLongitude = -73.50
+        reqMsg.message_parameters_reference.user_ooi_id = ANONYMOUS_USER_ID
         
         log.debug('Calling findDataResources.')
         rspMsg = yield self.aisc.findDataResources(reqMsg)
@@ -664,7 +660,7 @@ class AppIntegrationTest(IonTestCase):
                 if not rspMsg.message_parameters_reference[0].dataResourceSummary.IsFieldSet('ion_geospatial_vertical_positive'):
                     self.fail('response to findDataResources has no ion_geospatial_vertical_positive field')
 
-                #self.__printMetadataVariables(rspMsg)
+                self.__printMetadata(rspMsg)
 
         
     @defer.inlineCallbacks
@@ -1861,16 +1857,46 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             i = i + 1                
 
 
-    def __printMetadataVariables(self, rspMsg):
-        log.debug('Minimum Metadata Variables:\n')
+    def __printMetadata(self, rspMsg):
+
+        #
+        # If there are any dataset "other_attributes," print them.
+        #
+        if len(rspMsg.message_parameters_reference[0].other_attributes) > 0:
+            log.debug('Dataset Other Attributes:')
+            for attr in rspMsg.message_parameters_reference[0].other_attributes:
+                log.debug('  attribute name: %s' %(attr.name))
+                log.debug('  attribute value: %s' %(attr.value))
+
+        #
+        # If there are any dataset dimensions, print them.
+        #
+        if len(rspMsg.message_parameters_reference[0].dimensions) > 0:
+            log.debug('Dataset Dimensions:')
+            for dim in rspMsg.message_parameters_reference[0].dimensions:
+                log.debug('  dimension name: %s' %(dim.name))
+                log.debug('  dimension length: %d' %(dim.length))
+
+        #
+        # Print any variables.  Variables can have their own "other_attributes"
+        # and dimensions, so print those too.
+        #
+        log.debug('Dataset Variables:')
         for var in rspMsg.message_parameters_reference[0].variable:
-            log.debug('  Variable:\n')
-            log.debug('    standard_name: ' + var.standard_name + '\n')
-            log.debug('    long_name: ' + var.long_name + '\n')
-            log.debug('    units: ' + var.units + '\n')
-            for attrib in var.other_attributes:
-                log.debug('    Other Attributes:\n')
-                log.debug('      ' + str(attrib) + str('\n'))
+            log.debug('  Variable name: %s' %(var.name))
+            log.debug('    standard_name: ' + var.standard_name)
+            log.debug('    long_name: ' + var.long_name)
+            log.debug('    units: ' + var.units)
+            
+            if len(var.other_attributes) > 0:
+                log.debug('    Other Attributes for Variable %s:' %(var.name))
+                for attrib in var.other_attributes:
+                    log.debug('      name: %s, value: %s' %(attrib.name, attrib.value))
+
+            if len(var.dimensions) > 0:
+                log.debug('    Dimensions for Variable %s:' %var.name)
+                for dim in var.dimensions:
+                    log.debug('      name: %s, length: %s' %(dim.name, dim.length))
 
 
 
