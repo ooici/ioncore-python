@@ -29,7 +29,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, PublisherFactory
 
-from ion.core.object.cdm_methods import attribute_merge
+from ion.core.object.cdm_methods import attribute_merge, variables
 
 from ion.core.exception import ApplicationError
 
@@ -243,7 +243,7 @@ class IngestionService(ServiceProcess):
             self.data_source = yield self.rc.get_instance(content.datasource_id)
         except ResourceClientError, rce:
            log.exception('Could not get datasource resource!')
-           raise IngestionError('Could not get the datasource resource from the datastore')
+           raise IngestionError('Could not get the datasource resource from the datastore.  Cause: %s' % str(rce))
 
         log.info('Got datasource resource')
 
@@ -750,19 +750,53 @@ class IngestionService(ServiceProcess):
 
 
 
-
     @defer.inlineCallbacks
     def _merge_overwrite_supplement(self):
 
-
         log.debug('_merge_overwrite_supplement - Start')
+        is_overwrite = True
 
-        raise NotImplementedError('OVERWRITE Supplement updates are not yet supported')
+        # Perform necessary premerge operations and unpack the result
+        cur_root, \
+        cur_etime, \
+        cur_agg_dim_length, \
+        sup_root, \
+        sup_stime, \
+        sup_etime, \
+        sup_agg_dim_length, \
+        sup_agg_dim_name, \
+        result = yield self.__premerge()
+
+
+        # Calculate offsets and indices for positioning the supplement in the dataset
+        log.debug('************* START  __calculate_merge_offsets() *************')
+        
+        sup_sindex, \
+        sup_eindex, \
+        agg_offset, \
+        insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
+        
+        log.debug('************* END    __calculate_merge_offsets() *************')
+
+        
+        log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
+        log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
+        log.debug('>> insertion_offset   = %i' % insertion_offset)
+        log.debug('>> agg_offset         = %i' % agg_offset)
+        log.debug('>> sup_sindex         = %i' % sup_sindex)
+        log.debug('>> sup_eindex         = %i' % sup_eindex)
+
+
+        # Perform the merge
+        result.update(self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex))
+
+
+        log.debug('_merge_overwrite_supplement - Complete')
+        defer.returnValue(result)
 
 
     @defer.inlineCallbacks
     def _merge_fmrc_supplement(self):
-
 
         log.debug('_merge_fmrc_supplement - Start')
 
@@ -773,9 +807,63 @@ class IngestionService(ServiceProcess):
     @defer.inlineCallbacks
     def _merge_overlapping_supplement(self):
 
-
         log.debug('_merge_overlapping_supplement - Start')
+        is_overwrite = False
 
+        # Perform necessary premerge operations and unpack the result
+        cur_root, \
+        cur_etime, \
+        cur_agg_dim_length, \
+        sup_root, \
+        sup_stime, \
+        sup_etime, \
+        sup_agg_dim_length, \
+        sup_agg_dim_name, \
+        result = yield self.__premerge()
+
+
+        # Calculate offsets and indices for positioning the supplement in the dataset
+        log.debug('************* START  __calculate_merge_offsets() *************')
+        
+        sup_sindex, \
+        sup_eindex, \
+        agg_offset, \
+        insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
+        
+        log.debug('************* END    __calculate_merge_offsets() *************')
+
+        
+        log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
+        log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
+        log.debug('>> insertion_offset   = %i' % insertion_offset)
+        log.debug('>> agg_offset         = %i' % agg_offset)
+        log.debug('>> sup_sindex         = %i' % sup_sindex)
+        log.debug('>> sup_eindex         = %i' % sup_eindex)
+
+
+        # Perform the merge
+        result.update(self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex))
+
+
+        log.debug('_merge_overlapping_supplement - Complete')
+        defer.returnValue(result)
+        
+
+    @defer.inlineCallbacks
+    def __premerge(self):
+        """
+        Performs the following steps to facilitate common merge operations:
+        1) Provides basic sanity checks on the dataset
+        2) Ensures merge data is commited in the datasets repository
+        3) Extracts time aggregation dimension and other fields to
+             be used in subsequent merge operations (such as in
+             _merge_overwrite_supplement() and _merge_overlapping_supplement()
+             
+        @return: A tuple containing the following items (in order):
+                 sup_stime - the start time of the merge dataset in seconds
+                 sup_etime - the end time of the merge dataset in seconds
+        """
+        
         # A little sanity check on entering recv_done...
         if len(self.dataset.Repository.branches) != 2:
             raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
@@ -794,15 +882,15 @@ class IngestionService(ServiceProcess):
         self.dataset.Repository.remove_branch(merge_branch)
 
 
-        # Get the root group of the current state of the dataset
-        root = self.dataset.root_group
+        # Get the cur_root group of the current state of the dataset
+        cur_root = self.dataset.root_group
 
-        # Get the root group of the supplement we are merging
-        merge_root = self.dataset.Merge[0].root_group
+        # Get the cur_root group of the supplement we are merging
+        sup_root = self.dataset.Merge[0].root_group
 
-        log.info('Starting Find Dimension LooP')
+        log.info('Starting Find Dimension Loop')
 
-        time_vars = self._find_time_var(merge_root)
+        time_vars = self._find_time_var(sup_root)
 
         if len(time_vars) is 0:
             result={EM_ERROR:'Error during ingestion: No Time variable found!'}
@@ -813,7 +901,6 @@ class IngestionService(ServiceProcess):
         for merge_var in time_vars:
 
             # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
-            # TODO: all this effectively does is remove duplicates.. order is preserved.. is this functionality expected?
             for merge_dim in reversed(merge_var.shape):
 
                 if merge_dim not in dimension_order:
@@ -824,208 +911,304 @@ class IngestionService(ServiceProcess):
 
         # This is the inner most!
         merge_agg_dim = dimension_order[0]
+        sup_agg_dim_name = merge_agg_dim.name
+        log.info('Merge aggregation dimension name is: %s' % sup_agg_dim_name)
 
-        log.info('Merge aggregation dimension name is: %s' % merge_agg_dim.name)
 
+        sup_agg_dim_length = merge_agg_dim.length
 
-        supplement_length = merge_agg_dim.length
+        result = {EM_TIMESTEPS:sup_agg_dim_length}
 
-        result = {EM_TIMESTEPS:supplement_length}
-
-        agg_offset = 0
+        cur_agg_dim_length = 0
         try:
-            agg_dim = root.FindDimensionByName(merge_agg_dim.name)
-            agg_offset = agg_dim.length
-            log.info('Aggregation offset from current dataset: %d' % agg_offset)
+            agg_dim = cur_root.FindDimensionByName(merge_agg_dim.name)
+            cur_agg_dim_length = agg_dim.length
+            log.info('Aggregation offset from current dataset: %d' % cur_agg_dim_length)
 
         except OOIObjectError, oe:
             log.debug("Time Dimension of data supplement is not present in current dataset.  Dimension name: '%s'.  Cause: %s" % (merge_agg_dim.name, str(oe)))
 
+
         # Get the start time of the supplement
         try:
-            string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
-            supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
-            log.debug('Supplement Start Time: %s (%i)' % (string_time.GetValue(), supplement_stime))
-
-            string_time = merge_root.FindAttributeByName('ion_time_coverage_end')
-            supplement_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
-
-            result.update({EM_START_DATE:supplement_stime*1000,
-                           EM_END_DATE:supplement_etime*1000})
+            string_time = sup_root.FindAttributeByName('ion_time_coverage_start')
+            sup_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            log.debug('Supplement Start Time: %s (%i)' % (string_time.GetValue(), sup_stime))
 
         except OOIObjectError, oe:
-            # TODO: this message should be cleaned up -- the FindAtt methods should be broken out into two try/except blocks so that accurate logs may be produced
-            # TODO: this uses the "log and throw" antipattern -- if ingestionError propogates and the message is logged again, this log should be removed.
-            log.debug('No start time attribute found in dataset supplement!' + str(oe))
-            raise IngestionError('No start time attribute found in dataset supplement!')
+            raise IngestionError('No start time attribute found in dataset supplement!' + str(oe))
             # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
 
 
-        # Get the end time of the current dataset
+        # Get the end time of the supplement
         try:
-            string_time = root.FindAttributeByName('ion_time_coverage_end')
-            current_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
-            log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), current_etime))
+            string_time = sup_root.FindAttributeByName('ion_time_coverage_end')
+            sup_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            log.debug('Supplement End Time: %s (%i)' % (string_time.GetValue(), sup_etime))
+
+        except OOIObjectError, oe:
+            raise IngestionError('No end time attribute found in dataset supplement!' + str(oe))
+            # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
+        
+        
+        result.update({EM_START_DATE:sup_stime*1000,
+                       EM_END_DATE:sup_etime*1000})
+        
+        
+        
+        # Get the start/end time indices of the current dataset and applicable offsets
+        cur_etime = None
+        try:
+            string_time = cur_root.FindAttributeByName('ion_time_coverage_end')
+            cur_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), cur_etime))
             
-            if current_etime == supplement_stime:
-                agg_offset -= 1
-                log.info('Aggregation offset decremented by one - supplement overlaps: %d' % agg_offset)
-
-            elif current_etime > supplement_stime:
-
-#                string_time_ds_end = string_time.GetValue()
-#                string_time_sup_start = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(supplement_stime))
-#                raise IngestionError('Can not aggregate dataset supplements which overlap by more than one timestep.  Dataset end time: "%s"  Supplement start time: "%s"' % (string_time_ds_end, string_time_sup_start))
-                
-                @defer.inlineCallbacks
-                def _find_time_index(self, time_var, search_time, is_overlap):
-                    """
-                    """
-                    # Step 1: Get a handle to an array of values from the supplement's time variable
-                    # Step 1a: Gather a list of keys for blobs which need to be fetched                    
-                    log.debug('Gathering a list of keys for blobs which need to be fetched...')
-                    need_keys = self._get_ndarray_keys(time_var)
-                    if log.getEffectiveLevel() <= logging.DEBUG:
-                        log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
-                    
-                    # Step 1b: Fetch all blobs for the ndarrays in the supplement
-                    log.debug('Fetching all blobs for the ndarrays in the supplement...')
-                    repo = self.dataset.Repository
-                    yield self._fetch_blobs(repo, need_keys)
-
-                    # Step 1c: Now, grab all the array values from the ndarrays..
-                    log.debug('Grabbing all the array values from the ndarrays...')
-                    values = self._get_ndarray_vals(time_var)
-                    if log.getEffectiveLevel() <= logging.DEBUG:
-                        log.debug('>>  ndarray values = %s' % str(values))
-
-
-                    # Step 2: Perform a binary search in the sup_time_values array for search_time --> CBM--wonder if binary search is necessary (see a below) - linear search seems like it would be more efficient most of the time...
-                    #         a) Binary search will most likely be performed nearer worse case (logN time) - since the
-                    #            overlapping region should (on average) be fairly small
-                    #            * Linear search may be optimal for average case
-                    #            ** Linear search is "required" when indexing into the current data (rather than the supplement) because we must traverse multiple bounded arrays
-                    #         b) We should not have to make accomodations for near-matches unless it is possible that
-                    #            the time value represented by search_time has been removed from the originating data
-                    
-                    
-                    # Step 2a: Perform the linear search to see where in the set of values our search_time lies
-                    log.debug('Searching for value "%s" in ndarray list' % str(search_time))
-
-                    # @warning: Change this threshold to something reasonable+meaningful
-                    THRESHOLD = 0.001
-                    for i in range(len(values)):
-                        idx, val = values[i]
-                        # @note: this is a good place to check if two entries in the time variables bounded_arrays
-                        #        contain mismatched values for the same index -- this shouldn't happen however
-                        if val is search_time or abs(val-search_time) < THRESHOLD: # TODO: should change this to using some sort of near-match function
-                            index_in_time_var = idx
-                            break
-                        elif search_time < val:
-                            index_in_time_var = -(i + 1)
-                            break
-                        # else search_time > val: continue
-                    else:
-                        index_in_time_var = -len(values)
-                        
-                    log.debug('index_in_time_var = %i' % index_in_time_var)
-                    
-                    # Step 2xx: Make sure that we aren't experiencing a roundoff issue by checking how close
-                    #           our search_time is to the values before and after it in the list (floats only)
-                     
-                    # Step 2a: (overlap only) If the search time is not in the list of values our overlapping data is invalid
-                    if is_overlap:
-                        if index_in_time_var < 0:
-                            if index_in_time_var == -len(values):
-                                raise IngestionError('Current data overlaps the supplement entirely and must be overwritten!  Supplement will NOT be merged!')
-                            elif index_in_time_var == -1:
-                                raise IngestionError('Supplement data does not actualy overlap the current data!  Supplement will NOT be merged!')
-                            else:
-                                raise IngestionError('Overlapping supplement data does not match current data!  Supplement will NOT be merged!')
-                    else:
-                        pass
-                        # handle overwrite -- (use index_in_time_var to determine how to break up existing bounded arrays to insert supplement data
-                    
-                    # Step 3: agg_offset -= (index_in_time_var + 1)
-                    #         if search_result is the end of the list (or off the list) operation must be overwrite (overlap region to large)
-                    #         if search_result must use near-match functionality then the time data has been modified.  This is an error due to an invalid overlap
-                    #         overlap must check that all values from the overlapping region match between the source and supplement -- if not, error
-                    #         -- overwrite does not need to do this..
-                    defer.returnValue(index_in_time_var)
-                    
-                log.debug('************* START  _find_agg_offset_in_supplement() *************')
-                agg_var    = merge_root.FindVariableByName(merge_agg_dim.name)
-                time_index = yield _find_time_index(self, agg_var, current_etime, True)
-                agg_offset = agg_offset - (time_index + 1)
-                log.debug('*************  END   _find_agg_offset_in_supplement() *************')
-                log.debug('>> agg_offset = %i' % agg_offset)
-
-            else:
-                log.info('Aggregation offset unchanged - supplement does not overlap.')
-
         except OOIObjectError, oe:
             log.debug(oe)
             log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
             # This is not an error - it is a new dataset.
             # ATTENTION: Is there any benefit to determining if there is a gap in the sequence here?
 
+
+        return_value = (cur_root, cur_etime, cur_agg_dim_length, sup_root, sup_stime, sup_etime, sup_agg_dim_length, sup_agg_dim_name, result)
+        defer.returnValue(return_value)
+
+
+    @defer.inlineCallbacks
+    def __calculate_merge_offsets(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length):
+        
+        sup_sindex       = cur_agg_dim_length
+        sup_eindex       = cur_agg_dim_length
+        agg_offset       = cur_agg_dim_length     #- Position of supplement relative to existing data along the aggregation dimension
+        insertion_offset = sup_agg_dim_length     #- Net change to the dataset along the aggregation dimension (how the length of the dim changes)
+                                                  #  defaults to length so that if there are no overlaps (during data append)
+                                                  #  we adjust the dimension length by adding this value.. otherwise, this
+                                                  #  var will be replaced so that it represents the differences between the
+                                                  #  number of values being inserted and the number of values that insertion
+                                                  #  would replace.
+                                                  #    Example 1: When appending data which doesn't overwrite:
+                                                  #          insertion_offset = (length - 0) = length
+                                                  #    Example 2: When overwriting identical data:
+                                                  #          insertion_offset = (length - length = 0
+                                                  #    Example 3: (insetion) When 5 values overwrite 4 values:
+                                                  #          insertion =_offset = (5 - 4) = 1
+        # If cur_etime is None then the current dataset does not exist.
+        # In this case the cur_agg_dim_length is 0 -- and therefore all our offsets will be as well
+        # insertion_offset will be the sup_agg_dim_length, which is equal to the total number of values we are inserting
+        if cur_etime is None:
+            log.info('__calculate_merge_offsets(): Current dataset does not exist -- offsets will be based on a starting index of 0')
+            
+        else:
+            log.info('__calculate_merge_offsets(): Current dataset exists, moving onward...')
+            if is_overwrite:
+                if cur_etime < sup_stime:
+                    log.info('__calculate_merge_offsets(overwrite): Supplement does not overlap.')
+                    
+                else:
+                    log.info('__calculate_merge_offsets(overwrite): Supplement overlaps -- calculating offsets')
+                    # Find where the supplement start time and end time should lay in the dataset (supplement_sindex, supplement_eindex)
+                    # Find how the origins in the supplement's data should change according to this position (agg_offset)
+                    # Find how the origins in the dataset's data should change according to this position (insertion_offset)
+                    agg_var      = cur_root.FindVariableByName(sup_agg_dim_name)
+                    time_indices = yield self._find_time_index(agg_var, [sup_stime, sup_etime])
+                    log.debug('time_indices = %s' % str(time_indices))
+                    
+                    sup_sindex = time_indices[sup_stime]
+                    sup_eindex = time_indices[sup_etime]
+                    
+                    # Adjust indices when the supplement times lay between indices in the current dataset
+                    if sup_sindex < 0:
+                        sup_sindex = -sup_sindex - 1
+                    if sup_eindex < 0:
+                        sup_eindex = -sup_eindex - 2
+                        
+                        
+                    agg_offset = sup_sindex
+                    
+                    # Calculate the insertion offset -- how bounded_arrays ordered after the overwritten section must be offset
+                    supplement_impact = (sup_eindex + 1) - sup_sindex  #(number of values displaced by inserting this supplement into the dataset)
+                    insertion_offset  = sup_agg_dim_length - supplement_impact
+            
+            else:
+    
+                # For overlap - determine how many indices overlap to determine our offsets
+                overlap_count = 0
+                
+                if cur_etime == sup_stime:
+                    overlap_count = 1
+                    log.info('__calculate_merge_offsets(overlap): Supplement overlaps by 1')
+    
+                elif cur_etime > sup_stime:
+                    log.info('__calculate_merge_offsets(overlap): Supplement overlaps -- calculating number of overlaps')
+                    agg_var      = sup_root.FindVariableByName(sup_agg_dim_name)
+                    time_indices = yield self._find_time_index(agg_var, [cur_etime])
+                    time_index   = time_indices[cur_etime]
+                    
+                    # Overlap has some restrictions--
+                    if time_index < 0:
+                        if time_index == -(sup_agg_dim_length + 1):
+                            raise IngestionError('Current data overlaps the supplement entirely and must be overwritten!  Supplement will NOT be merged!  index:%i' % time_index)
+                        elif time_index == -1:
+                            raise IngestionError('Supplement data does not actualy overlap the current data!  Supplement will NOT be merged!  index:%i' % time_index)
+                        else:
+                            raise IngestionError('Overlapping supplement data does not match current data!  Supplement will NOT be merged!  index:%i' % time_index)
+                    
+                    overlap_count = time_index + 1
+                    
+                else:
+                    log.info('__calculate_merge_offsets(overlap): Supplement does not overlap.')
+            
+            
+                agg_offset        -= overlap_count
+                insertion_offset  -= overlap_count
+                sup_sindex -= overlap_count
+        
+        
+        result = (sup_sindex, sup_eindex, agg_offset, insertion_offset)
+        defer.returnValue(result)
+
+
+    def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex):
+        result = {}
+        
         ###
         ### Add the dimensions from the supplement to the current state if they are not already there
         ###
         merge_dims = {}
-        for merge_dim in merge_root.dimensions:
+        for merge_dim in sup_root.dimensions:
             merge_dims[merge_dim.name] = merge_dim
 
         dims = {}
-        for dim in root.dimensions:
+        for dim in cur_root.dimensions:
             dims[dim.name] = dim
 
         if merge_dims.keys() != dims.keys():
             if len(dims) != 0:
                 raise IngestionError('Can not ingest supplement with different dimensions than the dataset')
             else:
-                for merge_dim in merge_root.dimensions:
-                    dim_link = root.dimensions.add()
+                # ! New dataset -- add all dimensions
+                for merge_dim in sup_root.dimensions:
+                    dim_link = cur_root.dimensions.add()
                     dim_link.SetLink(merge_dim)
 
         else:
-            # We are appending an existing dataset - adjust the length of the aggregation dimension
-            agg_dim = dims[merge_agg_dim.name]
-            agg_dim.length = agg_offset + supplement_length
+            # ! We are appending an existing dataset - adjust the length of the aggregation dimension
+            agg_dim = dims[sup_agg_dim_name]
+            agg_dim.length += insertion_offset
             log.info('Setting the aggregation dimension %s to %d' % (agg_dim.name, agg_dim.length))
 
 
-        for merge_var in merge_root.variables:
+        ###
+        ### Add/merge the variables from the supplement to the current state if they are not already there
+        ### Merge variable if it is dimensioned on the aggregation dimension (merge_agg_dim)
+        ###
+        for merge_var in sup_root.variables:
             var_name = merge_var.name
 
             log.info('Merge Var Name: %s' % merge_var.name)
 
-
+            
+            # Step 1: Copy new variables from the supplement into the dataset
             try:
-                var = root.FindVariableByName(var_name)
+                var = cur_root.FindVariableByName(var_name)
             except OOIObjectError, oe:
                 log.debug(oe)
                 log.info('Variable %s does not yet exist in the dataset!' % var_name)
 
-                v_link = root.variables.add()
+                v_link = cur_root.variables.add()
                 v_link.SetLink(merge_var, ignore_copy_errors=True)
 
                 log.info('Copied Variable %s into the dataset!' % var_name)
                 continue # Go to next variable...
 
 
-            if merge_agg_dim not in merge_var.shape:
+            # Step 2: Skip merge for variables which are not dimensioned on the merge_agg_dim
+            # @todo: check to see if supplement shape and dataset shape don't match (like if time dimensions are at different indices)
+            merge_agg_dim_idx = -1
+            for i in range(len(merge_var.shape)):
+                if merge_var.shape[i].name == sup_agg_dim_name:
+                    merge_agg_dim_idx = i
+                    break
+            else:
                 log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
                 continue # Ignore this variable...
 
 
-            # @TODO check attributes for variables which are not aggregated....
+            # @todo: check attributes for variables which are not aggregated....
 
-
+            
+            # Step 3: Merge variable values
+            # If cur_etime is None then the dataset doesnt exist yet.  In that case,
+            #   applying all these offsets in this codeblock is not necessary
+            if is_overwrite and cur_etime is not None:
+                # Step 3a: (overwrite) Restructure the data in the dataset
+                if cur_etime >= sup_stime:
+                    #          This requires the following:
+                    #            1) Removing bounded arrays which are totally contained in the supplement
+                    #            2) Breaking apart bounded arrays which contain 1 or more overlapping indices
+                    #               and throwing away the overlapping region
+                    #            3) Adjusting the indices of all bounded_arrays positioned after the overwrite
+                    iter_offset = 0  # iter_offset is used to alter i when iterating the list of
+                                     # bounded_arrays because we are performing a restructuring of the
+                                     # list while iterating over it  (concurrent modification)
+                    for i in range(len(var.content.bounded_arrays)):
+                        ba = var.content.bounded_arrays[i + iter_offset]
+                        bound = ba.bounds[merge_agg_dim_idx]
+                        
+                        log.debug('Var:"%s"  BA:%i  BA.origin:%i  BA.size:%i  sup_sindex:%i  sup_eindex:%i' % (var.name, i, bound.origin, bound.size, sup_sindex, sup_eindex))
+        
+                        # (contains check)
+                        # @todo: add unit tests for this case!
+                        if bound.origin >= sup_sindex and bound.origin + bound.size - 1 <= sup_eindex:
+                            # Remove this bounded array
+                            if log.getEffectiveLevel() <= logging.DEBUG:
+                                log.debug("(contains) Removing bounded array: %s" % str(var.content.bounded_arrays[i + iter_offset].ndarray.value))
+                            del var.content.bounded_arrays[i + iter_offset]
+                            iter_offset -= 1
+                        
+                        # (intersects check)
+                        # @todo: add unit tests for this case!
+                        elif bound.origin <= sup_eindex and bound.origin + bound.size > sup_sindex:
+                            # Split the bounded array according to what data overlaps
+                            
+                            # if the supplement starts after this bounded_array's origin...
+                            if sup_sindex > bound.origin:
+                                # Create a new bounded_array containing only values leading up to the supplement (along the agg dimension)
+                                new_ba = self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, bound.origin, sup_sindex)
+                                ba_link = var.content.bounded_arrays.add()
+                                ba_link.SetLink(new_ba)
+                                if log.getEffectiveLevel() <= logging.DEBUG:
+                                    log.debug("(intersects) Split bounded array and created [left] (origin:%s  size:%s  values:%s)" % (str([bbb.origin for bbb in new_ba.bounds]), str([bbb.size for bbb in new_ba.bounds]), str(new_ba.ndarray.value)))
+                            
+                            log.debug('check 2 Var:"%s"  BA:%i  BA.origin:%i  BA.size:%i  sup_sindex:%i  sup_eindex:%i' % (var.name, i, bound.origin, bound.size, sup_sindex, sup_eindex))
+                            if sup_eindex < (bound.origin + bound.size) - 1:
+                                log.debug('here')
+                                # Create a new bounded_array containing only values from the end of the supplement to the end of the existing bounded_array (along the agg dim)
+                                new_ba = self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, sup_eindex + 1, bound.origin + bound.size)
+                                ba_link = var.content.bounded_arrays.add()
+                                ba_link.SetLink(new_ba)
+                                if log.getEffectiveLevel() <= logging.DEBUG:
+                                    log.debug("(intersects) Split bounded array and created [right] (origin:%s  size:%s  values:%s)" % (str([bbb.origin for bbb in new_ba.bounds]), str([bbb.size for bbb in new_ba.bounds]), str(new_ba.ndarray.value)))
+                            
+                            # Either way remove this bounded array
+                            if log.getEffectiveLevel() <= logging.DEBUG:
+                                log.debug("(intersects) Removing bounded array: %s" % str(var.content.bounded_arrays[i + iter_offset].ndarray.value))
+                            del var.content.bounded_arrays[i + iter_offset]
+                            iter_offset -= 1
+                            
+                        
+                        # (post insertion check)
+                        # @todo: add unit tests for this case!
+                        elif bound.origin > sup_eindex:
+                            # Adjust the origin using insertion_offset
+                            log.debug("(post-insert) Adjusting bound.origin from %i to %i" % (bound.origin, bound.origin + insertion_offset))
+                            bound.origin += insertion_offset
+            
+            
+            # Step 3b: Merge the supplement into the dataset
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
-                # @warning:  This assumes the first dimension is the agg_dim -- this might not always be the case!!!
-                ba.bounds[0].origin += agg_offset
+                ba.bounds[merge_agg_dim_idx].origin += agg_offset
 
                 ba_link = var.content.bounded_arrays.add()
                 ba_link.SetLink(ba)
@@ -1033,6 +1216,7 @@ class IngestionService(ServiceProcess):
             log.info('Merged Variable %s into the dataset!' % var_name)
 
             
+            # Step 4: Merge variable attributes
             merge_att_ids = set()
             for merge_att in merge_var.attributes:
                 merge_att_ids.add(merge_att.MyId)
@@ -1053,19 +1237,21 @@ class IngestionService(ServiceProcess):
                 #raise ImportError('Variable %s attributes are not the same in the supplement!' % var_name)
 
 
+
+        ###
+        ### Add/merge the attributes from the supplement to the current state
+        ###
         # @TODO Get the vertical positive 'direction!' Deal with attributes accordingly.
 
-
-
         try:
-            merge_att = merge_root.FindAttributeByName('ion_geospatial_vertical_positive')
+            merge_att = sup_root.FindAttributeByName('ion_geospatial_vertical_positive')
             merge_vertical_positive = merge_att.GetValue()
         except OOIObjectError, oe:
             log.debug(oe)
             merge_vertical_positive = None
 
         try:
-            att = root.FindAttributeByName('ion_geospatial_vertical_positive')
+            att = cur_root.FindAttributeByName('ion_geospatial_vertical_positive')
             vertical_positive = att.GetValue()
         except OOIObjectError, oe:
             log.debug(oe)
@@ -1080,7 +1266,7 @@ class IngestionService(ServiceProcess):
             vertical_positive = vertical_positive or merge_vertical_positive
 
 
-        for merge_att in merge_root.attributes:
+        for merge_att in sup_root.attributes:
 
             att_name = merge_att.name
             try:
@@ -1089,24 +1275,24 @@ class IngestionService(ServiceProcess):
                 log.info('Merging Attribute: %s' % att_name)
 
                 if att_name == 'ion_time_coverage_start':
-                    root.MergeAttLesser(att_name, merge_root)
+                    cur_root.MergeAttLesser(att_name, sup_root)
 
                 elif att_name == 'ion_time_coverage_end':
-                    root.MergeAttGreater(att_name, merge_root)
+                    cur_root.MergeAttGreater(att_name, sup_root)
 
                 elif att_name == 'ion_geospatial_lat_min':
-                    root.MergeAttLesser(att_name, merge_root)
+                    cur_root.MergeAttLesser(att_name, sup_root)
 
                 elif att_name == 'ion_geospatial_lat_max':
-                    root.MergeAttGreater(att_name, merge_root)
+                    cur_root.MergeAttGreater(att_name, sup_root)
                 
                 elif att_name == 'ion_geospatial_lon_min':
                     # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                    root.MergeAttSrc(att_name, merge_root)
+                    cur_root.MergeAttSrc(att_name, sup_root)
 
                 elif att_name == 'ion_geospatial_lon_max':
                     # @TODO Need a better method to merge these - determine the greater extent of a wrapped coordinate
-                    root.MergeAttSrc(att_name, merge_root)
+                    cur_root.MergeAttSrc(att_name, sup_root)
 
 
                 elif att_name == 'ion_geospatial_vertical_min':
@@ -1114,36 +1300,36 @@ class IngestionService(ServiceProcess):
                     # Check vert min/max for NaN, either is NaN or missing, don't merge
                     min = False
                     max = False
-                    if merge_root.HasAttribute('ion_geospatial_vertical_min'):
-                        val = merge_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
+                    if sup_root.HasAttribute('ion_geospatial_vertical_min'):
+                        val = sup_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
                         if not pu.isnan(val):
                             min = True
                     
                     # Only check for max if min is available (if either value is not available, we can't continue)
                     if min is not None:
-                        if merge_root.HasAttribute('ion_geospatial_vertical_max'):
-                            val = merge_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
+                        if sup_root.HasAttribute('ion_geospatial_vertical_max'):
+                            val = sup_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
                             if not pu.isnan(val):
                                 max = True
                     
                     
                     if min and max:
                         if vertical_positive == 'down':
-                            root.MergeAttLesser(att_name, merge_root)
+                            cur_root.MergeAttLesser(att_name, sup_root)
     
                         elif vertical_positive == 'up':
-                            root.MergeAttGreater(att_name, merge_root)
+                            cur_root.MergeAttGreater(att_name, sup_root)
     
                         else:
                             raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_min is present')
                     else:
-                        root_min = root.HasAttribute('ion_geospatial_vertical_min')
-                        root_max = root.HasAttribute('ion_geospatial_vertical_max')
+                        root_min = cur_root.HasAttribute('ion_geospatial_vertical_min')
+                        root_max = cur_root.HasAttribute('ion_geospatial_vertical_max')
                         
-                        # if root doesnt have min/max, add new attributes with default values...
+                        # if cur_root doesnt have min/max, add new attributes with default values...
                         if not root_min and not root_max:
-                            root.AddAttribute('ion_geospatial_vertical_min', root.DataType.DOUBLE, float('nan'))
-                            root.AddAttribute('ion_geospatial_vertical_max', root.DataType.DOUBLE, float('nan'))
+                            cur_root.AddAttribute('ion_geospatial_vertical_min', cur_root.DataType.DOUBLE, float('nan'))
+                            cur_root.AddAttribute('ion_geospatial_vertical_max', cur_root.DataType.DOUBLE, float('nan'))
 
 
                 elif att_name == 'ion_geospatial_vertical_max':
@@ -1151,45 +1337,45 @@ class IngestionService(ServiceProcess):
                     # Check vert min/max for NaN, either is NaN or missing, don't merge
                     min = False
                     max = False
-                    if merge_root.HasAttribute('ion_geospatial_vertical_min'):
-                        val = merge_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
+                    if sup_root.HasAttribute('ion_geospatial_vertical_min'):
+                        val = sup_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
                         if not pu.isnan(val):
                             min = True
                     
                     # Only check for max if min is available (if either value is not available, we can't continue)
                     if min is not None:
-                        if merge_root.HasAttribute('ion_geospatial_vertical_max'):
-                            val = merge_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
+                        if sup_root.HasAttribute('ion_geospatial_vertical_max'):
+                            val = sup_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
                             if not pu.isnan(val):
                                 max = True
                     
                     
                     if min and max:
                         if vertical_positive == 'down':
-                            root.MergeAttGreater(att_name, merge_root)
+                            cur_root.MergeAttGreater(att_name, sup_root)
     
                         elif vertical_positive == 'up':
-                            root.MergeAttLesser(att_name, merge_root)
+                            cur_root.MergeAttLesser(att_name, sup_root)
     
                         else:
                             raise OOIObjectError('Invalid value for Vertical Positive but ion_geospatial_vertical_max is present')
                     else:
-                        root_min = root.HasAttribute('ion_geospatial_vertical_min')
-                        root_max = root.HasAttribute('ion_geospatial_vertical_max')
+                        root_min = cur_root.HasAttribute('ion_geospatial_vertical_min')
+                        root_max = cur_root.HasAttribute('ion_geospatial_vertical_max')
                         
-                        # if root doesnt have min/max, add new attributes with default values...
+                        # if cur_root doesnt have min/max, add new attributes with default values...
                         if not root_min and not root_max:
-                            root.AddAttribute('ion_geospatial_vertical_min', root.DataType.DOUBLE, float('nan'))
-                            root.AddAttribute('ion_geospatial_vertical_max', root.DataType.DOUBLE, float('nan'))
+                            cur_root.AddAttribute('ion_geospatial_vertical_min', cur_root.DataType.DOUBLE, float('nan'))
+                            cur_root.AddAttribute('ion_geospatial_vertical_max', cur_root.DataType.DOUBLE, float('nan'))
                         
 
 
                 elif att_name == 'history':
                     # @TODO is this the correct treatment for history?
-                    root.MergeAttDstOver(att_name, merge_root)
+                    cur_root.MergeAttDstOver(att_name, sup_root)
 
                 else:
-                    root.MergeAttSrc(att_name, merge_root)
+                    cur_root.MergeAttSrc(att_name, sup_root)
 
             except OOIObjectError, oe:
 
@@ -1201,9 +1387,9 @@ class IngestionService(ServiceProcess):
                 log.exception('Attribute merger failed for global attribute "%s".  Cause: %s' % (att_name, str(ex)))
 
 
-        log.debug('_merge_overlapping_supplement - Complete')
+        return result
+            
 
-        defer.returnValue(result)
 
     def _find_time_var(self, group):
 
@@ -1233,15 +1419,15 @@ class IngestionService(ServiceProcess):
 
         return time_vars
 
-
-    def _get_ndarray_keys(self, dataset_variable):
+    @classmethod
+    def _get_ndarray_keys(cls, dataset_variable):
         results = []
         for ba in dataset_variable.content.bounded_arrays:
             results.append(ba.GetLink('ndarray').key)
         return results
     
-    
-    def _get_ndarray_vals(self, time_variable):
+    @classmethod
+    def _get_ndarray_vals(cls, time_variable):
         results = []
         for ba in time_variable.content.bounded_arrays:
             if len(ba.bounds) > 1:
@@ -1300,6 +1486,145 @@ class IngestionService(ServiceProcess):
                 # Put the new objects in the repository
                 element = gpb_wrapper.StructureElement(se.GPBMessage)
                 repo.index_hash[element.key] = element
+
+
+    @defer.inlineCallbacks
+    def _find_time_index(self, time_var, search_times, THRESHOLD = 0.001):
+        """
+        @todo: Add documentation about what negative value returns mean
+        """
+        search_times_cpy = search_times[:]  # copy the search_times list so we can remove values
+        # Step 1: Get a handle to an array of values from the given time variable
+        # Step 1a: Gather a list of keys for blobs which need to be fetched             
+        
+        log.debug('Gathering a list of keys for blobs which need to be fetched...')
+        need_keys = IngestionService._get_ndarray_keys(time_var)
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
+        
+        # Step 1b: Fetch all blobs for the ndarrays in the time_var
+        log.debug('Fetching all blobs for the ndarrays in the supplement...')
+        repo = self.dataset.Repository
+        yield self._fetch_blobs(repo, need_keys)
+
+        # Step 1c: Now, grab all the array values from the ndarrays..
+        log.debug('Grabbing all the array values from the ndarrays...')
+        values = IngestionService._get_ndarray_vals(time_var)
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            log.debug('>>  ndarray values = %s' % str(values))
+
+
+        # Step 2: Perform a linear search in the values array for each time in search_times
+        #         a) Binary search will most likely be performed nearer worse case (logN time) - since the
+        #            overlapping region should (on average) be fairly small
+        #            * Linear search may be optimal for average case
+        #            ** Linear search is "required" when indexing into the current data (rather than the
+        #               supplement) because we must traverse multiple bounded arrays
+        
+        
+        # Step 2a: Perform the linear search to see where in the set of values our search_times lay
+        log.debug('Searching for values "%s" in ndarray list' % str(search_times_cpy))
+        results_dict = {}
+        for i in range(len(values)):
+            idx, val = values[i]
+            # @note: this is a good place to check if two entries in the time variables bounded_arrays
+            #        contain mismatched values for the same index -- this shouldn't happen however
+            for search_time in search_times_cpy:
+                if val is search_time or abs(val - search_time) < THRESHOLD: # TODO: should change this to using some sort of near-match function
+                    results_dict[search_time] = idx
+                    search_times_cpy.remove(search_time)
+                elif search_time < val:
+                    results_dict[search_time] = -(i + 1)
+                    search_times_cpy.remove(search_time)
+                # else search_time > val: continue
+            if len(search_times_cpy) == 0:
+                break; 
+                
+        if len(search_times_cpy) > 0:
+            not_in_list_val = -(len(values) + 1)
+            for search_time in search_times_cpy:
+                results_dict[search_time] = not_in_list_val
+        # don't use the copy of the list after this point -- structure is indeterminant
+        search_times_cpy = None
+                
+            
+        # Step 2b: @todo: Make sure that we aren't experiencing a roundoff issue by checking how close
+        #           our search_start is to the values before and after it in the list (floats only)
+         
+
+        defer.returnValue(results_dict)
+
+    
+    def subset_bounded_array(self, repo, old_ba, idx, min, max):
+        """
+        Creates a new bounded array which is a subset of the given bounded_array.  "repo" is used to construct
+        the resultant object but it is the callers responsibility to attach the bounded array to something
+        (such as a variable)
+        
+        @param repo: The repository in which the bounded_array subset will be created
+        @param old_ba: The bounded array from which a new subset will be created
+        @param idx: The index of the subset dimension in var.bounds
+        @param min: The minimum index for the subset (inclusive) along the subset dimension (idx)
+        @param max: The maximum index for the subset (exclusive) along the subset dimension (idx)
+        
+        @note: When determining if the index of an element in the bounded_array lies within the range
+               given by min and max, the origin of that bounded_array is applied first.  As such,
+               min and max should specify canonical indices of data values in the datastructure itself
+               rather than specifying indices of values in the given bounded_array's underlying ndarray.
+               
+               Example:
+                 For a 1-D bounded array with: origin=12; size=5; values=[10,11,12,13,14]
+                 
+                 subset_bounded_array(..., idx=0, min=1,  max=4)    returns nothing
+                 subset_bounded_array(..., idx=0, min=13, max=16)   returns BA [11,12,13]
+               
+        """
+        new_ba = repo.create_object(CDM_BOUNDED_ARRAY_TYPE)
+        
+        
+        # Step 1: Create the bounds
+        old_shape = []
+        for i in range(len(old_ba.bounds)):
+            old_bound = old_ba.bounds[i]
+            new_bound = new_ba.bounds.add()
+            
+            old_shape.append(old_bound.size) # (used in step 2 below)
+            
+            if i == idx:
+                new_bound.size = max - min
+                new_bound.origin = min
+            else:
+                new_bound.size = old_bound.size
+                new_bound.origin = old_bound.origin
+            new_bound.stride = old_bound.stride # not used here, but must transpose
+        
+        
+        # Step 2: Create the ndarray
+        old_nd = old_ba.ndarray
+        new_nd = repo.create_object(old_nd.ObjectType)
+        
+        offset_min = min - old_ba.bounds[idx].origin
+        offset_max = max - old_ba.bounds[idx].origin
+        for i in range(len(old_nd.value)):  # (.value is a list)
+            shape = variables._unflatten_index(i, old_shape)
+            
+            # If this value is in our subset range (for the dimension indexed by idx)
+            if (shape[idx] >= offset_min and shape[idx] < offset_max):
+                new_nd.value.append(old_nd.value[i])
+        
+        
+        # Make sure the actual length of the new ndarray matches the length indicated by
+        # the cumulative sizes of the arrays bounds
+        expect_len = reduce(lambda x,y: x+y, [bound.size for bound in new_ba.bounds])
+        actual_len = len(new_nd.value)
+        assert(expect_len == actual_len, 'Actual length of ndarray != expected length: %i != %i' % (actual_len, expect_len))
+
+
+        
+        new_ba.ndarray = new_nd
+        return new_ba
+        
+        
 
 
 class IngestionClient(ServiceClient):

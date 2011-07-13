@@ -327,7 +327,7 @@ class IngestionTest(IonTestCase):
         # Step 1: Ingest and merge a supplement
         #--------------------------------------
         log.debug('test_merge_overlap(): Merging first supplement (no overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=1)
 
 
         # Test the data in the datastore
@@ -337,7 +337,7 @@ class IngestionTest(IonTestCase):
         
         self.assertEqual(len(tvar.content.bounded_arrays), 2)
         log.debug('test_merge_overlap(): Bounded array count: 2')
-        
+
         
         # Make sure there are no overlaps for the first supplement
         ba_vals  = []
@@ -352,7 +352,7 @@ class IngestionTest(IonTestCase):
         # Step 2: Now try ingesting a supplement which overlaps
         #------------------------------------------------------
         log.debug('test_merge_overlap(): Merging second supplement (3 timestep overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=2, supplement_overlap_count=3)
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=2, supplement_overlap_count=3)
         
         
         # Test the data in the datastore
@@ -395,6 +395,11 @@ class IngestionTest(IonTestCase):
         self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].origin, 1)  # This origin would be 4, but this array contains a 3 overlapping values!
         self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].size, 5)
 
+
+        # Verify the number of reported values matches the number of actual values
+        for ba in tvar.content.bounded_arrays:
+            self.assertEqual(len(ba.ndarray.value), ba.bounds[0].size)
+            
         
         # Verify that all values are monotonic and duplicate indices provided matching data
         value_list = []
@@ -429,6 +434,135 @@ class IngestionTest(IonTestCase):
 
         # @todo: Validate the arrangement of the salinity data mathematically?  (this should be possible because it is now created mathematically
     
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service
+        """
+
+        # Step 1: Ingest and merge a supplement
+        #--------------------------------------
+        log.debug('test_merge_overwrite(): Merging first supplement (no overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+
+
+        # Test the data in the datastore
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[])
+        root    = dataset.root_group
+        tvar    = root.FindVariableByName('time')
+        
+        self.assertEqual(len(tvar.content.bounded_arrays), 2)
+        log.debug('test_merge_overwrite(): Bounded array count: 2')
+        
+        
+        # Make sure there are no overlaps for the first supplement
+        ba_vals  = []
+        for ba in tvar.content.bounded_arrays:
+            value = ba.ndarray.value
+            self.assertNotIn(value, ba_vals)
+            ba_vals.extend(value)
+        log.debug("test_merge_overwrite(): Values for the 'time' variable: %s" % ba_vals)
+
+
+        
+        # Step 2: Now try ingesting some supplements which overlap
+        #---------------------------------------------------------
+        log.debug('test_merge_overwrite(): Merging second supplement (3 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=2, supplement_overlap_count=3)
+        
+        log.debug('test_merge_overwrite(): Merging third supplement (tail data -- to check for origin updates)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=3)
+        
+        log.debug('test_merge_overwrite(): Merging fourth supplement (overwrite data in middle of dataset)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+        
+        
+        
+        # Test the data in the datastore
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[])
+        root = dataset.root_group
+        tvar = root.FindVariableByName('time')
+        
+        
+        ba_vals  = []
+        for ba in tvar.content.bounded_arrays:
+            value = ba.ndarray.value
+            self.assertNotIn(value, ba_vals)
+            ba_vals.extend(value)
+        ba_vals.sort()
+        log.debug("test_merge_overwrite(): Sorted values for the 'time' variable: %s" % ba_vals)
+        
+        
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            for i in range(len(tvar.content.bounded_arrays)):
+                ba = tvar.content.bounded_arrays[i]
+                log.debug('BA:%i  origin:%s  size:%s  values:%s' % (i, str([bound.origin for bound in ba.bounds]), str([bound.size for bound in ba.bounds]), str([(ba_vals.index(val), val) for val in ba.ndarray.value])))
+        
+        self.assertEqual(len(tvar.content.bounded_arrays), 5)
+        log.debug('test_merge_overwrite(): Bounded array count: 4')
+        
+        
+        # Verify the offsets for all the bounded arrays make sense
+        self.assertEqual(len(tvar.content.bounded_arrays[0].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[1].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[2].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[3].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[4].bounds), 1)
+        
+        self.assertEqual(tvar.content.bounded_arrays[0].bounds[0].origin, 0)
+        self.assertEqual(tvar.content.bounded_arrays[0].bounds[0].size, 1)
+
+        self.assertEqual(tvar.content.bounded_arrays[1].bounds[0].origin, 6)
+        self.assertEqual(tvar.content.bounded_arrays[1].bounds[0].size, 2)
+        
+        self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].origin, 1)
+        self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].size, 1)
+        
+        self.assertEqual(tvar.content.bounded_arrays[3].bounds[0].origin, 4)   # bounded_array[2] and bounded_array[3] were switched during overwrite
+        self.assertEqual(tvar.content.bounded_arrays[3].bounds[0].size, 2)     # -- this is expected
+        
+        self.assertEqual(tvar.content.bounded_arrays[4].bounds[0].origin, 2)
+        self.assertEqual(tvar.content.bounded_arrays[4].bounds[0].size, 2)
+        
+        
+        # Verify the number of reported values matches the number of actual values
+        for ba in tvar.content.bounded_arrays:
+            self.assertEqual(len(ba.ndarray.value), ba.bounds[0].size)
+        
+        
+        # Verify that all values are monotonic there are no duplicate indices (these should have been overwritten)
+        value_list = []
+        for i in range(len(tvar.content.bounded_arrays)):
+            ba = tvar.content.bounded_arrays[i]
+            for j in range(len(ba.ndarray.value)):
+                val = ba.ndarray.value[j]
+                key = ba.bounds[0].origin + j
+                value_list.append((key, val))
+        
+        value_list.sort()
+        last_key, last_val = value_list[0]
+        for k,v in value_list[1:]:
+            self.assertNotEqual(k, last_key, 'Indices should not match -- there should be no overlapping data')
+            
+            self.assertTrue(v > last_val, 'Fails if the data in the "time" variable is not monotonic after merge')
+            last_key = k
+            last_val = v
+            
+            
+        #  Verify that the ion_time_coverage_start and ion_time_coverage_end match the min/max values of the bounded_arrays
+        start_time_s = root.FindAttributeByName('ion_time_coverage_start')
+        start_time   = calendar.timegm(time.strptime(start_time_s.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+        
+        end_time_s = root.FindAttributeByName('ion_time_coverage_end')
+        end_time   = calendar.timegm(time.strptime(end_time_s.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+        
+        self.assertEqual(long(start_time), tvar.content.bounded_arrays[0].ndarray.value[0])
+        self.assertEqual(long(end_time),   tvar.content.bounded_arrays[1].ndarray.value[-1])
+
+
+        # @todo: Validate the arrangement of the salinity data mathematically?  (this should be possible because it is now created mathematically
+    
 
     @defer.inlineCallbacks
     def _perform_test_ingest(self, aggregation_rule=None, *args, **kwargs):
@@ -446,11 +580,12 @@ class IngestionTest(IonTestCase):
 
         # Set the aggregation_rule if present
         if aggregation_rule is AggregationRule.OVERLAP:
-            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.OVERLAP
+            self.ingest.data_source.aggregation_rule = self.ingest.data_source.AggregationRule.OVERLAP
         if aggregation_rule is AggregationRule.OVERWRITE:
-            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.OVERWRITE
+            self.ingest.data_source.aggregation_rule = self.ingest.data_source.AggregationRule.OVERWRITE
         if aggregation_rule is AggregationRule.FMRC:
-            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.FMRC
+            self.ingest.data_source.aggregation_rule = self.ingest.data_source.AggregationRule.FMRC
+        yield self.ingest.rc.put_instance(self.ingest.data_source)
         
         
         # Now fake the receipt of the dataset message

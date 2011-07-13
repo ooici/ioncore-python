@@ -17,6 +17,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.object.cdm_methods import group
 
+from math import ceil
+
 #--------------------------------------#
 # Wrapper_Variable Specialized Methods #
 #--------------------------------------#
@@ -149,6 +151,31 @@ def _flatten_index(indices, shape):
     
     return result
 
+
+def _unflatten_index(index, shape):
+    """
+    Uses the given storage-flattened index to produce its equivalent multidimentional position (indices)
+    given the shape of the multidimensional space from which it was flattened.
+    """
+    assert(isinstance(index, int))
+    assert(isinstance(shape, list))
+    assert(len(shape) > 0)
+
+    indices = []
+    for x in range(len(shape)):
+        # Determine the significance of this dimension
+        sig = 1
+        for i in range(x+1, len(shape)):
+            sig *= shape[i]
+        
+        # Determine this dimension's index for the flattened array index:
+        unflat = ceil(index / sig)
+        if unflat >= shape[x]:
+            unflat %= shape[x]
+
+        indices.append(unflat)
+
+    return indices
 
 
 """
