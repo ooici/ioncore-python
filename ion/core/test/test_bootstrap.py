@@ -48,3 +48,10 @@ class BootstrapTest2(IonTestCase):
 
         yield pu.asleep(1)
         self.assertEqual(request.workbench_context, ['Test runner context!'])
+
+##  Potential tests for bootstrap_profile_dataset()  ## 
+# @todo: test ion start and end time match the data in the time variable
+# @todo: test that time variable is monotonic
+# @todo: test that a supplement contains 2 new data values dimensioned by time
+# @todo: test that the total number of values for the time dimension = (2 + overlap count)
+# @todo: test invalid combinations of inputs for supplement_number, supplement_overlap_count and random_initialization

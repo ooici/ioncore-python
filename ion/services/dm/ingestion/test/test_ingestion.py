@@ -9,7 +9,7 @@ from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber, Publisher
 
-import logging
+import logging, time, calendar
 import ion.util.ionlog
 from ion.util.iontime import IonTime
 
@@ -43,6 +43,12 @@ GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 CONF = ioninit.config(__name__)
 
 
+class AggregationRule():
+    OVERLAP   = 1
+    OVERWRITE = 2
+    FMRC      = 3
+    
+        
 class FakeDelayedCall(object):
 
     def active(self):
@@ -321,74 +327,114 @@ class IngestionTest(IonTestCase):
         This is a test method for the merge dataset operation (with overlaps) of the ingestion service
         """
 
-        # Ingest and merge a supplement
-        dataset_id = yield self._perform_test_ingest(supplement_number=1)
-#        dataset_id = SAMPLE_PROFILE_DATASET_ID
+        # Step 1: Ingest and merge a supplement
+        #--------------------------------------
+        log.debug('test_merge_overlap(): Merging first supplement (no overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+
+
+        # Test the data in the datastore
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[])
+        root    = dataset.root_group
+        tvar    = root.FindVariableByName('time')
         
-        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
-        self.assertNotEqual(dataset, None)
+        self.assertEqual(len(tvar.content.bounded_arrays), 2)
+        log.debug('test_merge_overlap(): Bounded array count: 2')
+        
+        
+        # Make sure there are no overlaps for the first supplement
+        ba_vals  = []
+        for ba in tvar.content.bounded_arrays:
+            value = ba.ndarray.value
+            self.assertNotIn(value, ba_vals)
+            ba_vals.extend(value)
+        log.debug("test_merge_overlap(): Values for the 'time' variable: %s" % ba_vals)
+
 
         
-        ###################################################
-#        # Get the links to the bounded arrays
-#        ba_links = []
-#        for var in dataset.root_group.variables:
-#            var_links = var.content.bounded_arrays.GetLinks()
-#            ba_links.extend(var_links)
-#
-#        yield dataset.Repository.fetch_links(ba_links)
-        ###################################################
+        # Step 2: Now try ingesting a supplement which overlaps
+        #------------------------------------------------------
+        log.debug('test_merge_overlap(): Merging second supplement (3 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=2, supplement_overlap_count=3)
         
         
         # Test the data in the datastore
+        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[])
         root = dataset.root_group
-        self.assertNotEqual(root, None)
-        time = root.FindVariableByName('time')
-        self.assertNotEqual(time, None)
+        tvar = root.FindVariableByName('time')
+        
+        self.assertEqual(len(tvar.content.bounded_arrays), 3)
+        log.debug('test_merge_overlap(): Bounded array count: 3')
+        
+        
+        # Verify that the new data is present and there are exactly 3 overlaps
+        prev_values = []
+        prev_values.extend(tvar.content.bounded_arrays[0].ndarray.value)
+        prev_values.extend(tvar.content.bounded_arrays[1].ndarray.value)
+        self.assertEqual(len(prev_values), 4)
+        
+        next_values = []
+        next_values.extend(tvar.content.bounded_arrays[2].ndarray.value)
+        self.assertEqual(len(next_values), 5)
+        
+        self.assertIn(next_values[0], prev_values)          # Overlapping data
+        self.assertIn(next_values[1], prev_values)          # Overlapping data
+        self.assertIn(next_values[2], prev_values)          # Overlapping data
+        self.assertNotIn(next_values[3], prev_values)       # New data
+        self.assertNotIn(next_values[4], prev_values)       # New data
+        
+        
+        # Verify the offsets for all the bounded arrays make sense
+        self.assertEqual(len(tvar.content.bounded_arrays[0].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[1].bounds), 1)
+        self.assertEqual(len(tvar.content.bounded_arrays[2].bounds), 1)
+        
+        self.assertEqual(tvar.content.bounded_arrays[0].bounds[0].origin, 0)
+        self.assertEqual(tvar.content.bounded_arrays[0].bounds[0].size, 2)
 
-        ba_links = self.ingest._get_ndarray_keys(time)
-        log.debug('Bounded array links for "time" variable: %s' % str(ba_links))
-        self.assertEqual(len(ba_links), 2)
-        yield self.ingest._fetch_blobs(dataset.Repository, ba_links)
+        self.assertEqual(tvar.content.bounded_arrays[1].bounds[0].origin, 2)
+        self.assertEqual(tvar.content.bounded_arrays[1].bounds[0].size, 2)
         
-        # Check the first bounded array for the original data and the second for the new (overlapping) data
-        ba_vals  = []
-        log.debug('Bounded array count: %i' % len(time.content.bounded_arrays))
-        for ba in time.content.bounded_arrays:
-            ba_vals.extend(ba.ndarray.value)
-        log.debug("\n\n\n**********************************Values for the 'time' variable: %s**********************************\n\n\n" % ba_vals)
+        self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].origin, 1)  # This origin would be 4, but this array contains a 3 overlapping values!
+        self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].size, 5)
+
         
+        # Verify that all values are monotonic and duplicate indices provided matching data
+        value_list = []
+        for i in range(len(tvar.content.bounded_arrays)):
+            ba = tvar.content.bounded_arrays[i]
+            for j in range(len(ba.ndarray.value)):
+                val = ba.ndarray.value[j]
+                key = ba.bounds[0].origin + j
+                value_list.append((key, val))
+        
+        value_list.sort()
+        last_key, last_val = value_list[0]
+        for k,v in value_list[1:]:
+            if k == last_key:
+                self.assertEqual(v, last_val)  ## Fails if overlapping indices do not provide matching data values after merge
+            elif k > last_key:
+                self.assertTrue(v > last_val)  ## Fails if data in the 'time' variable is not monotonic after merge
+            last_key = k
+            last_val = v
+            
+            
+        #  Verify that the ion_time_coverage_start and ion_time_coverage_end match the min/max values of the bounded_arrays
+        start_time_s = root.FindAttributeByName('ion_time_coverage_start')
+        start_time   = calendar.timegm(time.strptime(start_time_s.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+        
+        end_time_s = root.FindAttributeByName('ion_time_coverage_end')
+        end_time   = calendar.timegm(time.strptime(end_time_s.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+        
+        self.assertEqual(long(start_time), tvar.content.bounded_arrays[0].ndarray.value[0])
+        self.assertEqual(long(end_time),   tvar.content.bounded_arrays[-1].ndarray.value[-1])
+
+
+        # @todo: Validate the arrangement of the salinity data mathematically?  (this should be possible because it is now created mathematically
     
-    def test_merge_overlap_mismatched_values(self):
-        pass
-        
-        
-    @defer.inlineCallbacks
-    def test_merge_overlap_scratch(self):
-        """
-        This is a test method for the merge dataset operation (with overlaps) of the ingestion service
-        """
-
-        dataset_id = yield self._perform_test_ingest()
-        # @todo: add some tests here to make sure preconditions are set for foregoing tests
-        dataset = yield self.ingest.rc.get_instance(dataset_id, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
-        
-        
-        
-        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=1, supplement_overlap_count=2)
-        # @todo: add some tests here to make sure preconditions are set for foregoing tests
-        
-        
-#        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=2, supplement_overlap_count=2)
-#        # @todo: add some tests here to make sure preconditions are set for foregoing tests
-#        
-#        
-#        cdm_dset_msg = yield self._perform_test_ingest(supplement_number=4, supplement_overlap_count=2) # Shouldn't overlap because we skipped a supplement
-#        # @todo: add some tests here to make sure preconditions are set for foregoing tests
-
 
     @defer.inlineCallbacks
-    def _perform_test_ingest(self, *args, **kwargs):
+    def _perform_test_ingest(self, aggregation_rule=None, *args, **kwargs):
         """
         @param kwargs: Key-worded arguments to be sent to bootstrap_profile_dataset() when building the sample dataset for ingestion
         """
@@ -397,10 +443,19 @@ class IngestionTest(IonTestCase):
         content.dataset_id    = SAMPLE_PROFILE_DATASET_ID
         content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
         yield self.ingest._prepare_ingest(content)
-
+        
         self.ingest.timeoutcb = FakeDelayedCall()
 
 
+        # Set the aggregation_rule if present
+        if aggregation_rule is AggregationRule.OVERLAP:
+            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.OVERLAP
+        if aggregation_rule is AggregationRule.OVERWRITE:
+            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.OVERWRITE
+        if aggregation_rule is AggregationRule.FMRC:
+            self.ingest.data_source.aggregation_rule == self.ingest.data_source.AggregationRule.FMRC
+        
+        
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
         yield bootstrap_profile_dataset(cdm_dset_msg, *args, **kwargs)
@@ -430,7 +485,7 @@ class IngestionTest(IonTestCase):
         yield self.ingest.rc.put_instance(self.ingest.dataset)
         
         self.ingest.dataset = None
-        self.data_source = None
+        self.ingest.data_source = None
         #############################################
         
         

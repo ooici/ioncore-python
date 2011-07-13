@@ -251,7 +251,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     if supplement_overlap_count > 0 and supplement_number is False:
         raise ValueError('Cannot use argument "supplement_overlap_count" without specifying "supplement_number')
     
-    if supplement_number > 0 and supplement_overlap_count > 0 and (supplement_number * 2 - supplement_overlap_count) * 3:
+    if supplement_number > 0 and supplement_overlap_count > 0 and (supplement_number * 2 < supplement_overlap_count):
         raise ValueError('Argument supplement_overlap_count (%i) is too large for the given supplement_number (%i)' % (supplement_overlap_count, supplement_number))
 
 
@@ -346,7 +346,7 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
 
 
     if supplement_number is not False:
-        start_time = 1280102520 + 3600 * supplement_number
+        start_time = 1280102520 + 3600 * supplement_number * 2 # x2 because each supplement provides 2 timesteps of data
 
     elif random_initialization:
         start_time = 1280102000 + int(round(random.random()* 360000))
@@ -521,10 +521,10 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     #stime = IonTime(start_time * 1000)
     #etime = IonTime(end_time * 1000)
 
-    gmtuple = time.gmtime(start_time)
+    gmtuple = time.gmtime(time_list[0])
     stime = time.strftime("%Y-%m-%dT%H:%M:%SZ", gmtuple)
 
-    gmtuple = time.gmtime(end_time)
+    gmtuple = time.gmtime(time_list[-1])
     etime = time.strftime("%Y-%m-%dT%H:%M:%SZ", gmtuple)
 
     log.info('ion_time_coverage_start: %s' % stime)

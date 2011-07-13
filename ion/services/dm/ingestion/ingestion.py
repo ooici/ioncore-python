@@ -820,19 +820,18 @@ class IngestionService(ServiceProcess):
 
         agg_offset = 0
         try:
-            # ATTENTION: Since this is a coordinate var, is it safe to assume the variable holds the same name?
             agg_dim = root.FindDimensionByName(merge_agg_dim.name)
             agg_offset = agg_dim.length
             log.info('Aggregation offset from current dataset: %d' % agg_offset)
 
         except OOIObjectError, oe:
-            log.debug('No Dimension found in current dataset:' + str(oe))
-            # TODO: a better msg here would be something like: ("Time Dimension of data supplement is not present in current dataset.  Dimension name: %s" % merge_agg_dim.name)
+            log.debug("Time Dimension of data supplement is not present in current dataset.  Dimension name: '%s'.  Cause: %s" % (merge_agg_dim.name, str(oe)))
 
         # Get the start time of the supplement
         try:
             string_time = merge_root.FindAttributeByName('ion_time_coverage_start')
             supplement_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            log.debug('Supplement Start Time: %s (%i)' % (string_time.GetValue(), supplement_stime))
 
             string_time = merge_root.FindAttributeByName('ion_time_coverage_end')
             supplement_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
@@ -852,7 +851,8 @@ class IngestionService(ServiceProcess):
         try:
             string_time = root.FindAttributeByName('ion_time_coverage_end')
             current_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
-
+            log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), current_etime))
+            
             if current_etime == supplement_stime:
                 agg_offset -= 1
                 log.info('Aggregation offset decremented by one - supplement overlaps: %d' % agg_offset)
@@ -895,20 +895,22 @@ class IngestionService(ServiceProcess):
                     #            the time value represented by search_time has been removed from the originating data
                     
                     
-                    # Step 2a: Perform the linear search to see wherein the set of values our search_time lies
+                    # Step 2a: Perform the linear search to see where in the set of values our search_time lies
                     log.debug('Searching for value "%s" in ndarray list' % str(search_time))
 
-#                    index_in_time_var = values.index(search_time)
-                    THRESHOLD = 2
+                    # @warning: Change this threshold to something reasonable+meaningful
+                    THRESHOLD = 0.001
                     for i in range(len(values)):
-                        value = values[i]
-                        if value is search_time or abs(value-search_time) < THRESHOLD: # TODO: should change this to using some sort of near-match function
-                            index_in_time_var = i
+                        idx, val = values[i]
+                        # @note: this is a good place to check if two entries in the time variables bounded_arrays
+                        #        contain mismatched values for the same index -- this shouldn't happen however
+                        if val is search_time or abs(val-search_time) < THRESHOLD: # TODO: should change this to using some sort of near-match function
+                            index_in_time_var = idx
                             break
-                        elif search_time < value:
+                        elif search_time < val:
                             index_in_time_var = -(i + 1)
                             break
-                        # else search_time > value: continue
+                        # else search_time > val: continue
                     else:
                         index_in_time_var = -len(values)
                         
@@ -1008,7 +1010,7 @@ class IngestionService(ServiceProcess):
 
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
-
+                # @warning:  This assumes the first dimension is the agg_dim -- this might not always be the case!!!
                 ba.bounds[0].origin += agg_offset
 
                 ba_link = var.content.bounded_arrays.add()
@@ -1228,9 +1230,13 @@ class IngestionService(ServiceProcess):
     def _get_ndarray_vals(self, time_variable):
         results = []
         for ba in time_variable.content.bounded_arrays:
-            results.extend(ba.ndarray.value)
-        # ATTENTION: Are these ndarrays guaranteed to be ordered or do i have to checkout offsets?
-        # ATTENTION: Since time values must be monotonic.. is sorting ok here?
+            if len(ba.bounds) > 1:
+                raise IngestionException('_get_ndarray_vals does not support enflating bounded arrays with more than one dimension -- yet')
+            origin = ba.bounds[0].origin
+            for i in range(len(ba.ndarray.value)):
+                val = ba.ndarray.value[i]
+                idx = origin + i
+                results.append((idx, val))
         results.sort()
         return results
 
