@@ -427,7 +427,22 @@ class SchedulerService(ServiceProcess):
 
         log.debug('Send completed, rescheduling %s' % task_id)
 
-        self.workbench.cache_repository(msg.Repository)
+        #################################################
+        ## BANDAID FIX FOR 262 RE-OPEN
+        ##
+        ## In live system, Jamie noticed a scheduler crash on this line, saying that the Message/Repository
+        ## is invalidated already before going into this call, which promptly crashes it and no longer
+        ## executes scheduled events. This try/except prevents this from occurring so scheduled events
+        ## will still run.
+        ##
+        ## Proper fix: find out why msg/repo is invalid!
+        ##
+        #################################################
+        try:
+            self.workbench.cache_repository(msg.Repository)
+        except Exception, ex:
+            log.error("Could not cache repository: %s" % str(ex))
+            pass
 
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
         self._schedule_event(None, int(tdef['interval_seconds']), task_id)
@@ -442,7 +457,6 @@ class SchedulerServiceClient(ServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'scheduler'
         ServiceClient.__init__(self, proc, **kwargs)
-        self.mc = MessageClient(proc=proc)
 
     @defer.inlineCallbacks
     def add_task(self, msg):
