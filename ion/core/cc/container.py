@@ -236,6 +236,9 @@ class Container(BasicLifecycleObject):
         if not self._fatal_error_encountered:
             self._fatal_error_encountered = True
             from twisted.internet import reactor
+            tp = reactor.getThreadPool()
+            for t in tp.working:
+                t._Thread__stop()
             reactor.stop()
 
 

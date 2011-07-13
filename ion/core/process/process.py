@@ -663,7 +663,7 @@ class Process(BasicLifecycleObject):
                 if self._get_state() == BasicStates.S_TERMINATED:
                     if payload.get('op',None) == 'terminate':
                         yield self.reply_ok(msg)
-                        return
+                        defer.returnValue()
 
                     text = "[%s] Process TERMINATED. Message refused!" % (self.proc_name)
                     log.error(text)
@@ -679,7 +679,7 @@ class Process(BasicLifecycleObject):
                     # This does not yet work properly with fail fast...
                     if payload.get('op',None) == 'terminate':
                         yield self.terminate()
-                        return
+                        defer.returnValue()
 
                     # Non-request messages (e.g. RPC reply are OK before ACTIVE)
                     if payload.get('performative', None) == 'request':

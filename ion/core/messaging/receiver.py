@@ -212,7 +212,9 @@ class Receiver(BasicLifecycleObject):
         def do_receive_and_wait():
             threads.blockingCallFromThread(reactor, self._do_receive, msg)
 
+        log.debug('before thread')
         yield threads.deferToThread(do_receive_and_wait)
+        log.debug('after thread')
 
     @defer.inlineCallbacks
     def _do_receive(self, msg):
@@ -230,7 +232,7 @@ class Receiver(BasicLifecycleObject):
             log.warn("Dropped message: "+str(msg.payload))
             # @todo ACK for now. Should be requeue.
             yield msg.ack()
-            return
+            defer.returnValue()
 
         assert not id(msg) in self.rec_messages, "Message already consumed"
         self.rec_messages[id(msg)] = msg
