@@ -51,15 +51,6 @@ KEYWORD = 'keyword'
 COMMIT_INDEXED_COLUMNS=[REPOSITORY_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT, PREDICATE_KEY,
                      PREDICATE_BRANCH, PREDICATE_COMMIT, OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT, KEYWORD, RESOURCE_LIFE_CYCLE_STATE, RESOURCE_OBJECT_TYPE]
 
-NOTIFICATION_ALERT_CACHE = "notification_alert_service"
-
-NOTIFICATION_ALERT_INDEXED_COLUMNS = ['user_ooi_id', 'data_src_id', 'subscription_type', 'email_alerts_filter', 'dispatcher_alerts_filter', 'dispatcher_script_path', \
-                                      'date_registered', 'title', 'institution', 'source', 'references', 'conventions', 'summary', 'comment', \
-                                      'ion_time_coverage_start', 'ion_time_coverage_end', 'ion_geospatial_lat_min', 'ion_geospatial_lat_max', \
-                                      'ion_geospatial_lon_min', 'ion_geospatial_lon_max', \
-                                       'ion_geospatial_vertical_min', 'ion_geospatial_vertical_max', 'ion_geospatial_vertical_positive', 'download_url']
-
-
 
 # Common Columns:
 VALUE = 'value'
@@ -106,19 +97,6 @@ commit_cf['column_metadata'] = commit_cols
 
 blob_cf = base_cf_def.copy()
 blob_cf['name']=BLOB_CACHE
-
-
-notification_alert_cols = []
-for col_name in NOTIFICATION_ALERT_INDEXED_COLUMNS:
-    col_def = base_col_def.copy()
-    col_def['name']=col_name
-    col_def['index_type']=IndexType.KEYS
-    notification_alert_cols.append(col_def)
-    
-notification_alert_cf = base_cf_def.copy()  
-notification_alert_cf['name'] = NOTIFICATION_ALERT_CACHE
-notification_alert_cf['column_metadata'] = notification_alert_cols  
-
 # No columns to declare for indexing
 
 ### Storage Keyspace Name is provided by the sysname!!!
@@ -152,8 +130,7 @@ def get_cassandra_configuration(sysname=None):
     """
     my_blob_cf = blob_cf.copy()
     my_commit_cf = commit_cf.copy()
-    my_notification_alert_cf = notification_alert_cf.copy()
-    
+
     ion_ks = base_ks_def.copy()
 
     # Create the return value object
@@ -186,7 +163,7 @@ def get_cassandra_configuration(sysname=None):
     if ion_ks['cf_defs'] is None:
         ion_ks['cf_defs'] =[]
 
-    ion_ks['cf_defs'].extend( [my_blob_cf, my_commit_cf, my_notification_alert_cf])
+    ion_ks['cf_defs'].extend( [my_blob_cf, my_commit_cf])
 
     # update the sysname
     sysname = sysname or ioninit.sys_name
@@ -197,9 +174,8 @@ def get_cassandra_configuration(sysname=None):
 
     # Set the keyspace name to the sysname!
     ion_ks['name'] = sysname
-    my_blob_cf['keyspace'] = sysname
-    my_commit_cf['keyspace'] = sysname
-    my_notification_alert_cf['keyspace'] = sysname
-    
+    for cf in ion_ks['cf_defs']:
+        cf['keyspace'] = sysname
+
     return confdict
 
