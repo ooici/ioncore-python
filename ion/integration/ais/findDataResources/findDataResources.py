@@ -526,8 +526,9 @@ class FindDataResources(object):
                     rspMsg.message_parameters_reference[0].datasetByOwnerMetadata.add()
                     self.__loadRspByOwnerPayload(rspMsg.message_parameters_reference[0].datasetByOwnerMetadata[j], dSetMetadata, ownerID, dSource)
 
-                #self.__printRootAttributes(dSet)
-                #self.__printRootVariables(dSet)
+                dSet = yield self.metadataCache.getDSet(dSetResID)
+                self.__printRootAttributes(dSet)
+                self.__printRootVariables(dSet)
                 #self.__printSourceMetadata(dSource)
                 #self.__printDownloadURL()
     
@@ -786,18 +787,22 @@ class FindDataResources(object):
 
 
     def __printRootAttributes(self, ds):
+        log.debug('Root Attributes:')
         for atrib in ds.root_group.attributes:
             log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
 
 
     def __printRootVariables(self, ds):
+        log.debug('Root Variables:')
         for var in ds.root_group.variables:
             log.debug('Root Variable: %s' % str(var.name))
             for atrib in var.attributes:
                 log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
-            print "....Dimensions:"
-            for dim in var.shape:
-                log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+            numDims = len(var.shape)                
+            print "Variable %s has %d dimensions:" %(var.name, numDims)
+            if numDims > 0:                
+                for dim in var.shape:
+                    log.debug("dim.name = %s, dim.source_name = %s, dim.length = %d" % (dim.name, dim.source_name, dim.length))
 
 
     def __printSourceMetadata(self, dSource):
