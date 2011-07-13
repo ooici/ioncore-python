@@ -310,248 +310,262 @@ class AppIntegrationServiceClient(ServiceClient):
         self.mc = MessageClient(proc=proc)
         
     @defer.inlineCallbacks
-    def findDataResources(self, message, user_ooi_id):
+    def findDataResources(self, message):
         yield self._check_init()
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
-        (content, headers, payload) = yield self.rpc_send_protected('findDataResources',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('findDataResources', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def findDataResourcesByUser(self, message, user_ooi_id):
+    def findDataResourcesByUser(self, message):
         yield self._check_init()
         log.debug("AppIntegrationServiceClient: findDataResourcesByUser(): sending msg to AppIntegrationService.")
-        (content, headers, payload) = yield self.rpc_send_protected('findDataResourcesByUser',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('findDataResourcesByUser', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def getDataResourceDetail(self, message, user_ooi_id):
+    def getDataResourceDetail(self, message):
         yield self._check_init()
         log.debug("AppIntegrationServiceClient: getDataResourceDetail(): sending msg to AppIntegrationService.")
-        (content, headers, payload) = yield self.rpc_send_protected('getDataResourceDetail',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def createDownloadURL(self, message, user_ooi_id):
+    def createDownloadURL(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('AIS.createDownloadURL: ' + result.error_str)
+            defer.returnValue(result)
+        # check that ooi_id is present in GPB
+        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "AIS.createDownloadURL: Required field [user_ooi_id] not found in message"
+            log.error("Required field [user_ooi_id] not found in message")
+            defer.returnValue(Response)
         log.debug("AppIntegrationServiceClient: createDownloadURL(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send_protected('createDownloadURL',
                                                                     message,
-                                                                    user_ooi_id,
+                                                                    message.message_parameters_reference.user_ooi_id,
                                                                     "0")
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.info('Service reply: ' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
-    def registerUser(self, message, user_ooi_id):
+    def registerUser(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.registerUser: sending following message to registerUser:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('registerUser',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('registerUser', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def updateUserProfile(self, message, user_ooi_id):
+    def updateUserProfile(self, message):
         yield self._check_init()
+        # check that the GPB is correct type & has a payload
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('AIS.updateUserProfile: ' + result.error_str)
+            defer.returnValue(result)
+        # check that ooi_id is present in GPB
+        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "AIS.updateUserProfile: Required field [user_ooi_id] not found in message (AIS)"
+            log.error("Required field [user_ooi_id] not found in message")
+            defer.returnValue(Response)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.updateUserProfile: sending following message to updateUserProfile:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('updateUserProfile',
                                                                     message,
-                                                                    user_ooi_id,
+                                                                    message.message_parameters_reference.user_ooi_id,
                                                                     "0")
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.updateUserProfile: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks
-    def getUser(self, message, user_ooi_id):
+    def getUser(self, message):
         yield self._check_init()
+        # check that the GPB is correct type & has a payload
+        result = yield self.CheckRequest(message)
+        if result is not None:
+            log.error('AIS.getUser: ' + result.error_str)
+            defer.returnValue(result)
+        # check that ooi_id is present in GPB
+        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "AIS.getUser: Required field [user_ooi_id] not found in message (AIS)"
+            log.error("Required field [user_ooi_id] not found in message")
+            defer.returnValue(Response)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.getUser: sending following message to getUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send_protected('getUser',
                                                                     message,
-                                                                    user_ooi_id,
+                                                                    message.message_parameters_reference.user_ooi_id,
                                                                     "0")
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.getUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def setUserRole(self, message, user_ooi_id):
+    def setUserRole(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.setUserRole: sending following message to setUserRole:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('setUserRole',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('setUserRole', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.setUserRole: IR Service reply:\n' + str(content))
         defer.returnValue(content)
               
     @defer.inlineCallbacks
-    def getResourceTypes(self, message, user_ooi_id):
+    def getResourceTypes(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.getResourceTypes: sending following message to getResourceTypes:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('getResourceTypes',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('getResourceTypes', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.getResourceTypes: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
-    def getResourcesOfType(self, message, user_ooi_id):
+    def getResourcesOfType(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.getResourcesOfType: sending following message to getResourcesOfType:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('getResourcesOfType',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('getResourcesOfType', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.getResourcesOfType: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
-    def getResource(self, message, user_ooi_id):
+    def getResource(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.getResource: sending following message to getResource:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('getResource',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('getResource', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.getResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
  
     @defer.inlineCallbacks
-    def createDataResource(self, message, user_ooi_id):
+    def createDataResource(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.createDataResource: sending following message to createDataResource:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('createDataResource',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('createDataResource', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def updateDataResource(self, message, user_ooi_id):
+    def updateDataResource(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.updateDataResource: sending following message to updateDataResource:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('updateDataResource',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('updateDataResource', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def deleteDataResource(self, message, user_ooi_id):
+    def deleteDataResource(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.deleteDataResource: sending following message to deleteDataResource:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('deleteDataResource',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('deleteDataResource', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def validateDataResource(self, message, user_ooi_id):
+    def validateDataResource(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.validateDataResource: sending following message to validateDataResource:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('validateDataResource',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('validateDataResource', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def createDataResourceSubscription(self, message, user_ooi_id):
+    def createDataResourceSubscription(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.createDataResourceSubscription: sending following message:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('createDataResourceSubscription',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('createDataResourceSubscription', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.createDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def findDataResourceSubscriptions(self, message, user_ooi_id):
+    def findDataResourceSubscriptions(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.findDataResourceSubscriptions: sending following message:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('findDataResourceSubscriptions',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('findDataResourceSubscriptions', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.findDataResourceSubscriptions: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def deleteDataResourceSubscription(self, message, user_ooi_id):
+    def deleteDataResourceSubscription(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.deleteDataResourceSubscription: sending following message:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('deleteDataResourceSubscription',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('deleteDataResourceSubscription', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.deleteDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def updateDataResourceSubscription(self, message, user_ooi_id):
+    def updateDataResourceSubscription(self, message):
         yield self._check_init()
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("AIS_client.updateDataResourceSubscription: sending following message:\n%s" % str(message))
-        (content, headers, payload) = yield self.rpc_send_protected('updateDataResourceSubscription',
-                                                                    message,
-                                                                    user_ooi_id,
-                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('updateDataResourceSubscription', message)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.updateDataResourceSubscription: AIS reply:\n' + str(content))
         defer.returnValue(content)
         
+
+    @defer.inlineCallbacks
+    def CheckRequest(self, request):
+        """
+        @brief Check for correct request GPB type -- this is good for ALL AIS requests
+        """
+        if request.MessageType != AIS_REQUEST_MSG_TYPE:
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = 'Bad message type received, ignoring'
+            defer.returnValue(Response)
+
+        # Check payload in message
+        if not request.IsFieldSet('message_parameters_reference'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [message_parameters_reference] not found in message"
+            defer.returnValue(Response)
+  
+        defer.returnValue(None)
+
+
 # Spawn of the process using the module name
 factory = ProcessFactory(AppIntegrationService)
 
