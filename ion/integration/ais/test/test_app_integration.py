@@ -20,7 +20,8 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_CACHE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
-                                                                    ANONYMOUS_USER_ID
+                                                                    ANONYMOUS_USER_ID, \
+                                                                    MYOOICI_USER_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
@@ -255,7 +256,7 @@ class AppIntegrationTest(IonTestCase):
         #reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
         #reqMsg.message_parameters_reference.user_ooi_id  = MYOOICI_USER_ID
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -282,7 +283,7 @@ class AppIntegrationTest(IonTestCase):
             reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
             reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
             
-            rspMsg = yield self.aisc.findDataResources(reqMsg)
+            rspMsg = yield self.aisc.findDataResources(reqMsg, self.user_id)
             if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
                 self.fail("findDataResources failed: " + rspMsg.error_str)
     
@@ -323,7 +324,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         
         log.debug('Calling findDataResources to get list of resources with no bounds.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -352,7 +353,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2011-03-05T00:02:00Z'
         
         log.debug('Calling findDataResources to get list of resources with temporal/spatial bounds.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -374,7 +375,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.posVertical  = 'down'
         
         log.debug('Calling findDataResources to get list of resources bounded by depth only.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -396,7 +397,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.posVertical  = 'up'
         
         log.debug('Calling findDataResources to get list of resources bounded by altitude only.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -432,8 +433,8 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.minTime      = '2010-07-26T00:02:00Z'
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:00Z'
 
-        log.debug('Calling findDataResourcesByUser to without ooi_user_id: should fail.')
-        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        log.debug('Calling findDataResourcesByUser without ooi_user_id: should fail.')
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing user_ooi_ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -455,7 +456,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T00:02:15Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
-        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
@@ -484,7 +485,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T02:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
-        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
 
@@ -512,7 +513,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2011-01-1T11:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
-        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
@@ -540,7 +541,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.maxTime      = '2010-07-26T01:00:00Z'
 
         log.debug('Calling findDataResourcesByUser to get list of resources.')
-        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg)
+        rspMsg = yield self.aisc.findDataResourcesByUser(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResourcesByUser failed: " + rspMsg.error_str)
         
@@ -569,7 +570,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
 
         log.debug('Calling getDataResourceDetail without resource ID.')
-        rspMsg = yield self.aisc.getDataResourceDetail(reqMsg)
+        rspMsg = yield self.aisc.getDataResourceDetail(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing resource ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
         
@@ -585,7 +586,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.user_ooi_id = ANONYMOUS_USER_ID
         
         log.debug('Calling findDataResources.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
 
         if len(rspMsg.message_parameters_reference) > 0:
             if len(rspMsg.message_parameters_reference[0].dataResourceSummary) > 0:
@@ -601,7 +602,7 @@ class AppIntegrationTest(IonTestCase):
                 reqMsg.message_parameters_reference.data_resource_id = dsID
 
                 log.debug('Calling getDataResourceDetail.')
-                rspMsg = yield self.aisc.getDataResourceDetail(reqMsg)
+                rspMsg = yield self.aisc.getDataResourceDetail(reqMsg, ANONYMOUS_USER_ID)
                 log.debug('getDataResourceDetail returned:\n' + \
                     str('resource_id: ') + \
                     str(rspMsg.message_parameters_reference[0].data_resource_id) + \
@@ -680,7 +681,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
 
         log.debug('Calling createDownloadURL without resource ID.')
-        rspMsg = yield self.aisc.createDownloadURL(reqMsg)
+        rspMsg = yield self.aisc.createDownloadURL(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing resource ID is not an AIS_RESPONSE_ERROR_TYPE GPB')
         
@@ -690,7 +691,7 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.data_resource_id = TEST_RESOURCE_ID
 
         log.debug('Calling createDownloadURL.')
-        rspMsg = yield self.aisc.createDownloadURL(reqMsg)
+        rspMsg = yield self.aisc.createDownloadURL(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         downloadURL = rspMsg.message_parameters_reference[0].download_url
         log.debug('DHE: createDownloadURL returned:\n' + downloadURL)
         if TEST_RESOURCE_ID not in downloadURL:
@@ -754,7 +755,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
 
         # try to register this user for the first time
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -770,7 +771,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
             
         # try to re-register this user for a second time
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -789,24 +790,24 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # try to send registerUser the wrong GPB
         # create a bad request GPBs
         msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
         # try to send registerUser incomplete GPBs
         # create a bad GPB request w/o payload
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o certificate
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o key
         msg.message_parameters_reference.certificate = "dumming certificate"
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
             
@@ -826,7 +827,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
-            reply = yield self.aisc.updateUserProfile(msg)
+            reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
             self.fail('updateUserProfile did not raise exception for ANONYMOUS ooi_id')
         except ReceivedApplicationError:
             log.info("updateUserProfile correctly raised exception for ANONYMOUS ooi_id")
@@ -836,7 +837,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
         try:
-            reply = yield self.aisc.getUser(msg)
+            reply = yield self.aisc.getUser(msg, msg.message_parameters_reference.user_ooi_id)
             self.fail('getUser did not raise exception for ANONYMOUS ooi_id')
         except ReceivedApplicationError:
             log.info("getUser correctly raised exception for ANONYMOUS ooi_id")
@@ -892,7 +893,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
 
         # try to register this user for the first time
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -909,7 +910,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.institution = "some_place"
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
         try:
-            reply = yield self.aisc.updateUserProfile(msg)
+            reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
         except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -928,7 +929,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.profile[1].name = "ProfileItem_2_Name"
         msg.message_parameters_reference.profile[1].value = "ProfileItem_2_Value"
         try:
-            reply = yield self.aisc.updateUserProfile(msg)
+            reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
         except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -942,7 +943,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(GET_USER_PROFILE_REQUEST_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         try:
-            reply = yield self.aisc.getUser(msg)
+            reply = yield self.aisc.getUser(msg, msg.message_parameters_reference.user_ooi_id)
         except ReceivedApplicationError:
             self.fail('getUser incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -962,24 +963,24 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # try to send updateUserProfile the wrong GPB
         # create a bad request GPBs
         msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.updateUserProfile(msg)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
         # try to send updateUserProfile incomplete GPBs
         # create a bad GPB request w/o payload
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.updateUserProfile(msg)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile to is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o ooi_id
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_PROFILE_REQUEST_TYPE)
-        reply = yield self.aisc.updateUserProfile(msg)
+        reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o emsil address
         msg.message_parameters_reference.user_ooi_id = "Some-ooi_id"
-        reply = yield self.aisc.updateUserProfile(msg)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -996,7 +997,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(MANAGE_USER_ROLE_REQUEST_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
 
-        rspMsg = yield self.aisc.setUserRole(reqMsg)
+        rspMsg = yield self.aisc.setUserRole(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing role is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -1005,7 +1006,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
         reqMsg.message_parameters_reference.role = 'AUTHENTICATED'
 
-        rspMsg = yield self.aisc.setUserRole(reqMsg)
+        rspMsg = yield self.aisc.setUserRole(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/ valid data is an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -1018,7 +1019,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         # create the empty request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS getResourceTypes request')
-        reply = yield self.aisc.getResourceTypes(msg)
+        reply = yield self.aisc.getResourceTypes(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResourceTypes returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1046,7 +1047,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.resource_type = "datasets"
         log.debug('getResourcesOfType: calling AIS to get datasets')
-        reply = yield self.aisc.getResourcesOfType(msg)
+        reply = yield self.aisc.getResourcesOfType(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1064,7 +1065,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.resource_type = "identities"
         log.debug('getResourcesOfType: calling AIS to get identities')
-        reply = yield self.aisc.getResourcesOfType(msg)
+        reply = yield self.aisc.getResourcesOfType(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1082,7 +1083,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.resource_type = "datasources"
         log.debug('getResourcesOfType: calling AIS to get datasources')
-        reply = yield self.aisc.getResourcesOfType(msg)
+        reply = yield self.aisc.getResourcesOfType(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1100,7 +1101,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         msg.message_parameters_reference.resource_type = "epucontrollers"
         log.debug('getResourcesOfType: calling AIS to get epucontrollers')
-        reply = yield self.aisc.getResourcesOfType(msg)
+        reply = yield self.aisc.getResourcesOfType(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResourcesOfType returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1127,7 +1128,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference = msg.CreateObject(GET_RESOURCE_REQUEST_TYPE)
         
         msg.message_parameters_reference.ooi_id = "agentservices_epu_controller"  #epu controller
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1139,7 +1140,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no resource field')
         
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F1"  #data set
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1151,7 +1152,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no resource field')
         
         msg.message_parameters_reference.ooi_id = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"   #anonymous identity
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1163,7 +1164,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no resource field')
         
         msg.message_parameters_reference.ooi_id = "3319A67F-91F3-424F-8E69-4F28C4E047F2"  #data source
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1175,7 +1176,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType has no resource field')
         
         msg.message_parameters_reference.ooi_id = "bogus-ooi_id"  #non-existant item
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
@@ -1183,7 +1184,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         yield self.createUser()        
         msg.message_parameters_reference.ooi_id = self.user_id   #created identity
-        reply = yield self.aisc.getResource(msg)
+        reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('getResource returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -1273,7 +1274,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         #
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
@@ -1331,7 +1332,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
         
         log.debug('Calling findDataResources to get list of resources to do subscription on.')
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, ANONYMOUS_USER_ID)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("findDataResources failed: " + rspMsg.error_str)
 
@@ -1367,7 +1368,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Call AIS to create the subscription
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
@@ -1381,7 +1382,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
         
         log.debug('Calling findDataResourceSubscriptions.')
-        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
+        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to findDataResourceSubscriptions')
         else:
@@ -1415,7 +1416,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.dataBounds.maxTime      = '2008-08-1T11:00:00Z'
         
         log.debug('Calling findDataResourceSubscriptions.')
-        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg)
+        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to findDataResourceSubscriptions')
         else:
@@ -1499,7 +1500,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription: '+str(rspMsg.error_str))
         else:
@@ -1524,7 +1525,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling updateDataResourceSubscription.')
-        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
@@ -1549,7 +1550,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 35.0
         
         log.debug('Calling updateDataResourceSubscription.')
-        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.updateDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to updateDataResourceSubscription: '+str(rspMsg.error_str))
         else:
@@ -1627,7 +1628,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Call AIS to create the subscription
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
@@ -1656,7 +1657,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Call AIS to create the subscription
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
@@ -1674,7 +1675,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.subscriptions[1].data_src_id  = 'dataset123'
 
         log.debug('Calling deleteDataResourceSubscriptions.')
-        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to deleteDataResourceSubscription: '+str(rspMsg.error_str))
         else:
@@ -1682,7 +1683,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         # now delete the subscriptions deleted above again
         log.debug('Calling deleteDataResourceSubscriptions a second time.')
-        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.deleteDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             log.info('correct ERROR rspMsg to deleteDataResourceSubscription')
         else:
@@ -1717,7 +1718,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = ANONYMOUS_USER_ID
-        rspMsg = yield self.aisc.findDataResources(reqMsg)
+        rspMsg = yield self.aisc.findDataResources(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail("test_updateDataResourceCache failed: " + rspMsg.error_str)
 
@@ -1910,7 +1911,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
 
-        # fill in the certificate and key
+        # fill in the certificate and key for
+        # subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
+
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
 MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
 MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRsw
@@ -1957,7 +1960,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
 
         # try to register this user for the first time
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
@@ -1981,7 +1984,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         msg.message_parameters_reference.profile[1].name = "profile item 2 name"
         msg.message_parameters_reference.profile[1].value = "profile item 2 value"
         try:
-            reply = yield self.aisc.updateUserProfile(msg)
+            reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
         except ReceivedApplicationError:
             self.fail('updateUserProfile incorrectly raised exception for an authenticated ooi_id')
         if log.getEffectiveLevel() <= logging.DEBUG:
@@ -2059,7 +2062,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Call AIS to create the subscription
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
@@ -2088,7 +2091,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Call AIS to create the subscription
         #
         log.debug('Calling createDataResourceSubscription.')
-        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg)
+        rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('ERROR rspMsg to createDataResourceSubscription')
         else:
