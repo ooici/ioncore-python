@@ -13,14 +13,14 @@
 """
 import os
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 from zope.interface import implements
 
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
-from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator, InvalidRequestException
+from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
 
 from ion.core.data import store
 from ion.core.data.store import Query
@@ -265,14 +265,17 @@ class CassandraIndexedStore(CassandraStore):
 
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
-    def query(self, query_predicates, row_count=100):
+    def query(self, query_predicates, row_count=10000000):
         """
         Search for rows in the Cassandra instance.
     
-        @param indexed_attributes is a dictionary with column:value mappings.
-        Rows are returned that have columns set to the value specified in 
-        the dictionary
-        
+        @param query_predicates is an instance of store.Query. 
+        @param row_count the maximum number of rows to return. 
+        The default argument is set to 10,000,000. 
+        (Setting this sys.maxint causes an internal error in Cassandra.)
+        This can be set  to a lower value, if you want to limit the number of rows 
+        to return.
+            
         @retVal a dictionary containing the keys and values which match the query.
         
         raises a CassandraError if the query_predicate object is malformed.
