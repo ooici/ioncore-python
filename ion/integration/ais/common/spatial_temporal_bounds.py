@@ -169,19 +169,15 @@ class SpatialTemporalBounds(object):
         self.bIsInTimeBounds = True
 
         if self.filterByLatitude:
-            #log.debug("----------------------------- 1 ------------------------------")
             self.bIsInAreaBounds = self.__isInLatitudeBounds(dSetMetadata, self.bounds)
 
         if self.bIsInAreaBounds and self.filterByLongitude:
-            #log.debug("----------------------------- 2 ------------------------------")
             self.bIsInAreaBounds = self.__isInLongitudeBounds(dSetMetadata, self.bounds)
 
         if self.bIsInAreaBounds and self.filterByVertical:
-            #log.debug("----------------------------- 3 ------------------------------")
             self.bIsInVerticalBounds = self.__isInVerticalBounds(dSetMetadata, self.bounds)
                                 
         if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
-            #log.debug("----------------------------- 4 ------------------------------")
             self.bIsInTimeBounds = self.__isInTimeBounds(dSetMetadata, self.bounds)
             
         if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
@@ -204,26 +200,26 @@ class SpatialTemporalBounds(object):
             # If bounds max is less that metadata min, bounds must be completely
             # less than data; return False
             #
-            if  bounds[MAX_LATITUDE] < minMetaData['ion_geospatial_lat_min']:
+            if isnan(minMetaData['ion_geospatial_lat_min']):
+                log.info(' minMetaData[ion_geospatial_lat_min] is not a number')
+                return False
+            
+            if bounds[MAX_LATITUDE] < minMetaData['ion_geospatial_lat_min']:
                 log.debug(' bounds max %f is < metadata min %f' % (bounds[MIN_LATITUDE], minMetaData['ion_geospatial_lat_min']))
                 return False
 
-            #if minMetaData['ion_geospatial_lat_min'] < bounds[MIN_LATITUDE]:
-            #    log.error(' metadata min %f is < bounds %f' % (minMetaData['ion_geospatial_lat_min'], bounds[MIN_LATITUDE]))
-            #    return False
-            
         if self.bIsMaxLatitudeSet:
             #
             # If bounds min is greater that metadata max, bounds must be completely
             # above the data; return False
             #
-            if  bounds[MIN_LATITUDE] > minMetaData['ion_geospatial_lat_max']:
-                log.debug('bounds min %s is > metadata max %s' % (bounds[MAX_LATITUDE], minMetaData['ion_geospatial_lat_max']))
+            if isnan(minMetaData['ion_geospatial_lat_max']):
+                log.info('minMetaData[ion_geospatial_lat_max] is not a number')
                 return False
             
-            #if minMetaData['ion_geospatial_lat_max'] > bounds[MAX_LATITUDE]:
-            #    log.error('metadata max %s is > bounds %s' % (minMetaData['ion_geospatial_lat_max'], bounds[MAX_LATITUDE]))
-            #    return False
+            if bounds[MIN_LATITUDE] > minMetaData['ion_geospatial_lat_max']:
+                log.debug('bounds min %s is > metadata max %s' % (bounds[MAX_LATITUDE], minMetaData['ion_geospatial_lat_max']))
+                return False
             
         return True
 
@@ -242,6 +238,10 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMinLongitudeSet:
+            if  isnan(minMetaData['ion_geospatial_lon_max']):
+                log.info('minMetaData[ion_geospatial_lon_max] is not a number')
+                return False
+        
             if  bounds[MIN_LONGITUDE] > minMetaData['ion_geospatial_lon_max']:
                 log.debug('bounds min %s is > metadata max %s' % (bounds[MIN_LONGITUDE], minMetaData['ion_geospatial_lon_max']))
                 return False
@@ -251,7 +251,11 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMaxLongitudeSet:
-            if  bounds[MAX_LONGITUDE] < minMetaData['ion_geospatial_lon_min']:
+            if isnan(minMetaData['ion_geospatial_lon_min']):
+                log.info('minMetaData[ion_geospatial_lon_min] is not a number')
+                return False
+
+            if bounds[MAX_LONGITUDE] < minMetaData['ion_geospatial_lon_min']:
                 log.debug('bounds max %s is < metadata min %s' % (bounds[MAX_LONGITUDE], minMetaData['ion_geospatial_lon_min']))
                 return False
         
@@ -278,15 +282,25 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMinVerticalSet:
-                if minMetaData['ion_geospatial_vertical_min'] > bounds[MAX_VERTICAL]:
+                if isnan(minMetaData['ion_geospatial_vertical_min']):
+                    log.info('minMetaData[ion_geospatial_vertical_min] is not a number')
+                    return False
+
+                if  minMetaData['ion_geospatial_vertical_min'] > bounds[MAX_VERTICAL]:
                     log.debug('min depth for data: %s is > bounds max depth: %s' % \
                               (minMetaData['ion_geospatial_vertical_min'], bounds[MAX_VERTICAL]))
                     return False
+
             #
             # If the maxDepth for the data is less than the min of the bounds,
             # return false
             #
             if self.bIsMaxVerticalSet:
+                if isnan(minMetaData['ion_geospatial_vertical_max']):
+                    log.info('minMetaData[ion_geospatial_vertical_max] is not a number')
+                    return False
+                
+
                 if minMetaData['ion_geospatial_vertical_max'] < bounds[MIN_VERTICAL]:
                     log.debug('max depth for data: %s is < bounds min depth: %s' % \
                               (minMetaData['ion_geospatial_vertical_max'], bounds[MIN_VERTICAL]))
@@ -300,6 +314,10 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMaxVerticalSet:
+                if isnan(minMetaData['ion_geospatial_vertical_max']):
+                    log.info('minMetaData[ion_geospatial_vertical_max] is not a number')
+                    return False
+                
                 if minMetaData['ion_geospatial_vertical_max'] < bounds[MIN_VERTICAL]:
                     log.debug('max altitude for data: %s is < bounds min altitude: %s' % \
                               (minMetaData['ion_geospatial_vertical_max'], bounds[MIN_VERTICAL]))
@@ -311,6 +329,10 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMinVerticalSet:
+                if isnan(minMetaData['ion_geospatial_vertical_min']):
+                    log.info('minMetaData[ion_geospatial_vertical_min] is not a number')
+                    return False
+        
                 if minMetaData['ion_geospatial_vertical_min'] > bounds[MAX_VERTICAL]:
                     log.debug('min altitude for data: %s is > bounds max altitude: %s' % \
                               (minMetaData['ion_geospatial_vertical_min'], bounds[MAX_VERTICAL]))
@@ -346,7 +368,6 @@ class SpatialTemporalBounds(object):
         # If data start time is < bounds min time and data max time > bounds min time, return true
         #
         if dataMinTime < bounds['minTime'] and dataMaxTime > bounds['minTime']:
-            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
             log.debug('DATA TIME COVERS BOUNDS MIN TIME')
             log.debug(' %s is < bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.minTimeBound))
             log.debug(' %s is > bounds %s' % (minMetaData['ion_time_coverage_end'], self.minTimeBound))
@@ -356,7 +377,6 @@ class SpatialTemporalBounds(object):
         # If data start time is < bounds max time and < data max time > bounds max time, return true
         #
         if dataMinTime < bounds['maxTime'] and dataMaxTime > bounds['maxTime']:
-            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
             log.debug('DATA TIME COVERS BOUNDS MAX TIME')
             log.debug(' %s is < bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.maxTimeBound))
             log.debug(' %s is > bounds %s' % (minMetaData['ion_time_coverage_end'], self.maxTimeBound))
@@ -366,7 +386,6 @@ class SpatialTemporalBounds(object):
         # If data min time > bounds min time and data max time < bounds max time
         #
         if dataMinTime > bounds['minTime'] and dataMaxTime < bounds['maxTime']:
-            #log.debug('%s is > bounds %s' % (dataMaxTime, bounds['maxTime']))
             log.debug('BOUNDS TIME COVERS DATA')
             log.debug(' %s is > bounds %s and...' % (minMetaData['ion_time_coverage_start'], self.minTimeBound))
             log.debug(' %s is < bounds %s' % (minMetaData['ion_time_coverage_end'], self.maxTimeBound))
