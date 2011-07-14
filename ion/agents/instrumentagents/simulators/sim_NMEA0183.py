@@ -545,6 +545,3 @@ class NMEA0183SimBase:
         self._goodComms = self.IsSocatRunning()
         self._workingSim = self.IsSimulatorRunning()
         return self._workingSim
-
-
-#

@@ -367,6 +367,14 @@ class TestNMEA0183Agent (IonTestCase):
         self.assertEqual(setparams[(chan, 'ALT_MSL')], result[(chan, 'ALT_MSL')][1])
         self.assertEqual(setparams[(chan, 'DED_REC')], result[(chan, 'DED_REC')][1])
         
+        
+        # Reset the agent to disconnect and bring down the driver and client.
+        log.debug('+++++ Disconnect from serial port')
+        cmd = [AgentCommand.TRANSITION, AgentEvent.RESET]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
         """ TODO Needs more work!
         
         # Acquire sample.

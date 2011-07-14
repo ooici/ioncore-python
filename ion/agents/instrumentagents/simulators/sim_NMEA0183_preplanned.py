@@ -276,3 +276,13 @@ Good PGRMC, just queries status:        $PGRMC
 """
 #
 
+if __name__ == '__main__':
+    # Running as standalone app to spew data on a port
+    log.info("Sim_NMEA0183_preplanned running as a standalone app!")
+    
+    # run our code
+    simulator = NMEA0183SimPrePlanned()
+    simulator.SetupSimulator()    
+
+    # start the reactor
+    reactor.run()
