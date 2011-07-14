@@ -963,14 +963,14 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # try to send updateUserProfile the wrong GPB
         # create a bad request GPBs
         msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
         # try to send updateUserProfile incomplete GPBs
         # create a bad GPB request w/o payload
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
-        reply = yield self.aisc.updateUserProfile(msg, msg.message_parameters_reference.user_ooi_id)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile to is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o ooi_id
@@ -980,7 +980,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o emsil address
         msg.message_parameters_reference.user_ooi_id = "Some-ooi_id"
-        reply = yield self.aisc.updateUserProfile(msg)
+        reply = yield self.aisc.updateUserProfile(msg, ANONYMOUS_USER_ID)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserProfile is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -997,7 +997,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference = reqMsg.CreateObject(MANAGE_USER_ROLE_REQUEST_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
 
-        rspMsg = yield self.aisc.setUserRole(reqMsg, msg.message_parameters_reference.user_ooi_id)
+        rspMsg = yield self.aisc.setUserRole(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/missing role is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
@@ -1006,7 +1006,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.user_ooi_id = valid_ooi_id
         reqMsg.message_parameters_reference.role = 'AUTHENTICATED'
 
-        rspMsg = yield self.aisc.setUserRole(reqMsg, msg.message_parameters_reference.user_ooi_id)
+        rspMsg = yield self.aisc.setUserRole(reqMsg, reqMsg.message_parameters_reference.user_ooi_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             self.fail('rspMsg to GPB w/ valid data is an AIS_RESPONSE_ERROR_TYPE GPB')
 
