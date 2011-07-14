@@ -293,7 +293,7 @@ class GetDataResourceDetail(object):
             else:
                 rspGpb.other_attributes.add()
                 rspGpb.other_attributes[i].name = attrib.name
-                rspGpb.other_attributes[i].value = attrib.GetValue()
+                rspGpb.other_attributes[i].value = str(attrib.GetValue())
                 i = i + 1
         
         #
