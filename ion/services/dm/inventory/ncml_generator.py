@@ -107,7 +107,6 @@ def rsync_ncml(local_filepath, server_url):
     local ncml files.
     @param local_filepath Local directory for writing ncml file(s)
     @param server_url rsync URL of the server
-    @param ssh_key_filename the filename of the private key
     @retval Deferred that will callback when rsync exits, or errback if rsync fails
     """
 
@@ -145,9 +144,7 @@ def do_complete_rsync(local_ncml_path, server_url):
 
     yield rsync_ncml(local_ncml_path, server_url)
 
-    # Delete the keys from the file system
-    #unlink(skey)
-    #unlink(pkey)
+
 
 
 
