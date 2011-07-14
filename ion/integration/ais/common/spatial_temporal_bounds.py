@@ -200,7 +200,7 @@ class SpatialTemporalBounds(object):
             # If bounds max is less that metadata min, bounds must be completely
             # less than data; return False
             #
-            if not isnan(minMetaData['ion_geospatial_lat_min']):
+            if isnan(minMetaData['ion_geospatial_lat_min']):
                 log.info(' minMetaData[ion_geospatial_lat_min] is not a number')
                 return False
             
@@ -213,7 +213,7 @@ class SpatialTemporalBounds(object):
             # If bounds min is greater that metadata max, bounds must be completely
             # above the data; return False
             #
-            if not isnan(minMetaData['ion_geospatial_lat_max']):
+            if isnan(minMetaData['ion_geospatial_lat_max']):
                 log.info('minMetaData[ion_geospatial_lat_max] is not a number')
                 return False
             
@@ -238,7 +238,7 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMinLongitudeSet:
-            if  not isnan(minMetaData['ion_geospatial_lon_max']):
+            if  isnan(minMetaData['ion_geospatial_lon_max']):
                 log.info('minMetaData[ion_geospatial_lon_max] is not a number')
                 return False
         
@@ -251,7 +251,7 @@ class SpatialTemporalBounds(object):
         # outside data; return False
         #
         if self.bIsMaxLongitudeSet:
-            if not isnan(minMetaData['ion_geospatial_lon_min']):
+            if isnan(minMetaData['ion_geospatial_lon_min']):
                 log.info('minMetaData[ion_geospatial_lon_min] is not a number')
                 return False
 
@@ -282,7 +282,7 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMinVerticalSet:
-                if not isnan(minMetaData['ion_geospatial_vertical_min']):
+                if isnan(minMetaData['ion_geospatial_vertical_min']):
                     log.info('minMetaData[ion_geospatial_vertical_min] is not a number')
                     return False
 
@@ -296,7 +296,7 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMaxVerticalSet:
-                if not isnan(minMetaData['ion_geospatial_vertical_max']):
+                if isnan(minMetaData['ion_geospatial_vertical_max']):
                     log.info('minMetaData[ion_geospatial_vertical_max] is not a number')
                     return False
                 
@@ -314,7 +314,7 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMaxVerticalSet:
-                if not isnan(minMetaData['ion_geospatial_vertical_max']):
+                if isnan(minMetaData['ion_geospatial_vertical_max']):
                     log.info('minMetaData[ion_geospatial_vertical_max] is not a number')
                     return False
                 
@@ -329,7 +329,7 @@ class SpatialTemporalBounds(object):
             # return false
             #
             if self.bIsMinVerticalSet:
-                if not isnan(minMetaData['ion_geospatial_vertical_min']):
+                if isnan(minMetaData['ion_geospatial_vertical_min']):
                     log.info('minMetaData[ion_geospatial_vertical_min] is not a number')
                     return False
         
