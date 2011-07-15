@@ -41,15 +41,6 @@ if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
         print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
 
 logging.config.fileConfig(logconf)
-if sys.platform == 'linux2':
-    c_pid = os.getpid()
-    syslog_formatter = logging.Formatter(str(c_pid) + " [%(module)-15s:%(lineno)3d] %(levelname)-5s:%(message)s")
-    syslog_address = '/dev/log'
-    syslog_facility = 'local0'
-    syslog_handler = logging.handlers.SysLogHandler(syslog_address, syslog_facility) 
-    syslog_handler.setLevel(logging.DEBUG)
-    syslog_handler.setFormatter(syslog_formatter)
-    logging.root.addHandler(syslog_handler)
 
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
