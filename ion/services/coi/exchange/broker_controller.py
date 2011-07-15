@@ -59,11 +59,12 @@ class BrokerController:
     def stop(self):
         """
         """
-        for ch, q in self.queues:
-            yield ch.queue_delete(queue=q)
-        for ch, ex in self.exchanges:
-            yield ch.exchange_delete(exchange=ex)
-            log.info('broker_controller: delete_exchange()  name=' + ex)
+        log.info("Stopping BrokerController")
+        # for ch, q in self.queues:
+        #    yield ch.queue_delete(queue=q)
+        # for ch, ex in self.exchanges:
+        #    yield ch.exchange_delete(exchange=ex)
+        #    log.info('broker_controller: delete_exchange()  name=' + ex)
         for connector in self.connectors:
             yield connector.disconnect()
   
