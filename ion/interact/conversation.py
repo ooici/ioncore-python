@@ -373,7 +373,8 @@ class ProcessConversationManager(object):
             del self.conversations[conv_id]
             log.info("Conversation FINAL: id=%s. Active conversations: %s" % (
                 conv_id, len(self.conversations)))
-            log.info("Conversation FINAL log:\n%s" % (conv.get_conv_log_str()))
+            # Removed for OOIION-335 Logging message very confusing
+            # log.info("Conversation FINAL log:\n%s" % (conv.get_conv_log_str()))
 
         # Create a tombstone for later messages and timeouts with this conv_id
 
