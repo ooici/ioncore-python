@@ -225,7 +225,7 @@ class AISManageDataResourceTest(IonTestCase):
 
         log.info("Trying to call updateDataResource with the wrong GPB")
         update_req_msg  = yield self.mc.create_instance(UPDATE_DATA_RESOURCE_REQ_TYPE)
-        result       = yield self.aisc.updateDataResource(update_req_msg)
+        result       = yield self.aisc.updateDataResource(update_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "updateDataResource accepted a GPB that was known to be the wrong type")
 
@@ -234,7 +234,7 @@ class AISManageDataResourceTest(IonTestCase):
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         update_req_msg  = ais_req_msg.CreateObject(UPDATE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = update_req_msg
-        result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.updateDataResource(ais_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "updateDataResource accepted a GPB without a data_source_resource_id")
 
@@ -335,7 +335,7 @@ class AISManageDataResourceTest(IonTestCase):
         update_req_msg.is_public                    = fr_is_public
 
         #actual update call
-        result_wrapped = yield self.aisc.updateDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.updateDataResource(ais_req_msg, MYOOICI_USER_ID)
 
         log.info("Analyzing results of updateDataResource call")
         if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
@@ -373,7 +373,7 @@ class AISManageDataResourceTest(IonTestCase):
 
         log.info("Trying to call deleteDataResource with the wrong GPB")
         delete_req_msg  = yield self.mc.create_instance(DELETE_DATA_RESOURCE_REQ_TYPE)
-        result       = yield self.aisc.deleteDataResource(delete_req_msg)
+        result       = yield self.aisc.deleteDataResource(delete_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "deleteDataResource accepted a GPB that was known to be the wrong type")
 
@@ -381,7 +381,7 @@ class AISManageDataResourceTest(IonTestCase):
         ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         delete_req_msg  = ais_req_msg.CreateObject(DELETE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = delete_req_msg
-        result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "deleteDataResource accepted a GPB without a data_source_resource_id list")
 
@@ -426,7 +426,7 @@ class AISManageDataResourceTest(IonTestCase):
         delete_req_msg.data_set_resource_id.append(data_set_id)
 
 
-        result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg, MYOOICI_USER_ID)
 
         if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
             self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
@@ -456,7 +456,7 @@ class AISManageDataResourceTest(IonTestCase):
     def test_createDataResource_BadInput(self):
         log.info("Trying to call createDataResource with the wrong GPB")
         create_req_msg  = yield self.mc.create_instance(CREATE_DATA_RESOURCE_REQ_TYPE)
-        result       = yield self.aisc.createDataResource(create_req_msg)
+        result       = yield self.aisc.createDataResource(create_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "createDataResource accepted a GPB that was known to be the wrong type")
 
@@ -496,7 +496,7 @@ class AISManageDataResourceTest(IonTestCase):
 
         #check range on update_start_datetime_millis (OOIION-164)
         create_req_msg.update_start_datetime_millis  = (int(time.time()) + 41536000) * 1000
-        result = yield self.aisc.createDataResource(ais_req_msg)
+        result = yield self.aisc.createDataResource(ais_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "createDataResource accepted a update_start_datetime_millis value more than a year in the future")
 
@@ -506,7 +506,7 @@ class AISManageDataResourceTest(IonTestCase):
         #should be ready for actual call that we expect to succeed
         log.info("testing with the call that we expect to succeed")
 
-        result_wrapped = yield self.aisc.createDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.createDataResource(ais_req_msg, MYOOICI_USER_ID)
 
         if not AIS_RESPONSE_MSG_TYPE == result_wrapped.MessageType:
             self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
@@ -597,7 +597,7 @@ class AISManageDataResourceTest(IonTestCase):
     @defer.inlineCallbacks
     def _checkCreateFieldAcceptance(self, req_msg):
 
-        result = yield self.aisc.createDataResource(req_msg)
+        result = yield self.aisc.createDataResource(req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "createDataResource accepted a GPB that was known to be lacking data")
 
