@@ -267,7 +267,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
 
         # try to register this user for the first time
-        reply = yield self.aisc.registerUser(msg)
+        reply = yield self.aisc.registerUser(msg, ANONYMOUS_USER_ID)
         log.debug('registerUser returned:\n'+str(reply))
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
