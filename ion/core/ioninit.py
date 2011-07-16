@@ -65,6 +65,25 @@ testing = True
 request = ContextLocal()
 
 
+# Optionally use Loggly for logging, just an experiment for now
+loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)
+if loggly_key is not None:
+    import hoover
+    import httplib2
+
+    # Need to monkey-patch to bypass SSL validation :(
+    _post_to_endpoint = hoover.utils.post_to_endpoint
+    def post_to_endpoint(endpoint, message):
+        h = httplib2.Http(disable_ssl_certificate_validation=True)
+        h.request(endpoint, 'POST', message)
+    async_post_to_endpoint = hoover.utils.async(post_to_endpoint)
+    setattr(hoover.utils, 'post_to_endpoint', post_to_endpoint)
+    setattr(hoover.utils, 'async_post_to_endpoint', async_post_to_endpoint)
+    setattr(hoover.handlers, 'async_post_to_endpoint', async_post_to_endpoint)
+        
+    loggly_handler = hoover.LogglyHttpHandler(token=loggly_key)
+    loggly_handler.setLevel(logging.DEBUG)
+    logging.root.addHandler(loggly_handler)
 
 def config(name):
     """
