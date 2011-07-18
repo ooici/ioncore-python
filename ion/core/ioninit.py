@@ -67,6 +67,7 @@ request = ContextLocal()
 
 # Optionally use Loggly for logging, just an experiment for now
 loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)
+loggly_key = os.environ.get('LOGGLY_KEY', loggly_key)
 if loggly_key is not None:
     import hoover
     import httplib2
