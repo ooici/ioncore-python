@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> 
+    <meta charset="utf-8" /> 
+    <title>mwap</title> 
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+    <script type="text/javascript" src="d3.js"></script>
+    <style>
+        body {
+            margin: 0px;
+        }
+        #mscheader {
+            position: fixed;
+            height: 65px;
+            top: 0px;
+            left: 0px;
+            width: 100%;
+            background-color: #000033;
+        }
+        #msccontain {
+            position: absolute;
+            width: 100%;
+            top: 65px;
+            bottom: 0px;
+            overflow: auto;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            height: 50px;
+            width: 120px;
+            background-color: gray;
+        }
+        #headercanvas {
+            width: 900px;
+            height: 65px;
+        }
+        #maincanvas {
+            width: 900px;
+            height: 5000px;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="mscheader">
+        <div id="headercanvas"></div>
+    </div>
+    <div id="msccontain">
+        <div id="maincanvas"></div>
+    </div>
+    <div id="controls">
+        <button name="additem" type="button" value="wat">add one</button>
+        <button name="getlive" type="button" value="getlive">get live</button>
+    </div>
+
+    <script type="text/javascript">
+        var gheaders = [];  // group headers
+        var headers={};     // associative array groupheader->[] of subheaders
+        var data = [];
+        var xdata=[ { to: "datastore/one", from: "assoc/two", content: "hi i am a bat", type:"rpcreq" },
+                   { to: "pubsub/three", from: "datastore/one", content: "are you with me", type:"rpcreq" },
+                   { to: "datastore/one", from: "pubsub/three", content: "sure", type:"rpcres" },
+                   { to: "assoc/two", from: "datastore/one", content: "i agree", type:"rpcres" },
+                   { to: "datastore/two", from: "datastore/one", content: "the best", type:"data" } ];
+
+        var cheader;
+        var cmain;
+        var curheight = 5000;
+        var curwidth = 900;
+        var curheads = 0;
+
+        function getnames(x) {
+            var sidx = x.indexOf("/");
+            if (sidx == -1) 
+                return { gname: "None", name: x };
+             else 
+                 return { gname: x.slice(0, sidx), name: x.slice(sidx+1) };
+        }
+
+        function doheaders(indata) {
+            var dirty = 0;
+            $.each(indata, function(i, d) {
+
+                function addunknown(x) {
+                    slices = getnames(x);
+                    gname = slices.gname;
+                    name = slices.name;
+
+                    if ($.inArray(gname, gheaders) == -1) {
+                        gheaders.push(gname);
+                        headers[gname] = [];
+                        gheaders.sort();
+                    }
+
+                    if ($.inArray(name, headers[gname]) == -1) {
+                        dirty += 1;
+                        headers[gname].push(name);
+                        headers[gname].sort();
+                    }
+                }
+
+                addunknown(d.to);
+                addunknown(d.from);
+            });
+
+            //console.log(gheaders);
+            //console.log(headers.datastore);
+
+            return dirty;
+        }
+
+        function drawheaders()
+        {
+            // first, group headers
+            var gheads = cheader.selectAll("g.gheader")
+                .data(gheaders, function(d) { return d; } );
+
+            function getgroupxoffset(d, i) {
+                var x, y = 0;
+                // x is the sum of the previous headers' children size
+                var icount = 0;
+                for (var i = 0; i < gheaders.indexOf(d); i++)
+                    icount += headers[gheaders[i]].length;
+
+                x = icount * 150;
+
+                return "translate(" + x + "," + y + ")";
+            }
+
+            // update current ones
+            gheads.transition()
+                .duration(500)
+                .attr("transform", getgroupxoffset)
+                .attr("width", function(d, i) {
+                    return headers[d].length * 150;
+                });
+            gheads.selectAll(".grect").transition()
+                .duration(500)
+                .attr("width", function(d) {
+                    return headers[d].length * 150 - 10;
+                })
+            gheads.selectAll(".gtext").transition()
+                .duration(500)
+                .attr("x", function(d) { return headers[d].length * 150 / 2; });
+
+            // create new ones
+            var newgheads = gheads.enter().append("svg:g")
+                .attr("id", function(d) { return d; })
+                .attr("class", "gheader")
+                .attr("transform", getgroupxoffset)
+                .attr("width", function(d, i) {
+                    return headers[d].length * 150;
+                })
+                .attr("height", 50)
+                .attr("fill", "#ff0000");
+
+            // no need to delete
+
+            // create rects/texts on any new items
+            newgheads.append("svg:rect")
+                .attr("class", "grect")
+                .attr("fill", "#336699")
+                .attr("x", 5)
+                .attr("y", 5)
+                .attr("width", function(d, i) {
+                    return headers[d].length * 150 - 10;
+                })
+                .attr("height", 25);
+ 
+            newgheads.append("svg:text")
+                .attr("class", "gtext")
+                .attr("fill", "white")
+                .attr("x", function(d) { return headers[d].length * 150 / 2; })
+                .attr("y", 20)
+                .attr("text-anchor", "middle")
+                .text(function(d) { return d });
+
+            // now draw subheaders
+            cheader.selectAll('.gheader').each(function (d, i) {
+
+                var sheads = d3.select(this).selectAll('.header')
+                    .data(headers[d], function(dx) { return dx; })
+
+                function getsubxoffset(d, i) {
+                    var x, y = 30;
+                    x = i * 150;
+                    return "translate(" + x + "," + y + ")";
+                }
+
+                // update existing
+                sheads.transition()
+                    .duration(500)
+                    .attr("transform", getsubxoffset);
+
+                var newsubheads = sheads.enter().append("svg:g")
+                    .attr("id", function(d) { return d; })
+                    .attr("class", "subhead")
+                    .attr("transform", getsubxoffset)
+                    .attr("opacity", 0);
+
+                newsubheads.transition()
+                    .delay(250)
+                    .duration(500)
+                    .attr("opacity", 1); 
+
+                newsubheads.append("svg:rect")
+                    .attr("x", 5)
+                    .attr("y", 5)
+                    .attr("width", 140)
+                    .attr("height", 25)
+                    .attr("fill", "#3696ef");
+
+                newsubheads.append("svg:text")
+                    .attr("x", 75)
+                    .attr("y", 20)
+                    .attr("fill", "white")
+                    .attr("text-anchor", "middle")
+                    .text(function(d) { return d });
+            });
+
+            // now draw lines on main doc
+
+            // assemble the current data in sorted form
+            linedata = [];
+            $.each(gheaders, function(i, d) {
+                $.each(headers[d], function(ii, dd) {
+                    linedata.push(d + "_" + dd);
+                });
+            });
+
+            var msclines = cmain.selectAll("line.proc")
+                .data(linedata, function(d) { return d; });
+
+            // update
+            var rettrans = msclines.transition()
+                .duration(500)
+                .attr("x1", function(d, i) { return i * 150 + 75; })
+                .attr("x2", function(d, i) { return i * 150 + 75; });
+
+            msclines.enter().append("svg:line")
+                .attr("id", function(d) { return d; })
+                .attr("class", "proc")
+                .attr("x1", function(d, i) { return i * 150 + 75; })
+                .attr("y1", 0)
+                .attr("x2", function(d, i) { return i * 150 + 75; })
+                .attr("y2", curheight)
+                .attr("stroke", "#999")
+                .attr("stroke-dasharray", "2, 2");
+
+            return rettrans;    // so we can chain off of this
+        }
+
+        function drawdata() {
+            
+            var dlines = cmain.selectAll("g.msg")
+                .data(data);    // index is fine
+
+            // should never need to update via data change from lines, only header changes
+            function getlinex(rawid) {
+              splits = getnames(rawid);
+              lid = splits.gname + "_" + splits.name;
+              return cmain.select("#" + lid).attr("x1");
+            }
+
+            // update existing just in case
+            var existingdlines = dlines.selectAll("line").transition()
+                .duration(500)
+                .attr("x1", function(d) { return getlinex(d.from) })
+                .attr("x2", function(d) { return getlinex(d.to) });
+
+            var existingtexts = dlines.selectAll("text").transition()
+                .duration(500)
+                .attr("x", function(d) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } );
+
+            // create new ones
+            var newdatas = dlines.enter().append("svg:g")
+                //.attr("style", "text-shadow: 0px 0px 5px #fff;")
+                .attr("class", "msg")
+                .attr("opacity", 0);
+                
+            newdatas.transition()
+                .duration(500)
+                .attr("opacity", 1);
+
+            newdatas.append("svg:line")
+                .attr("stroke", "#666")
+                .attr("x1", function(d, i) { return getlinex(d.from); })
+                .attr("y1", function(d, i) { return 30 * i + 10; })
+                .attr("x2", function(d, i) { return getlinex(d.to); })
+                .attr("y2", function(d, i) { return 30 * i + 10; })
+                .attr("stroke-width", 2)
+                .attr("marker-end", function(d) { return "url(#" + d.type + ")"; } )
+                .attr("stroke-dasharray", function(d) {
+                    if (d.type == "rpcreq")
+                        return "none";
+                    else if (d.type == "data")
+                        return "5, 2";
+                    else
+                        return "2, 2";
+                });
+
+            newdatas.append("svg:text")
+                .attr("fill", "#000")
+                //.attr("stroke", "#fff")
+                //.attr("stroke-width", 15)
+                .attr("x", function(d, i) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } )
+                .attr("y", function(d, i) { return 30 * i + 8; })
+                .attr("text-anchor", "middle")
+                .text(function(d) { return d.content; });
+
+        }
+
+        $(function() {
+            // setup errything
+            cheader = d3.select('#headercanvas').append('svg:svg').attr('width', 900).attr('height', 100);
+            cmain = d3.select('#maincanvas').append('svg:svg').attr('width', 900).attr('height', curheight);
+
+            // rpc arrow
+            var defs = cmain.append("svg:defs")
+
+            defs.append("svg:marker")
+                .attr("id", "rpcreq")
+                .attr("viewBox", "0 0 10 20")
+                .attr("refX", 10)
+                .attr("refY", 10)
+                .attr("markerUnits", "strokeWidth")
+                .attr("orient", "auto")
+                .attr("markerWidth", 10)
+                .attr("markerHeight", 10)
+                .append("svg:polyline")
+                .attr("points", "0,0 10,10 0,20")
+                .attr("fill", "#000000");
+
+            defs.append("svg:marker")
+                .attr("id", "rpcres")
+                .attr("viewBox", "0 0 10 20")
+                .attr("refX", 10)
+                .attr("refY", 10)
+                .attr("markerUnits", "strokeWidth")
+                .attr("orient", "auto")
+                .attr("markerWidth", 10)
+                .attr("markerHeight", 10)
+                .append("svg:polyline")
+                .attr("points", "0,0 10,10 0,20")
+                .attr("fill", "#999999");
+
+            defs.append("svg:marker")
+                .attr("id", "data")
+                .attr("viewBox", "0 0 10 20")
+                .attr("refX", 10)
+                .attr("refY", 10)
+                .attr("markerUnits", "strokeWidth")
+                .attr("orient", "auto")
+                .attr("markerWidth", 10)
+                .attr("markerHeight", 10)
+                .append("svg:polyline")
+                .attr("points", "0,0 10,10 0,20")
+                .attr("fill", "#0000ff");
+
+            $("button[name='additem']").click(function() {
+                //headers.push("i am test");
+                //headers.splice(1, 0, "i am test");
+                var poss = [ "datastore/one", "datastore/two", "datastore/three",
+                             "assoc/four", "assoc/five",
+                             "resource/six", "resource/seven", "resource/eight",
+                             "psc/nine",
+                             "ems/ten",
+                             "ingestion/eleven", "ingestion/tewlve", "ingestion/thirteen",
+                             "jaw/fourteen", "jaw/fifteen",
+                             "bootstrap/sixteen" ];
+
+                var newdata = [];
+                for (var i = 0; i < Math.floor(Math.random() * 3) + 1; i++)
+                {
+                    newdata.push( { from: poss[Math.floor(Math.random() * poss.length)],
+                                    to: poss[Math.floor(Math.random() * poss.length)], 
+                                    content: "test",
+                                    type: "rpcreq" } );
+                }
+
+                console.log(newdata);
+
+                data = data.concat(newdata);
+                redraw(newdata);
+            });
+
+            $("button[name='getlive']").click(function() {
+
+                $.getJSON('/data/', function(newdata) {
+                    console.log(newdata);
+                    data = data.concat(newdata);
+                    redraw(newdata);
+                });
+            });
+
+        });
+
+        function redraw(newdata, force)
+        {
+            if (!force)
+                force = false;
+
+            var trans = null;
+            var dirty = doheaders(newdata);
+
+            curheads += dirty;
+            //console.log("currently " + curheads);
+
+            // resize svg if we need to
+            if (curheads * 150 > curwidth) {
+                curwidth = curheads * 150;
+                $("#msccontain,#mscheader,svg").attr("width", curwidth);
+                console.log("tried to resize");
+            }
+
+            if (dirty != 0)
+                trans = drawheaders();
+
+            // we only wait if were dirty and not forced
+            if (dirty != 0 && !force)
+            {
+                var callonce = false;
+                trans.each("end", function() {
+                    if (!callonce) {
+                        callonce = true;
+                        drawdata();
+                    }
+                });
+            }
+            else
+                drawdata();
+        }
+
+        $(function() {
+            $('#msccontain').scroll(function() {
+                ls = $(this).scrollLeft();
+                //console.log($(this).scrollLeft());
+                $('#headercanvas').offset({ top:0, left: 0 - ls});
+            });
+        });
+
+        $(function() { redraw(data, true); });
+    </script>
+</body>
+</html>
