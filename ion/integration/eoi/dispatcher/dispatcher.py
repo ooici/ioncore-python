@@ -177,16 +177,16 @@ class DispatcherProcess(Process):
             finally:
                 if f is not None:
                     f.close()
-            # create all user HAS_A associations for this dispatcher
-            yield self._make_user_associations(id)
 
+        # Step 3: sync all user HAS_A associations for this dispatcher
+        yield self._sync_user_associations(id)
         
-        # Step 3: Store the new ID locally -- later used to create Subscription Subscribers
+        # Step 4: Store the new ID locally -- later used to create Subscription Subscribers
         self.dispatcher_id = id
         log.info('\n\nplc_activate(): Retrieved dispatcher_id "%s"\n\n' % id)
         
 
-        # Step 4: Generate Subscription Event Subscribers
+        # Step 5: Generate Subscription Event Subscribers
         # @attention: Do this before creating the UEN subscribers to ensure
         #             that subscription changes are not lost (see design docs)
         #             -- also, while the subscription subscribers are bound to
@@ -196,7 +196,7 @@ class DispatcherProcess(Process):
         self.del_ses = yield self._create_subscription_subscriber(DelSubscriptionEventSubscriber, lambda *args, **kw: self.delete_dataset_update_subscriber(*args, **kw))
 
         
-        # Step 5: Create all necessary Update Event Notification Subscribers
+        # Step 6: Create all necessary Update Event Notification Subscribers
         yield self._preload_associated_workflows(self.dispatcher_id)
 
         # Clean up the temporary process used during init:
@@ -212,7 +212,7 @@ class DispatcherProcess(Process):
         
     
     @defer.inlineCallbacks
-    def _make_user_associations(self, DispatcherID):
+    def _sync_user_associations(self, DispatcherID):
         """
         @brief: Utilizes User Definitions in the local file "dispatcher_users.id" to request the OOI Resource ID
                 of each user and create a HAS_A association between it and the given DispatcherID
@@ -229,47 +229,84 @@ class DispatcherProcess(Process):
         f = None
         try:
             f = open('dispatcher_users.id', 'r')
-            Users = f.readlines()
+            users = f.readlines()
         except IOError, ex:
-            log.warn("_make_user_associations: Dispatcher's users file could not be read, no associations will be made.  Cause: %s" % str(ex))
+            log.warn("_sync_user_associations: Dispatcher's users file could not be read, no associations will be made.  Cause: %s" % str(ex))
             defer.returnValue(None)
         finally:
             if f is not None:
                 f.close()
-        
-        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
-        IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
-        for User in Users:
-            User = User.strip(" \n\r")
-            log.info('_make_user_associations: making association for user <%s>' % User)
-            
+
+        # get all current associations from Users to Dispatchers
+        associations = yield self.ac.find_associations(obj=DispatcherRes, predicate_or_predicates=HAS_A_ID)
+
+        existing_user_keys = set([x.SubjectReference.key for x in associations])    # User Resources (keys) associated with this dispatcher currently
+        user_resource_keys = set()                                                  # User Resources (keys) as determined by contents of dispatcher_users.id
+        user_resources = {}                                                         # actual user resources, key -> resource
+
+        # lookup all users in dispatcher_users.id file
+        for user in users:
+            user = user.strip(" \n\r")
+
             # get User's resource ID
-            IdentityRequest.configuration.subject = User
+            identity_request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR request')
+            identity_request.configuration = identity_request.CreateObject(IDENTITY_TYPE)
+            identity_request.configuration.subject = user
             try:
-                UserID = yield self.irc.get_ooiid_for_user(IdentityRequest)
+                user_id = yield self.irc.get_ooiid_for_user(identity_request)
             except ReceivedApplicationError, ex:
-                log.warn('_make_user_associations: can not get ID for user "%s".  Cause: %s' % (User, str(ex)))
+                log.warn('_sync_user_associations: can not get ID for user "%s".  Cause: %s' % (user, str(ex)))
                 continue
             if log.getEffectiveLevel() <= logging.INFO:
-                log.info('_make_user_associations: got id %s for user %s'%(UserID.resource_reference.ooi_id, User))
+                log.info('_sync_user_associations: got id %s for user %s'%(user_id.resource_reference.ooi_id, user))
             
             # get User instance
             try:
-                UserRes = yield self.rc.get_instance(UserID.resource_reference.ooi_id)
+                user_key = user_id.resource_reference.ooi_id
+
+                user_res = yield self.rc.get_instance(user_key)
+                user_resources[user_key] = user_res
+                user_resource_keys.add(user_key)
             except ApplicationError, ex:
-                log.warn('_make_user_associations: can not get instance for UserID "%s".  Cause: %s' % (UserID.resource_reference.ooi_id, str(ex)))
-            
-            # Create an association between the user and the dispatcher
+                log.warn('_sync_user_associations: can not get instance for UserID "%s".  Cause: %s' % (user_id.resource_reference.ooi_id, str(ex)))
+
+        # Rules:
+        # - in both: association already exists, do nothing
+        # - in user_resources, not in existing_users: create association
+        # - in existing_users, not in user_resources:  remove existing association
+
+        # solely for logging purposes (should not be expensive at all, just a set operation)
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            for user_key in user_resource_keys.intersection(existing_user_keys):
+                log.debug("Existing user association for user %s -> dispatcher %s, no change needed" % (user_key, DispatcherID))
+
+        for user_key in user_resource_keys.difference(existing_user_keys):
             try:
-                association = yield self.ac.create_association(UserRes, HAS_A_ID, DispatcherRes)
-                
+                user = user_resources[user_key]
+                association = yield self.ac.create_association(user, HAS_A_ID, DispatcherRes)
+
                 # Put the association in datastore
-                log.debug('_make_user_associations: Storing association: ' + str(association))
+                log.debug('_sync_user_associations: storing association for user %s' % user_key)
                 yield self.rc.put_instance(association)
             except ApplicationError, ex:
-                errString = 'Error creating assocation between UserRes: ' + UserID.resource_reference.ooi_id + ' and DispatcherID: ' + DispatcherID + '. ex: ' + str(ex)
+                errString = 'Error creating assocation between UserRes: ' + user_key + ' and DispatcherID: ' + DispatcherID + '. ex: ' + str(ex)
                 log.error(errString)
- 
+
+        # delete associations
+        for user_key in existing_user_keys.difference(user_resource_keys):
+            # need to lookup user from resources as we haven't done so yet
+            user = yield self.rc.get_instance(user_key)
+
+            associations = yield self.ac.find_associations(subject=user, predicate_or_predicates=HAS_A_ID, obj=DispatcherRes)
+            if not len(associations) == 1:
+                log.error("Existing association we were trying to delete could not be found properly, returned %d items." % len(associations))
+                continue
+
+            log.debug('_sync_user_associations: removing association for user %s' % user_key)
+
+            for association in associations:
+                association.SetNull()
+                yield self.rc.put_instance(association)
 
     @defer.inlineCallbacks
     def _register_dispatcher(self, name):

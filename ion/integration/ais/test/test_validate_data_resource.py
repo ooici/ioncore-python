@@ -15,7 +15,7 @@ from twisted.internet import defer
 
 #from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-
+from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID
 
 from ion.test.iontest import IonTestCase
 
@@ -86,7 +86,7 @@ class AISValidateDataResourceTest(IonTestCase):
 
         log.info("Trying to call validateDataResource with the wrong GPB")
         validate_req_msg  = yield self.mc.create_instance(VALIDATE_DATASOURCE_REQ)
-        result            = yield self.aisc.validateDataResource(validate_req_msg)
+        result            = yield self.aisc.validateDataResource(validate_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "validateDataResource accepted a GPB that was known to be the wrong type")
 
@@ -94,7 +94,7 @@ class AISValidateDataResourceTest(IonTestCase):
         ais_req_msg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
         validate_req_msg = ais_req_msg.CreateObject(VALIDATE_DATASOURCE_REQ)
         ais_req_msg.message_parameters_reference = validate_req_msg
-        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg, MYOOICI_USER_ID)
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "validateDataResource accepted a GPB without a data_resource_url")
 
@@ -135,7 +135,7 @@ class AISValidateDataResourceTest(IonTestCase):
 
 
         validate_req_msg.data_resource_url = "http://thredds1.pfeg.noaa.gov/thredds/dodsC/satellite/GR/ssta/1day"
-        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg, MYOOICI_USER_ID)
 
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_ERROR_TYPE,
                              "validateDataResource passed a known-bad URL")
@@ -156,7 +156,7 @@ class AISValidateDataResourceTest(IonTestCase):
         validate_req_msg.data_resource_url = data_source_url
 
 
-        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg)
+        result_wrapped = yield self.aisc.validateDataResource(ais_req_msg, MYOOICI_USER_ID)
 
         self.failUnlessEqual(result_wrapped.MessageType, AIS_RESPONSE_MSG_TYPE,
                              "validateDataResource had an internal failure")

@@ -41,15 +41,6 @@ if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
         print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
 
 logging.config.fileConfig(logconf)
-if sys.platform == 'linux2':
-    c_pid = os.getpid()
-    syslog_formatter = logging.Formatter(str(c_pid) + " [%(module)-15s:%(lineno)3d] %(levelname)-5s:%(message)s")
-    syslog_address = '/dev/log'
-    syslog_facility = 'local0'
-    syslog_handler = logging.handlers.SysLogHandler(syslog_address, syslog_facility) 
-    syslog_handler.setLevel(logging.DEBUG)
-    syslog_handler.setFormatter(syslog_formatter)
-    logging.root.addHandler(syslog_handler)
 
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
@@ -74,6 +65,26 @@ testing = True
 request = ContextLocal()
 
 
+# Optionally use Loggly for logging, just an experiment for now
+loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)
+loggly_key = os.environ.get('LOGGLY_KEY', loggly_key)
+if loggly_key is not None:
+    import hoover
+    import httplib2
+
+    # Need to monkey-patch to bypass SSL validation :(
+    _post_to_endpoint = hoover.utils.post_to_endpoint
+    def post_to_endpoint(endpoint, message):
+        h = httplib2.Http(disable_ssl_certificate_validation=True)
+        h.request(endpoint, 'POST', message)
+    async_post_to_endpoint = hoover.utils.async(post_to_endpoint)
+    setattr(hoover.utils, 'post_to_endpoint', post_to_endpoint)
+    setattr(hoover.utils, 'async_post_to_endpoint', async_post_to_endpoint)
+    setattr(hoover.handlers, 'async_post_to_endpoint', async_post_to_endpoint)
+        
+    loggly_handler = hoover.LogglyHttpHandler(token=loggly_key)
+    loggly_handler.setLevel(logging.DEBUG)
+    logging.root.addHandler(loggly_handler)
 
 def config(name):
     """
