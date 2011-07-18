@@ -221,7 +221,6 @@ class SchedulerService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_activate(self):
         # get all items from the store
-        """
         query = Query()
         query.add_predicate_eq('constant', '1')
         rows = yield self.scheduled_events.query(query)
@@ -229,8 +228,8 @@ class SchedulerService(ServiceProcess):
         for task_id, tdef in rows.iteritems():
             log.debug("slc_activate: scheduling %s" % task_id)
             self._schedule_event(int(tdef['start_time']), int(tdef['interval_seconds']), task_id)
-        """
-        yield 1
+        
+        
         
     def slc_terminate(self):
         """
