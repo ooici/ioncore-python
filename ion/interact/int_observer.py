@@ -105,12 +105,18 @@ class InteractionObserver(Process):
         if len(self.msg_log) > self.max_msglog + 100:
             self.msg_log = self.msg_log[100:]
 
-    def writeout_msc(self):
-        msglog = self.msg_log[:]
-        procs = []
-        senders = []
+    def _get_participants(self, msglog):
+        """
+        Given a msglog, extract the participants into an alias table.
+
+        Returns a tuple of proc_alias, open_rpcs, procs:
+            proc_alias maps receivers -> process names
+            open_rpcs maps convid -> unknown receiver names
+            procs is a list of left-over non rpc destinations
+        """
         proc_alias = {}     # maps receivers -> process names
         open_rpcs = {}      # maps convid -> unknown receiver names
+        procs = []
 
         for msgtup in msglog:
             msg = msgtup[1]
@@ -165,40 +171,40 @@ class InteractionObserver(Process):
 
         proc_alias = new_proc_alias
 
-        # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
-        senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
-        senders.extend(open_rpcs.itervalues())
+        return (proc_alias, open_rpcs, procs)
 
-        # add leftover non-rpc destinations
-        for rec in procs:
-            if not (rec in proc_alias or rec in open_rpcs.values()):
-                senders.append(rec)
+    def _get_msc_data(self, msglog, proc_alias):
+        """
+        Provides msc data in python format, to be converted either to msc text or to json for use with
+        msc web monitor.
 
-        # sort senders list
-        senders = sorted(senders)
-
-        def sanitize(input):
-            return string.replace(string.replace(input, ".", "_"), "-", "_")
-
-        msc = "msc {\n"
-        msc += ' wordwraparcs="1";\n'
-        sstr = sanitize(",".join(senders))
-        msc += " %s;\n" % sstr
+        Returns a list of hashes of the format { to, from, content, type, ts, error (boolean) }
+        """
+        msgdata = []
 
         for msgtup in msglog:
+            datatemp = { "to": None, "from":None, "content":None, "type":None, "ts":None, "error":False }
+
             msg = msgtup[1]
 
             sid = msg.get('sender', '??')
             sname = proc_alias.get(sid, sid)
-            sname = sanitize(sname)
+            sname = self._sanitize(sname)
+
+            datatemp["from"] = sname
 
             rec = msg.get('receiver')
 
             rname = proc_alias.get(rec, rec)
-            rname = sanitize(rname)
+            rname = self._sanitize(rname)
+
+            datatemp["to"] = rname
+
+            datatemp["ts"] = msg["ts"]
 
             if msgtup[2]:
                 # this is an EVENT, show it as a box!
+                datatemp["type"] = "event"
 
                 # this table pulled from https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
                 # on 6 July 2011
@@ -225,45 +231,85 @@ class InteractionObserver(Process):
                 evid, evorigin = rec.split(".", 1)
                 evlabel = "E: %s (%s)\\nOrigin: %s" % (evtable[evid], evid, evorigin)
 
-                msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, evlabel)
+                datatemp["content"] = evlabel
             else:
-
-                #mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
-                #    msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
-                # @todo Clean up sender and receiver names - remove host and PID
-                #re.sub('.+:','',sname)
-
                 mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+                datatemp["content"] = mlabel
 
-                # default attributes: only a label
-                attrs = {'label': mlabel}
-
-                # determine arrow type used based on message type
-                arrow = '->'
                 if msg.get('protocol', None) == 'rpc':
 
-                    # we know its rpc based on arrow type and color, so we change the label to be more friendly
-                    #rpclabel = "%s (%s->%s) <%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
-                    #attrs['label'] = rpclabel
-
-                    arrow = ">>"    # default response, covers a few cases here
+                    datatemp["type"] = "rpcres"
 
                     performative = msg.get('performative', None)
                     if performative == 'request':
-                        arrow = '=>'
+                        datatemp["type"] = "rpcreq"
                     elif performative == 'timeout':
-                        arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
+                        pass # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
 
                     if performative == 'failure' or performative == 'error':
-                        attrs['textbgcolor'] = 'red'
-                        attrs['linecolor'] = 'red'
-                    else:
-                        attrs['textcolor'] = 'navy'
-                        attrs['linecolor'] = 'navy'
+                        datatemp["error"] = True
+
                 else:
                     # non rpc -> perhaps a data message for ingest/exgest?
-                    #msglabel = "%s (%s->%s) <%s>"
-                    pass
+                    datatemp["type"] = "data"
+
+            msgdata.append(datatemp)
+
+        return msgdata
+
+    @classmethod
+    def _sanitize(cls, input):
+        return string.replace(string.replace(input, ".", "_"), "-", "_")
+
+    def writeout_msc(self):
+        msglog = self.msg_log[:]
+        senders = []
+        proc_alias, open_rpcs, procs = self._get_participants(msglog)
+
+        # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
+        senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
+        senders.extend(open_rpcs.itervalues())
+        # add leftover non-rpc destinations
+        for rec in procs:
+            if not (rec in proc_alias or rec in open_rpcs.values()):
+                senders.append(rec)
+
+        # sort senders list
+        senders = sorted(senders)
+
+        msc = "msc {\n"
+        msc += ' wordwraparcs="1";\n'
+        sstr = self._sanitize(",".join(senders))
+        msc += " %s;\n" % sstr
+
+        mscdata = self._get_msc_data(msglog, proc_alias)
+
+        for mscitem in mscdata:
+
+            sname = mscitem['from']
+            rname = mscitem['to']
+
+            if mscitem['type'] == "event":
+                msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, mscitem['content'])
+            else:
+
+                # default attributes: only a label
+                attrs = {'label': mscitem['content']}
+
+                # determine arrow type used based on message type
+                arrow = '->'
+
+                if mscitem['type'] == "rpcreq":
+                    arrow = "=>"
+                elif mscitem['type'] == "rpcres":
+                    arrow = ">>"
+
+                if mscitem["error"]:
+                    attrs['textbgcolor'] = 'red'
+                    attrs['linecolor'] = 'red'
+                else:
+                    attrs['textcolor'] = 'navy'
+                    attrs['linecolor'] = 'navy'
 
                 msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(('%s="%s"' % (k, v) for k,v in attrs.iteritems())))
 
