@@ -77,21 +77,17 @@ def uni(text):
 
         try:
             return text.decode('utf-8')               # Most likely
-            print "SANITIZING!!!!!! utf-8"
         except UnicodeEncodeError:
             try:
                 return text.decode('latin-1')         # Windows
-                print "SANITIZING!!!!!! latin-1"
 
             except UnicodeEncodeError:
 
                 try:
                     return text.decode('mac-roman')       # Mac
-                    print "SANITIZING!!!!!! mac-roman"
 
                 except UnicodeEncodeError:
                     return text.decode('iso-8859-1')       # iso 8859
-                    print "SANITIZING!!!!!! iso-8859-1"
 
 
 
