@@ -24,6 +24,7 @@ from ion.core.cc import container
 from ion.util.path import adjust_dir
 from ion.services.dm.distribution.events import ContainerStartupEventPublisher
 from ion.core.process.process import Process
+from ion.core.cc import shell
 
 class Options(usage.Options):
     """
@@ -133,9 +134,6 @@ class CapabilityContainer(service.Service):
         d.addErrback(self.container.fatalError)
         yield d
 
-        if not self.config['no_shell']:
-            self.start_shell()
-
         log.info("All startup actions completed.")
 
         # signal successful container start
@@ -221,19 +219,19 @@ class CapabilityContainer(service.Service):
             return boot()
         raise RuntimeError('Bad boot script path')
 
-    def start_shell(self):
-        """
-        Start CC shell (a prog itself)
-        """
-        log.info("Starting Shell...")
-        from ion.core.cc.shell import control
-        control.start(self)
-
 def makeService(config):
     """
     Twisted plugin service instantiation.
     Required by Twisted; IServiceMaker interface
     """
+    service_container = service.MultiService()
     global cc_instance
     cc_instance = CapabilityContainer(config)
-    return cc_instance
+    cc_instance.setServiceParent(service_container)
+    if not config['no_shell']:
+        stdioshell = shell.STDIOShell(cc_instance)
+        stdioshell.setServiceParent(service_container)
+    else: # if no shell, start telnet shell
+        telnetshell = shell.TelnetShell({'cc':cc_instance})
+        telnetshell.setServiceParent(service_container)
+    return service_container
