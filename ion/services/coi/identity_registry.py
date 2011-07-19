@@ -10,19 +10,18 @@ log = ion.util.ionlog.getLogger(__name__)
 import logging
 
 from twisted.internet import defer
-from ion.core import ioninit, bootstrap
+from ion.core import ioninit
 
 CONF = ioninit.config(__name__)
 
-from ion.core.messaging.receiver import Receiver, FanoutReceiver
-from ion.core.process.process import Process, ProcessClient, ProcessDesc, ProcessFactory
+from ion.core.messaging.receiver import FanoutReceiver
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ApplicationError
 from ion.core.security.authentication import Authentication
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
-from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
@@ -40,8 +39,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config \
     import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
 
 from ion.services.coi.datastore import ASSOCIATION_TYPE, DataStoreError
-from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, \
-                                                          ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 

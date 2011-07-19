@@ -11,10 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from twisted.trial import unittest
-import random
 
-from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError
@@ -23,8 +20,7 @@ from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RE
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.core.intercept.policy import userroledb_filename, user_has_role
-from ion.util.config import Config
+from ion.core.intercept.policy import user_has_role
 from ion.core.security.authentication import Authentication
 
 CONF = ioninit.config(__name__)
@@ -344,7 +340,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         IdentityRequest.configuration.email = "someone@someplace.somedomain"
         IdentityRequest.configuration.subject = user1.resource_reference.subject
         try:
-            response = yield self.irc.update_user_profile(IdentityRequest)
+            yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
@@ -358,7 +354,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         IdentityRequest.configuration.email = "someone-else@someplace-else.some-other-domain"
         IdentityRequest.configuration.subject = user1.resource_reference.subject
         try:
-            response = yield self.irc.update_user_profile(IdentityRequest)
+            yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
@@ -378,7 +374,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         IdentityRequest.configuration.profile[1].value = "profile item 2 value"
         log.info('IR.C = '+str(IdentityRequest.configuration))
         try:
-            response = yield self.irc.update_user_profile(IdentityRequest)
+            yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
@@ -399,7 +395,7 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         IdentityRequest.configuration.profile[0].value = "profile item 3 value"
         log.info('IR.C = '+str(IdentityRequest.configuration))
         try:
-            response = yield self.irc.update_user_profile(IdentityRequest)
+            yield self.irc.update_user_profile(IdentityRequest)
         except ReceivedApplicationError, ex:
             self.fail("update_user_profile failed for user %s"%IdentityRequest.configuration.subject)
         user2 = yield self.irc.get_user(OoiIdRequest)
