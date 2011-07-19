@@ -63,7 +63,6 @@ class TestNMEA0183Agent (IonTestCase):
         
         yield self._start_container()
 
-        log.debug("*** started container")
         # Driver and agent configuration. Configuration data will ultimately be accessed via
         # some persistence mechanism: platform filesystem or a device registry.
         # For now, we pass all configuration data that would be read this way as process arguments.

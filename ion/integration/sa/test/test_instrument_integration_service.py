@@ -287,13 +287,13 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         log.info("IIServiceTest test_createInstrumentStartSampling  startAutoSampling: %s ", rspMsg.message_parameters_reference[0].status)
 
         # Wait for a few samples to arrive.
-        yield pu.asleep(10)
+        yield pu.asleep(3)
 
         # Stop autosampling.
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Stop instrument sampling request')
         msg.message_parameters_reference = msg.CreateObject(STOP_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE)
         msg.message_parameters_reference.instrument_resource_id = instrument_id
-
         rspMsg = yield self.iic.stopAutoSampling(msg)
+
         log.info("IIServiceTest test_createInstrumentStartSampling  Stop autosampling: %s ", rspMsg.message_parameters_reference[0].status)
 

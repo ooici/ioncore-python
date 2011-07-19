@@ -670,16 +670,13 @@ class NMEADeviceDriver(InstrumentDriver):
                 self._serialReadMode = OFF    # Stop continually acquiring lines
 
         elif event == NMEADeviceEvent.DATA_RECEIVED:
-            log.debug("*** ABOUT TO PUBLISH DATA")
+            log.debug("NMEA Driver ready to publish data to agent")
             while self._data_lines:
-                log.debug("*** Have data lines...")
                 nmeaLine = self._data_lines.pop()
-                log.debug("*** popped line: %s", nmeaLine)
                 if len(nmeaLine) > 0:
-                    log.debug("*** nmea line is long enough...")
                     # This is where NMEA data is published
                     if self._serialReadMode == ON:
-                        log.debug('Streaming data published: %s' % nmeaLine)
+                        log.debug('Streaming data published to agent: %s' % nmeaLine)
                         content = {'type': DriverAnnouncement.DATA_RECEIVED,
                                    'transducer': NMEADeviceChannel.GPS,
                                    'value': nmeaLine}
