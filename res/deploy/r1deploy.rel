@@ -73,17 +73,17 @@
         {'name':'identity_registry',    'version':'0.1',
                                         'processapp':('identity_registry','ion.services.coi.identity_registry','IdentityRegistryService'),
         },
+
+        # Add scheduler service
+        {'name':'scheduler', 'version':'0.1',
+                                        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
+        },
 #-------------#
 # Bootlevel 8 #
 #-------------#
 
         {'name':'pubsub',               'version':'0.1',
                                         'processapp':('pubsub','ion.services.dm.distribution.pubsub_service','PubSubService'),
-        },
-
-        # Add scheduler service
-        {'name':'scheduler', 'version':'0.1',
-                                        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
         },
 
         # Add Dataset Controller Service

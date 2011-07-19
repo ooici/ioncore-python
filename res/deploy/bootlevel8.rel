@@ -13,10 +13,7 @@
                                         'processapp':('pubsub','ion.services.dm.distribution.pubsub_service','PubSubService'),
         },
 
-        # Add scheduler service
-        {'name':'scheduler', 'version':'0.1',
-        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
-        },
+        # Add scheduler service - Now in level 7!
 
         # Add Dataset Controller Service
         {'name':'dataset_controller',   'version':'0.1',

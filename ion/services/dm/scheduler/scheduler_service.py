@@ -24,6 +24,8 @@ from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.services.dm.distribution.events import ScheduleEventPublisher
 
+from ion.core.data.storage_configuration_utility import STORAGE_PROVIDER, PERSISTENT_ARCHIVE, get_cassandra_configuration
+
 from ion.util.iontime import IonTime
 
 import ion.util.procutils as pu
@@ -176,19 +178,13 @@ class SchedulerService(ServiceProcess):
         assert store.IIndexStore.implementedBy(self.index_store_class), \
             'The back end class for the index store passed to the scheduler service does not implement the required IIndexStore interface.'
 
-        if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
-            self._username = self.spawn_args.get("username", CONF.getValue("username", None))
-            self._password = self.spawn_args.get("password", CONF.getValue("password", None))
-            self._storage_provider = self.spawn_args.get("storage_provider", CONF.getValue("storage_provider", {}))
-            self._keyspace = self.spawn_args.get("keyspace", CONF.getValue("keyspace", ioninit.sys_name))   # use sysname as default
-
-            if self._storage_provider is not None and not self._storage_provider.has_key("host"):
-                log.warn("Storage provider provided but no host set, using localhost")
-                self._storage_provider['host'] = 'localhost'
-            if self._storage_provider is not None and not self._storage_provider.has_key("port"):
-                log.warn("Storage provider provided but no port set, using default of 9160")
-                self._storage_provider['port'] = 9160
-
+        self._storage_conf = get_cassandra_configuration()
+        self._storage_provider = self._storage_conf[STORAGE_PROVIDER]
+        
+        self._username = self.spawn_args.get("cassandra_username", CONF.getValue("cassandra_username", default=None))
+        self._password = self.spawn_args.get("cassandra_password", CONF.getValue("cassandra_password", default=None))
+        self._column_family  = self.spawn_args.get("column_family", CONF.getValue("column_family", default=None))    
+        
         # Get the configuration for cassandra - may or may not be used depending on the backend class
         #self._storage_conf = get_cassandra_configuration()
 
@@ -204,11 +200,19 @@ class SchedulerService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_init(self):
         if issubclass(self.index_store_class, cassandra.CassandraIndexedStore):
-            log.info("Instantiating Cassandra Index Store")
-
-            self.scheduled_events = self.index_store_class(self._username, self._password, self._storage_provider, self._keyspace, self.COLUMN_FAMILY)
-
+           
+            log.info("Instantiating CassandraStore")
+            keyspace = self._storage_conf[PERSISTENT_ARCHIVE]['name']
+            
+            self.scheduled_events = self.index_store_class(self._username, self._password, self._storage_provider, keyspace, self._column_family)
+            
+            
+            yield self.scheduled_events.initialize()
+            yield self.scheduled_events.activate()
+            
             yield self.register_life_cycle_object(self.scheduled_events)
+            log.info("Done with instantiating the Cassandra store")
+        
         else:
             self.scheduled_events = self.index_store_class(self, indices=self.INDICES)
 
@@ -224,7 +228,9 @@ class SchedulerService(ServiceProcess):
         for task_id, tdef in rows.iteritems():
             log.debug("slc_activate: scheduling %s" % task_id)
             self._schedule_event(int(tdef['start_time']), int(tdef['interval_seconds']), task_id)
-
+        
+        
+        
     def slc_terminate(self):
         """
         Called before terminate, this is a good place to tear down the AS and jobs.
