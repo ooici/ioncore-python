@@ -348,6 +348,7 @@ class IngestionService(ServiceProcess):
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         self.timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
+        self.timeoutcb.ingest_service_timeout = content.ingest_service_timeout
 
         log.info(
             'Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
@@ -527,8 +528,14 @@ class IngestionService(ServiceProcess):
             msg._state = "ACKED"
             defer.returnValue(None)
 
-        log.info('Adding 30 seconds to timeout')
-        self.timeoutcb.delay(30)
+        # reset timeout
+        cbtimeout = self.timeoutcb.ingest_service_timeout
+        cbfunc = self.timeoutcb.func
+
+        log.info('Setting timeout to %d seconds from now' % cbtimeout)
+        self.timeoutcb.cancel()
+        self.timeoutcb = reactor.callLater(cbtimeout, cbfunc)
+        self.timeoutcb.ingest_service_timeout = cbtimeout
 
         # notify JAW and others via event that we are still processing
         yield self._ingestion_processing_publisher.create_and_publish_event(origin=self.dataset.ResourceIdentity,
@@ -589,8 +596,15 @@ class IngestionService(ServiceProcess):
             msg._state = "ACKED"
             defer.returnValue(None)
 
-        log.info('Adding 30 seconds to timeout')
-        self.timeoutcb.delay(30)
+        # reset timeout
+        cbtimeout = self.timeoutcb.ingest_service_timeout
+        cbfunc = self.timeoutcb.func
+
+        log.info('Setting timeout to %d seconds from now' % cbtimeout)
+        self.timeoutcb.cancel()
+        self.timeoutcb = reactor.callLater(cbtimeout, cbfunc)
+        self.timeoutcb.ingest_service_timeout = cbtimeout
+
         # this is NOT rpc
         if content.MessageType != SUPPLEMENT_MSG_TYPE:
             raise IngestionError('Expected message type SupplementMessageType, received %s'
