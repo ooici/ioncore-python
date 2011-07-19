@@ -16,7 +16,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessDesc, Process
 
 # The shell namespace
-namespace = None
+namespace = {}
 
 def info():
     print "Python Capability Container, "

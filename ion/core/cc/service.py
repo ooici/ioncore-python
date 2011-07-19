@@ -232,6 +232,8 @@ def makeService(config):
         stdioshell = shell.STDIOShell(cc_instance)
         stdioshell.setServiceParent(service_container)
     else: # if no shell, start telnet shell
-        telnetshell = shell.TelnetShell({'cc':cc_instance})
+        ns = shell.makeNamespace()
+        ns.update({'cc':cc_instance})
+        telnetshell = shell.TelnetShell(ns)
         telnetshell.setServiceParent(service_container)
     return service_container
