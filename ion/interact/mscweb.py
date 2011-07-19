@@ -241,6 +241,11 @@ class EventMonitorWebResource(resource.Resource):
         # TODO: testing only, load every time
         #log.critical(request)
         #log.critical(request.prepath)
+
+        # DEBUGGING reload session stored object every time so we can get teh data over and over
+        lastdata = ILastData(request.getSession())
+        lastdata.last_index = 0
+        
         res = "msc.html"
         if "d3.js" in str(request.prepath):
             res = "d3.js"
