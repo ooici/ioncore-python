@@ -38,7 +38,7 @@
         }
         #maincanvas {
             width: 900px;
-            height: 5000px;
+            height: 600px;
         }
 
     </style>
@@ -51,7 +51,6 @@
         <div id="maincanvas"></div>
     </div>
     <div id="controls">
-        <button name="additem" type="button" value="wat">add one</button>
         <button name="getlive" type="button" value="getlive">get live</button>
     </div>
 
@@ -62,7 +61,7 @@
 
         var cheader;
         var cmain;
-        var curheight = 5000;
+        var curheight = 600;
         var curwidth = 900;
         var curheads = 0;
 
@@ -320,8 +319,6 @@
                 .text(function(d) { return d.content; });
 
             function onlyevents(d, i) {
-                if (d.type == "event")
-                    console.log("filtering " + i);
                 return d.type == "event";
             }
 
@@ -330,7 +327,7 @@
                 .attr("stroke", "#666")
                 .attr("fill", "#ffcc33")
                 .attr("x", function(d, i) { return getlinex(d.from) - 75; })
-                .attr("y", function(d, i) { console.log(d.content + " index " + d.idx); return 30 * d.idx; })
+                .attr("y", function(d, i) { return 30 * d.idx; })
                 .attr("width", 150)
                 .attr("height", 20)
                 .attr("stroke-width", 2);
@@ -391,38 +388,11 @@
                 .attr("points", "0,0 10,10 0,20")
                 .attr("fill", "#0000ff");
 
-            $("button[name='additem']").click(function() {
-                //headers.push("i am test");
-                //headers.splice(1, 0, "i am test");
-                var poss = [ "datastore/one", "datastore/two", "datastore/three",
-                             "assoc/four", "assoc/five",
-                             "resource/six", "resource/seven", "resource/eight",
-                             "psc/nine",
-                             "ems/ten",
-                             "ingestion/eleven", "ingestion/tewlve", "ingestion/thirteen",
-                             "jaw/fourteen", "jaw/fifteen",
-                             "bootstrap/sixteen" ];
-
-                var newdata = [];
-                for (var i = 0; i < Math.floor(Math.random() * 3) + 1; i++)
-                {
-                    newdata.push( { from: poss[Math.floor(Math.random() * poss.length)],
-                                    to: poss[Math.floor(Math.random() * poss.length)], 
-                                    content: "test",
-                                    type: "rpcreq" } );
-                }
-
-                console.log(newdata);
-
-                data = data.concat(newdata);
-                redraw(newdata);
-            });
-
             $("button[name='getlive']").click(function() {
 
                 $.getJSON('/data/', function(newdata) {
                     //console.log(newdata);
-                    console.log(newdata.length);
+                    console.log("Retrieved " + newdata.length + " new elements.");
 
                     for (var i = 0; i < newdata.length; i++)
                     {
@@ -430,6 +400,8 @@
                         data.push(newdata[i]);
                     }
                     redraw(newdata);
+                    if (newdata.length > 0)
+                        $('#msccontain').scrollTop($('#msccontain').attr('height'));
                 });
             });
 
