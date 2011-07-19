@@ -31,7 +31,10 @@ def _get_attribute_value_by_index(self, index = 0):
     if index < 0 or index >= len(self.array.value):
         raise OOIObjectError('Given array index out of bounds: %i -- valid range: 0 to %i' % (int(index), len(self.array.value) - 1))
 
-    return self.array.value[index]
+    if self.data_type == self.DataType.STRING:
+        return uni(self.array.value[index])
+    else:
+        return self.array.value[index]
 
 @_gpb_source
 def _get_attribute_values(self):
@@ -39,7 +42,10 @@ def _get_attribute_values(self):
     Specialized method for CDM Objects to retreive all attribute values as a string list
     """
     # Create a copy of the values array
-    result = [item for item in self.array.value]
+    if self.data_type == self.DataType.STRING:
+        result = [uni(item) for item in self.array.value]
+    else:
+        result = [item for item in self.array.value]
     return result
 
 @_gpb_source
@@ -64,3 +70,32 @@ def _attribute_is_same_type(self, attribute):
 
     return self.GetDataType() == attribute.GetDataType()
 
+
+def uni(text):
+    
+    try:
+
+        try:
+            return text.decode('utf-8')               # Most likely
+            print "SANITIZING!!!!!! utf-8"
+        except UnicodeEncodeError:
+            try:
+                return text.decode('latin-1')         # Windows
+                print "SANITIZING!!!!!! latin-1"
+
+            except UnicodeEncodeError:
+
+                try:
+                    return text.decode('mac-roman')       # Mac
+                    print "SANITIZING!!!!!! mac-roman"
+
+                except UnicodeEncodeError:
+                    return text.decode('iso-8859-1')       # iso 8859
+                    print "SANITIZING!!!!!! iso-8859-1"
+
+
+
+    except Exception, uee:
+
+        log.warn('Sanitizing attribute character encoding failed!!!!\n%s' % str(uee))
+        return '*** Unknown character encoding in attribute string ***'
