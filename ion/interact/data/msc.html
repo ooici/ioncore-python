@@ -59,11 +59,6 @@
         var gheaders = [];  // group headers
         var headers={};     // associative array groupheader->[] of subheaders
         var data = [];
-        var xdata=[ { to: "datastore/one", from: "assoc/two", content: "hi i am a bat", type:"rpcreq" },
-                   { to: "pubsub/three", from: "datastore/one", content: "are you with me", type:"rpcreq" },
-                   { to: "datastore/one", from: "pubsub/three", content: "sure", type:"rpcres" },
-                   { to: "assoc/two", from: "datastore/one", content: "i agree", type:"rpcres" },
-                   { to: "datastore/two", from: "datastore/one", content: "the best", type:"data" } ];
 
         var cheader;
         var cmain;
@@ -101,7 +96,8 @@
                     }
                 }
 
-                addunknown(d.to);
+                if (d.type != "event")
+                    addunknown(d.to);
                 addunknown(d.from);
             });
 
@@ -257,22 +253,29 @@
             var dlines = cmain.selectAll("g.msg")
                 .data(data);    // index is fine
 
-            // should never need to update via data change from lines, only header changes
             function getlinex(rawid) {
               splits = getnames(rawid);
               lid = splits.gname + "_" + splits.name;
               return cmain.select("#" + lid).attr("x1");
             }
 
-            // update existing just in case
-            var existingdlines = dlines.selectAll("line").transition()
+            // update existing 
+            dlines.selectAll(".dataline").transition()
                 .duration(500)
                 .attr("x1", function(d) { return getlinex(d.from) })
                 .attr("x2", function(d) { return getlinex(d.to) });
 
-            var existingtexts = dlines.selectAll("text").transition()
+            dlines.selectAll(".datatext").transition()
                 .duration(500)
                 .attr("x", function(d) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } );
+
+            dlines.selectAll(".dataevent").transition()
+                .duration(500)
+                .attr("x", function(d) { return getlinex(d.from) - 75; });
+
+            dlines.selectAll(".eventtext").transition()
+                .duration(500)
+                .attr("x", function(d) { return getlinex(d.from); });
 
             // create new ones
             var newdatas = dlines.enter().append("svg:g")
@@ -284,12 +287,17 @@
                 .duration(500)
                 .attr("opacity", 1);
 
-            newdatas.append("svg:line")
+            function noevents(d, i) {
+                return d.type != "event";
+            }
+
+            newdatas.filter(noevents).append("svg:line")
+                .attr("class", "dataline")
                 .attr("stroke", "#666")
                 .attr("x1", function(d, i) { return getlinex(d.from); })
-                .attr("y1", function(d, i) { return 30 * i + 10; })
+                .attr("y1", function(d, i) { return 30 * d.idx + 10; })
                 .attr("x2", function(d, i) { return getlinex(d.to); })
-                .attr("y2", function(d, i) { return 30 * i + 10; })
+                .attr("y2", function(d, i) { return 30 * d.idx + 10; })
                 .attr("stroke-width", 2)
                 .attr("marker-end", function(d) { return "url(#" + d.type + ")"; } )
                 .attr("stroke-dasharray", function(d) {
@@ -301,15 +309,39 @@
                         return "2, 2";
                 });
 
-            newdatas.append("svg:text")
+            newdatas.filter(noevents).append("svg:text")
+                .attr("class", "datatext")
                 .attr("fill", "#000")
                 //.attr("stroke", "#fff")
                 //.attr("stroke-width", 15)
                 .attr("x", function(d, i) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } )
-                .attr("y", function(d, i) { return 30 * i + 8; })
+                .attr("y", function(d, i) { return 30 * d.idx + 8; })
                 .attr("text-anchor", "middle")
                 .text(function(d) { return d.content; });
 
+            function onlyevents(d, i) {
+                if (d.type == "event")
+                    console.log("filtering " + i);
+                return d.type == "event";
+            }
+
+            newdatas.filter(onlyevents).append("svg:rect")
+                .attr("class", "dataevent")
+                .attr("stroke", "#666")
+                .attr("fill", "#ffcc33")
+                .attr("x", function(d, i) { return getlinex(d.from) - 75; })
+                .attr("y", function(d, i) { console.log(d.content + " index " + d.idx); return 30 * d.idx; })
+                .attr("width", 150)
+                .attr("height", 20)
+                .attr("stroke-width", 2);
+
+            newdatas.filter(onlyevents).append("svg:text")
+                .attr("class", "eventtext")
+                .attr("fill", "#000")
+                .attr("x", function(d, i) { return getlinex(d.from); })
+                .attr("y", function(d, i) { return 30 * d.idx + 12; })
+                .attr("text-anchor", "middle")
+                .text(function(d) { return d.content; });
         }
 
         $(function() {
@@ -389,8 +421,14 @@
             $("button[name='getlive']").click(function() {
 
                 $.getJSON('/data/', function(newdata) {
-                    console.log(newdata);
-                    data = data.concat(newdata);
+                    //console.log(newdata);
+                    console.log(newdata.length);
+
+                    for (var i = 0; i < newdata.length; i++)
+                    {
+                        newdata[i].idx = data.length;
+                        data.push(newdata[i]);
+                    }
                     redraw(newdata);
                 });
             });
@@ -413,6 +451,15 @@
                 curwidth = curheads * 150;
                 $("#msccontain,#mscheader,svg").attr("width", curwidth);
                 console.log("tried to resize");
+            }
+
+            if (data.length * 30 + 10 > curheight) {
+                curheight = data.length * 30 + 10;
+                $('#msccontain, #msccontain svg').attr('height', curheight);
+                console.log("tried to resize vert");
+
+                var msclines = cmain.selectAll("line.proc");
+                msclines.attr('y2', curheight);
             }
 
             if (dirty != 0)
