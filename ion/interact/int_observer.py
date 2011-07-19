@@ -50,7 +50,7 @@ class InteractionObserver(Process):
         self.add_life_cycle_object(self.msg_receiver)
         self.add_life_cycle_object(self.ev_sub)
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def plc_terminate(self):
         #yield self.msg_receiver.deactivate()
         #yield self.msg_receiver.terminate()
@@ -178,7 +178,7 @@ class InteractionObserver(Process):
         Provides msc data in python format, to be converted either to msc text or to json for use with
         msc web monitor.
 
-        Returns a list of hashes of the format { to, from, content, type, ts, error (boolean) }
+        Returns a list of hashes of the format { to, from, content, type, ts, error (boolean), to_raw, from_raw, topline }
         """
         msgdata = []
 
@@ -189,18 +189,17 @@ class InteractionObserver(Process):
 
             sid = msg.get('sender', '??')
             sname = proc_alias.get(sid, sid)
+            datatemp["from_raw"] = sname
             sname = self._sanitize(sname)
-
             datatemp["from"] = sname
 
             rec = msg.get('receiver')
-
             rname = proc_alias.get(rec, rec)
+            datatemp["to_raw"] = rname
             rname = self._sanitize(rname)
-
             datatemp["to"] = rname
 
-            datatemp["ts"] = msg["ts"]
+            datatemp["ts"] = msg.get("ts", "??")
 
             if msgtup[2]:
                 # this is an EVENT, show it as a box!
@@ -229,12 +228,14 @@ class InteractionObserver(Process):
                             "4001" : "Data block" }
 
                 evid, evorigin = rec.split(".", 1)
-                evlabel = "E: %s (%s)\\nOrigin: %s" % (evtable[evid], evid, evorigin)
+                evlabel = "E: %s (%s)\nOrigin: %s" % (evtable[evid], evid, evorigin)
 
                 datatemp["content"] = evlabel
+                datatemp["topline"] = evlabel.split("\n")[0]
             else:
-                mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+                mlabel = "%s\n(%s->%s)\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
                 datatemp["content"] = mlabel
+                datatemp["topline"] = mlabel.split("\n")[0]
 
                 if msg.get('protocol', None) == 'rpc':
 

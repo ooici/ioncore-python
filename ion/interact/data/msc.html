@@ -2,7 +2,7 @@
 <html lang="en">
 <head> 
     <meta charset="utf-8" /> 
-    <title>mwap</title> 
+    <title>MSCWeb</title> 
     <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
     <script type="text/javascript" src="d3.js"></script>
     <style>
@@ -43,6 +43,19 @@
             height: 600px;
         }
 
+        #hover {
+            background-color: #ccccff;
+            width: 200px;
+            height: 100px;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            position: absolute;
+            z-index: 10;
+            overflow: auto;
+            box-shadow: 0 1px 15px rgba(0,0,0,0.75);
+        }
+
     </style>
 </head>
 <body>
@@ -51,6 +64,7 @@
             <svg id="headersvg" width="900" height="100" />
         </div>
     </div>
+    <div id="hover"></div>
     <div id="msccontain">
         <div id="maincanvas">
             <svg id="mainsvg" width="900" height="600">
@@ -333,12 +347,13 @@
             newdatas.filter(noevents).append("svg:text")
                 .attr("class", "datatext")
                 .attr("fill", "#000")
+                .attr("data-full", function(d, i) { return d.content; })
                 //.attr("stroke", "#fff")
                 //.attr("stroke-width", 15)
                 .attr("x", function(d, i) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } )
                 .attr("y", function(d, i) { return 30 * d.idx + 8; })
                 .attr("text-anchor", "middle")
-                .text(function(d) { return d.content; });
+                .text(function(d) { return d.topline; });
 
             function onlyevents(d, i) {
                 return d.type == "event";
@@ -348,6 +363,7 @@
                 .attr("class", "dataevent")
                 .attr("stroke", "#666")
                 .attr("fill", "#ffcc33")
+                .attr("data-full", function(d, i) { return d.content; })
                 .attr("x", function(d, i) { return getlinex(d.from) - 75; })
                 .attr("y", function(d, i) { return 30 * d.idx; })
                 .attr("width", 150)
@@ -360,7 +376,16 @@
                 .attr("x", function(d, i) { return getlinex(d.from); })
                 .attr("y", function(d, i) { return 30 * d.idx + 12; })
                 .attr("text-anchor", "middle")
-                .text(function(d) { return d.content; });
+                .text(function(d) { return d.topline; });
+
+            $('g.msg').unbind('mouseover').mouseover(function(e) {
+                $('#hover').text($('[data-full]', this).attr('data-full'));
+                //$('#hover').offset({top:e.pageX - 10, left: e.pageY - 100});
+                $('#hover').css({display:'block', left:e.pageX - 100, top:e.pageY + 20});
+            });
+            $('g.msg').unbind('mouseout').mouseout(function(e) {
+                $('#hover').css({display:'none'});
+            });
         }
 
         $(function() {
@@ -384,7 +409,6 @@
                     $(this).text('Stop');
                 }
             });
-
         });
 
         var intervalID;
