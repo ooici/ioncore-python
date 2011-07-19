@@ -26,11 +26,13 @@
         }
         #controls {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
+            bottom: 20px;
+            left: 20px;
             height: 50px;
             width: 120px;
-            background-color: gray;
+            background-color: #cccccc;
+            border: 1px solid black;
+            box-shadow: 0 1px 15px rgba(0,0,0,0.75);
         }
         #headercanvas {
             width: 900px;
@@ -51,7 +53,11 @@
         <div id="maincanvas"></div>
     </div>
     <div id="controls">
-        <button name="getlive" type="button" value="getlive">get live</button>
+        <!--<button name="getlive" type="button" value="getlive">get live (debug)</button>-->
+        <button name="flowcontrol" type="button" value="live">Start</button>
+        <br/>
+        <input id="scrollondata" name="scrollondata" type="checkbox" checked="checked" value="Scroll on new data" />
+        <label for="scrollondata" name="lbl_scrollondata">Autoscroll</label>
     </div>
 
     <script type="text/javascript">
@@ -389,23 +395,46 @@
                 .attr("fill", "#0000ff");
 
             $("button[name='getlive']").click(function() {
+                get_live_data(false);
+            });
 
-                $.getJSON('/data/', function(newdata) {
-                    //console.log(newdata);
-                    console.log("Retrieved " + newdata.length + " new elements.");
-
-                    for (var i = 0; i < newdata.length; i++)
-                    {
-                        newdata[i].idx = data.length;
-                        data.push(newdata[i]);
-                    }
-                    redraw(newdata);
-                    if (newdata.length > 0)
-                        $('#msccontain').scrollTop($('#msccontain').attr('height'));
-                });
+            $("button[name='flowcontrol']").click(function() {
+                if ($(this).text() == "Stop")
+                {
+                    window.clearTimeout(intervalID);
+                    $(this).text('Start');
+                }
+                else
+                {
+                    get_live_data(true);
+                    $(this).text('Stop');
+                }
             });
 
         });
+
+        var intervalID;
+
+        function get_live_data(reschedule)
+        {
+            console.log('get_live_data');
+            $.getJSON('/data/', function(newdata) {
+                //console.log(newdata);
+                console.log("Retrieved " + newdata.length + " new elements.");
+
+                for (var i = 0; i < newdata.length; i++)
+                {
+                    newdata[i].idx = data.length;
+                    data.push(newdata[i]);
+                }
+                redraw(newdata);
+                if ($("input[name='scrollondata']").attr('checked') == 'checked' && newdata.length > 0)
+                    $('#msccontain').scrollTop($('#msccontain').attr('height'));
+
+                if (reschedule == true)
+                    intervalID = window.setTimeout(get_live_data, 2000, true);
+            });
+        }
 
         function redraw(newdata, force)
         {
