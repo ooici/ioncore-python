@@ -341,12 +341,13 @@ class TelnetShell(service.Service):
     @brief Debugging tool for inspect the container name space with a
     Manhole interpreter over a network protocol (ssh or telnet).
     """
-    _portfilename = '.ccdebugport'
+    _portfilename_base = '.ccdebugport-'
 
     def __init__(self, namespace=None):
         if namespace is None:
             namespace = {}
         self.namespace = namespace
+        self._portfilename = self._portfilename_base + str(os.getpid())
 
     def _write_port_file(self, port):
         """

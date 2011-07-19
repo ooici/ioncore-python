@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
-telnet localhost `cat .ccdebugport`
+# You must pass the pid of the container as the first argument
+telnet localhost `cat .ccdebugport-$1`
