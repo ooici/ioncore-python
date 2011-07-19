@@ -47,10 +47,26 @@
 </head>
 <body>
     <div id="mscheader">
-        <div id="headercanvas"></div>
+        <div id="headercanvas">
+            <svg id="headersvg" width="900" height="100" />
+        </div>
     </div>
     <div id="msccontain">
-        <div id="maincanvas"></div>
+        <div id="maincanvas">
+            <svg id="mainsvg" width="900" height="600">
+                <defs>
+                    <marker id="rpcreq" viewBox="0 0 10 20" refX=10 refY=10 markerUnits="strokeWidth" orient="auto" markerWidth=10 markerHeight=10>
+                        <polyline points="0,0 10,10 0,20" fill="#000000" />
+                    </marker>
+                    <marker id="rpcres" viewBox="0 0 10 20" refX=10 refY=10 markerUnits="strokeWidth" orient="auto" markerWidth=10 markerHeight=10>
+                        <polyline points="0,0 10,10 0,20" fill="#999999" />
+                    </marker>
+                    <marker id="data" viewBox="0 0 10 20" refX=10 refY=10 markerUnits="strokeWidth" orient="auto" markerWidth=10 markerHeight=10>
+                        <polyline points="0,0 10,10 0,20" fill="#0000ff" />
+                    </marker>
+                </defs>
+            </svg>
+        </div>
     </div>
     <div id="controls">
         <!--<button name="getlive" type="button" value="getlive">get live (debug)</button>-->
@@ -349,51 +365,9 @@
 
         $(function() {
             // setup errything
-            cheader = d3.select('#headercanvas').append('svg:svg').attr('width', 900).attr('height', 100);
-            cmain = d3.select('#maincanvas').append('svg:svg').attr('width', 900).attr('height', curheight);
-
-            // rpc arrow
-            var defs = cmain.append("svg:defs")
-
-            defs.append("svg:marker")
-                .attr("id", "rpcreq")
-                .attr("viewBox", "0 0 10 20")
-                .attr("refX", 10)
-                .attr("refY", 10)
-                .attr("markerUnits", "strokeWidth")
-                .attr("orient", "auto")
-                .attr("markerWidth", 10)
-                .attr("markerHeight", 10)
-                .append("svg:polyline")
-                .attr("points", "0,0 10,10 0,20")
-                .attr("fill", "#000000");
-
-            defs.append("svg:marker")
-                .attr("id", "rpcres")
-                .attr("viewBox", "0 0 10 20")
-                .attr("refX", 10)
-                .attr("refY", 10)
-                .attr("markerUnits", "strokeWidth")
-                .attr("orient", "auto")
-                .attr("markerWidth", 10)
-                .attr("markerHeight", 10)
-                .append("svg:polyline")
-                .attr("points", "0,0 10,10 0,20")
-                .attr("fill", "#999999");
-
-            defs.append("svg:marker")
-                .attr("id", "data")
-                .attr("viewBox", "0 0 10 20")
-                .attr("refX", 10)
-                .attr("refY", 10)
-                .attr("markerUnits", "strokeWidth")
-                .attr("orient", "auto")
-                .attr("markerWidth", 10)
-                .attr("markerHeight", 10)
-                .append("svg:polyline")
-                .attr("points", "0,0 10,10 0,20")
-                .attr("fill", "#0000ff");
-
+            cheader = d3.select('#headercanvas').select('svg');
+            cmain = d3.select('#maincanvas').select('svg');
+            
             $("button[name='getlive']").click(function() {
                 get_live_data(false);
             });
