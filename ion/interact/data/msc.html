@@ -256,12 +256,12 @@
 
                 redraw([]);
             });
-            $('g.gheader .grect,.gtext').unbind('mouseover').mouseover(function(e) {
+            $('.grect,.gtext').unbind('mouseover').mouseover(function(e) {
                 headname = $(this).parent().attr('id');
                 cmain.selectAll('g.msg[data-from^='+headname+']').classed("lite", true).classed("lite-from", true);
                 cmain.selectAll('g.msg[data-to^='+headname+']').classed("lite", true).classed("lite-to", true);
             });
-            $('g.gheader .grect,.gtext').unbind('mouseout').mouseout(function(e) {
+            $('.grect,.gtext').unbind('mouseout').mouseout(function(e) {
                 headname = $(this).parent().attr('id');
                 cmain.selectAll('g.msg[data-from^='+headname+']').classed("lite", false).classed("lite-from", false);
                 cmain.selectAll('g.msg[data-to^='+headname+']').classed("lite", false).classed("lite-to", false);
@@ -348,6 +348,22 @@
 
                 // remove old ones (recently collapsed)
                 sheads.exit().remove();
+                
+                $('g.subhead rect, g.subhead text').unbind('mouseover').mouseover(function(e) {
+                    headname = $(this).parent().attr('id');
+                    if (headname[0] == "(")
+                        return;
+                    cmain.selectAll('g.msg[data-from$='+headname+']').classed("lite", true).classed("lite-from", true);
+                    cmain.selectAll('g.msg[data-to$='+headname+']').classed("lite", true).classed("lite-to", true);
+                });
+                $('g.subhead rect, g.subhead text').unbind('mouseout').mouseout(function(e) {
+                    headname = $(this).parent().attr('id');
+                    if (headname[0] == "(")
+                        return;
+                    cmain.selectAll('g.msg[data-from$='+headname+']').classed("lite", false).classed("lite-from", false);
+                    cmain.selectAll('g.msg[data-to$='+headname+']').classed("lite", false).classed("lite-to", false);
+                });
+
             });
 
             // now draw lines on main doc
