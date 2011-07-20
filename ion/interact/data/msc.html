@@ -125,7 +125,7 @@
         function getnames(x) {
             var sidx = x.indexOf("/");
             if (sidx == -1) 
-                return { gname: "None", name: x };
+                return { gname: x, name: x };
              else 
                  return { gname: x.slice(0, sidx), name: x.slice(sidx+1) };
         }
