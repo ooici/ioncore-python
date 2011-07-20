@@ -26,12 +26,14 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.dm.distribution.events import DatasetChangeEventPublisher, \
-    DatasetChangeEventSubscriber
+                                                DatasourceChangeEventPublisher
 from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
 from ion.test.iontest import IonTestCase
 
+from ion.integration.ais.findDataResources.findDataResources import DatasetUpdateEventSubscriber, \
+                                                                    DatasourceUpdateEventSubscriber
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 #from ion.integration.ais.findDataResources import DatasetUpdateEventSubscriber
 
@@ -176,6 +178,17 @@ class MetadataCacheTest(IonTestCase):
         self.mc = MessageClient(proc=sup)
         self.ac  = AssociationClient(proc=sup)
         self._proc = Process()
+
+        #
+        # Instantiate the caching object
+        #
+        subproc = Process()
+        yield subproc.spawn()
+
+        self.cache = MetadataCache(subproc)
+        log.debug('Instantiated AIS Metadata Cache Object')
+        yield self.cache.loadDataSets()
+        yield self.cache.loadDataSources()
         
         if self.AnalyzeTiming != None:
             self.TimeStamps.StartTime = time.time()
@@ -194,15 +207,13 @@ class MetadataCacheTest(IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
+    def getMetadataCache(self):
+        return self.cache
 
     @defer.inlineCallbacks
     def test_metadataCache(self):
+        log.debug('Testing updateMetadataCache.')
 
-        self.cache = MetadataCache(self.sup)
-        log.debug('Instantiated AIS Metadata Cache Object')
-        yield self.cache.loadDataSets()
-        yield self.cache.loadDataSources()
-        
         #
         # Log the number of datasets
         #
@@ -223,7 +234,8 @@ class MetadataCacheTest(IonTestCase):
             dSetMetadata = yield self.cache.getDSetMetadata(dSetResID)
     
             #
-            # Dataset should exist since we got it from the cache list
+            # Dataset metadata should exist since we got it from the cache list.
+            # If it doesn't, fail test.
             #
             if dSetMetadata is None:
                 self.fail("test_metadataCache failed: dSetMetadata returned None for dataset %s" %(dSetResID))
@@ -240,3 +252,58 @@ class MetadataCacheTest(IonTestCase):
             #
             log.debug('DatasetUpdateEventSubscriber putting new metadata in cache for %s' %(dSetResID))
             yield self.cache.putDSetMetadata(dSetResID)
+
+
+    @defer.inlineCallbacks
+    def test_updateMetadataCache(self):
+        log.debug('Testing updateMetadataCache.')
+
+        # Setup the publishers
+        datasetPublisher = DatasetChangeEventPublisher(process=self._proc)
+        yield datasetPublisher.initialize()
+        yield datasetPublisher.activate()
+ 
+        datasrcPublisher = DatasourceChangeEventPublisher(process=self._proc)
+        yield datasrcPublisher.initialize()
+        yield datasrcPublisher.activate()
+ 
+        # Setup the subscribers
+        log.info('instantiating DatasetUpdateEventSubscriber')
+        self.dataset_subscriber = DatasetUpdateEventSubscriber(self, process = self._proc)
+        yield self.dataset_subscriber.initialize()
+        yield self.dataset_subscriber.activate()
+        
+        log.info('instantiating DatasourceUpdateEventSubscriber')
+        self.datasource_subscriber = DatasourceUpdateEventSubscriber(self, process = self._proc)
+        yield self.datasource_subscriber.initialize()
+        yield self.datasource_subscriber.activate()
+           
+        dsList = self.cache.getDatasets()
+        log.debug('List of datasets returned from metadataCache:')
+        for ds in dsList:
+            dSetID = ds['ResourceIdentity']
+            dSrcID = ds['DSourceID']
+            
+            log.debug('publishing event for dSetID: %s' %(dSetID))
+
+            yield datasetPublisher.create_and_publish_event(
+                name = "TestUpdateDataResourceCache",
+                origin = "SOME DATASET RESOURCE ID",
+                dataset_id = dSetID,
+                )
+    
+            # Pause ???
+            #yield pu.asleep(3.0)
+
+            log.debug('publishing event for dSrcID: %s' %(dSrcID))
+
+            yield datasrcPublisher.create_and_publish_event(
+                name = "TestUpdateDataResourceCache",
+                origin = "SOME DATASOURCE RESOURCE ID",
+                datasource_id = dSrcID,
+                )
+    
+            # Pause to make sure we catch the message
+            yield pu.asleep(3.0)
+            
+

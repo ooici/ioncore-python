@@ -443,7 +443,7 @@ class MetadataCache(object):
 
     def __unlockCache(self):
         """
-        Lock the cache to insure exclusive access while updating
+        Unlock the cache to insure exclusive access while updating
         """
         
         log.debug('__unlockCache')
