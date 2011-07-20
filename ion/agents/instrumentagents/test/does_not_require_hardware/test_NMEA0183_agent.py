@@ -11,6 +11,8 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 import ion.util.ionlog
+import ion.util.procutils as pu
+
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -28,6 +30,9 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
+from ion.core.process.process import Process
+
+from ion.services.dm.distribution.events import DataBlockEventSubscriber
 
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
@@ -51,7 +56,7 @@ class TestNMEA0183Agent (IonTestCase):
     def setUp (self):
 
         log.info("TestNMEA0183Agent.setUp")
-
+        
         self._sim = sim()
         yield self._sim.SetupSimulator()
 
@@ -575,3 +580,111 @@ class TestNMEA0183Agent (IonTestCase):
         success = reply['success']
         self.assert_(InstErrorCode.is_ok(success))
 
+    @defer.inlineCallbacks
+    def test_publish_data (self):
+        """
+        Test cases for executing device commands through the instrument agent.
+        """
+        # Setup a subscriber to an event topic
+        class TestDataSubscriber(DataBlockEventSubscriber):
+            def __init__(self, *args, **kwargs):
+                self.msgs = []
+                DataBlockEventSubscriber.__init__(self, *args, **kwargs)
+                log.info("TestData subscriber is subscribed to channel: %s", kwargs['origin'])
+                
+            def ondata(self, data):
+                log.debug("TestEventSubscriber received a message with name: %s, content: %s",
+                          data['content'].name, data['content']),
+                self.msgs.append(data)
+                
+        subproc = Process()
+        yield subproc.spawn()
+        testsub = TestDataSubscriber(origin=("%s.%s" % (NMEADeviceChannel.GPS,
+                                                         str(self.svc_id))),
+                                      process=subproc)
+        yield testsub.initialize()
+        yield testsub.activate()
+        
+        # Check agent state upon creation. No transaction needed for get operation.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.UNINITIALIZED)
+
+        # Check that the driver and client descriptions were set by spawnargs, and save them for later restore.
+
+        # Begin an explicit transaciton.
+        reply = yield self.ia_client.start_transaction()
+        success = reply['success']
+        tid = reply['transaction_id']
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assertEqual(type (tid), str)
+        self.assertEqual(len (tid), 36)
+
+        # Initialize the agent to bring up the driver and client.
+        cmd = [AgentCommand.TRANSITION, AgentEvent.INITIALIZE]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.INACTIVE)
+
+        # Connect to the driver.
+        cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.IDLE)
+        
+        # Enter observatory mode.
+        cmd = [AgentCommand.TRANSITION, AgentEvent.RUN]
+        reply = yield self.ia_client.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+    
+        # Check agent state.
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.ia_client.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
+    
+        # start acquisition
+        reply = yield self.ia_client.execute_device([NMEADeviceChannel.GPS],
+            [NMEADeviceCommand.START_AUTO_SAMPLING], tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
+        # check for a publish event
+        yield pu.asleep(1.0)
+        self.assertEqual(len(testsub.msgs), 2)
+        
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction (tid)
+        success = reply['success']
+        self.assert_(InstErrorCode.is_ok (success))
+        

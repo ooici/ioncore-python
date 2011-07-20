@@ -12,18 +12,15 @@ services are not running yet.
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from ion.util.tcp_connections import TCPConnection
-from telephus.cassandra.ttypes import KsDef, CfDef, ColumnDef, NotFoundException, IndexType, InvalidRequestException
+from telephus.cassandra.ttypes import KsDef, CfDef, ColumnDef, NotFoundException
 
 from twisted.internet import defer
 from twisted.internet import reactor
-from ion.util.state_object import BasicStates
-
-from ion.util import procutils as pu
 
 from ion.core.process import process
 from ion.core.process.process import ProcessFactory
 
-from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore, CassandraError
+from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore
 from ion.core.data.storage_configuration_utility import PERSISTENT_ARCHIVE, STORAGE_PROVIDER, DEFAULT_KEYSPACE_NAME
 from ion.core.data import storage_configuration_utility
 import ion.util.ionlog
@@ -37,7 +34,7 @@ def parse_cassandra_config(username, password, storage_provider, keyspace=None):
     Get init args from the bootstrap
     """
 
-    log.info('CassandraBootStrap Args: Uname - %s, Password - %s, Keyspace - %s' % (username,password,keyspace))
+    log.info('CassandraBootStrap Args: Uname - %s, Password - %s, Keyspace - %s' % (username,'******',keyspace))
 
 
     log.debug('Configuring Cassandra Connection: %s' % str(storage_provider))

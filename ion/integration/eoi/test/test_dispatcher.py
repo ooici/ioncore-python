@@ -6,24 +6,16 @@
 @author Bill Bollenbacher
 """
 
-from twisted.trial import unittest
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from shutil import copy
 import ion.util.procutils as pu
-import os
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import MYOOICI_USER_ID, \
-                                                                    HAS_A_ID, \
-                                                                    ROOT_USER_ID, \
-                                                                    ANONYMOUS_USER_ID, \
-                                                                    DISPATCHER_RESOURCE_TYPE_ID
+from ion.core.data.storage_configuration_utility import COMMIT_CACHE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ANONYMOUS_USER_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.services.coi.resource_registry.association_client import AssociationClient
@@ -36,26 +28,9 @@ from ion.integration.ais.app_integration_service import AppIntegrationServiceCli
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
-                                                       AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_RESPONSE_ERROR_TYPE
+                                                       AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
-                                                       GET_USER_PROFILE_REQUEST_TYPE, \
-                                                       GET_USER_PROFILE_RESPONSE_TYPE, \
-                                                       FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
-                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
-                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_REQUEST_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_TYPES_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_REQUEST_TYPE, \
-                                                       GET_RESOURCE_RESPONSE_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_RSP_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_RSP_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE
+                                                       REGISTER_USER_RESPONSE_TYPE
 
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
@@ -185,9 +160,6 @@ class DispatcherTest(IonTestCase):
     def test_dispatcher(self):
         log.debug('Testing dispatcher.')
 
-        # Create a message client
-        mc = MessageClient(proc=self.test_sup)
-
         yield self.createUser()
 
         try:
@@ -203,7 +175,7 @@ class DispatcherTest(IonTestCase):
         from ion.core.process.process import ProcessDesc
         proc = ProcessDesc(**desc)
         log.debug('DispatcherTest.test_dispatcher(): spawning dispatcher')
-        pid = proc.spawn()
+        proc.spawn()
         log.debug('DispatcherTest.test_dispatcher(): spawned dispatcher')
         # sleeping to let dispatcher startup
         yield pu.asleep(10)

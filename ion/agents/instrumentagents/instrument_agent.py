@@ -29,7 +29,7 @@ from ion.services.dm.distribution.events \
 from ion.services.dm.distribution.events import DataBlockEventPublisher
 from ion.agents.instrumentagents.instrument_fsm import InstrumentFSM
 from ion.agents.instrumentagents.instrument_constants import AgentParameter, \
-    AgentConnectionState, AgentState, driver_client, publish_msg_type, \
+    AgentConnectionState, AgentState, driver_client, \
     DriverAnnouncement, InstErrorCode, DriverParameter, DriverChannel, \
     ObservatoryState, DriverStatus, InstrumentCapability, DriverCapability, \
     MetadataParameter, AgentCommand, Datatype, TimeSource, ConnectionMethod, \
@@ -2362,7 +2362,7 @@ class InstrumentAgent(Process):
         @param content a dict with 'type' and 'transducer' strings and 'value'
             object.
         """
-
+        log.debug("op_driver_event_occurred begins")
         assert isinstance(content, dict), 'Expected a content dict.'
 
         type = content.get('type', None)
@@ -2380,7 +2380,6 @@ class InstrumentAgent(Process):
 
         # If data received, coordinate buffering and publishing.
         if type == DriverAnnouncement.DATA_RECEIVED:
-
             # Remember the transducer in case we need to transmit at a time
             # other than these events.
             self._prev_data_transducer = transducer
@@ -2410,9 +2409,10 @@ class InstrumentAgent(Process):
             #if len(strval) > 0:
             if json_val != None:
                 origin = "%s.%s" % (transducer, self.event_publisher_origin)
+                log.debug("Instrument Agent publishing data: %s on origin: %s", json_val, origin)
                 yield self._data_publisher.create_and_publish_event(\
                     origin=origin, data_block=json_val)
-
+                
         # Driver configuration changed, publish config.
         elif type == DriverAnnouncement.CONFIG_CHANGE:
 
@@ -2455,65 +2455,6 @@ class InstrumentAgent(Process):
 
         self._debug_print_driver_event(type, transducer, value)
 
-    @defer.inlineCallbacks
-    def op_publish(self, content, headers, msg):
-        """
-        Collect data from a subprocess (usually the driver) to publish to the
-        correct topic, specific to the hardware device, not the agent.
-        @param content A dict including: a Type string of "StateChange",
-          "ConfigChange", "Error", or "Data", and a Value string with the
-          data or message that is to be published. Must also have "Transducer"
-          to specify the transducer doing the chagne.
-        """
-        assert isinstance(content, dict), "InstrumentAgent op_publish \
-            argument error"
-        log.debug("Agent is publishing with sender: %s, child_procs: %s, \
-                content: %s",
-                  headers["sender-name"], self.child_procs, content)
-        if (self._is_child_process(headers["sender-name"])):
-            if (content["Type"] == publish_msg_type["Data"]):
-                yield self._data_publisher.create_and_publish_event( \
-                    origin="%s.%s" % (content["Transducer"],
-                    self.event_publisher_origin), description=content["Value"])
-            elif ((content["Type"] == publish_msg_type["Error"])
-                or (content["Value"] == "ConfigChange")):
-                yield self._log_publisher.create_and_publish_event( \
-                    origin="%s.%s" % (content["Transducer"],
-                    self.event_publisher_origin), description=content["Value"])
-            elif (content["Type"] == publish_msg_type["StateChange"]):
-                yield self._state_publisher.create_and_publish_event( \
-                    origin="%s.%s" % (content["Transducer"],
-                    self.event_publisher_origin), description=content["Value"])
-        else:
-            # Really should be handled better...what if there isnt a reply
-            # expected?
-            yield self.reply_err(msg,
-                                 "publish invoked from non-child process")
-        # return something...like maybe result?
-
-    @defer.inlineCallbacks
-    def _self_publish(self, type, value):
-        """
-        Publish a message from the instrument agent to one of the agent
-        pubsub topics. Possibly an event or a state change. Probably not data
-        @param type The type of information to publish (should be "Error",
-            "StateChange", "ConfigChange", "Event")
-        @todo Actually write a test case for this!
-        """
-        assert ((type == publish_msg_type["Error"]) or \
-            (type == publish_msg_type["Event"]) or \
-        (type == publish_msg_type["StateChange"]) or \
-        (type == publish_msg_type["ConfigChange"])), "Bad IA publish type"
-
-        if (type == publish_msg_type["Error"]) or \
-            (type == publish_msg_type["Event"]) or \
-            (type == publish_msg_type["ConfigChange"]):
-                yield self._log_publisher.create_and_publish_event( \
-                    origin=self.event_publisher_origin, description=value)
-
-        if (type == publish_msg_type["StateChange"]):
-                yield self._state_publisher.create_and_publish_event( \
-                    origin=self.event_publisher_origin, description=value)
 
     ###########################################################################
     #   Driver lifecycle.

@@ -10,8 +10,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.process.process import ProcessFactory, ProcessDesc
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
@@ -19,19 +17,15 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.services.coi.resource_registry.association_client import AssociationClientError
 from ion.core.messaging.message_client import MessageClient
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, PREDICATE_REFERENCE_TYPE
 
-import ion.util.procutils as pu
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
-from ion.services.dm.distribution.events import DataEventSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
-from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 #from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
@@ -42,14 +36,8 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import INSTRUMENT_R
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 import SERPORTSLAVE
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 
-from ion.core.process.process import Process
-from ion.core.process.process import ProcessDesc
-from ion.core import bootstrap
-
 
 from ion.core.object import object_utils
-import gviz_api
-
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
 INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
@@ -131,8 +119,10 @@ class InstrumentIntegrationService(ServiceProcess):
         reply = yield self.ia_client.start_transaction(0)
         success = reply['success']
         trans_id = reply['transaction_id']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        log.debug("Transaction started, ID=%s", trans_id)
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -140,8 +130,9 @@ class InstrumentIntegrationService(ServiceProcess):
         cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
         reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -149,8 +140,9 @@ class InstrumentIntegrationService(ServiceProcess):
         cmd = [AgentCommand.TRANSITION,AgentEvent.GO_ACTIVE]
         reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -158,8 +150,9 @@ class InstrumentIntegrationService(ServiceProcess):
         cmd = [AgentCommand.TRANSITION,AgentEvent.RUN]
         reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -170,8 +163,9 @@ class InstrumentIntegrationService(ServiceProcess):
         success = reply['success']
         result = reply['result']
         log.info("IIService prep_instrument state: %s", result)
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -184,8 +178,9 @@ class InstrumentIntegrationService(ServiceProcess):
         reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
         result = reply['result']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -195,16 +190,18 @@ class InstrumentIntegrationService(ServiceProcess):
         success = reply['success']
         result = reply['result']
         log.info("IIService op_cleanupInstrument state: %s", result)
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return     
 
         # End the transaction.
         reply = yield self.ia_client.end_transaction(trans_id)
         success = reply['success']
-        if not success:
-            log.info("IIService Unable to transition instrument state")
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(success, "Unable to transition instrument state")
             return
 
@@ -308,15 +305,21 @@ class InstrumentIntegrationService(ServiceProcess):
         reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         log.info('startAutoSampling success: %s',str(reply['success']))
         success = reply['success']
-        result = reply['result']
         if InstErrorCode.is_error(success):
-            log.info("IIService Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(msg, "Unable to transition instrument state")
             return
 
-        # Put the instrument back into passive mode
-        reply = yield self.op_cleanupInstrument(transaction_id)
-
+        # Keep the instrument going, but end the transaction...we are done
+        # with commands for now
+        reply = yield self.ia_client.end_transaction(transaction_id)
+        success = reply['success']
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService op_startAutoSampling unable to end transaction")
+            yield self.reply_err(success, "Unable to transition instrument state")
+            return
+        
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(START_INSTRUMENT_SAMPLING_RESPONSE_MSG_TYPE)
@@ -331,26 +334,35 @@ class InstrumentIntegrationService(ServiceProcess):
         Service operation: Execute a command on an instrument.
 
         """
-        log.info("IIService op_startAutoSampling")
+        log.info("IIService op_stopAutoSampling")
         # Step 1: Extract the arguments from the UI generated message content
         commandInput = content.message_parameters_reference.instrument_resource_id
 
         # get the agent resource for this instrument
         agent_resource_id = yield self.getAgentForInstrument(commandInput)
-        log.info("IIService op_startAutoSampling agent resource: %s", agent_resource_id)
+        log.info("IIService op_stopAutoSampling agent resource: %s", agent_resource_id)
 
         instrument_agent_resource = yield self.rc.get_instance(agent_resource_id)
 
         # Put the instrument in a state to accept commands
-        transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
+        #transaction_id = yield self.op_prepInstrument(instrument_agent_resource)
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        trans_id = reply['transaction_id']
+        log.debug("Transaction started, ID=%s", trans_id)
+        if not InstErrorCode.is_ok(success):
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
+            yield self.reply_err(success, "Unable to transition instrument state")
+            return
 
         # Stop autosampling.
         chans = [DriverChannel.GPS]
         cmd = [DriverCommand.STOP_AUTO_SAMPLING,'GETDATA']
         while True:
-            reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
+            
+            reply = yield self.ia_client.execute_device(chans, cmd, trans_id)
             success = reply['success']
-            result = reply['result']
 
             if InstErrorCode.is_ok(success):
                 break
@@ -360,12 +372,13 @@ class InstrumentIntegrationService(ServiceProcess):
                 pass
 
             else:
-                log.info("IIService Unable to transition instrument state")
+                log.info("IIService Unable to transition instrument state: %s",
+                         reply['success'])
                 yield self.reply_err(msg, "Unable to transition instrument state")
                 return
                 
         # Put the instrument back into passive mode
-        reply = yield self.op_cleanupInstrument(transaction_id)
+        reply = yield self.op_cleanupInstrument(trans_id)
 
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
@@ -401,7 +414,8 @@ class InstrumentIntegrationService(ServiceProcess):
         result = reply['result']
         log.info("IIService op_getInstrumentState state: %s", result)
         if InstErrorCode.is_error(success):
-            log.info("IIService Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(msg, "Unable to transition instrument state")
             return
 
@@ -469,7 +483,8 @@ class InstrumentIntegrationService(ServiceProcess):
         result = reply['result']
         log.info("IIService op_setInstrumentState state: %s", result)
         if InstErrorCode.is_error(success):
-            log.info("IIService Unable to transition instrument state")
+            log.info("IIService Unable to transition instrument state: %s",
+                     reply['success'])
             yield self.reply_err(msg, "Unable to transition instrument state")
             return
 
