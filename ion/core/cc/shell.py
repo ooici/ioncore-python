@@ -132,6 +132,10 @@ class DebugManhole(manhole.Manhole):
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
 
+    def terminalSize(self, width, height):
+        self.width = width
+        self.height = height
+
     def handle_QUIT(self):
         self.terminal.loseConnection()
 
@@ -195,9 +199,7 @@ class DebugManhole(manhole.Manhole):
             and the word length plus padding must be less than or equal to the
             number of columns.
             """
-            p = os.popen('stty size', 'r')
-            rows, columns = map(int, p.read().split())
-            p.close()
+            rows, columns = self.height, self.width
             l.sort()
             number_words = len(l)
             longest_word = len(max(l)) + 2
