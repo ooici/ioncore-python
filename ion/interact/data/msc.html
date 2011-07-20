@@ -3,13 +3,15 @@
 <head> 
     <meta charset="utf-8" /> 
     <title>MSCWeb</title> 
-    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+    <script type="text/javascript" src="jquery-1.6.1.min.js"></script>
+    <script type="text/javascript" src="jquery.cookie.js"></script>
     <script type="text/javascript" src="d3.js"></script>
     <style>
         body {
             margin: 0px;
             font-size: 10px;
             font-family: helvetica, sans-serif;
+            background-color: white;
         }
         #mscheader {
             position: fixed;
@@ -30,11 +32,20 @@
             position: absolute;
             bottom: 20px;
             left: 20px;
-            height: 50px;
+            height: 70px;
             width: 120px;
-            background-color: #cccccc;
-            border: 1px solid black;
-            box-shadow: 0 1px 15px rgba(0,0,0,0.75);
+            background-color: #efefef;
+            border: 1px solid #666;
+            box-shadow: 0 1px 10px rgba(0,0,0,0.75);
+            text-align: center;
+        }
+        #controls a {
+            float: right;
+            margin-top: 5px;
+            margin-right: 5px;
+        }
+        #controls button {
+            width: 95%;
         }
         #headercanvas {
             width: 900px;
@@ -76,6 +87,82 @@
         .lite .datatext {
             fill: #3366ff;
         }
+        button {
+            margin: 2px auto;
+            border: 1px solid #999;
+            background-color: #ccc;
+            background: -webkit-linear-gradient(top, rgba(255,255,255,.3) 0%,rgba(0,0,0,.3) 100%);
+            background: -moz-linear-gradient(top, rgba(255,255,255,.3) 0%, rgba(0,0,0,.3) 100%);
+            background: linear-gradient(top, rgba(255,255,255,.3) 0%,rgba(0,0,0,.3) 100%);
+            padding: 5px;
+            border-radius: 3px;
+        }
+        button:active {
+            border-color: white;
+            color: white;
+        }
+
+        #bigcontrols {
+            position: absolute;
+            top: 200px;
+            left: 50%;
+            margin-left: -200px;
+            display: none;
+
+            width: 400px;
+            /*height: 600px;*/
+
+            background-color: #efefef;
+            border: 1px solid #666;
+
+            padding: 5px;
+            box-shadow: 0 1px 15px rgba(0,0,0,0.75);
+        }
+
+        h1 {
+            margin: 0px;
+            padding: 3px;
+            background-color: #ff6633;
+            background: -webkit-linear-gradient(top, #f63 0%, #f64 100%);
+            background: -moz-linear-gradient(top, #f63 0%, #f64 100%);
+            background: linear-gradient(top, #f63 0%,#f64 100%);
+            border: 1px solid black;
+        }
+
+        #controls h1 {
+            font-size: 8px;
+            margin: 1px 2px;
+        }
+
+        #bigcontrols #ignorelistcontain {
+            overflow: auto;
+            height: 250px;
+            border: 1px solid #ccc;
+        }
+
+        #bigcontrols ul {
+            list-style-type: none;
+            margin: 0px;
+            padding: 0px;
+            width: 100%;
+        }
+
+        #bigcontrols ul li {
+            width: 100%;
+        }
+
+        #bigcontrols ul li label {
+            display: block;
+            padding: 4px;
+        }
+
+        #bigcontrols ul li:nth-child(odd) { 
+            background-color: white;
+        }
+
+        #bigcontrols #saves {
+            text-align: left;
+        }
 
     </style>
 </head>
@@ -104,20 +191,44 @@
         </div>
     </div>
     <div id="controls">
+        <h1>MSCWeb</h1>
         <!--<button name="getlive" type="button" value="getlive">get live (debug)</button>-->
         <button name="flowcontrol" type="button" value="live">Start</button>
         <br/>
         <input id="scrollondata" name="scrollondata" type="checkbox" checked="checked" value="Scroll on new data" />
         <label for="scrollondata" name="lbl_scrollondata">Autoscroll</label>
+        <a href="#" id="more">more...</a>
+    </div>
+    <div id="bigcontrols">
+        <h1>MSCWeb Admin</h1>
+
+        <h3>Admin</h3>
+        <button name="resetio" type="button">Reset IO</button>
+        <button name="resetview" type="button">Reset View</button>
+
+        <h3>Ignore List</h3>
+        <div id="saves">
+            <button name="saveignores" type="button">Save Ignores</button>
+            <button name="resetignores" type="button">Reset Saved Ignores</button>
+            <span id="savedignorescount"></span>
+        </div>
+        <div id="ignorelistcontain">
+            <ul id="ignorelist">
+            </ul>
+        </div>
+
+        <button name="closebig" type="button">Close</button>
     </div>
 
     <script type="text/javascript">
         var gheaders = [];  // group headers
         var headers={};     // associative array groupheader->[] of subheaders
         var data = [];
+        var ignore_list = [];
 
         var cheader;
         var cmain;
+        var ccontrols;
         var curheight = 600;
         var curwidth = 900;
         var curheads = 0;
@@ -140,7 +251,7 @@
                     name = slices.name;
 
                     if ($.inArray(gname, $.map(gheaders, function(el, idx) { return el.name; })) == -1) {
-                        gheaders.push({name:gname, collapsed:true, hidden:false});
+                        gheaders.push({name:gname, collapsed:true, hidden:$.inArray(gname, ignore_list) != -1});
                         headers[gname] = [];
                         gheaders.sort(function(a, b) {
                             a = a.name.toLowerCase();
@@ -558,34 +669,12 @@
             });
         }
 
-        $(function() {
-            // setup errything
-            cheader = d3.select('#headercanvas').select('svg');
-            cmain = d3.select('#maincanvas').select('svg');
-            
-            $("button[name='getlive']").click(function() {
-                get_live_data(false);
-            });
-
-            $("button[name='flowcontrol']").click(function() {
-                if ($(this).text() == "Stop")
-                {
-                    window.clearTimeout(intervalID);
-                    $(this).text('Start');
-                }
-                else
-                {
-                    get_live_data(true);
-                    $(this).text('Stop');
-                }
-            });
-        });
 
         var intervalID;
 
         function get_live_data(reschedule)
         {
-            console.log('get_live_data');
+            //console.log('get_live_data');
             $.getJSON('/data/', function(newdata) {
                 //console.log(newdata);
                 console.log("Retrieved " + newdata.length + " new elements.");
@@ -648,7 +737,115 @@
 
             // anim is too annoying, don't bother
             drawdata();
+
+            if ($('#bigcontrols').is(':visible'))
+                drawignorelist();
         }
+
+        function drawignorelist()
+        {
+            var ignoreupdate = ccontrols.selectAll('li')
+                .data(gheaders, function(d) { return d.name; });
+
+            // update things
+            ignoreupdate.select('input')
+                .property('checked', function(d) { return d.hidden; });
+
+            // add new things
+            var li = ignoreupdate.enter().append('li')
+                .attr('data-gheader', function(d) { return d.name; });
+
+            var lbl = li.append('label')
+                .attr('for', function(d) { return 'icb_' + d.name; })
+
+            lbl.append('input')
+                .attr('type', 'checkbox')
+                .property('checked', function(d) { return d.hidden; })
+                .attr('id', function(d) { return 'icb_' + d.name; });
+
+            lbl.append('span')
+                .text(function(d) { return d.name; });
+
+            // remove dead things
+            ignoreupdate.exit().remove();
+
+            // rig up listener
+            $('#ignorelist input').unbind('change').change(function(e) {
+                headname = $(this).closest('li').attr('data-gheader');
+
+                for (var i = 0; i < gheaders.length; i++)
+                    if (gheaders[i].name == headname)
+                    {
+                        gheaders[i].hidden = $(this).is(':checked'); 
+                        break;
+                    }
+
+                redraw([]);
+            });
+ 
+        }
+
+        $(function() {
+            // setup errything
+            cheader = d3.select('#headercanvas').select('svg');
+            cmain = d3.select('#maincanvas').select('svg');
+            ccontrols = d3.select('#ignorelist');
+            
+            $("button[name='getlive']").click(function() {
+                get_live_data(false);
+            });
+
+            $("button[name='flowcontrol']").click(function() {
+                if ($(this).text() == "Stop")
+                {
+                    window.clearTimeout(intervalID);
+                    $(this).text('Start');
+                }
+                else
+                {
+                    get_live_data(true);
+                    $(this).text('Stop');
+                }
+            });
+
+            $("button[name='closebig']").click(function() {
+                $('#bigcontrols').hide();
+            });
+
+            $("a#more").click(function() {
+                drawignorelist();
+                $('#bigcontrols').show();
+                return false;
+            });
+
+            $("button[name='resetview']").click(function() {
+                data = [];
+                gheaders = [];
+                headers = [];
+                redraw([]);
+            });
+
+            $("button[name='saveignores']").click(function() {
+                ignored = $.grep(gheaders, function(el, idx) { return el.hidden; });
+                $.cookie('msc_saved_ignores', $.map(ignored, function(el, idx) {
+                    return el.name;
+                }), { expires: 365 });
+
+                $('#savedignorescount').text(ignored.length + " saved");
+            });
+
+            $("button[name='resetignores']").click(function() {
+                $.cookie('msc_saved_ignores', null);
+            });
+
+            ignore_list = $.cookie('msc_saved_ignores');
+            if (!ignore_list)
+                ignore_list = [];
+            else
+                ignore_list = ignore_list.split(',');
+
+            $('#savedignorescount').text(ignore_list.length + " saved");
+        });
 
         $(function() {
             $('#msccontain').scroll(function() {

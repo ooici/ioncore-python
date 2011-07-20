@@ -245,12 +245,12 @@ class EventMonitorWebResource(resource.Resource):
         # DEBUGGING reload session stored object every time so we can get teh data over and over
         lastdata = ILastData(request.getSession())
         lastdata.last_index = 0
-        
-        res = "msc.html"
-        if "d3.js" in str(request.prepath):
-            res = "d3.js"
 
-        self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", res))
+        listpath = list(request.prepath)
+        if len(listpath) == 1 and listpath[0] == '':
+            listpath[0] = "msc.html"
+
+        self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", *listpath))
         return self._mainpage.render_GET(request)
 
 class MSCWebProcess(Process):
