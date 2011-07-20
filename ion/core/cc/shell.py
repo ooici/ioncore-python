@@ -19,6 +19,9 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ionconst
 
+CTRL_A = '\x01'
+CTRL_E = '\x05'
+
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
         virtual_env = os.path.join(os.environ.get('VIRTUAL_ENV'),
@@ -121,6 +124,13 @@ class ConsoleManhole(manhole.ColoredManhole):
 
 class DebugManhole(manhole.Manhole):
     ps = ('<>< ', '... ')
+
+    def connectionMade(self):
+        manhole.Manhole.connectionMade(self)
+        self.keyHandlers.update({
+            CTRL_A: self.handle_HOME,
+            CTRL_E: self.handle_END,
+            })
 
     def initializeScreen(self):
         self.terminal.write('Ion Remote Container Shell\r\n')
