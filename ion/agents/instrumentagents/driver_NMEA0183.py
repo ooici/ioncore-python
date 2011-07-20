@@ -670,10 +670,10 @@ class NMEADeviceDriver(InstrumentDriver):
                 self._serialReadMode = OFF    # Stop continually acquiring lines
 
         elif event == NMEADeviceEvent.DATA_RECEIVED:
+            log.debug("NMEA Driver ready to publish data to agent")
             while self._data_lines:
                 nmeaLine = self._data_lines.pop()
                 if len(nmeaLine) > 0:
-
                     # This is where NMEA data is published
                     if self._serialReadMode == ON:
                         log.debug('Streaming data published: %s' % nmeaLine)
@@ -1391,21 +1391,20 @@ class NMEADeviceDriver(InstrumentDriver):
         for(chan, arg) in params:
             if NMEADeviceChannel.has(chan) and NMEADeviceStatus.has(arg):
                 if chan in GoodValues.validChans:
-                    chan = NMEADeviceChannel.GPS
-                    ok = InstErrorCode.OK
+                    chan = NMEADeviceChannel.INSTRUMENT
                     all = (arg == NMEADeviceStatus.ALL)
                     if arg == NMEADeviceStatus.DRIVER_STATE or all:
                         result[(chan, NMEADeviceStatus.DRIVER_STATE)]\
-                            = (ok, self.fsm.get_current_state())
+                            = (InstErrorCode.OK, self.fsm.get_current_state())
                     if arg == NMEADeviceStatus.OBSERVATORY_STATE or all:
                         result[(chan, NMEADeviceStatus.OBSERVATORY_STATE)]\
-                            = (ok, self._get_observatory_state())
+                            = (InstErrorCode.OK, self._get_observatory_state())
                     if arg == NMEADeviceStatus.DRIVER_ALARMS or all:
                         result[(chan, NMEADeviceStatus.DRIVER_ALARMS)]\
-                            = (ok, self._alarms)
+                            = (InstErrorCode.OK, self._alarms)
                     if arg == NMEADeviceStatus.DRIVER_VERSION or all:
                         result[(chan, NMEADeviceStatus.DRIVER_VERSION)]\
-                            = (ok, self.get_version())
+                            = (InstErrorCode.OK, self.get_version())
                 else:
                     result[(chan, arg)] = (InstErrorCode.INVALID_CHANNEL, chan)
 

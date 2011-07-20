@@ -56,7 +56,6 @@ class TestOmsDriver(IonTestCase):
         raise unittest.SkipTest('Integration test requires VPN into RSN')
         (content, headers, message) = \
             yield self.proc_client.rpc_send('connect', ('Server', 'if1Speed'))
-        log.debug("*** content: %s, message: %s", content, message)
         self.assertTrue(isinstance(content, dict))
         self.assertTrue(len(content)>0)
         # Wish there were a better assert here, but the system has "live" or
