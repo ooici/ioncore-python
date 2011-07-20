@@ -437,8 +437,9 @@ class MetadataCache(object):
         Lock the cache to insure exclusive access while updating
         """
         
-        log.debug('__lockCache')
+        log.debug('__lockCache requesting lock')
         yield self.cacheLock.acquire()
+        log.debug('__lockCache lock acquired')
 
 
     def __unlockCache(self):

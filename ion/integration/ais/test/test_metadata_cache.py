@@ -303,7 +303,9 @@ class MetadataCacheTest(IonTestCase):
                 datasource_id = dSrcID,
                 )
     
-            # Pause to make sure we catch the message
-            yield pu.asleep(3.0)
+        # Pause to make sure we catch the message
+        log.debug('TestUpdateDataResourceCache waiting to shut down...')
+        yield pu.asleep(10.0)
+        log.debug('TestUpdateDataResourceCache shutting down...')
             
 

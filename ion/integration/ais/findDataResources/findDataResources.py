@@ -55,14 +55,14 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug("DatasetUpdateEventSubscriber received an event:\n")
 
         dSetResID = data['content'].additional_data.dataset_id
+        log.debug("DatasetUpdateEventSubscriber received event for dsetID: %s\n" %(dSetResID))
 
         #
         # If the dataset is cached, delete it.  In any case, cache the dataset.
         #
-        
+
         #
         # Check the cache to see if there's currently metadata for this
         # datasetID
@@ -97,15 +97,15 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
 
     @defer.inlineCallbacks
     def ondata(self, data):
-        log.debug("DatasourceUpdateEventSubscriber received an event:\n")
 
         dSourceResID = data['content'].additional_data.datasource_id
+        log.debug("DatasourceUpdateEventSubscriber received event for dsrcID: %s\n" %(dSourceResID))
 
         #
         # If the datasource is cached, delete it.  In any case, cache the
         # datasource.
         #
-        
+
         #
         # Check the cache to see if there's currently metadata for this
         # datasourceID
