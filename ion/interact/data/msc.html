@@ -55,7 +55,6 @@
             overflow: auto;
             box-shadow: 0 1px 15px rgba(0,0,0,0.75);
         }
-
     </style>
 </head>
 <body>
@@ -118,16 +117,28 @@
                     gname = slices.gname;
                     name = slices.name;
 
-                    if ($.inArray(gname, gheaders) == -1) {
-                        gheaders.push(gname);
+                    if ($.inArray(gname, $.map(gheaders, function(el, idx) { return el.name; })) == -1) {
+                        gheaders.push({name:gname, collapsed:true, hidden:false});
                         headers[gname] = [];
-                        gheaders.sort();
+                        gheaders.sort(function(a, b) {
+                            a = a.name.toLowerCase();
+                            b = b.name.toLowerCase();
+                            if (a < b) return -1;
+                            if (a > b) return 1;
+                            return 0;
+                        });
                     }
 
-                    if ($.inArray(name, headers[gname]) == -1) {
+                    if ($.inArray(name, $.map(headers[gname], function(el,idx) { return el.name; })) == -1) {
                         dirty += 1;
-                        headers[gname].push(name);
-                        headers[gname].sort();
+                        headers[gname].push({name:name, hidden:false});
+                        headers[gname].sort(function(a, b) {
+                            a = a.name.toLowerCase();
+                            b = b.name.toLowerCase();
+                            if (a < b) return -1;
+                            if (a > b) return 1;
+                            return 0;
+                        });
                     }
                 }
 
@@ -145,15 +156,23 @@
         function drawheaders()
         {
             // first, group headers
+            //console.log(gheaders);
             var gheads = cheader.selectAll("g.gheader")
-                .data(gheaders, function(d) { return d; } );
+                .data(gheaders, function(d) { return d.name; } );
 
             function getgroupxoffset(d, i) {
                 var x, y = 0;
                 // x is the sum of the previous headers' children size
                 var icount = 0;
                 for (var i = 0; i < gheaders.indexOf(d); i++)
-                    icount += headers[gheaders[i]].length;
+                {
+                    if (gheaders[i].hidden)
+                        icount += 0;
+                    else if (gheaders[i].collapsed)
+                        icount += 1;
+                    else
+                        icount += headers[gheaders[i].name].length;
+                }
 
                 x = icount * 150;
 
@@ -165,29 +184,58 @@
                 .duration(500)
                 .attr("transform", getgroupxoffset)
                 .attr("width", function(d, i) {
-                    return headers[d].length * 150;
+                    if (d.collapsed)
+                        return 150;
+                    else
+                        return headers[d.name].length * 150;
                 });
             gheads.selectAll(".grect").transition()
                 .duration(500)
                 .attr("width", function(d) {
-                    return headers[d].length * 150 - 10;
-                })
+                    if (d.collapsed)
+                        return 150 - 10;
+                    else
+                        return headers[d.name].length * 150 - 10;
+                });
+
             gheads.selectAll(".gtext").transition()
                 .duration(500)
-                .attr("x", function(d) { return headers[d].length * 150 / 2; });
+                .attr("x", function(d) { 
+                    if (d.collapsed)
+                        return 150 / 2;
+                    else
+                        return headers[d.name].length * 150 / 2; 
+                });
 
             // create new ones
             var newgheads = gheads.enter().append("svg:g")
-                .attr("id", function(d) { return d; })
+                .attr("id", function(d) { return d.name; })
                 .attr("class", "gheader")
                 .attr("transform", getgroupxoffset)
                 .attr("width", function(d, i) {
-                    return headers[d].length * 150;
+                    if (d.collapsed)
+                        return 150;
+                    else
+                        return headers[d.name].length * 150;
                 })
                 .attr("height", 50)
                 .attr("fill", "#ff0000");
 
             // no need to delete
+            // @TODO HIDDEN WILL NEED TO DELETE
+
+            $('g.gheader').unbind('click').click(function(e) {
+                headname = $(this).attr('id')
+                for (var i = 0; i < gheaders.length; i++)
+                    if (gheaders[i].name == headname)
+                    {
+                        gheaders[i].collapsed = !gheaders[i].collapsed;
+                        break;
+                    }
+
+
+                redraw([]);
+            });
 
             // create rects/texts on any new items
             newgheads.append("svg:rect")
@@ -196,23 +244,35 @@
                 .attr("x", 5)
                 .attr("y", 5)
                 .attr("width", function(d, i) {
-                    return headers[d].length * 150 - 10;
+                    if (d.collapsed)
+                        return 150 - 10;
+                    else
+                        return headers[d.name].length * 150 - 10;
                 })
                 .attr("height", 25);
  
             newgheads.append("svg:text")
                 .attr("class", "gtext")
                 .attr("fill", "white")
-                .attr("x", function(d) { return headers[d].length * 150 / 2; })
+                .attr("x", function(d) {
+                    if (d.collapsed)
+                        return 150 / 2;
+                    else
+                        return headers[d.name].length * 150 / 2; 
+                })
                 .attr("y", 20)
                 .attr("text-anchor", "middle")
-                .text(function(d) { return d });
+                .text(function(d) { return d.name; });
 
             // now draw subheaders
             cheader.selectAll('.gheader').each(function (d, i) {
 
-                var sheads = d3.select(this).selectAll('.header')
-                    .data(headers[d], function(dx) { return dx; })
+                var heads = d3.select(this).selectAll('.subhead');
+                var sheads;
+                if (d.collapsed)
+                    sheads = heads.data([{name:"(" + headers[d.name].length + " items)"}], function(dx) { return dx.name; });
+                else
+                    sheads = heads.data(headers[d.name], function(dx) { return dx.name; })
 
                 function getsubxoffset(d, i) {
                     var x, y = 30;
@@ -221,12 +281,18 @@
                 }
 
                 // update existing
-                sheads.transition()
+                sheads
+                    .attr('id', function(d) { return d.name; })
+                    .transition()
                     .duration(500)
                     .attr("transform", getsubxoffset);
 
+                sheads.selectAll('text')
+                    .text(function(d) { return d.name });
+
+                // append new ones
                 var newsubheads = sheads.enter().append("svg:g")
-                    .attr("id", function(d) { return d; })
+                    .attr("id", function(d) { return d.name; })
                     .attr("class", "subhead")
                     .attr("transform", getsubxoffset)
                     .attr("opacity", 0);
@@ -248,7 +314,10 @@
                     .attr("y", 20)
                     .attr("fill", "white")
                     .attr("text-anchor", "middle")
-                    .text(function(d) { return d });
+                    .text(function(d) { return d.name });
+
+                // remove old ones (recently collapsed)
+                sheads.exit().remove();
             });
 
             // now draw lines on main doc
@@ -256,17 +325,25 @@
             // assemble the current data in sorted form
             linedata = [];
             $.each(gheaders, function(i, d) {
-                $.each(headers[d], function(ii, dd) {
-                    linedata.push(d + "_" + dd);
-                });
+                if (!d.hidden)
+                {
+                    if (d.collapsed)
+                        linedata.push("line_" + d.name);
+                    else
+                    {
+                        $.each(headers[d.name], function(ii, dd) {
+                            linedata.push("line_" + d.name + "_" + dd.name);
+                        });
+                    }
+                }
             });
 
             var msclines = cmain.selectAll("line.proc")
                 .data(linedata, function(d) { return d; });
 
             // update
-            var rettrans = msclines.transition()
-                .duration(500)
+            var rettrans = msclines/*.transition()
+                .duration(500)*/
                 .attr("x1", function(d, i) { return i * 150 + 75; })
                 .attr("x2", function(d, i) { return i * 150 + 75; });
 
@@ -280,6 +357,9 @@
                 .attr("stroke", "#999")
                 .attr("stroke-dasharray", "2, 2");
 
+            // remove dead ones
+            msclines.exit().remove();
+
             return rettrans;    // so we can chain off of this
         }
 
@@ -290,8 +370,21 @@
 
             function getlinex(rawid) {
               splits = getnames(rawid);
-              lid = splits.gname + "_" + splits.name;
-              return cmain.select("#" + lid).attr("x1");
+              var collapsed = false;
+              for (var i = 0; i < gheaders.length; i++)
+              {
+                if (gheaders[i].name == splits.gname) {
+                  collapsed = gheaders[i].collapsed;
+                  break;
+                }
+              }
+
+              if (collapsed)
+                  lid = "line_" + splits.gname;
+              else
+                  lid = "line_" + splits.gname + "_" + splits.name;
+
+              return cmain.select("line#" + lid).attr("x1");
             }
 
             // update existing 
@@ -315,6 +408,7 @@
             // create new ones
             var newdatas = dlines.enter().append("svg:g")
                 //.attr("style", "text-shadow: 0px 0px 5px #fff;")
+                .attr("data-to", "spiffy")
                 .attr("class", "msg")
                 .attr("opacity", 0);
                 
@@ -322,11 +416,9 @@
                 .duration(500)
                 .attr("opacity", 1);
 
-            function noevents(d, i) {
-                return d.type != "event";
-            }
+            var noevdatas = newdatas.filter(function(d) { return d.type != "event"; });
 
-            newdatas.filter(noevents).append("svg:line")
+            noevdatas.append("svg:line")
                 .attr("class", "dataline")
                 .attr("stroke", "#666")
                 .attr("x1", function(d, i) { return getlinex(d.from); })
@@ -344,7 +436,7 @@
                         return "2, 2";
                 });
 
-            newdatas.filter(noevents).append("svg:text")
+            noevdatas.append("svg:text")
                 .attr("class", "datatext")
                 .attr("fill", "#000")
                 .attr("data-full", function(d, i) { return d.content; })
@@ -355,11 +447,9 @@
                 .attr("text-anchor", "middle")
                 .text(function(d) { return d.topline; });
 
-            function onlyevents(d, i) {
-                return d.type == "event";
-            }
-
-            newdatas.filter(onlyevents).append("svg:rect")
+            var evdatas = newdatas.filter(function(d) { return d.type == "event"; });
+            
+            evdatas.append("svg:rect")
                 .attr("class", "dataevent")
                 .attr("stroke", "#666")
                 .attr("fill", "#ffcc33")
@@ -370,7 +460,7 @@
                 .attr("height", 20)
                 .attr("stroke-width", 2);
 
-            newdatas.filter(onlyevents).append("svg:text")
+            evdatas.append("svg:text")
                 .attr("class", "eventtext")
                 .attr("fill", "#000")
                 .attr("x", function(d, i) { return getlinex(d.from); })
@@ -433,21 +523,21 @@
                     intervalID = window.setTimeout(get_live_data, 2000, true);
             });
         }
-
-        function redraw(newdata, force)
+        
+        function resize_svgs()
         {
-            if (!force)
-                force = false;
-
-            var trans = null;
-            var dirty = doheaders(newdata);
-
-            curheads += dirty;
-            //console.log("currently " + curheads);
+            headcount = 0;
+            $.each(gheaders, function(idx, el) { 
+                if (!el.hidden)
+                    if (el.collapsed)
+                        headcount+=1;
+                    else
+                        headcount += headers[el.name].length;
+            });
 
             // resize svg if we need to
-            if (curheads * 150 > curwidth) {
-                curwidth = curheads * 150;
+            if (headcount * 150 > curwidth) {
+                curwidth = headcount * 150;
                 $("#msccontain,#mscheader,svg").attr("width", curwidth);
                 console.log("tried to resize");
             }
@@ -461,22 +551,23 @@
                 msclines.attr('y2', curheight);
             }
 
-            if (dirty != 0)
-                trans = drawheaders();
+        }
 
-            // we only wait if were dirty and not forced
-            if (dirty != 0 && !force)
-            {
-                var callonce = false;
-                trans.each("end", function() {
-                    if (!callonce) {
-                        callonce = true;
-                        drawdata();
-                    }
-                });
-            }
-            else
-                drawdata();
+        function redraw(newdata, force)
+        {
+            var trans = null;
+            var dirty = doheaders(newdata);
+
+            curheads += dirty;
+            //console.log("currently " + curheads);
+
+            // resize
+            resize_svgs();
+
+            trans = drawheaders();
+
+            // anim is too annoying, don't bother
+            drawdata();
         }
 
         $(function() {
