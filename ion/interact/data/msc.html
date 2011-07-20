@@ -8,6 +8,8 @@
     <style>
         body {
             margin: 0px;
+            font-size: 10px;
+            font-family: helvetica, sans-serif;
         }
         #mscheader {
             position: fixed;
@@ -177,8 +179,12 @@
         {
             // first, group headers
             //console.log(gheaders);
+
+            // filter out gheaders for what is hidden or not
+            gheaders_filtered = $.grep(gheaders, function(el, idx) { return !el.hidden; });
+
             var gheads = cheader.selectAll("g.gheader")
-                .data(gheaders, function(d) { return d.name; } );
+                .data(gheaders_filtered, function(d) { return d.name; } );
 
             function getgroupxoffset(d, i) {
                 var x, y = 0;
@@ -227,6 +233,9 @@
                         return headers[d.name].length * 150 / 2; 
                 });
 
+            // delete ones
+            gheads.exit().remove();
+
             // create new ones
             var newgheads = gheads.enter().append("svg:g")
                 .attr("id", function(d) { return d.name; })
@@ -240,9 +249,6 @@
                 })
                 .attr("height", 50)
                 .attr("fill", "#ff0000");
-
-            // no need to delete
-            // @TODO HIDDEN WILL NEED TO DELETE
 
             $('g.gheader').unbind('click').click(function(e) {
                 headname = $(this).attr('id')
@@ -299,7 +305,9 @@
 
                 var heads = d3.select(this).selectAll('.subhead');
                 var sheads;
-                if (d.collapsed)
+                if (d.hidden)
+                    sheads = heads.data([]);
+                else if (d.collapsed)
                     sheads = heads.data([{name:"(" + headers[d.name].length + " items)"}], function(dx) { return dx.name; });
                 else
                     sheads = heads.data(headers[d.name], function(dx) { return dx.name; })
@@ -346,7 +354,7 @@
                     .attr("text-anchor", "middle")
                     .text(function(d) { return d.name });
 
-                // remove old ones (recently collapsed)
+                // remove old ones (recently collapsed or hidden)
                 sheads.exit().remove();
                 
                 $('g.subhead rect, g.subhead text').unbind('mouseover').mouseover(function(e) {
@@ -411,8 +419,25 @@
 
         function drawdata() {
             
+            filtdata = $.grep(data, function(el, idx) {
+                names = [getnames(el.from).gname, getnames(el.to).gname];
+
+                for (var i = 0; i < gheaders.length; i++)
+                    if ($.inArray(gheaders[i].name, names) != -1 && gheaders[i].hidden)
+                        return false;
+
+                return true;
+            });
+
+            // update visible indicies
+            $.each(filtdata, function(idx, el) { el.vidx = idx; });
+
             var dlines = cmain.selectAll("g.msg")
-                .data(data);    // index is fine
+             .data(filtdata, function(d) { return d.idx; } );    // index is fine
+
+            //console.log(dlines);
+            //console.log(dlines.enter());
+            //console.log(dlines.exit());
 
             function getlinex(rawid) {
               splits = getnames(rawid);
@@ -433,23 +458,31 @@
               return cmain.select("line#" + lid).attr("x1");
             }
 
+            // anything dead? remove it
+            dlines.exit().remove();
+
             // update existing 
             dlines.selectAll(".dataline").transition()
                 .duration(500)
                 .attr("x1", function(d) { return getlinex(d.from) })
-                .attr("x2", function(d) { return getlinex(d.to) });
+                .attr("x2", function(d) { return getlinex(d.to) })
+                .attr("y1", function(d, i) { return 30 * d.vidx + 10; })
+                .attr("y2", function(d, i) { return 30 * d.vidx + 10; });
 
             dlines.selectAll(".datatext").transition()
                 .duration(500)
-                .attr("x", function(d) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } );
+                .attr("x", function(d) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } )
+                .attr("y", function(d, i) { return 30 * d.vidx + 8; });
 
             dlines.selectAll(".dataevent").transition()
                 .duration(500)
-                .attr("x", function(d) { return getlinex(d.from) - 75; });
+                .attr("x", function(d) { return getlinex(d.from) - 75; })
+                .attr("y", function(d) { return 30 * d.vidx; });
 
             dlines.selectAll(".eventtext").transition()
                 .duration(500)
-                .attr("x", function(d) { return getlinex(d.from); });
+                .attr("x", function(d) { return getlinex(d.from); })
+                .attr("y", function(d) { return 30 * d.vidx + 12; });
 
             // create new ones
             var newdatas = dlines.enter().append("svg:g")
@@ -469,9 +502,9 @@
                 .attr("class", "dataline")
                 .attr("stroke", "#666")
                 .attr("x1", function(d, i) { return getlinex(d.from); })
-                .attr("y1", function(d, i) { return 30 * d.idx + 10; })
+                .attr("y1", function(d, i) { return 30 * d.vidx + 10; })
                 .attr("x2", function(d, i) { return getlinex(d.to); })
-                .attr("y2", function(d, i) { return 30 * d.idx + 10; })
+                .attr("y2", function(d, i) { return 30 * d.vidx + 10; })
                 .attr("stroke-width", 2)
                 .attr("marker-end", function(d) { return "url(#" + d.type + ")"; } )
                 .attr("stroke-dasharray", function(d) {
@@ -490,7 +523,7 @@
                 //.attr("stroke", "#fff")
                 //.attr("stroke-width", 15)
                 .attr("x", function(d, i) { return (parseInt(getlinex(d.from)) + parseInt(getlinex(d.to))) / 2; } )
-                .attr("y", function(d, i) { return 30 * d.idx + 8; })
+                .attr("y", function(d, i) { return 30 * d.vidx + 8; })
                 .attr("text-anchor", "middle")
                 .text(function(d) { return d.topline; });
 
@@ -502,7 +535,7 @@
                 .attr("fill", "#ffcc33")
                 .attr("data-full", function(d, i) { return d.content; })
                 .attr("x", function(d, i) { return getlinex(d.from) - 75; })
-                .attr("y", function(d, i) { return 30 * d.idx; })
+                .attr("y", function(d, i) { return 30 * d.vidx; })
                 .attr("width", 150)
                 .attr("height", 20)
                 .attr("stroke-width", 2);
@@ -511,7 +544,7 @@
                 .attr("class", "eventtext")
                 .attr("fill", "#000")
                 .attr("x", function(d, i) { return getlinex(d.from); })
-                .attr("y", function(d, i) { return 30 * d.idx + 12; })
+                .attr("y", function(d, i) { return 30 * d.vidx + 12; })
                 .attr("text-anchor", "middle")
                 .text(function(d) { return d.topline; });
 
