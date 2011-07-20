@@ -55,6 +55,26 @@
             overflow: auto;
             box-shadow: 0 1px 15px rgba(0,0,0,0.75);
         }
+
+        .lite text {
+        }
+
+        .lite .dataevent {
+            fill: #ff6633;
+            stroke: #ff3366;
+        }
+        .lite .eventtext {
+            fill: #cc33ff;
+        }
+
+        .lite .dataline {
+            stroke: #ff6633;
+        }
+
+        .lite .datatext {
+            fill: #3366ff;
+        }
+
     </style>
 </head>
 <body>
@@ -236,6 +256,16 @@
 
                 redraw([]);
             });
+            $('g.gheader .grect,.gtext').unbind('mouseover').mouseover(function(e) {
+                headname = $(this).parent().attr('id');
+                cmain.selectAll('g.msg[data-from^='+headname+']').classed("lite", true).classed("lite-from", true);
+                cmain.selectAll('g.msg[data-to^='+headname+']').classed("lite", true).classed("lite-to", true);
+            });
+            $('g.gheader .grect,.gtext').unbind('mouseout').mouseout(function(e) {
+                headname = $(this).parent().attr('id');
+                cmain.selectAll('g.msg[data-from^='+headname+']').classed("lite", false).classed("lite-from", false);
+                cmain.selectAll('g.msg[data-to^='+headname+']').classed("lite", false).classed("lite-to", false);
+            });
 
             // create rects/texts on any new items
             newgheads.append("svg:rect")
@@ -408,7 +438,8 @@
             // create new ones
             var newdatas = dlines.enter().append("svg:g")
                 //.attr("style", "text-shadow: 0px 0px 5px #fff;")
-                .attr("data-to", "spiffy")
+                .attr("data-to", function(d) { return d.to; })
+                .attr("data-from", function(d) { return d.from; })
                 .attr("class", "msg")
                 .attr("opacity", 0);
                 
@@ -451,7 +482,7 @@
             
             evdatas.append("svg:rect")
                 .attr("class", "dataevent")
-                .attr("stroke", "#666")
+                .attr("stroke", "#f5b800")
                 .attr("fill", "#ffcc33")
                 .attr("data-full", function(d, i) { return d.content; })
                 .attr("x", function(d, i) { return getlinex(d.from) - 75; })
