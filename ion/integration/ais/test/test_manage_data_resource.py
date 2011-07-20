@@ -169,8 +169,10 @@ class AISManageDataResourceTest(IonTestCase):
         #prepare to monkey patch so we don't use the cache functions
         child_aiss = yield self.sup.get_child_id('app_integration')
         self.aiss  = self._get_procinstance(child_aiss)
-        self.aiss.metadataCache = None
 
+        # For testing purposes - turn of the subscriber and remove the call back to update the cache - for now!
+        self.aiss.dataset_subscriber.terminate()
+        self.aiss.datasource_subscriber.terminate()
 
     @defer.inlineCallbacks
     def tearDown(self):
