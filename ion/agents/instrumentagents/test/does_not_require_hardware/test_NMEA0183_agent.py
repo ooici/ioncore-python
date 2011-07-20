@@ -11,6 +11,8 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 import ion.util.ionlog
+import ion.util.procutils as pu
+
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentParameter
@@ -28,8 +30,9 @@ from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
+from ion.core.process.process import Process
 
-from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
+from ion.services.dm.distribution.events import DataBlockEventSubscriber
 
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
@@ -582,24 +585,23 @@ class TestNMEA0183Agent (IonTestCase):
         """
         Test cases for executing device commands through the instrument agent.
         """
-        log.debug("*** starting test_publish_data")
         # Setup a subscriber to an event topic
-        class TestEventSubscriber(InfoLoggingEventSubscriber):
+        class TestDataSubscriber(DataBlockEventSubscriber):
             def __init__(self, *args, **kwargs):
                 self.msgs = []
-                InfoLoggingEventSubscriber.__init__(self, *args, **kwargs)
+                DataBlockEventSubscriber.__init__(self, *args, **kwargs)
+                log.info("TestData subscriber is subscribed to channel: %s", kwargs['origin'])
                 
             def ondata(self, data):
-                log.debug("TestEventSubscriber received a message with name: %s",
-                          data['content'].name)
+                log.debug("TestEventSubscriber received a message with name: %s, content: %s",
+                          data['content'].name, data['content']),
                 self.msgs.append(data)
                 
-        log.debug("*** creating subproc of subscriber")    
         subproc = Process()
         yield subproc.spawn()
-        testsub = TestEventSubscriber(origin=('agent.' + str(self.svc_id)),
+        testsub = TestDataSubscriber(origin=("%s.%s" % (NMEADeviceChannel.GPS,
+                                                         str(self.svc_id))),
                                       process=subproc)
-        log.debug("*** found it")
         yield testsub.initialize()
         yield testsub.activate()
         
@@ -670,8 +672,15 @@ class TestNMEA0183Agent (IonTestCase):
         self.assert_(InstErrorCode.is_ok (success))
         self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
     
+        # start acquisition
+        reply = yield self.ia_client.execute_device([NMEADeviceChannel.GPS],
+            [NMEADeviceCommand.START_AUTO_SAMPLING], tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
         # check for a publish event
-        yield pu.asleep(2.0)
+        yield pu.asleep(1.0)
         self.assertEqual(len(testsub.msgs), 2)
         
         # End the transaction.

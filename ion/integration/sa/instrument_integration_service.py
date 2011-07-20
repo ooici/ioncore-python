@@ -10,8 +10,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.process.process import ProcessFactory, ProcessDesc
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
@@ -19,19 +17,15 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.services.coi.resource_registry.association_client import AssociationClientError
 from ion.core.messaging.message_client import MessageClient
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, PREDICATE_REFERENCE_TYPE
 
-import ion.util.procutils as pu
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.dm.distribution.events import InfoLoggingEventSubscriber
-from ion.services.dm.distribution.events import DataEventSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
-from ion.agents.instrumentagents.instrument_constants import AgentState
 from ion.agents.instrumentagents.instrument_constants import DriverChannel
 from ion.agents.instrumentagents.instrument_constants import DriverParameter
 #from ion.agents.instrumentagents.SBE37_driver import SBE37Parameter
@@ -42,14 +36,8 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import INSTRUMENT_R
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 import SERPORTSLAVE
 from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
 
-from ion.core.process.process import Process
-from ion.core.process.process import ProcessDesc
-from ion.core import bootstrap
-
 
 from ion.core.object import object_utils
-import gviz_api
-
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
 INSTRUMENT_TYPE = object_utils.create_type_identifier(object_id=4301, version=1)
@@ -142,7 +130,6 @@ class InstrumentIntegrationService(ServiceProcess):
         cmd = [AgentCommand.TRANSITION,AgentEvent.INITIALIZE]
         reply = yield self.ia_client.execute_observatory(cmd,trans_id)
         success = reply['success']
-        log.debug("*** reply: %s", reply)
         if not InstErrorCode.is_ok(success):
             log.info("IIService Unable to transition instrument state: %s",
                      reply['success'])
@@ -318,7 +305,6 @@ class InstrumentIntegrationService(ServiceProcess):
         reply = yield self.ia_client.execute_device(chans,cmd,transaction_id)
         log.info('startAutoSampling success: %s',str(reply['success']))
         success = reply['success']
-        result = reply['result']
         if InstErrorCode.is_error(success):
             log.info("IIService Unable to transition instrument state: %s",
                      reply['success'])
@@ -377,7 +363,6 @@ class InstrumentIntegrationService(ServiceProcess):
             
             reply = yield self.ia_client.execute_device(chans, cmd, trans_id)
             success = reply['success']
-            result = reply['result']
 
             if InstErrorCode.is_ok(success):
                 break
