@@ -445,9 +445,9 @@ class SchedulerService(ServiceProcess):
         ##
         #################################################
         try:
-            self.workbench.cache_repository(msg.Repository)
+            self.workbench.clear_repository(msg.Repository)
         except Exception, ex:
-            log.error("Could not cache repository: %s" % str(ex))
+            log.error("Could not clear repository: %s" % str(ex))
             pass
 
         # start time of None is fine, we just happened so we can be sure interval_seconds is just about right
