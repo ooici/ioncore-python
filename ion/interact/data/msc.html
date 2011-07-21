@@ -232,6 +232,7 @@
         var curheight = 600;
         var curwidth = 900;
         var curheads = 0;
+        var lastvidx = 0;   // last visible index, set on every draw
 
         function getnames(x) {
             var sidx = x.indexOf("/");
@@ -541,7 +542,7 @@
             });
 
             // update visible indicies
-            $.each(filtdata, function(idx, el) { el.vidx = idx; });
+            $.each(filtdata, function(idx, el) { el.vidx = idx; lastvidx = idx + 1; });
 
             var dlines = cmain.selectAll("g.msg")
              .data(filtdata, function(d) { return d.idx; } );    // index is fine
@@ -704,22 +705,21 @@
                         headcount += headers[el.name].length;
             });
 
-            // resize svg if we need to
-            if (headcount * 150 > curwidth) {
+            if (headcount * 150 != $("#msccontain").attr("width"))
+            {
                 curwidth = headcount * 150;
                 $("#msccontain,#mscheader,svg").attr("width", curwidth);
-                console.log("tried to resize");
+
             }
 
-            if (data.length * 30 + 10 > curheight) {
-                curheight = data.length * 30 + 10;
+            if (lastvidx * 30 + 10 != $("#msccontain").attr("height"))
+            {
+                curheight = lastvidx * 30 + 10;
                 $('#msccontain, #msccontain svg').attr('height', curheight);
-                console.log("tried to resize vert");
 
                 var msclines = cmain.selectAll("line.proc");
                 msclines.attr('y2', curheight);
             }
-
         }
 
         function redraw(newdata, force)
