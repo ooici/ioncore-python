@@ -884,7 +884,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         log.info("Driver has disconnected from the device")
         NMEADeviceDriver.serConnection = None
-        self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
+        yield self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
 
     ###########################################################################
     # Agent interface methods.
@@ -1159,7 +1159,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success': None, 'result': None}
-        success = self.fsm.on_event_async(NMEADeviceEvent.INITIALIZE)
+        success = yield self.fsm.on_event_async(NMEADeviceEvent.INITIALIZE)
 
         # Set success and send reply.
         # Unsuccessful initialize means event is not handled in the cur. state.
@@ -1659,7 +1659,7 @@ class NMEADeviceDriver(InstrumentDriver):
             elif NMEA_CD in self._device_NMEA_config.cfgParams:
                 self._most_recent[NMEA_CD] = nmeaLine
                 self._data_lines.append(nmeaLine)
-            self.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
+            yield self.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
             
 class NMEA0183Protocol(basic.LineReceiver):
 
