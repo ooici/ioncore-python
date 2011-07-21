@@ -241,6 +241,13 @@ class Process(BasicLifecycleObject):
     # on_XXX: State management API action callbacks
     # plc_XXX: Callback hooks for subclass processes
 
+    def workbench_memory(self):
+        """
+        A debug method - used in the shell to print the foot print of the workbench
+        """
+        print "Cached Repositories - %d, Working Repositories - %d, Objects - %d, Memory - %d kb" % \
+            (len(self.workbench._workbench_cache), len(self.workbench._repos),len(self.workbench._repo_cache), self.workbench._repo_cache.total_size/1000)
+
     @defer.inlineCallbacks
     def spawn(self):
         """

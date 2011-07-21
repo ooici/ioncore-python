@@ -18,6 +18,10 @@ from ion.core.process.process import ProcessDesc, Process
 # The shell namespace
 namespace = {}
 
+# The objects to import:
+__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc']
+#from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
+
 def info():
     print "Python Capability Container, "
     print "  Container id:", ioninit.container_instance.id
@@ -31,6 +35,7 @@ def info():
     print "  spawn(module): Spawn a process from a module"
     print "  makeprocess(): Returns a new Process object (spawn is called but may not be done yet)"
     print "  ping(servicename): Pings a named service in this container's sysname. Returns a deferred."
+    print "  get_proc(full_id): Returns the process instance object"
     print "Variables:"
     print "  control: shell control"
     print "  procs: dict of local process names -> pid"
@@ -196,6 +201,11 @@ def kill(id):
      - cancel messaging consumer
      - delete
     """
+    p = get_proc(id)
+    p.terminate()
+    ioninit.container_instance.proc_manager.process_registry.remove(id)
+    print 'Process terminated and removed from process registry'
+
 
 def nodes():
     agent = namespace['agent']
@@ -252,3 +262,11 @@ def ping(servicename):
     d.addCallback(pingok)
 
     return d
+
+def get_proc(full_id):
+    """
+    This sucks - the get method is deferred - so call result and see if we can get around it - should be instant!
+    """
+
+    return ioninit.container_instance.proc_manager.get_local_process(full_id).result
+
