@@ -287,7 +287,7 @@ class ObjectContainer(object):
 
     def _wrap_message_object(self, message, obj_id=None, addtoworkspace=True):
 
-        if not obj_id:
+        if obj_id is None:
             obj_id = self.new_id()
         obj = gpb_wrapper.Wrapper(message)
         obj._repository = self
