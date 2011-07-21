@@ -134,14 +134,16 @@ class MetadataCache(object):
         numDSets =  len(dSetResults.idrefs)          
         log.debug('Found ' + str(numDSets) + ' datasets.')
 
-        yield self.__lockCache()
-        
-        i = 0
-        while (i < numDSets):
-            yield self.__putDSetMetadata(dSetResults.idrefs[i].key)
-            i = i + 1
+        try:
+            yield self.__lockCache()
+            
+            i = 0
+            while (i < numDSets):
+                yield self.__putDSetMetadata(dSetResults.idrefs[i].key)
+                i = i + 1
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
             
         defer.returnValue(True)
 
@@ -165,14 +167,16 @@ class MetadataCache(object):
         numDSources =  len(dSourceResults.idrefs)          
         log.debug('Found ' + str(numDSources) + ' datasources.')
 
-        yield self.__lockCache()
-        
-        i = 0
-        while (i < numDSources):
-            yield self.__putDSourceMetadata(dSourceResults.idrefs[i].key)
-            i = i + 1
+        try:
+            yield self.__lockCache()
+            
+            i = 0
+            while (i < numDSources):
+                yield self.__putDSourceMetadata(dSourceResults.idrefs[i].key)
+                i = i + 1
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
             
         defer.returnValue(True)
 
@@ -186,9 +190,9 @@ class MetadataCache(object):
         
         log.debug('getDSet')
 
-        yield self.__lockCache()
-                    
         try:
+            yield self.__lockCache()
+                    
             metadata = self.__metadata[dSetID]
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
             returnValue = metadata[DSET]
@@ -196,7 +200,8 @@ class MetadataCache(object):
             log.error('Metadata not found for datasetID: ' + dSetID)
             returnValue = None
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
         
         defer.returnValue(returnValue)
 
@@ -210,17 +215,19 @@ class MetadataCache(object):
         
         log.debug('getDSetMetadata')
 
-        yield self.__lockCache()
-                    
         try:
+            yield self.__lockCache()
+                    
             metadata = self.__metadata[dSetID]
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
             returnValue = metadata
         except KeyError:
             log.info('Metadata not found for datasetID: ' + dSetID)
             returnValue = None
+            
+        finally:            
 
-        self.__unlockCache()
+            self.__unlockCache()
         
         defer.returnValue(returnValue)
 
@@ -235,11 +242,13 @@ class MetadataCache(object):
         
         log.debug('putDSetMetadata')
 
-        yield self.__lockCache()
+        try:
+            yield self.__lockCache()
+    
+            yield self.__putDSetMetadata(dSetID)
 
-        yield self.__putDSetMetadata(dSetID)
-
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
                     
     
     @defer.inlineCallbacks
@@ -251,9 +260,9 @@ class MetadataCache(object):
         
         log.debug('deleteDSetMetadata')
 
-        yield self.__lockCache()
-
         try:
+            yield self.__lockCache()
+
             #
             # Set the persistent flag to False
             #
@@ -268,8 +277,10 @@ class MetadataCache(object):
         else:
             self.numDSets = self.numDSets - 1
             returnValue = True
+
+        finally:
             
-        self.__unlockCache()
+            self.__unlockCache()
         
         defer.returnValue(returnValue)
 
@@ -283,10 +294,10 @@ class MetadataCache(object):
         """
         
         log.debug('getDSource for: ' + dSourceID)
-                    
-        yield self.__lockCache()
 
-        try:
+        try:                    
+            yield self.__lockCache()
+
             metadata = self.__metadata[dSourceID]
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
             returnValue = metadata[DSOURCE]
@@ -294,7 +305,8 @@ class MetadataCache(object):
             log.error('Metadata not found for datasourceID: ' + dSourceID)
             returnValue = None
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
             
         defer.returnValue(returnValue)            
         
@@ -306,11 +318,11 @@ class MetadataCache(object):
         represented by the given ResourceID (dSourceID).
         """
         
-        yield self.__lockCache()
-
-        log.debug('getDSourceMetadata')
-                    
         try:
+            yield self.__lockCache()
+    
+            log.debug('getDSourceMetadata')
+                    
             metadata = self.__metadata[dSourceID]
             log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
             returnValue = metadata
@@ -318,7 +330,8 @@ class MetadataCache(object):
             log.info('Metadata not found for datasourceID: ' + dSourceID)
             returnValue = None
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
             
         defer.returnValue(returnValue)
     
@@ -332,11 +345,13 @@ class MetadataCache(object):
         
         log.debug('putDSourceMetadata')
 
-        yield self.__lockCache()
+        try:
+            yield self.__lockCache()
 
-        yield self.__putDSourceMetadata(dSourceID)
+            yield self.__putDSourceMetadata(dSourceID)
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
 
 
     @defer.inlineCallbacks
@@ -348,9 +363,10 @@ class MetadataCache(object):
         
         log.debug('deleteDSourceMetadata')
 
-        yield self.__lockCache()
-        
+
         try:
+            yield self.__lockCache()
+        
             #
             # Set the persistent flag to False
             #
@@ -366,7 +382,8 @@ class MetadataCache(object):
             self.numDSources = self.numDSources - 1
             returnValue = True
 
-        self.__unlockCache()
+        finally:
+            self.__unlockCache()
         
         defer.returnValue(returnValue)
 
