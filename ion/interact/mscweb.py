@@ -18,6 +18,7 @@ from ion.interact.int_observer import InteractionObserver
 from zope.interface import Interface, Attribute, implements
 from twisted.python.components import registerAdapter
 from twisted.web.server import Session
+from pkg_resources import resource_stream
 
 from ion.services.dm.distribution.eventmonitor import EventMonitorServiceClient
 
@@ -223,7 +224,7 @@ class EventMonitorWebResource(resource.Resource):
 
         self._io = io
 
-        self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "msc.html"))
+        #self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "msc.html"))
 
     def getChild(self, name, request):
 
@@ -236,13 +237,11 @@ class EventMonitorWebResource(resource.Resource):
         return self
 
     def render_GET(self, request):
-        #template = string.Template(self.page_template)
-        #return template.substitute()
         # TODO: testing only, load every time
         #log.critical(request)
         #log.critical(request.prepath)
 
-        # DEBUGGING reload session stored object every time so we can get teh data over and over
+        # reload session stored object every time so we can get the data over and over - very useful
         lastdata = ILastData(request.getSession())
         lastdata.last_index = 0
 
@@ -250,8 +249,19 @@ class EventMonitorWebResource(resource.Resource):
         if len(listpath) == 1 and listpath[0] == '':
             listpath[0] = "msc.html"
 
-        self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", *listpath))
-        return self._mainpage.render_GET(request)
+        f = resource_stream(__name__, "data/%s" % "/".join(listpath))
+        data = f.readlines()
+        f.close()
+
+        # figure out mime type, in a hacky manner - most browsers don't care and will get it right
+        mime = "text/%s"
+        if ".js" in listpath[-1]:
+            mime = mime % "javascript"
+        else:
+            mime = mime % "html"
+
+        webdata = static.Data(''.join(data), mime)
+        return webdata.render_GET(request)
 
 class MSCWebProcess(Process):
     """
