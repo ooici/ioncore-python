@@ -201,6 +201,11 @@ def kill(id):
      - cancel messaging consumer
      - delete
     """
+    p = get_proc(id)
+    p.terminate()
+    ioninit.container_instance.proc_manager.process_registry.remove(id)
+    print 'Process terminated and removed from process registry'
+
 
 def nodes():
     agent = namespace['agent']
