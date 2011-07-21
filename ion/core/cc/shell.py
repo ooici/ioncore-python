@@ -19,6 +19,9 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ionconst
 
+CTRL_A = '\x01'
+CTRL_E = '\x05'
+
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
         virtual_env = os.path.join(os.environ.get('VIRTUAL_ENV'),
@@ -122,6 +125,13 @@ class ConsoleManhole(manhole.ColoredManhole):
 class DebugManhole(manhole.Manhole):
     ps = ('<>< ', '... ')
 
+    def connectionMade(self):
+        manhole.Manhole.connectionMade(self)
+        self.keyHandlers.update({
+            CTRL_A: self.handle_HOME,
+            CTRL_E: self.handle_END,
+            })
+
     def initializeScreen(self):
         self.terminal.write('Ion Remote Container Shell\r\n')
         self.terminal.write('\r\n')
@@ -131,6 +141,10 @@ class DebugManhole(manhole.Manhole):
         self.terminal.write('\r\n')
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
+
+    def terminalSize(self, width, height):
+        self.width = width
+        self.height = height
 
     def handle_QUIT(self):
         self.terminal.loseConnection()
@@ -195,9 +209,7 @@ class DebugManhole(manhole.Manhole):
             and the word length plus padding must be less than or equal to the
             number of columns.
             """
-            p = os.popen('stty size', 'r')
-            rows, columns = map(int, p.read().split())
-            p.close()
+            rows, columns = self.height, self.width
             l.sort()
             number_words = len(l)
             longest_word = len(max(l)) + 2
