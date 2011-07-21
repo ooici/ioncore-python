@@ -8,7 +8,6 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-import logging
 import ion.util.procutils as pu
 
 from twisted.internet import defer
@@ -17,14 +16,10 @@ import time
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.core.exception import ReceivedApplicationError
 from ion.core.data.storage_configuration_utility import COMMIT_CACHE
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
-                                                                    ANONYMOUS_USER_ID, \
-                                                                    MYOOICI_USER_ID
 
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
-from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.dm.distribution.events import DatasetChangeEventPublisher, \
                                                 DatasourceChangeEventPublisher
 from ion.core.data import store
@@ -34,30 +29,6 @@ from ion.test.iontest import IonTestCase
 
 from ion.integration.ais.findDataResources.findDataResources import DatasetUpdateEventSubscriber, \
                                                                     DatasourceUpdateEventSubscriber
-from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
-#from ion.integration.ais.findDataResources import DatasetUpdateEventSubscriber
-
-# import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
-                                                       AIS_RESPONSE_MSG_TYPE, \
-                                                       AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
-                                                       UPDATE_USER_PROFILE_REQUEST_TYPE, \
-                                                       REGISTER_USER_RESPONSE_TYPE, \
-                                                       GET_USER_PROFILE_REQUEST_TYPE, \
-                                                       FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
-                                                       GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE, \
-                                                       CREATE_DOWNLOAD_URL_REQ_MSG_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_REQUEST_TYPE, \
-                                                       GET_RESOURCES_OF_TYPE_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_TYPES_RESPONSE_TYPE, \
-                                                       GET_RESOURCE_REQUEST_TYPE, \
-                                                       GET_RESOURCE_RESPONSE_TYPE, \
-                                                       SUBSCRIBE_DATA_RESOURCE_REQ_TYPE, \
-                                                       FIND_DATA_SUBSCRIPTIONS_REQ_TYPE, \
-                                                       DELETE_SUBSCRIPTION_REQ_TYPE, \
-                                                       MANAGE_USER_ROLE_REQUEST_TYPE
-
 # Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
 dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
@@ -133,12 +104,9 @@ class MetadataCacheTest(IonTestCase):
                     }
             },
             {
-                'name':'resource_registry1',
-                'module':'ion.services.coi.resource_registry.resource_registry',
-                'class':'ResourceRegistryService',
-                'spawnargs':
-                    {
-                        'datastore_service':'datastore'}
+                'name':'association_service',
+                'module':'ion.services.dm.inventory.association_service',
+                'class':'AssociationService'
             },
             {
                 'name':'exchange_management',
@@ -146,26 +114,10 @@ class MetadataCacheTest(IonTestCase):
                 'class':'ExchangeManagementService',
             },
             {
-                'name':'association_service',
-                'module':'ion.services.dm.inventory.association_service',
-                'class':'AssociationService'
-            },
-            {
-                'name':'attributestore',
-                'module':'ion.services.coi.attributestore',
-                'class':'AttributeStoreService'
-            },
-            {
                 'name':'store_service',
                 'module':'ion.core.data.store_service',
                 'class':'StoreService'
             },
-            {
-                'name':'dataset_controller',
-                'module':'ion.services.dm.inventory.dataset_controller',
-                'class':'DatasetControllerClient'
-            },
-
             ]
 
         log.debug('MetadataCacheTest.setUp(): spawning processes')
@@ -174,9 +126,6 @@ class MetadataCacheTest(IonTestCase):
 
         self.sup = sup
 
-        self.rc = ResourceClient(proc=sup)
-        self.mc = MessageClient(proc=sup)
-        self.ac  = AssociationClient(proc=sup)
         self._proc = Process()
 
         #
