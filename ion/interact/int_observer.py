@@ -50,7 +50,7 @@ class InteractionObserver(Process):
         self.add_life_cycle_object(self.msg_receiver)
         self.add_life_cycle_object(self.ev_sub)
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def plc_terminate(self):
         #yield self.msg_receiver.deactivate()
         #yield self.msg_receiver.terminate()
@@ -105,20 +105,24 @@ class InteractionObserver(Process):
         if len(self.msg_log) > self.max_msglog + 100:
             self.msg_log = self.msg_log[100:]
 
-    def writeout_msc(self):
-        msglog = self.msg_log[:]
-        procs = []
-        senders = []
+    def _get_participants(self, msglog):
+        """
+        Given a msglog, extract the participants into an alias table.
+
+        Returns a tuple of proc_alias, open_rpcs, procs:
+            proc_alias maps receivers -> process names
+            open_rpcs maps convid -> unknown receiver names
+            procs is a list of left-over non rpc destinations
+        """
         proc_alias = {}     # maps receivers -> process names
         open_rpcs = {}      # maps convid -> unknown receiver names
+        procs = []
 
         for msgtup in msglog:
             msg = msgtup[1]
             sid = msg.get('sender', '??')
-            rec = msg.get('receiver')
+            rec = msg.get('receiver', None)
             sname = msg.get('sender-name', sid)
-            if "DatasetAgent" in sname:
-                sname = "%s_%s" % (sname, sid[0:5])
 
             # map sender to process name
             if not sid in proc_alias:
@@ -134,11 +138,10 @@ class InteractionObserver(Process):
                 if convid is None or performative is None:
                     log.warn('Intercepted message with no performative or convid, but says it is rpc')
                 elif performative == 'request':
-                    torec = msg.get('receiver', None)
-                    if torec is not None and torec not in proc_alias:
+                    if rec is not None and rec not in proc_alias:
                         # add to open rpc conversation maps
-                        open_rpcs[convid] = torec
-                        log.debug("Adding receiver %s to open conversations to resolve (conv id %s)" % (torec, convid))
+                        open_rpcs[convid] = rec
+                        log.debug("Adding receiver %s to open conversations to resolve (conv id %s)" % (rec, convid))
 
                 elif performative != 'timeout':     # all other items are responses, so we should be able to get info
 
@@ -157,38 +160,50 @@ class InteractionObserver(Process):
             if not rec in procs and not msgtup[2]:
                 procs.append(rec)
 
+        # morph names in proc_alias to resemble "sname/sid" for taxonomy purposes
+        new_proc_alias = {}
+        for k, v in proc_alias.iteritems():
+            if k != v:
+                newv = "%s/%s" % (v, k)
+            else:
+                newv = v
+            new_proc_alias[k] = newv
 
-        # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
-        senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
-        senders.extend(open_rpcs.itervalues())
+        proc_alias = new_proc_alias
 
-        # add leftover non-rpc destinations
-        for rec in procs:
-            if not (rec in proc_alias or rec in open_rpcs.values()):
-                senders.append(rec)
+        return (proc_alias, open_rpcs, procs)
 
-        def sanitize(input):
-            return string.replace(string.replace(input, ".", "_"), "-", "_")
+    def _get_msc_data(self, msglog, proc_alias):
+        """
+        Provides msc data in python format, to be converted either to msc text or to json for use with
+        msc web monitor.
 
-        msc = "msc {\n"
-        msc += ' wordwraparcs="1";\n'
-        sstr = sanitize(",".join(senders))
-        msc += " %s;\n" % sstr
+        Returns a list of hashes of the format { to, from, content, type, ts, error (boolean), to_raw, from_raw, topline }
+        """
+        msgdata = []
 
         for msgtup in msglog:
+            datatemp = { "to": None, "from":None, "content":None, "type":None, "ts":None, "error":False }
+
             msg = msgtup[1]
 
             sid = msg.get('sender', '??')
             sname = proc_alias.get(sid, sid)
-            sname = sanitize(sname)
+            datatemp["from_raw"] = sname
+            sname = self._sanitize(sname)
+            datatemp["from"] = sname
 
             rec = msg.get('receiver')
-
             rname = proc_alias.get(rec, rec)
-            rname = sanitize(rname)
+            datatemp["to_raw"] = rname
+            rname = self._sanitize(rname)
+            datatemp["to"] = rname
+
+            datatemp["ts"] = msg.get("ts", "??")
 
             if msgtup[2]:
                 # this is an EVENT, show it as a box!
+                datatemp["type"] = "event"
 
                 # this table pulled from https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
                 # on 6 July 2011
@@ -213,47 +228,89 @@ class InteractionObserver(Process):
                             "4001" : "Data block" }
 
                 evid, evorigin = rec.split(".", 1)
-                evlabel = "E: %s (%s)\\nOrigin: %s" % (evtable[evid], evid, evorigin)
+                evlabel = "E: %s (%s)\nOrigin: %s" % (evtable[evid], evid, evorigin)
 
-                msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, evlabel)
+                datatemp["content"] = evlabel
+                datatemp["topline"] = evlabel.split("\n")[0]
             else:
+                mlabel = "%s\n(%s->%s)\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
+                datatemp["content"] = mlabel
+                datatemp["topline"] = mlabel.split("\n")[0]
 
-                #mlabel = "%s:%s:%s:%s" % (msg.get('protocol',None),
-                #    msg.get('performative',None), msg.get('op',None), msg.get('conv-seq',None))
-                # @todo Clean up sender and receiver names - remove host and PID
-                #re.sub('.+:','',sname)
-
-                mlabel = "%s\\n(%s->%s)\\n<%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
-
-                # default attributes: only a label
-                attrs = {'label': mlabel}
-
-                # determine arrow type used based on message type
-                arrow = '->'
                 if msg.get('protocol', None) == 'rpc':
 
-                    # we know its rpc based on arrow type and color, so we change the label to be more friendly
-                    #rpclabel = "%s (%s->%s) <%s>" % (msg.get('op', None), sid.rsplit(".", 1)[-1], rec.rsplit(".", 1)[-1], msg.get('_content_type', ''))
-                    #attrs['label'] = rpclabel
-
-                    arrow = ">>"    # default response, covers a few cases here
+                    datatemp["type"] = "rpcres"
 
                     performative = msg.get('performative', None)
                     if performative == 'request':
-                        arrow = '=>'
+                        datatemp["type"] = "rpcreq"
                     elif performative == 'timeout':
-                        arrow = '-x'    # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
+                        pass # timeout, unfortunatly you don't see this as it never gets messaged, @TODO
 
                     if performative == 'failure' or performative == 'error':
-                        attrs['textbgcolor'] = 'red'
-                        attrs['linecolor'] = 'red'
-                    else:
-                        attrs['textcolor'] = 'navy'
-                        attrs['linecolor'] = 'navy'
+                        datatemp["error"] = True
+
                 else:
                     # non rpc -> perhaps a data message for ingest/exgest?
-                    #msglabel = "%s (%s->%s) <%s>"
-                    pass
+                    datatemp["type"] = "data"
+
+            msgdata.append(datatemp)
+
+        return msgdata
+
+    @classmethod
+    def _sanitize(cls, input):
+        return string.replace(string.replace(input, ".", "_"), "-", "_")
+
+    def writeout_msc(self):
+        msglog = self.msg_log[:]
+        senders = []
+        proc_alias, open_rpcs, procs = self._get_participants(msglog)
+
+        # senders are - anything in the proc_alias values or the open_rpcs values as we've not resolved them
+        senders.extend(set(proc_alias.itervalues()))    # proc_alias values contain many duplicates, reduce them
+        senders.extend(open_rpcs.itervalues())
+        # add leftover non-rpc destinations
+        for rec in procs:
+            if not (rec in proc_alias or rec in open_rpcs.values()):
+                senders.append(rec)
+
+        # sort senders list
+        senders = sorted(senders)
+
+        msc = "msc {\n"
+        msc += ' wordwraparcs="1";\n'
+        sstr = self._sanitize(",".join(senders))
+        msc += " %s;\n" % sstr
+
+        mscdata = self._get_msc_data(msglog, proc_alias)
+
+        for mscitem in mscdata:
+
+            sname = mscitem['from']
+            rname = mscitem['to']
+
+            if mscitem['type'] == "event":
+                msc += ' %s abox %s [ label="%s", textbgcolor="orange" ];\n' % (sname, sname, mscitem['content'])
+            else:
+
+                # default attributes: only a label
+                attrs = {'label': mscitem['content']}
+
+                # determine arrow type used based on message type
+                arrow = '->'
+
+                if mscitem['type'] == "rpcreq":
+                    arrow = "=>"
+                elif mscitem['type'] == "rpcres":
+                    arrow = ">>"
+
+                if mscitem["error"]:
+                    attrs['textbgcolor'] = 'red'
+                    attrs['linecolor'] = 'red'
+                else:
+                    attrs['textcolor'] = 'navy'
+                    attrs['linecolor'] = 'navy'
 
                 msc += ' %s %s %s [ %s ];\n' % (sname, arrow, rname, ','.join(('%s="%s"' % (k, v) for k,v in attrs.iteritems())))
 

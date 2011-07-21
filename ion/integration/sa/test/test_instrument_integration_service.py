@@ -9,21 +9,18 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
 
 INSTRUMENTDATA_EVENT_ID = 5001
 
+import ion.util.procutils as pu
 from ion.integration.sa.instrument_integration_service import InstrumentIntegrationClient
 from ion.test.iontest import IonTestCase
-from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient, ResourceRegistryError
-from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceInstance, RESOURCE_TYPE
-from ion.services.dm.distribution.events import DataEventPublisher
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
-from ion.agents.instrumentagents.instrument_constants import DriverChannel
-from ion.services.dm.distribution.events import DataEventSubscriber, DataBlockEventSubscriber
-
+from ion.services.coi.resource_registry.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG
 from ion.core.messaging.message_client import MessageClient
-
+from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
+    import NMEA0183SimPrePlanned as sim
 from ion.core.object import object_utils
 
 AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
@@ -44,10 +41,7 @@ SET_INSTRUMENT_STATE_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(obj
 GET_INSTRUMENT_LIST_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9313, version=1)
 GET_INSTRUMENT_LIST_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9314, version=1)
 
-from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
-    import NMEA0183SimPrePlanned as sim
 
-import ion.util.procutils as pu
 
 
 class InstrumentIntegrationServiceTest(IonTestCase):
@@ -287,13 +281,13 @@ class InstrumentIntegrationServiceTest(IonTestCase):
         log.info("IIServiceTest test_createInstrumentStartSampling  startAutoSampling: %s ", rspMsg.message_parameters_reference[0].status)
 
         # Wait for a few samples to arrive.
-        yield pu.asleep(10)
+        yield pu.asleep(3)
 
         # Stop autosampling.
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='Stop instrument sampling request')
         msg.message_parameters_reference = msg.CreateObject(STOP_INSTRUMENT_SAMPLING_REQUEST_MSG_TYPE)
         msg.message_parameters_reference.instrument_resource_id = instrument_id
-
         rspMsg = yield self.iic.stopAutoSampling(msg)
+
         log.info("IIServiceTest test_createInstrumentStartSampling  Stop autosampling: %s ", rspMsg.message_parameters_reference[0].status)
 

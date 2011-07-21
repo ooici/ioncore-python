@@ -67,6 +67,7 @@ request = ContextLocal()
 
 # Optionally use Loggly for logging, just an experiment for now
 loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)
+loggly_key = os.environ.get('LOGGLY_KEY', loggly_key)
 if loggly_key is not None:
     import hoover
     import httplib2
@@ -80,9 +81,20 @@ if loggly_key is not None:
     setattr(hoover.utils, 'post_to_endpoint', post_to_endpoint)
     setattr(hoover.utils, 'async_post_to_endpoint', async_post_to_endpoint)
     setattr(hoover.handlers, 'async_post_to_endpoint', async_post_to_endpoint)
+
+    # Override the log method to add hostname in front
+    import platform
+    hostname = platform.node()
+    class IonLogglyHandler(hoover.LogglyHttpHandler):
+        def emit(self, record):
+            setattr(record, 'hostname', hostname)
+            hoover.LogglyHttpHandler.emit(self, record)
         
-    loggly_handler = hoover.LogglyHttpHandler(token=loggly_key)
+    loggly_handler = IonLogglyHandler(token=loggly_key)
     loggly_handler.setLevel(logging.DEBUG)
+    loggly_formatter = logging.Formatter(
+        '%(hostname)s> %(asctime)s.%(msecs)03d [%(levelname)s] {%(module)s:%(lineno)3d} %(message)s')
+    loggly_handler.setFormatter(loggly_formatter)
     logging.root.addHandler(loggly_handler)
 
 def config(name):

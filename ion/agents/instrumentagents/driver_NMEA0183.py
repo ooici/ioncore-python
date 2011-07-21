@@ -670,10 +670,10 @@ class NMEADeviceDriver(InstrumentDriver):
                 self._serialReadMode = OFF    # Stop continually acquiring lines
 
         elif event == NMEADeviceEvent.DATA_RECEIVED:
+            log.debug("NMEA Driver ready to publish data to agent")
             while self._data_lines:
                 nmeaLine = self._data_lines.pop()
                 if len(nmeaLine) > 0:
-
                     # This is where NMEA data is published
                     if self._serialReadMode == ON:
                         log.debug('Streaming data published: %s' % nmeaLine)
@@ -884,7 +884,7 @@ class NMEADeviceDriver(InstrumentDriver):
         """
         log.info("Driver has disconnected from the device")
         NMEADeviceDriver.serConnection = None
-        self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
+        yield self.fsm.on_event_async(NMEADeviceEvent.DISCONNECT_COMPLETE)
 
     ###########################################################################
     # Agent interface methods.
@@ -1159,7 +1159,7 @@ class NMEADeviceDriver(InstrumentDriver):
 
         # Set up the reply and fire an EVENT_INITIALIZE.
         reply = {'success': None, 'result': None}
-        success = self.fsm.on_event_async(NMEADeviceEvent.INITIALIZE)
+        success = yield self.fsm.on_event_async(NMEADeviceEvent.INITIALIZE)
 
         # Set success and send reply.
         # Unsuccessful initialize means event is not handled in the cur. state.
@@ -1391,21 +1391,20 @@ class NMEADeviceDriver(InstrumentDriver):
         for(chan, arg) in params:
             if NMEADeviceChannel.has(chan) and NMEADeviceStatus.has(arg):
                 if chan in GoodValues.validChans:
-                    chan = NMEADeviceChannel.GPS
-                    ok = InstErrorCode.OK
+                    chan = NMEADeviceChannel.INSTRUMENT
                     all = (arg == NMEADeviceStatus.ALL)
                     if arg == NMEADeviceStatus.DRIVER_STATE or all:
                         result[(chan, NMEADeviceStatus.DRIVER_STATE)]\
-                            = (ok, self.fsm.get_current_state())
+                            = (InstErrorCode.OK, self.fsm.get_current_state())
                     if arg == NMEADeviceStatus.OBSERVATORY_STATE or all:
                         result[(chan, NMEADeviceStatus.OBSERVATORY_STATE)]\
-                            = (ok, self._get_observatory_state())
+                            = (InstErrorCode.OK, self._get_observatory_state())
                     if arg == NMEADeviceStatus.DRIVER_ALARMS or all:
                         result[(chan, NMEADeviceStatus.DRIVER_ALARMS)]\
-                            = (ok, self._alarms)
+                            = (InstErrorCode.OK, self._alarms)
                     if arg == NMEADeviceStatus.DRIVER_VERSION or all:
                         result[(chan, NMEADeviceStatus.DRIVER_VERSION)]\
-                            = (ok, self.get_version())
+                            = (InstErrorCode.OK, self.get_version())
                 else:
                     result[(chan, arg)] = (InstErrorCode.INVALID_CHANNEL, chan)
 
@@ -1660,7 +1659,7 @@ class NMEADeviceDriver(InstrumentDriver):
             elif NMEA_CD in self._device_NMEA_config.cfgParams:
                 self._most_recent[NMEA_CD] = nmeaLine
                 self._data_lines.append(nmeaLine)
-            self.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
+            yield self.fsm.on_event_async(NMEADeviceEvent.DATA_RECEIVED)
             
 class NMEA0183Protocol(basic.LineReceiver):
 

@@ -7,7 +7,9 @@
 import os, sys, tty, termios
 import rlcompleter
 import re
+import math
 
+from twisted.application import service
 from twisted.internet import stdio
 from twisted.conch.insults import insults
 from twisted.conch import manhole
@@ -16,6 +18,9 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ionconst
+
+CTRL_A = '\x01'
+CTRL_E = '\x05'
 
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
@@ -117,12 +122,149 @@ class ConsoleManhole(manhole.ColoredManhole):
             except IOError:
                 pass
 
+class DebugManhole(manhole.Manhole):
+    ps = ('<>< ', '... ')
+
+    def connectionMade(self):
+        manhole.Manhole.connectionMade(self)
+        self.keyHandlers.update({
+            CTRL_A: self.handle_HOME,
+            CTRL_E: self.handle_END,
+            })
+
+    def initializeScreen(self):
+        self.terminal.write('Ion Remote Container Shell\r\n')
+        self.terminal.write('\r\n')
+        self.terminal.write('%s \r\n' % get_virtualenv())
+        self.terminal.write('[host: %s] \r\n' % (os.uname()[1],))
+        self.terminal.write('[cwd: %s] \r\n' % (os.getcwd(),))
+        self.terminal.write('\r\n')
+        self.terminal.write(self.ps[self.pn])
+        self.setInsertMode()
+
+    def terminalSize(self, width, height):
+        self.width = width
+        self.height = height
+
+    def handle_QUIT(self):
+        self.terminal.loseConnection()
+
+    def handle_TAB(self):
+        completer = rlcompleter.Completer(self.namespace)
+        def _no_postfix(val, word):
+            return word
+        completer._callable_postfix = _no_postfix
+        head_line, tail_line = self.currentLineBuffer()
+        search_line = head_line
+        cur_buffer = self.lineBuffer
+        cur_index = self.lineBufferIndex
+
+        def find_term(line):
+            chrs = []
+            attr = False
+            for c in reversed(line):
+                if c == '.':
+                    attr = True
+                if not c.isalnum() and c not in ('_', '.'):
+                    break
+                chrs.insert(0, c)
+            return ''.join(chrs), attr
+
+        search_term, attrQ = find_term(search_line)
+
+        if not search_term:
+            return manhole.Manhole.handle_TAB(self)
+
+        if attrQ:
+            matches = completer.attr_matches(search_term)
+            matches = list(set(matches))
+            matches.sort()
+        else:
+            matches = completer.global_matches(search_term)
+
+        def same(*args):
+            if len(set(args)) == 1:
+                return args[0]
+            return False
+
+        def progress(rem):
+            letters = []
+            while True:
+                to_compare = []
+                for elm in rem:
+                    if not elm:
+                        return letters
+                    to_compare.append(elm.pop(0))
+                letter = same(*to_compare)
+                if letter:
+                    letters.append(letter)
+                else:
+                    return letters
+
+        def group(l):
+            """
+            columns is the width the list has to fit into
+            the longest word length becomes the padded length of every word, plus a
+            uniform space padding. The sum of the product of the number of words
+            and the word length plus padding must be less than or equal to the
+            number of columns.
+            """
+            rows, columns = self.height, self.width
+            l.sort()
+            number_words = len(l)
+            longest_word = len(max(l)) + 2
+            words_per_row = int(columns / (longest_word + 2)) - 1
+            number_rows = int(math.ceil(float(number_words) / words_per_row))
+
+            grouped_words = [list() for i in range(number_rows)]
+            for i, word in enumerate(l):
+                """
+                row, col = divmod(i_word, number_rows)
+                row is the index of element in a print column
+                col is the number of the col list to append to
+                """
+                r, c = divmod(i, number_rows)
+                grouped_words[c].append(pad(word, longest_word))
+            return grouped_words
+
+        def pad(word, full_length):
+            padding = ' ' * (full_length - len(word))
+            return word + padding
+
+        def max(l):
+            last_max = ''
+            for elm in l:
+                if len(elm) > len(last_max):
+                    last_max = elm
+            return last_max
+
+        if matches is not None:
+            rem = [list(s.partition(search_term)[2]) for s in matches]
+            more_letters = progress(rem)
+            n = len(more_letters)
+            lineBuffer = list(head_line) + more_letters + list(tail_line)
+            if len(matches) > 1:
+                groups = group(matches)
+                line = self.lineBuffer
+                self.terminal.nextLine()
+                self.terminal.saveCursor()
+                for row in groups:
+                    s = '  '.join(map(str, row))
+                    self.addOutput(s, True)
+                if tail_line:
+                    self.terminal.cursorBackward(len(tail_line))
+                    self.lineBufferIndex -= len(tail_line)
+            self._deliverBuffer(more_letters)
+
+
 def makeNamespace():
-    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
+    #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
+    from ion.core.cc.shell_api import *
     from ion.core.id import Id
 
     namespace = locals()
     return namespace
+
 
 class Control(object):
 
@@ -187,3 +329,63 @@ try:
 except NameError:
     control = Control()
 
+class STDIOShell(service.Service):
+
+    def __init__(self, ccService):
+        self.ccService = ccService
+        #self.shell_control = Control()
+        self.shell_control = control
+
+    def startService(self):
+        service.Service.startService(self)
+        self.shell_control.start(self.ccService)
+
+    def stopService(self):
+        service.Service.stopService(self)
+        # This Control provides no way to externally disconnect the shell
+        #self.shell_control.stop()
+
+from twisted.conch.telnet import TelnetTransport, TelnetBootstrapProtocol
+from twisted.internet import protocol
+from twisted.internet import reactor
+
+class TelnetShell(service.Service):
+    """
+    @brief Debugging tool for inspect the container name space with a
+    Manhole interpreter over a network protocol (ssh or telnet).
+    """
+    _portfilename_base = '.ccdebugport-'
+
+    def __init__(self, namespace=None):
+        if namespace is None:
+            namespace = {}
+        self.namespace = namespace
+        self._portfilename = self._portfilename_base + str(os.getpid())
+
+    def _write_port_file(self, port):
+        """
+        """
+        f = open(self._portfilename, 'w')
+        f.write(str(port))
+        f.close()
+
+    def _remove_port_file(self):
+        os.unlink(self._portfilename)
+
+    def _start_listener(self):
+        f = protocol.ServerFactory()
+        f.protocol = lambda: TelnetTransport(TelnetBootstrapProtocol,
+                                            insults.ServerProtocol,
+                                            DebugManhole,
+                                            self.namespace)
+        listeningPort = reactor.listenTCP(0, f)
+        self._write_port_file(listeningPort._realPortNumber)
+
+
+    def startService(self):
+        service.Service.startService(self)
+        self._start_listener()
+
+    def stopService(self):
+        service.Service.stopService(self)
+        self._remove_port_file()

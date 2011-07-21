@@ -14,7 +14,7 @@ import ion.util.ionlog
 from ion.util.iontime import IonTime
 
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.trial import unittest
 import random
 
@@ -47,18 +47,15 @@ class AggregationRule():
     OVERLAP   = 1
     OVERWRITE = 2
     FMRC      = 3
-    
-        
-class FakeDelayedCall(object):
 
-    def active(self):
-        return True
-
-    def cancel(self):
+def create_delayed_call(timeoutval=None):
+    timeoutval = timeoutval or 10000
+    def _timeout():
+        # do nothing
         pass
-
-    def delay(self, int):
-        pass
+    dc = reactor.callLater(timeoutval, _timeout)
+    dc.ingest_service_timeout = timeoutval
+    return dc
 
 class IngestionTest(IonTestCase):
     """
@@ -171,7 +168,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
         #print '\n\n\n Got Dataset in Ingest \n\n\n\n'
 
@@ -209,7 +206,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
         self.ingest.dataset.CreateUpdateBranch()
 
@@ -305,7 +302,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
@@ -444,7 +441,7 @@ class IngestionTest(IonTestCase):
         content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
         yield self.ingest._prepare_ingest(content)
         
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
 
         # Set the aggregation_rule if present
@@ -574,7 +571,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
@@ -753,7 +750,7 @@ class IngestionTest(IonTestCase):
 
         yield self.ingest._prepare_ingest(content)
 
-        self.ingest.timeoutcb = FakeDelayedCall()
+        self.ingest.timeoutcb = create_delayed_call()
 
         self.ingest.dataset.CreateUpdateBranch()
 
