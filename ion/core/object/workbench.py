@@ -253,7 +253,7 @@ class WorkBench(object):
 
     def clear_repository(self, repo):
 
-        log.info('Clearing Repository: %s ' % repo.repository_key)
+        log.info('Clearing Repository: %s ' % str(repo.repository_key))
 
         key = repo.repository_key
         repo.clear()
@@ -269,7 +269,7 @@ class WorkBench(object):
 
     def cache_repository(self, repo):
 
-        log.info('Caching Repository: %s ' % repo.repository_key)
+        log.info('Caching Repository: %s ' % str(repo.repository_key))
 
         key = repo.repository_key
         # Get rid of the nick name - this is a PITA
@@ -296,7 +296,6 @@ class WorkBench(object):
 
         log.info('Running Manage Workbench Cache...')
 
-
         # Can't use iter here - it is actually deleting keys in the dict object.
         for key, repo in self._repos.items():
 
@@ -310,6 +309,9 @@ class WorkBench(object):
 
                 else:
                     self.cache_repository(repo)
+
+
+        log.info('End Manage Workbench Cache...')
 
 
     def clear(self):
@@ -507,10 +509,12 @@ class WorkBench(object):
             result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)
         except ReceivedApplicationError, re:
 
-            log.info('ReceivedApplicationError', str(re))
+
 
             ex_msg = re.msg_content
             msg_headers = re.msg_headers
+
+            log.info('ReceivedApplicationError:Response code - %s, Response Message - "%s"' % (ex_msg.MessageResponseCode, ex_msg.MessageResponseBody))
 
             if cloning:
                 # Clear the repository that was created for the clone
@@ -518,9 +522,9 @@ class WorkBench(object):
 
             if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
 
-                raise WorkBenchError('Pull Operation failed: Repository Key Not Found! "%s"' % str(re))
+                raise WorkBenchError('Pull Operation failed: Repository Key Not Found! "%s"' % ex_msg.MessageResponseCode )
             else:
-                raise WorkBenchError('Pull Operation failed for unknown reason "%s"' % str(re))
+                raise WorkBenchError('Pull Operation failed: Response code - %s, Response Message - "%s"' % (ex_msg.MessageResponseCode, ex_msg.MessageResponseBody))
 
         if not hasattr(result, 'MessageType') or result.MessageType != PULL_RESPONSE_MESSAGE_TYPE:
             raise WorkBenchError('Invalid response to pull request. Bad Message Type!')
@@ -582,8 +586,12 @@ class WorkBench(object):
         if not repo:
             raise WorkBenchError('Repository Key "%s" not found' % request.repository_key, request.ResponseCodes.NOT_FOUND)
 
-        if repo.status != repo.UPTODATE:
+        log.debug('Found repository to pull')
+
+        if repo.status == repo.MODIFIED:
+            log.debug('Bad repo state for pulling - status: %s' % repo.status)
             raise WorkBenchError('Invalid pull request. Requested Repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
+
 
         my_commits = self.list_repository_commits(repo)
 
@@ -603,6 +611,8 @@ class WorkBench(object):
         response.repo_head_element = obj
 
 
+        log.debug('Created response and head object')
+
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
@@ -611,9 +621,7 @@ class WorkBench(object):
             obj = response.Repository._wrap_message_object(commit_element._element)
             link.SetLink(obj)
 
-
-
-
+        log.debug('Added commits to the response')
 
         if request.get_head_content:
 
@@ -632,6 +640,8 @@ class WorkBench(object):
                 obj = response.Repository._wrap_message_object(element._element)
 
                 link.SetLink(obj)
+
+            log.debug('Added blobs to the response')
 
         yield self._process.reply_ok(msg, content=response)
         log.info('op_pull - complete')
