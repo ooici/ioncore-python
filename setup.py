@@ -63,6 +63,7 @@ setup( name = 'ioncore',
                         'console_scripts': [
                             'cassandra-setup=ion.core.data.cassandra_schema_script:main',
                             'cassandra-teardown=ion.core.data.cassandra_teardown_script:main',
+                            'dbmanhole=ion.ops.dbmanhole:main',
                             ],
                         },
        include_package_data = True,
