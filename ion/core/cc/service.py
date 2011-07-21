@@ -52,6 +52,7 @@ class Options(usage.Options):
     optFlags = [
                 ["no_shell", "n", "Do not start shell"],
                 ["no_history", "i", "Do not read/write history file"],
+                ["no_dbmanhole", None, "Do not start dbmanhole"],
                     ]
 
     def __init__(self):
@@ -231,7 +232,7 @@ def makeService(config):
     if not config['no_shell']:
         stdioshell = shell.STDIOShell(cc_instance)
         stdioshell.setServiceParent(service_container)
-    else: # if no shell, start telnet shell
+    elif not config['no_dbmanhole']: # if no shell, start telnet shell
         ns = shell.makeNamespace()
         ns.update({'cc':cc_instance})
         telnetshell = shell.TelnetShell(ns)
