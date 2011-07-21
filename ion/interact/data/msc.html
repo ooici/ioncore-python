@@ -246,13 +246,15 @@
             var dirty = 0;
             $.each(indata, function(i, d) {
 
-                function addunknown(x) {
+                function addunknown(x, dname) {
                     slices = getnames(x);
                     gname = slices.gname;
                     name = slices.name;
 
+                    displayslices = getnames(dname);
+
                     if ($.inArray(gname, $.map(gheaders, function(el, idx) { return el.name; })) == -1) {
-                        gheaders.push({name:gname, collapsed:true, hidden:$.inArray(gname, ignore_list) != -1});
+                        gheaders.push({name:gname, dispname:displayslices.gname, collapsed:true, hidden:$.inArray(gname, ignore_list) != -1});
                         headers[gname] = [];
                         gheaders.sort(function(a, b) {
                             a = a.name.toLowerCase();
@@ -265,7 +267,7 @@
 
                     if ($.inArray(name, $.map(headers[gname], function(el,idx) { return el.name; })) == -1) {
                         dirty += 1;
-                        headers[gname].push({name:name, hidden:false});
+                        headers[gname].push({name:name, dispname:displayslices.name, hidden:false});
                         headers[gname].sort(function(a, b) {
                             a = a.name.toLowerCase();
                             b = b.name.toLowerCase();
@@ -277,8 +279,8 @@
                 }
 
                 if (d.type != "event")
-                    addunknown(d.to);
-                addunknown(d.from);
+                    addunknown(d.to, d.to_raw);
+                addunknown(d.from, d.from_raw);
             });
 
             //console.log(gheaders);
@@ -410,7 +412,7 @@
                 })
                 .attr("y", 20)
                 .attr("text-anchor", "middle")
-                .text(function(d) { return d.name; });
+                .text(function(d) { return d.dispname; });
 
             // now draw subheaders
             cheader.selectAll('.gheader').each(function (d, i) {
@@ -420,7 +422,7 @@
                 if (d.hidden)
                     sheads = heads.data([]);
                 else if (d.collapsed)
-                    sheads = heads.data([{name:"(" + headers[d.name].length + " items)"}], function(dx) { return dx.name; });
+                    sheads = heads.data([{name:"(" + headers[d.name].length + " items)", dispname:"(" + headers[d.name].length + " items)"}], function(dx) { return dx.name; });
                 else
                     sheads = heads.data(headers[d.name], function(dx) { return dx.name; })
 
@@ -438,7 +440,7 @@
                     .attr("transform", getsubxoffset);
 
                 sheads.selectAll('text')
-                    .text(function(d) { return d.name });
+                    .text(function(d) { return d.dispname });
 
                 // append new ones
                 var newsubheads = sheads.enter().append("svg:g")
@@ -464,7 +466,7 @@
                     .attr("y", 20)
                     .attr("fill", "white")
                     .attr("text-anchor", "middle")
-                    .text(function(d) { return d.name });
+                    .text(function(d) { return d.dispname });
 
                 // remove old ones (recently collapsed or hidden)
                 sheads.exit().remove();
