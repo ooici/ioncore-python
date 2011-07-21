@@ -80,6 +80,8 @@ class NotificationAlertService(ServiceProcess):
  
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         
+        self.MailServer = CONF.getValue('mail_server', default='mail.oceanobservatories.org')
+        
         self.index_store_class = pu.get_class(index_store_class_name)
         self._storage_conf = get_cassandra_configuration()
         self.storage_provider = self._storage_conf[STORAGE_PROVIDER]
@@ -167,7 +169,9 @@ class NotificationAlertService(ServiceProcess):
                     BODY), "\r\n")
 
                 try:
-                    smtpObj = smtplib.SMTP('mail.oceanobservatories.org', 25, 'localhost')
+                    log.debug("connecting to mail server at " + self.MailServer)
+                    smtpObj = smtplib.SMTP(self.MailServer, 25, 'localhost')
+                    log.debug("connected to mail server at " + self.MailServer)
                     smtpObj.sendmail(FROM, [TO], body)
                     log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except smtplib.SMTPException:
@@ -191,8 +195,8 @@ class NotificationAlertService(ServiceProcess):
 
         # build the email from the event content
         msg = content['content']
-        startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis))))
-        enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis))) )
+        startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis/1000))))
+        enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
         SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
@@ -245,7 +249,9 @@ class NotificationAlertService(ServiceProcess):
                     BODY), "\r\n")
 
                 try:
-                    smtpObj = smtplib.SMTP('mail.oceanobservatories.org', 25, 'localhost')
+                    log.debug("connecting to mail server at " + self.MailServer)
+                    smtpObj = smtplib.SMTP(self.MailServer, 25, 'localhost')
+                    log.debug("connected to mail server at " + self.MailServer)
                     smtpObj.sendmail(FROM, [TO], body)
                     log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                 except smtplib.SMTPException:
@@ -385,7 +391,7 @@ class NotificationAlertService(ServiceProcess):
                 ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
                   and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
                 ):
-                self.sub = DatasetSupplementAddedEventSubscriber(process=self, origin="magnet_topic")
+                self.sub = DatasetSupplementAddedEventSubscriber(process=self)
                 log.info('NotificationAlertService.op_addSubscription set handler for DatasetSupplementAddedEventSubscriber')
                 self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
                 yield self.sub.register()
@@ -403,7 +409,7 @@ class NotificationAlertService(ServiceProcess):
                   and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter) \
                 ):
                 log.info('NotificationAlertService.op_addSubscription create DatasourceUnavailableEventSubscriber')
-                self.sub = DatasourceUnavailableEventSubscriber(process=self, origin="magnet_topic")
+                self.sub = DatasourceUnavailableEventSubscriber(process=self)
                 log.info('NotificationAlertService.op_addSubscription set handler for DatasourceUnavailableEventSubscriber')
                 self.sub.ondata = self.handle_offline_event    # need to do something with the data when it is received
                 yield self.sub.register()
