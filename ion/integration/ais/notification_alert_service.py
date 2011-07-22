@@ -21,7 +21,6 @@ import ion.util.procutils as pu
 
 
 import string
-import smtplib
 import time
 from datetime import datetime
 
@@ -32,6 +31,8 @@ from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.process.process import ProcessFactory
 from ion.core.data import cassandra_bootstrap
 
+from twisted.mail.smtp import sendmail, SMTPClientError
+from email.mime.text import MIMEText
 
 from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.core.data.store import Query
@@ -160,24 +161,19 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                body = string.join((
-
-                    "From: %s" % FROM,
-                    "To: %s" % TO,
-                    "Subject: %s" % SUBJECT,
-                    "",
-                    BODY), "\r\n")
-
+                msg = MIMEText(BODY)
+                msg['Subject'] = SUBJECT
+                msg['From'] = FROM
+                msg['To'] = ', '.join([TO])
+                    
                 try:
-                    log.debug("connecting to mail server at " + self.MailServer)
-                    smtpObj = smtplib.SMTP(self.MailServer, 25, 'localhost')
-                    log.debug("connected to mail server at " + self.MailServer)
-                    smtpObj.sendmail(FROM, [TO], body)
+                    log.debug("NotificationAlertService.handle_offline_event sending email to %s using the mail server at %s" %(TO, self.MailServer))
+                    Resullt = yield sendmail(self.MailServer, FROM, [TO], msg)
                     log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
-                except smtplib.SMTPException:
+                except SMTPClientError:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
                 except Exception, ex:
-                    log.warning('NotificationAlertService.handle_offline_event Error: %s' %str(ex))
+                    log.warning('NotificationAlertService.handle_offline_event Error: unable to send email - %s' %str(ex))
 
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
@@ -240,30 +236,25 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                body = string.join((
-
-                    "From: %s" % FROM,
-                    "To: %s" % TO,
-                    "Subject: %s" % SUBJECT,
-                    "",
-                    BODY), "\r\n")
+                msg = MIMEText(BODY)
+                msg['Subject'] = SUBJECT
+                msg['From'] = FROM
+                msg['To'] = ', '.join([TO])
 
                 try:
-                    log.debug("connecting to mail server at " + self.MailServer)
-                    smtpObj = smtplib.SMTP(self.MailServer, 25, 'localhost')
-                    log.debug("connected to mail server at " + self.MailServer)
-                    smtpObj.sendmail(FROM, [TO], body)
+                    log.debug("NotificationAlertService.handle_update_event: sending email to %s using the mail server at %s" %(TO, self.MailServer))
+                    Resullt = yield sendmail(self.MailServer, FROM, [TO], msg)
                     log.info('NotificationAlertService.handle_update_event Successfully sent email' )
-                except smtplib.SMTPException:
+                except SMTPClientError:
                     log.info('NotificationAlertService.handle_update_event Error: unable to send email')
                 except Exception, ex:
-                    log.warning('NotificationAlertService.handle_offline_event Error: %s'% str(ex))
+                    log.warning('NotificationAlertService.handle_update_event Error: unable to send email - %s'% str(ex))
 
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
                 if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
                     yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
-                    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
+                    log.info('NotificationAlertService.handle_update_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
                 log.info('NotificationAlertService.handle_update_event completed ')
 

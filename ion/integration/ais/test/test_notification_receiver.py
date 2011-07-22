@@ -109,13 +109,13 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = MYOOICI_USER_ID
-        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataresrc123'
+        reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'UnitTest_dataresrc123'
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
         reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = MYOOICI_USER_ID
-        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'dataresrc123'
+        reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'UnitTest_dataresrc123'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_start = '2007-01-1T00:02:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_time_coverage_end = '2007-01-1T00:03:00Z'
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_min = -50.0
@@ -141,21 +141,21 @@ class NotificationReceiverTest(IonTestCase):
 
 
 
-        yield pubSupplementAdded.create_and_publish_event(origin="magnet_topic",
-                                           dataset_id="dataresrc123",
-                                           datasource_id="dataresrc123",
-                                           title="TODO",
-                                           url="TODO",
-                                           start_datetime_millis = 10000,
-                                           end_datetime_millis = 11000,
-                                           number_of_timesteps = 7
-                                     )
+        yield pubSupplementAdded.create_and_publish_event(origin='UnitTest',
+                                                          dataset_id="UnitTest_dataresrc123",
+                                                          datasource_id="UnitTest_dataresrc123",
+                                                          title="Unit Test Datasource",
+                                                          url="Some URL",
+                                                          start_datetime_millis = 10000,
+                                                          end_datetime_millis = 11000,
+                                                          number_of_timesteps = 7)
 
 
+        yield pu.asleep(1.0)
 
-        yield pubSourceOffline.create_and_publish_event(origin="magnet_topic",
-                                           datasource_id="dataresrc123",
-                                           error_explanation="explanation")
+        yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
+                                                        datasource_id="UnitTest_dataresrc123",
+                                                        error_explanation="UnitTest_explanation")
         
 
         yield pu.asleep(3.0)
