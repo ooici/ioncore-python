@@ -645,7 +645,7 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(default_obj.word, value[PREDICATE_CFG])
 
-
+    """
 
 
     @defer.inlineCallbacks
@@ -741,7 +741,7 @@ class DataStoreTest(IonTestCase):
             mem = yield pu.print_memory_usage()
             log.info(mem)
 
-
+    """
 
 class MulitDataStoreTest(IonTestCase):
     """
