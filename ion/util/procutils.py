@@ -7,7 +7,8 @@
 """
 
 import logging
-import subprocess
+
+from ion.util import os_process
 import sys
 import traceback
 import re
@@ -279,6 +280,7 @@ def pprint_to_string(obj):
     fstream.close()
     return result
 
+@defer.inlineCallbacks
 def print_memory_usage():
     """
     @brief Prints the memory usage of the container processes.
@@ -296,9 +298,14 @@ def print_memory_usage():
     ps_args = ["-o args,command,rss,vsize",  "-p", pids]
     #I'd rather not execute this through the shell, but the output from the command was truncated
     #when I did not set shell=True.
-    p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
-    std_output = p.communicate()[0]
+    p = os_process.OSProcess(binary="/bin/ps", spawnargs=ps_args)
+    result = yield p.spawn()
+    std_output = result.get('outlines')
+
+    #p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
+    #std_output = p.communicate()[0]
+
     #This should probably become a logging statement.
     header = "================================================================================="
     ret = "%s\nOS Process Status Memory Use: \n%s%s" % (header,std_output,header)
-    return ret
+    defer.returnValue(ret)
