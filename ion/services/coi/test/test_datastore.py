@@ -46,11 +46,42 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 association_type = object_utils.create_type_identifier(object_id=13, version=1)
 
+OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
+
+
+
+
+@defer.inlineCallbacks
+def create_large_object(wb):
+
+    rand = open('/dev/random','r')
+
+    repo = yield wb.create_repository(OPAQUE_ARRAY_TYPE)
+    MB = 1024 * 124
+    repo.root_object.value.extend(rand.read(2 *MB))
+
+    repo.commit('Commit before send...')
+
+    log.info('Repository size: %d bytes, array len %d' % (repo.__sizeof__(), len(repo.root_object.value)))
+
+    rand.close()
+
+
+    defer.returnValue(repo)
+
+
+
 
 class DataStoreTest(IonTestCase):
     """
     Testing Datastore service.
     """
+
+    # Number or repetitions for pull large object test
+    repetitions = 3
+
+    # when setting high repetitions, the timeout must be increased.
+    #timeout = 600
 
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
@@ -521,10 +552,6 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(ab.title,'Datastore Addressbook')
 
 
-
-
-
-
     @defer.inlineCallbacks
     def test_push_clear_pull_many(self):
 
@@ -619,6 +646,100 @@ class DataStoreTest(IonTestCase):
             self.assertEqual(default_obj.word, value[PREDICATE_CFG])
 
 
+
+
+    @defer.inlineCallbacks
+    def test_pull_object(self):
+
+        repo = yield create_large_object(self.wb1.workbench)
+
+        result = yield self.wb1.workbench.push('datastore',repo)
+
+        self.repo_key = repo.repository_key
+
+        for i in range(self.repetitions):
+
+            log.info("Testing pull loop!!!")
+
+            result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+
+            log.info(pu.print_memory_usage())
+            log.info("WB1: %s" % self.wb1.workbench_memory())
+            log.info("DS1: %s" % self.ds1.workbench_memory())
+            #import objgraph
+            #objgraph.show_growth()
+
+
+    @defer.inlineCallbacks
+    def test_get_blobs(self):
+
+        log.info('Starting test_get_blobs')
+
+        wb = self.ds1.workbench
+
+        obj_repo = yield create_large_object(wb)
+
+        log.info('Created large object')
+
+
+        for i in range(self.repetitions):
+            load_repo = yield wb.create_repository(OPAQUE_ARRAY_TYPE)
+
+            blobs = yield wb._get_blobs(load_repo,[obj_repo.commit_head.MyId])
+
+            wb.clear_repository(load_repo)
+
+            log.info("DS1: %s" % self.ds1.workbench_memory())
+            mem = yield pu.print_memory_usage()
+            log.info(mem)
+
+
+
+
+
+    @defer.inlineCallbacks
+    def test_large_objects(self):
+
+
+        for i in range(self.repetitions):
+            repo = yield create_large_object(self.wb1.workbench)
+
+            result = yield self.wb1.workbench.push('datastore',repo)
+
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            log.info("WB1: %s" % self.wb1.workbench_memory())
+            log.info("DS1: %s" % self.ds1.workbench_memory())
+            log.info("Expect memory to grow unless you are using cassandra backend and the cache is full")
+
+            mem = yield pu.print_memory_usage()
+            log.info(mem)
+
+            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+
+
+
+
+    @defer.inlineCallbacks
+    def test_checkout_a_lot(self):
+
+
+        for i in range(self.repetitions):
+            yield self.test_checkout_defaults()
+            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+
+            for key, repo in self.wb1.workbench._repo_cache.iteritems():
+                log.info('Repo Name - %s, size - %d, # of blobs - %d' % (key, repo.__sizeof__(), len(repo.index_hash)))
+
+            log.info("WB1: %s" % self.wb1.workbench_memory())
+            log.info("DS1: %s" % self.ds1.workbench_memory())
+
+            mem = yield pu.print_memory_usage()
+            log.info(mem)
 
 
 
@@ -831,6 +952,8 @@ class MulitDataStoreTest(IonTestCase):
             repo.checkout('master')
 
             self.assertEqual(repo.root_object.person[0].id,n-1)
+
+
 
 
 

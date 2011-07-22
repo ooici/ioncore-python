@@ -701,9 +701,13 @@ class Wrapper(object):
     def Invalid(self):
         return self._source._invalid
 
+    def noisy_invalidate(self):
+        pass
+
     def Invalidate(self, other=None):
 
 
+        self.noisy_invalidate()
         if other is not None:
 
             #log.debug('Invalidating self:\n%s' % self.Debug())

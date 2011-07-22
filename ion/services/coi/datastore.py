@@ -23,7 +23,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.services.coi.resource_registry import resource_client
-
+from ion.core.messaging.message_client import MessageClient
 from types import FunctionType
 
 from ion.core.object import object_utils
@@ -204,8 +204,10 @@ class DataStoreWorkbench(WorkBench):
         def_filter = lambda x: True
         filtermethod = filtermethod or def_filter
 
+        objects = {}
+        new_links_to_get = set()
         while len(keys_to_get) > 0:
-            new_links_to_get = set()
+            new_links_to_get.clear()
 
             def_list = []
             #@TODO - put some error checking here so that we don't overflow due to a stupid request!
@@ -216,7 +218,10 @@ class DataStoreWorkbench(WorkBench):
                 if wse:
                     blobs[wse.key]=wse
                     # get the object
+
                     obj = repo._load_element(wse)
+
+                    objects[key] = obj
 
                     # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
                     new_links_to_get.update(obj.ChildLinks)
@@ -224,12 +229,11 @@ class DataStoreWorkbench(WorkBench):
                     def_list.append(self._blob_store.get(key))
 
 
-            result_list = []
-            if def_list:
-                result_list = yield defer.DeferredList(def_list)
+            result_list = yield defer.DeferredList(def_list)
 
             for result, blob in result_list:
                 assert result==True, 'Error getting link from blob store!'
+                assert blob is not None, 'Blob not found in blob store!'
                 wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 blobs[wse.key]=wse
 
@@ -246,7 +250,13 @@ class DataStoreWorkbench(WorkBench):
                 if not blobs.has_key(link.key) and filtermethod(link):
                     keys_to_get.add(link.key)
 
+            for obj in objects.itervalues():
+                obj.Invalidate()
+
+            objects.clear()
+            
         defer.returnValue(blobs)
+        #return blobs
 
     @defer.inlineCallbacks
     def _resolve_repo_state(self, repository_key, fail_if_not_found=True):
@@ -394,11 +404,26 @@ class DataStoreWorkbench(WorkBench):
 
             blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
 
-            for element in blobs.values():
+            #log.critical( "OBJ GRAPH")
+            #import objgraph
+            #objgraph.show_growth()
+
+            #def log_repo():
+            #    log.critical("CALLING Clear!!!")
+            #setattr(response.Repository,'noisy_clear', log_repo)
+
+
+            for element in blobs.itervalues():
+
+
                 link = response.blob_elements.add()
                 obj = response.Repository._wrap_message_object(element._element)
-
                 link.SetLink(obj)
+
+                #def log_wrapper():
+                #    log.critical("CALLING INVALIDATE!!!\n%s" % obj.Debug())
+                #setattr(obj, 'noisy_invalidate',log_wrapper)
+
 
         yield self._process.reply_ok(msg, content=response)
 
@@ -430,66 +455,6 @@ class DataStoreWorkbench(WorkBench):
 
             repo = yield self._resolve_repo_state(repostate.repository_key, fail_if_not_found=False)
             repo.cached = True
-
-            """
-            repo = self.get_repository(repostate.repository_key)
-            if repo is None:
-                #if it does not exist make a new one
-                repo = repository.Repository(repository_key=repostate.repository_key, cached=True)
-                self.put_repository(repo)
-                repo_keys=set()
-            else:
-
-                if repo.status == repo.MODIFIED:
-                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', pushmsg.ResponseCodes.BAD_REQUEST)
-                repo_keys = set(self.list_repository_blobs(repo))
-
-            # Get the latest commits in the repository
-            q = Query()
-            q.add_predicate_eq(REPOSITORY_KEY, repostate.repository_key)
-
-            rows = yield self._commit_store.query(q)
-    
-            for key, columns in rows.items():
-
-                blob = columns[VALUE]
-                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                if wse.key in repo._commit_index.keys():
-                    # No thanks, he's already got one!
-                    continue
-
-                repo.index_hash[key] = wse
-
-                if columns[BRANCH_NAME]:
-                    # If this appears to be a head commit
-
-                    # Deal with the possibility that more than one branch points to the same commit
-                    branch_names = columns[BRANCH_NAME].split(',')
-
-                    for name in branch_names:
-
-                        for branch in repo.branches:
-                            # if the branch already exists in the new_head just add a commitref
-                            if branch.branchkey == name:
-                                link = branch.commitrefs.add()
-                                #  Link is set below...
-                                break
-                        else:
-                            # If not add a new branch
-                            branch = repo._dotgit.branches.add()
-                            branch.branchkey = name
-                            link = branch.commitrefs.add()
-                            # Link is set below...
-
-                        cref = repo._load_element(wse)
-                        repo._commit_index[cref.MyId]=cref
-                        cref.ReadOnly = True
-
-                        link.SetLink(cref)
-
-            # Now the repo is up to date on the data store side...
-            """
-
 
             repo_keys = set(self.list_repository_blobs(repo))
 
@@ -1582,6 +1547,8 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
+
+        self.message_client = MessageClient(self)
 
         yield self.initialize_datastore()
 
