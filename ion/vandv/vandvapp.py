@@ -77,7 +77,9 @@ def start(container, starttype, app_definition, *args, **kwargs):
     curtest = klass()
 
     if hasattr(curtest, 'setup'):
+        print "V+V (%s): calling setup:\n" % vvtclass
         yield defer.maybeDeferred(curtest.setup)
+        print "... completed.\n"
 
     # pull out test steps
     rtestmethod = re.compile(r'^s\d+_')

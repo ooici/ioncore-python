@@ -65,7 +65,7 @@ class ITVOSProcess(OSProcess):
     def errReceived(self, data):
         OSProcess.errReceived(self, data)
 
-        if not self._ready_deferred.called and ("DEBUG_CC:" in data):
+        if not self._ready_deferred.called and ("LAUNCHER" in data):
             cba = { 'exitcode': 0,
                    'outlines' : self.outlines,
                    'errlines' : self.errlines }
