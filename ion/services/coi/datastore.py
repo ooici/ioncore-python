@@ -1546,8 +1546,12 @@ class DataStoreService(ServiceProcess):
 
         
         log.info("Created stores")
+
+        # Create a specialized workbench for the datastore which has a persistent back end.
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
+        # Replace the existing message client in the procss with a new one - that uses the new workbench
+        # Not doing this was the source of a huge memory leak!
         self.message_client = MessageClient(self)
 
         yield self.initialize_datastore()
