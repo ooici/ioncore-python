@@ -23,7 +23,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.services.coi.resource_registry import resource_client
-
+from ion.core.messaging.message_client import MessageClient
 from types import FunctionType
 
 from ion.core.object import object_utils
@@ -218,9 +218,8 @@ class DataStoreWorkbench(WorkBench):
                 if wse:
                     blobs[wse.key]=wse
                     # get the object
-                    obj = repo._load_element(wse)
 
-                    #print obj.Debug()
+                    obj = repo._load_element(wse)
 
                     objects[key] = obj
 
@@ -231,10 +230,6 @@ class DataStoreWorkbench(WorkBench):
 
                     def_list.append(self._blob_store.get(key))
 
-
-            #result_list = []
-            ##if def_list:
-            #    result_list = yield defer.DeferredList(def_list)
 
             result_list = yield defer.DeferredList(def_list)
 
@@ -409,28 +404,28 @@ class DataStoreWorkbench(WorkBench):
                 """
                 return (x.type not in request.excluded_types)
 
-            # Correct method - looks in store
-            #import objgraph
-            #log.critical( "OBJ GRAPH")
-            #objgraph.show_growth()
-            #log.critical( "Get_blobs")
-
-            #blobs = WorkBench._get_blobs(self,response.Repository, keys, filtermethod)
             blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
+
             #log.critical( "OBJ GRAPH")
+            #import objgraph
             #objgraph.show_growth()
 
-            # Remove the deferred part
-            #blobs = self._get_blobs(response.Repository, keys, filtermethod)
+            #def log_repo():
+            #    log.critical("CALLING Clear!!!")
+            #setattr(response.Repository,'noisy_clear', log_repo)
 
-            # Use the workbench method - no store...
-            #blobs = WorkBench._get_blobs(self,response.Repository, keys, filtermethod)
 
             for element in blobs.itervalues():
+
+
                 link = response.blob_elements.add()
                 obj = response.Repository._wrap_message_object(element._element)
-
                 link.SetLink(obj)
+
+                #def log_wrapper():
+                #    log.critical("CALLING INVALIDATE!!!\n%s" % obj.Debug())
+                #setattr(obj, 'noisy_invalidate',log_wrapper)
+
 
         yield self._process.reply_ok(msg, content=response)
 
@@ -1554,6 +1549,8 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
+
+        self.message_client = MessageClient(self)
 
         yield self.initialize_datastore()
 
