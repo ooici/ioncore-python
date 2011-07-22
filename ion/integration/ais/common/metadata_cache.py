@@ -74,15 +74,6 @@ VISIBILITY = 'visibility'
 
 class MetadataCache(object):
     
-    #
-    # these are the mappings from resource life cycle states to the view
-    # permission states of a dataset
-    # 
-    #REGISTERED = 'Registered'
-    #PRIVATE    = 'Private'
-    #PUBLIC     = 'Public'
-    #UNKOWNN    = 'Unknown'
-    
     __metadata = {}
 
     def __init__(self, ais):
@@ -463,13 +454,14 @@ class MetadataCache(object):
         Lock the cache to insure exclusive access while updating
         """
         
-        log.debug('__lockCache')
+        log.debug('__lockCache requesting lock')
         yield self.cacheLock.acquire()
+        log.debug('__lockCache lock acquired')
 
 
     def __unlockCache(self):
         """
-        Lock the cache to insure exclusive access while updating
+        Unlock the cache to insure exclusive access while updating
         """
         
         log.debug('__unlockCache')
@@ -724,8 +716,15 @@ class MetadataCache(object):
         log.debug('Metadata for ' + resType + ': ' + res.ResourceIdentity + ':')
         for key in self.__metadata[res.ResourceIdentity].keys():
             log.debug('key: ' + key)
-        for value in self.__metadata[res.ResourceIdentity].values():
-            log.debug('value: ' + str(value))
+            #
+            # If this is a datasource object, don't print
+            #
+            if key == 'dset' or key == 'dsource':
+                log.debug('value is set or dsource object; not printing')
+            else:                
+                log.debug('value: ' + str(self.__metadata[res.ResourceIdentity][key]))
+            
+            
 
     def __printObject(self, object):
         if log.getEffectiveLevel() <= logging.DEBUG:
