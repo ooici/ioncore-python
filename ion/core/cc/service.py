@@ -104,6 +104,7 @@ class CapabilityContainer(service.Service):
         self.config = config
         self.container = None
         ioninit.testing = False
+        self.child_services = [] #hack
 
         # calls back when the CC service starts up - anyone may attach to this callback and
         # use it for whatever is needed.
@@ -143,6 +144,17 @@ class CapabilityContainer(service.Service):
             self.lockfile.close()
             # The spawning process must cleanup the lockfile to avoid race conditions
 
+        if not self.config['no_shell']:
+            stdioshell = shell.STDIOShell(cc_instance)
+            stdioshell.startService()
+            self.child_services.append(stdioshell)
+        elif not self.config['no_dbmanhole']: # if no shell, start telnet shell
+            ns = shell.makeNamespace()
+            ns.update({'cc':cc_instance})
+            telnetshell = shell.TelnetShell(ns)
+            telnetshell.startService()
+            self.child_services.append(telnetshell)
+
         self.defer_started.callback(True)
 
         # event notify that the startup is good to go!
@@ -165,6 +177,8 @@ class CapabilityContainer(service.Service):
     @defer.inlineCallbacks
     def stopService(self):
         log.info("Stopping container service.")
+        for svc in self.child_services:
+            svc.stopService()
         yield self.container.terminate()
         service.Service.stopService(self)
 
@@ -220,21 +234,12 @@ class CapabilityContainer(service.Service):
             return boot()
         raise RuntimeError('Bad boot script path')
 
+
 def makeService(config):
     """
     Twisted plugin service instantiation.
     Required by Twisted; IServiceMaker interface
     """
-    service_container = service.MultiService()
     global cc_instance
     cc_instance = CapabilityContainer(config)
-    cc_instance.setServiceParent(service_container)
-    if not config['no_shell']:
-        stdioshell = shell.STDIOShell(cc_instance)
-        stdioshell.setServiceParent(service_container)
-    elif not config['no_dbmanhole']: # if no shell, start telnet shell
-        ns = shell.makeNamespace()
-        ns.update({'cc':cc_instance})
-        telnetshell = shell.TelnetShell(ns)
-        telnetshell.setServiceParent(service_container)
-    return service_container
+    return cc_instance

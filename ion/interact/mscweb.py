@@ -275,7 +275,7 @@ class MSCWebProcess(Process):
         yield self.register_life_cycle_object(self._io)
 
         self._web = EventMonitorWebResource(self._io)
-        self._site = server.Site(self._web)
+        self._site = server.Site(self._web, logPath="mscweb.log")
         reactor.listenTCP(9999, self._site)
         print "Listening on http://localhost:9999"
 

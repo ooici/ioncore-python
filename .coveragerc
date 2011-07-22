@@ -2,6 +2,15 @@
 branch = True
 source =
     ion
+omit =
+    # omit __init__.py file
+    *__init__*
+    # omit tests
+    */test/*
+    # omit per S&A
+    /*/utilities/SBE37_util*
+    /*/utilities/client_*
+    /*/utilities/inst_*
 
 [report]
 # Regexes for lines to exclude from consideration
@@ -22,16 +31,6 @@ exclude_lines =
 
     # 'pass' generally means 'this won't be called'
     ^ *pass *$
-
-omit =
-    # omit __init__.py file
-    *__init__*
-    # omit tests
-    */test/*
-    # omit per S&A
-    /*/utilities/SBE37_util*
-    /*/utilities/client_*
-    /*/utilities/inst_*
 
 [html]
 directory = coverage_results
