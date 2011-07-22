@@ -104,19 +104,17 @@ class MetadataCacheTest(IonTestCase):
                     }
             },
             {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry.resource_registry',
+                'class':'ResourceRegistryService',
+                'spawnargs':
+                    {
+                        'datastore_service':'datastore'}
+            },
+            {
                 'name':'association_service',
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
-            },
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
-            },
-            {
-                'name':'store_service',
-                'module':'ion.core.data.store_service',
-                'class':'StoreService'
             },
             ]
 
@@ -254,7 +252,7 @@ class MetadataCacheTest(IonTestCase):
     
         # Pause to make sure we catch the message
         log.debug('TestUpdateDataResourceCache waiting to shut down...')
-        yield pu.asleep(10.0)
+        yield pu.asleep(20.0)
         log.debug('TestUpdateDataResourceCache shutting down...')
             
 
