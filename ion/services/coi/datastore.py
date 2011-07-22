@@ -226,8 +226,6 @@ class DataStoreWorkbench(WorkBench):
                     # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
                     new_links_to_get.update(obj.ChildLinks)
                 else:
-                    log.critical('Getting content from store!!!!!!!!!!')
-
                     def_list.append(self._blob_store.get(key))
 
 
