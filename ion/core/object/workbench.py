@@ -411,6 +411,10 @@ class WorkBench(object):
 
                     # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
                     new_links_to_get.update(obj.ChildLinks)
+                else:
+
+                    log.warn('Blob not found in _get_blobs.')
+
 
             keys_to_get.clear()
             for link in new_links_to_get:
