@@ -7,6 +7,7 @@
 """
 
 import logging
+import subprocess
 import sys
 import traceback
 import re
@@ -277,3 +278,27 @@ def pprint_to_string(obj):
     result = fstream.getvalue()
     fstream.close()
     return result
+
+def print_memory_usage():
+    """
+    @brief Prints the memory usage of the container processes.
+
+    Performs a ps command as a subprocess and retrieves the RSS and VSIZE of the
+    twistd container processes.
+
+    @TODO convert to use the twisted subprocess!
+    """
+
+    pids = os.getenv("ION_TEST_CASE_PIDS",'')
+    #log.info("Started the containers")
+    pids += ' ' + str(os.getpid())
+    #print 'Got str_pids: "%s"' % pids
+    ps_args = ["-o args,command,rss,vsize",  "-p", pids]
+    #I'd rather not execute this through the shell, but the output from the command was truncated
+    #when I did not set shell=True.
+    p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
+    std_output = p.communicate()[0]
+    #This should probably become a logging statement.
+    header = "================================================================================="
+    ret = "%s\nOS Process Status Memory Use: \n%s%s" % (header,std_output,header)
+    return ret
