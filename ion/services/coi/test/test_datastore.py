@@ -46,6 +46,8 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 association_type = object_utils.create_type_identifier(object_id=13, version=1)
 
+OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
+
 
 class DataStoreTest(IonTestCase):
     """
@@ -621,6 +623,48 @@ class DataStoreTest(IonTestCase):
 
 
 
+    @defer.inlineCallbacks
+    def create_large_object(self):
+
+        rand = open('/dev/random','r')
+
+        repo = yield self.wb1.workbench.create_repository(OPAQUE_ARRAY_TYPE)
+        MB = 1024 * 124
+        repo.root_object.value.extend(rand.read(2 *MB))
+
+        repo.commit('Commit before send...')
+
+        log.info('Repository size: %d bytes, array len %d' % (repo.__sizeof__(), len(repo.root_object.value)))
+
+        rand.close()
+
+
+        defer.returnValue(repo)
+
+
+
+    @defer.inlineCallbacks
+    def test_pull_object(self):
+
+        repo = yield self.create_large_object()
+
+        result = yield self.wb1.workbench.push('datastore',repo)
+
+        self.repo_key = repo.repository_key
+
+        for i in range(4):
+
+            result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            print pu.print_memory_usage()
+            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+            print self.wb1.workbench_memory()
+
+
+
+
 
 class MulitDataStoreTest(IonTestCase):
     """
@@ -831,6 +875,8 @@ class MulitDataStoreTest(IonTestCase):
             repo.checkout('master')
 
             self.assertEqual(repo.root_object.person[0].id,n-1)
+
+
 
 
 

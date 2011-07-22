@@ -410,7 +410,15 @@ class DataStoreWorkbench(WorkBench):
                 return (x.type not in request.excluded_types)
 
             # Correct method - looks in store
+            import objgraph
+            log.critical( "OBJ GRAPH")
+            objgraph.show_growth()
+            log.critical( "Get_blobs")
+
+            #blobs = WorkBench._get_blobs(self,response.Repository, keys, filtermethod)
             blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
+            log.critical( "OBJ GRAPH")
+            objgraph.show_growth()
 
             # Remove the deferred part
             #blobs = self._get_blobs(response.Repository, keys, filtermethod)
