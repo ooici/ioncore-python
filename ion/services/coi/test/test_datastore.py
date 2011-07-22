@@ -49,12 +49,37 @@ association_type = object_utils.create_type_identifier(object_id=13, version=1)
 OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version=1)
 
 
+
+
+@defer.inlineCallbacks
+def create_large_object(wb):
+
+    rand = open('/dev/random','r')
+
+    repo = yield wb.create_repository(OPAQUE_ARRAY_TYPE)
+    MB = 1024 * 124
+    repo.root_object.value.extend(rand.read(2 *MB))
+
+    repo.commit('Commit before send...')
+
+    log.info('Repository size: %d bytes, array len %d' % (repo.__sizeof__(), len(repo.root_object.value)))
+
+    rand.close()
+
+
+    defer.returnValue(repo)
+
+
+
+
 class DataStoreTest(IonTestCase):
     """
     Testing Datastore service.
     """
 
-    timeout = 600
+    # Number or repetitions for pull large object test
+    pull_repetitions = 3
+
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True}}
@@ -524,10 +549,6 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(ab.title,'Datastore Addressbook')
 
 
-
-
-
-
     @defer.inlineCallbacks
     def test_push_clear_pull_many(self):
 
@@ -625,46 +646,29 @@ class DataStoreTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def create_large_object(self):
-
-        rand = open('/dev/random','r')
-
-        repo = yield self.wb1.workbench.create_repository(OPAQUE_ARRAY_TYPE)
-        MB = 1024 * 124
-        repo.root_object.value.extend(rand.read(2 *MB))
-
-        repo.commit('Commit before send...')
-
-        log.info('Repository size: %d bytes, array len %d' % (repo.__sizeof__(), len(repo.root_object.value)))
-
-        rand.close()
-
-
-        defer.returnValue(repo)
-
-
-
-    @defer.inlineCallbacks
     def test_pull_object(self):
 
-        repo = yield self.create_large_object()
+        repo = yield create_large_object(self.wb1.workbench)
 
         result = yield self.wb1.workbench.push('datastore',repo)
 
         self.repo_key = repo.repository_key
 
-        for i in range(100):
+        for i in range(self.pull_repetitions):
+
+            log.info("Testing pull loop!!!")
 
             result = yield self.wb1.workbench.pull('datastore',self.repo_key)
 
             self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
-            print pu.print_memory_usage()
             self.wb1.workbench.manage_workbench_cache('Test runner context!')
-            print "WB1: %s" % self.wb1.workbench_memory()
-            print "DS1: %s" % self.ds1.workbench_memory()
-            import objgraph
-            objgraph.show_growth()
+
+            log.info(pu.print_memory_usage())
+            log.info("WB1: %s" % self.wb1.workbench_memory())
+            log.info("DS1: %s" % self.ds1.workbench_memory())
+            #import objgraph
+            #objgraph.show_growth()
 
 
 
