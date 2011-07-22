@@ -205,9 +205,9 @@ class DataStoreWorkbench(WorkBench):
         filtermethod = filtermethod or def_filter
 
         objects = {}
-
+        new_links_to_get = set()
         while len(keys_to_get) > 0:
-            new_links_to_get = set()
+            new_links_to_get.clear()
 
             def_list = []
             #@TODO - put some error checking here so that we don't overflow due to a stupid request!
@@ -220,6 +220,8 @@ class DataStoreWorkbench(WorkBench):
                     # get the object
                     obj = repo._load_element(wse)
 
+                    #print obj.Debug()
+
                     objects[key] = obj
 
                     # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
@@ -230,12 +232,15 @@ class DataStoreWorkbench(WorkBench):
                     def_list.append(self._blob_store.get(key))
 
 
-            result_list = []
-            if def_list:
-                result_list = yield defer.DeferredList(def_list)
+            #result_list = []
+            ##if def_list:
+            #    result_list = yield defer.DeferredList(def_list)
+
+            result_list = yield defer.DeferredList(def_list)
 
             for result, blob in result_list:
                 assert result==True, 'Error getting link from blob store!'
+                assert blob is not None, 'Blob not found in blob store!'
                 wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 blobs[wse.key]=wse
 
@@ -258,6 +263,7 @@ class DataStoreWorkbench(WorkBench):
             objects.clear()
             
         defer.returnValue(blobs)
+        #return blobs
 
     @defer.inlineCallbacks
     def _resolve_repo_state(self, repository_key, fail_if_not_found=True):
@@ -403,10 +409,16 @@ class DataStoreWorkbench(WorkBench):
                 """
                 return (x.type not in request.excluded_types)
 
+            # Correct method - looks in store
             blobs = yield self._get_blobs(response.Repository, keys, filtermethod)
-            #blobs = yield WorkBench._get_blobs(self,response.Repository, keys, filtermethod)
 
-            for element in blobs.values():
+            # Remove the deferred part
+            #blobs = self._get_blobs(response.Repository, keys, filtermethod)
+
+            # Use the workbench method - no store...
+            #blobs = WorkBench._get_blobs(self,response.Repository, keys, filtermethod)
+
+            for element in blobs.itervalues():
                 link = response.blob_elements.add()
                 obj = response.Repository._wrap_message_object(element._element)
 
