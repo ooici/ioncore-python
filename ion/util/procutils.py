@@ -300,12 +300,15 @@ def print_memory_usage():
     #when I did not set shell=True.
     p = os_process.OSProcess(binary="/bin/ps", spawnargs=ps_args)
     result = yield p.spawn()
-    std_output = result.get('outlines')
+    std_output = result.get('outlines', None)
+
+    if std_output is None or std_output == []:
+        defer.returnValue( 'print_memory_usage Failed!')
 
     #p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
     #std_output = p.communicate()[0]
 
     #This should probably become a logging statement.
     header = "================================================================================="
-    ret = "%s\nOS Process Status Memory Use: \n%s%s" % (header,std_output,header)
+    ret = "\n%s\nOS Process Status Memory Use: \n%s%s" % (header,std_output[0],header)
     defer.returnValue(ret)
