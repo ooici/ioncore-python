@@ -727,11 +727,16 @@ class Repository(ObjectContainer):
 
         return self.index_hash.__sizeof__()
 
+    def noisy_clear(self):
+        pass
 
     def clear(self):
         """
         Clear the repository in preparation for python garbage collection
         """
+
+        self.noisy_clear()
+
          # Do some clean up!
         for item in self._workspace.itervalues():
             #print 'ITEM',item
