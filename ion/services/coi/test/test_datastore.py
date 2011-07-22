@@ -54,6 +54,7 @@ class DataStoreTest(IonTestCase):
     Testing Datastore service.
     """
 
+    timeout = 600
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True, ION_AIS_RESOURCES_CFG:True}}
@@ -652,7 +653,7 @@ class DataStoreTest(IonTestCase):
 
         self.repo_key = repo.repository_key
 
-        for i in range(4):
+        for i in range(100):
 
             result = yield self.wb1.workbench.pull('datastore',self.repo_key)
 
@@ -660,9 +661,10 @@ class DataStoreTest(IonTestCase):
 
             print pu.print_memory_usage()
             self.wb1.workbench.manage_workbench_cache('Test runner context!')
-            print self.wb1.workbench_memory()
-
-
+            print "WB1: %s" % self.wb1.workbench_memory()
+            print "DS1: %s" % self.ds1.workbench_memory()
+            import objgraph
+            objgraph.show_growth()
 
 
 
