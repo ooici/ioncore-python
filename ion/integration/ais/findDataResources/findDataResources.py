@@ -452,12 +452,12 @@ class FindDataResources(object):
                     #
                     # The datasource is not cached; this could be because it was deleted
                     # or because the datasource hasn't been added yet.  In any case,
-                    # do not include the corresponding dataset in the list; break out
-                    # of loop now (after incrementing index)
+                    # do not include the corresponding dataset in the list; continue
+                    # the loop now (after incrementing index)
                     #
                     log.info('metadata not found for datasourceID: ' + dSourceResID)
                     i = i + 1
-                    break
+                    continue
                     
                 #
                 # Added this for Tim and Tom; not sure we need it yet...

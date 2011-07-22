@@ -205,6 +205,14 @@ class MetadataCacheTest(IonTestCase):
     def test_updateMetadataCache(self):
         log.debug('Testing updateMetadataCache.')
 
+        #
+        # Setup the sleepTime and totalSleepTime (that we wait for the
+        # metadatacache event handler to complete its work).  Currently
+        # waiting 5 seconds for each set of 2 events (dataset & datasource)
+        #
+        sleepTime = 5
+        totalSleepTime = 0
+        
         # Setup the publishers
         datasetPublisher = DatasetChangeEventPublisher(process=self._proc)
         yield datasetPublisher.initialize()
@@ -238,10 +246,7 @@ class MetadataCacheTest(IonTestCase):
                 origin = "SOME DATASET RESOURCE ID",
                 dataset_id = dSetID,
                 )
-    
-            # Pause ???
-            #yield pu.asleep(3.0)
-
+            
             log.debug('publishing event for dSrcID: %s' %(dSrcID))
 
             yield datasrcPublisher.create_and_publish_event(
@@ -249,10 +254,15 @@ class MetadataCacheTest(IonTestCase):
                 origin = "SOME DATASOURCE RESOURCE ID",
                 datasource_id = dSrcID,
                 )
+
+            #
+            # Increment the sleep time
+            #
+            totalSleepTime = totalSleepTime + sleepTime
     
         # Pause to make sure we catch the message
-        log.debug('TestUpdateDataResourceCache waiting to shut down...')
-        yield pu.asleep(20.0)
+        log.debug('TestUpdateDataResourceCache waiting %s seconds to shut down...' %(totalSleepTime))
+        yield pu.asleep(sleepTime)
         log.debug('TestUpdateDataResourceCache shutting down...')
             
 
