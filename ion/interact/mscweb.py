@@ -249,9 +249,13 @@ class EventMonitorWebResource(resource.Resource):
         if len(listpath) == 1 and listpath[0] == '':
             listpath[0] = "msc.html"
 
-        f = resource_stream(__name__, "data/%s" % "/".join(listpath))
-        data = f.readlines()
-        f.close()
+        try:
+            f = resource_stream(__name__, "data/%s" % "/".join(listpath))
+            data = f.readlines()
+            f.close()
+        except IOError:
+            request.setResponseCode(404)
+            return "404 not found"
 
         # figure out mime type, in a hacky manner - most browsers don't care and will get it right
         mime = "text/%s"
