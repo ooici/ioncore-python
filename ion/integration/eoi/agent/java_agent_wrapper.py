@@ -141,12 +141,13 @@ class UpdateHandler(ScheduleEventSubscriber):
                Overridden to unpack dataset and datasource IDs from the update notification
         @param data: A dictionary of data
         """
-        log.debug('Got an update event message from the scheduler')
+        log.info('JAW: Got an update event message from the scheduler')
 
         content = data['content']
         update_msg = content.additional_data.payload
 
-        yield self.hook_fn(update_msg.dataset_id, update_msg.datasource_id)
+        res = yield self.hook_fn(update_msg.dataset_id, update_msg.datasource_id)
+        log.info("JAW (scheduled update event): %s" % str(res))
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -448,6 +449,7 @@ class JavaAgentWrapper(ServiceProcess):
         @param dataset_id: The OOI Resource ID of the Dataset which has been updated
         @param data_source_id: The OOI Resource ID of the Data Source which has been updated
         """
+        log.info("JAW _update_request - Start")
 
         # Step 0: retrieve the dataset_id from the data_source_id if it is not provided -- and vise versa
         if dataset_id and not data_source_id:
@@ -485,11 +487,35 @@ class JavaAgentWrapper(ServiceProcess):
 
         # @note: Can't use client because we want to access the defered and change the timeout!
         perform_ingest_deferred = self.rpc_send(self.get_scoped_name('system',"ingestion"), "ingest", begin_msg, timeout=ingest_timeout)
+
+        # there is a possibility this ingestion call can error and callback before it can succeed in calling our ingest_ready,
+        # which means we'll just spin forever below and cause all kinds of weird state. we need to prevent that from happening.
+        def early_err(failure):
+            # crash out of yield for ingest ready deferred
+            if not self.__ingest_ready_deferred.called:
+                self.__ingest_ready_deferred.errback(failure)
+
+            # pass through what we got, no matter what.
+            return failure
+
+        def early_cb(result):
+            if not self.__ingest_ready_deferred.called:
+                self.__ingest_ready_deferred.errback(ReceivedError('Perform ingest deferred called back without calling ingest ready!'))
+
+            # pass through result every time
+            return result
+
+        # these are designed to be passthroughs if nothing happened
+        perform_ingest_deferred.addCallbacks(early_cb, early_err)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called when the ingest invokes op_ingest_ready()
         log.debug("Yielding on the ingest -- it'll callback when its ready to receive ingestion data")
-        irmsg = yield self.__ingest_ready_deferred
+        try:
+            irmsg = yield self.__ingest_ready_deferred
+        except ReceivedError, ex:
+            log.error("Ingestion did not ever signal it was ready: %s" % str(ex))
+            defer.returnValue(False)
         
         log.debug("Ingest is ready to receive data!")
         context.xp_name = irmsg.xp_name
