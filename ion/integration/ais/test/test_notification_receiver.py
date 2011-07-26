@@ -150,16 +150,11 @@ class NotificationReceiverTest(IonTestCase):
                                                           end_datetime_millis = 11000,
                                                           number_of_timesteps = 7)
 
-
-        yield pu.asleep(1.0)
-
         yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
                                                         datasource_id="UnitTest_dataresrc123",
                                                         error_explanation="UnitTest_explanation")
         
 
-        yield pu.asleep(3.0)
-
-
-
-            
+        yield pu.asleep(5.0)
+        
+        log.info('NotificationReceiverTest:test_publish_receive completed')        
