@@ -141,11 +141,13 @@ class DatasetController(ServiceProcess):
         self.ssc = SchedulerServiceClient(proc=self)
         self.asc = AssociationServiceClient(proc=self)
 
+        
+        #self.private_key = self.spawn_args.get('private_key' ,
+        #                                       CONF.getValue('private_key'))
+        #self.public_key = self.spawn_args.get('public_key' ,
+        #                                      CONF.getValue('public_key'))
+        
         # As per DS, pull config from spawn args first and config file(s) second
-        self.private_key = self.spawn_args.get('private_key' ,
-                                               CONF.getValue('private_key'))
-        self.public_key = self.spawn_args.get('public_key' ,
-                                              CONF.getValue('public_key'))
         self.server_url = self.spawn_args.get('thredds_ncml_url',
                                               CONF.getValue('thredds_ncml_url',
                                               default='datactlr@thredds.oceanobservatories.org:/opt/tomcat/ooici_tds_data'))

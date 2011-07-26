@@ -61,14 +61,17 @@ def check_for_ncml_files(local_filepath):
 
     try:
         allfiles = listdir(local_filepath)
+        log.debug("all files %s" % (allfiles,))
         ncml_files = []
-        for file in allfiles:
-            if fnmatch.fnmatch(file, '*.ncml'):
-                ncml_files.append(file)
+        for fname in allfiles:
+            log.debug("Got file %s" % (fname,))
+            if fnmatch.fnmatch(fname, '*.ncml'):
+                ncml_files.append(fname)
     except IOError:
         log.exception('Error searching %s for ncml files' % local_filepath)
         return False
-
+    
+    log.debug("len(ncml_files): %s"% (len(ncml_files),))
     if len(ncml_files) > 0:
         return True
 
