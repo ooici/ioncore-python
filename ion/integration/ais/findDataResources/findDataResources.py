@@ -440,12 +440,15 @@ class FindDataResources(object):
 
                 dSourceResID = dSetMetadata['DSourceID']
                 if dSourceResID is None:
-                    log.info('dSourceResID is None')
-                    Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                          MessageName='AIS findDataResources error response')
-                    Response.error_num = Response.ResponseCodes.NOT_FOUND
-                    Response.error_str = "AIS.findDataResources: Datasource not found."
-                    defer.returnValue(Response)
+                    #
+                    # There is no associated ID for this dataset; this is a strange
+                    # error and it means that there was no datasource returned by
+                    # the association service.  Really shouldn't happen, but it
+                    # does sometimes.
+                    #
+                    log.error('dataset %s has no associated dSourceResID.' %(dSetResID))
+                    i = i + 1
+                    continue
 
                 dSource = yield self.metadataCache.getDSourceMetadata(dSourceResID)
                 if dSource is None:
