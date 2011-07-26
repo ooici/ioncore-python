@@ -428,9 +428,9 @@ class JavaAgentWrapper(ServiceProcess):
         result = yield self._update_request(content.dataset_id, content.data_source_id)
 
         if result:
-            yield self.reply_ok(msg,'Java agent wrapper succeeded!')
+            yield self.reply_ok(msg,'Java agent wrapper update succeeded!')
         else:
-            yield self.reply_err(msg,'Java agent wrapper failed!')
+            yield self.reply_ok(msg,'Java agent wrapper skipped the update procedure')
 
     @defer.inlineCallbacks
     def _update_request(self, dataset_id, data_source_id):
@@ -439,14 +439,20 @@ class JavaAgentWrapper(ServiceProcess):
                 having the wrapped Dataset Agent perform an update and push the compliant data into the Resource Registry.
                 
                 This process involves:
-                    1) Requesting the datasources current state (known as "context") from the Resource Registry
-                    2) The update procedure is invoked via an RPC call to the underlying Dataset Agent using
+                    1) Verifying the state of the dataset -- update will be cancelled if ResourceLifeCycleState is:
+                            INACTIVE
+                            DECOMMISSIONED
+                            RETIRED
+                    2) Requesting the datasources current state (known as "context") from the Resource Registry
+                    3) The update procedure is invoked via an RPC call to the underlying Dataset Agent using
                        the acquired "context"
-                    3) The Dataset Agent performs the update assimilating data into CDM/CF compliant form,
+                    4) The Dataset Agent performs the update, organizes data in CDM/CF canonical form,
                        pushes that data to the Resource Registry, and returns the new DatasetID.
         
         @param dataset_id: The OOI Resource ID of the Dataset which has been updated
         @param data_source_id: The OOI Resource ID of the Data Source which has been updated
+        @return: True if the update procedure completes normally, False if the update procedure is skipped for any reason
+                 which doesn't raise an exception (such as when the dataset is INACTIVE).
         """
 
         # Step 0: retrieve the dataset_id from the data_source_id if it is not provided -- and vise versa
@@ -457,19 +463,33 @@ class JavaAgentWrapper(ServiceProcess):
         elif not dataset_id and not data_source_id:
             raise JavaAgentWrapperException('Must provide data source or dataset ID!')
     
-        # Step 1: Grab the context for the given dataset ID
+        # Step 1: Check the ResourceLifeCycleState of the dataset -- don't update if it is inactive, decommissioned, etc
+        dataset = yield self.rc.get_instance(dataset_id)
+        r_state = dataset.ResourceLifeCycleState
+        
+        cancel_states = []
+        cancel_states.append(dataset.INACTIVE)
+        cancel_states.append(dataset.DECOMMISSIONED)
+        cancel_states.append(dataset.RETIRED)
+        
+        if r_state in cancel_states:
+            log.warn('Dataset Resource for ID "%s" has state "%s" and will not be updated' % (dataset_id, r_state))
+            defer.returnValue(False)
+
+        # Step 2: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
         try:
             context = yield self._get_dataset_context(dataset_id, data_source_id)
         except KeyError, ex:
-            log.exception('Failed to get dataset context!   %s' % str(ex))
-            defer.returnValue(False)
+            err_msg = 'Failed to get dataset context!   %s' % str(ex)
+            log.error(err_msg)
+            raise JavaAgentWrapperException(err_msg)
 
-        # Step 2: Setup a deferred so that we can wait for the Ingest Service to respond before sending data messages
+        # Step 3: Setup a deferred so that we can wait for the Ingest Service to respond before sending data messages
         log.debug('Setting up ingest ready deferred...')
         self.__ingest_ready_deferred = defer.Deferred()
         
-        # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
+        # Step 4: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
         reply_to        = self.receiver.name
         ingest_timeout  = context.max_ingest_millis/1000
 
@@ -486,7 +506,7 @@ class JavaAgentWrapper(ServiceProcess):
         # @note: Can't use client because we want to access the defered and change the timeout!
         perform_ingest_deferred = self.rpc_send(self.get_scoped_name('system',"ingestion"), "ingest", begin_msg, timeout=ingest_timeout)
         
-        # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
+        # Step 5: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called when the ingest invokes op_ingest_ready()
         log.debug("Yielding on the ingest -- it'll callback when its ready to receive ingestion data")
         irmsg = yield self.__ingest_ready_deferred
@@ -524,22 +544,24 @@ class JavaAgentWrapper(ServiceProcess):
         try:
             (ingest_result, ingest_headers, ingest_msg) = yield perform_ingest_deferred
         except defer.TimeoutError:
-            log.error("JAW timed out client side and will tell DAC to cease transmission")
+            err_msg = 'JAW timed out client side and will tell DAC to cease transmission (while updating dataset "%s")' % dataset_id
+            log.error(err_msg)
 
             # tell dataset agent to stop doing its thing
             nonemsg = yield self.mc.create_instance(None)
             yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
 
-            defer.returnValue(False)
+            raise JavaAgentWrapperException(err_msg)
 
         except ReceivedError, ex:
-            log.error("Ingestion raised an error: %s" % str(ex.msg_content.MessageResponseBody))
+            err_msg = 'Ingestion raised an error (while updating dataset "%s"): %s' % (dataset_id, str(ex.msg_content.MessageResponseBody))
+            log.error(err_msg)
 
             # tell dataset agent to stop doing its thing
             nonemsg = yield self.mc.create_instance(None)
             yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
 
-            defer.returnValue(False)
+            raise JavaAgentWrapperException(err_msg)
 
         finally:
             # cleanup timeout-increasing subscriber
