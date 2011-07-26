@@ -5,6 +5,9 @@
 @author Dave Foster <dfoster@asascience.com>
 """
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from ion.core.messaging.receiver import Receiver
 from twisted.internet import defer, reactor
 from twisted.web import server, resource, static
@@ -28,7 +31,7 @@ try:
     import json
 except:
     import simplejson as json
-
+    
 class EventMonitorWebResource(resource.Resource):
 
     class AsyncResource(resource.Resource):
@@ -130,6 +133,8 @@ class EventMonitorWebResource(resource.Resource):
 
         @defer.inlineCallbacks
         def _do_action(self, request):
+            requestStr = str(request)
+            log.debug('ControlRequest _do_action Request %s' % requestStr)
 
             command = request.postpath.pop(0)
 
@@ -146,18 +151,18 @@ class EventMonitorWebResource(resource.Resource):
                 msg.event_id = int(event_id)
                 if origin:
                     msg.origin = origin
-                print 'session id'
-                print msg.session_id
-                print 'event_id'
-                print msg.event_id
-                print 'origin'
-                print msg.origin
+                log.debug('session id %s' % str(msg.session_id))
+                log.debug('event_id %s' % str(msg.event_id))
+                log.debug('origin %s' % str(msg.origin))
 
+                log.debug('before subscribe')
                 resp = yield self._ec.subscribe(msg)
 
+                log.debug('subscribe response %s' % str(resp))
                 response = {'status':'ok',
-                            'subscription_id': resp.subscription_id }
+                                'subscription_id': resp.subscription_id }
 
+                log.debug('Returning OK from subscribe')
                 defer.returnValue(json.dumps(response))
 
             elif command == "unsub":
@@ -172,10 +177,13 @@ class EventMonitorWebResource(resource.Resource):
                     msg.subscription_id = sub_id
 
                 yield self._ec.unsubscribe(msg)
+
                 response = {'status':'ok'}
+                
+                log.debug('Returning OK from unsubscribe')
                 defer.returnValue(json.dumps(response))
 
-            print "UNKNOWN CTL REQUEST"
+            log.error("UNKNOWN CTL REQUEST %s" % str(request))
             response = {'status':'bad'}
             defer.returnValue(json.dumps(response))
 
@@ -212,7 +220,14 @@ class EventMonitorWebResource(resource.Resource):
         #template = string.Template(self.page_template)
         #return template.substitute()
         # TODO: testing only, load every time
-        self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "instrument_web_monitor.html"))
+        #print '############# Request'
+        #print request
+        requestStr = str(request)
+        log.debug('render_GET Request %s' % requestStr)
+        if requestStr.rfind('NMEA'):
+            self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "nmea_instrument_web_monitor.html"))
+        else:
+            self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "instrument_web_monitor.html"))
         return self._mainpage.render_GET(request)
 
 class NotificationWebMonitorService(Process):
@@ -230,7 +245,7 @@ class NotificationWebMonitorService(Process):
         self._web = EventMonitorWebResource(self._mc, self._ec)
         self._site = server.Site(self._web)
         reactor.listenTCP(9998, self._site)
-        print "Listening on http://localhost:9998"
+        log.info("Listening on http://localhost:9998")
 
     def handler(self):
         self._web._msgs = self._msgs
