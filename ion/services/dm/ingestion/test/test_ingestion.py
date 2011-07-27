@@ -25,12 +25,10 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG,
 from ion.services.dm.distribution.events import DatasourceUnavailableEventSubscriber, DatasetSupplementAddedEventSubscriber, DATASET_STREAMING_EVENT_ID, get_events_exchange_point
 
 from ion.core.process import process
-from ion.services.dm.ingestion.ingestion import IngestionClient, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE, CDM_BOUNDED_ARRAY_TYPE 
+from ion.services.dm.ingestion.ingestion import IngestionClient, IngestionError, SUPPLEMENT_MSG_TYPE, CDM_DATASET_TYPE, DAQ_COMPLETE_MSG_TYPE, PERFORM_INGEST_MSG_TYPE, CREATE_DATASET_TOPICS_MSG_TYPE, EM_URL, EM_ERROR, EM_TITLE, EM_DATASET, EM_END_DATE, EM_START_DATE, EM_TIMESTEPS, EM_DATA_SOURCE, CDM_BOUNDED_ARRAY_TYPE 
 from ion.test.iontest import IonTestCase
 
 from ion.services.coi.datastore_bootstrap.dataset_bootstrap import bootstrap_profile_dataset, BOUNDED_ARRAY_TYPE, FLOAT32ARRAY_TYPE, bootstrap_byte_array_dataset
-
-from ion.services.dm.ingestion.ingestion import CREATE_DATASET_TOPICS_MSG_TYPE
 
 from ion.core.object.object_utils import create_type_identifier, ARRAY_STRUCTURE_TYPE
 from ion.core.messaging.message_client import MessageInstance
@@ -322,12 +320,27 @@ class IngestionTest(IonTestCase):
     def test_merge_overlap(self):
         """
         This is a test method for the merge dataset operation (with overlaps) of the ingestion service
+        where the supplement being merged is sent as a whole dataset
         """
+        yield self._test_merge_overlap(False)
+
+
+    @defer.inlineCallbacks
+    def test_merge_overlap_chunks(self):
+        """
+        This is a test method for the merge dataset operation (with overlaps) of the ingestion service
+        where the supplement being merged is sent in chunks
+        """
+        yield self._test_merge_overlap(True)
+    
+    
+    @defer.inlineCallbacks
+    def _test_merge_overlap(self, send_as_chunks):
 
         # Step 1: Ingest and merge a supplement
         #--------------------------------------
         log.debug('test_merge_overlap(): Merging first supplement (no overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=1)
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, send_as_chunks=send_as_chunks, supplement_number=1)
 
 
         # Test the data in the datastore
@@ -352,7 +365,7 @@ class IngestionTest(IonTestCase):
         # Step 2: Now try ingesting a supplement which overlaps
         #------------------------------------------------------
         log.debug('test_merge_overlap(): Merging second supplement (3 timestep overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=2, supplement_overlap_count=3)
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, send_as_chunks=send_as_chunks, supplement_number=2, supplement_overlap_count=3)
         
         
         # Test the data in the datastore
@@ -433,18 +446,87 @@ class IngestionTest(IonTestCase):
 
 
         # @todo: Validate the arrangement of the salinity data mathematically?  (this should be possible because it is now created mathematically
-    
-    
+
+
+    @defer.inlineCallbacks
+    def test_merge_overlap_fail_total_overlap(self):
+        
+        # Step 1: Ingest and merge a supplement (supplement # 2 with 2 overlaps introduces 4 new values on top of the original dataset
+        #--------------------------------------
+        log.debug('test_merge_overlap(): Merging first supplement (no overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=2, supplement_overlap=2)
+
+        excep = None
+        try:
+            # Now send a supplement which is encompassed by the dataset
+            # In this case, overlap cannot properly append this data -- this should be done via overwrite, and so an exception is thrown.
+            dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=1)
+        except Exception, ex:
+            excep = ex
+            
+        
+        self.assertTrue(isinstance(excep, IngestionError), 'Ingestion is supposed to throw an IngestionError when the current dataset completely overlaps the dataset supplement')
+
+
+    @defer.inlineCallbacks
+    def test_merge_overlap_check_fetch_one_overlap(self):
+        """
+        This is a test method for the merge dataset operation (via overlap) of the ingestion service.
+        This runs through an overlap test without first fetching the blobs for the dataset to ensure
+        that the merge methods will fetch blobs when necessary
+        """
+
+        # Step 1: Ingest and merge a supplement which provides overlapping indices
+        #-------------------------------------------------------------------------
+        log.info('test_merge_overlap_check_fetch(): Merging first supplement (1 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=1, supplement_overlap_count=1)
+        log.info('test_merge_overlap_check_fetch(): Merging second supplement (4 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=2, supplement_overlap_count=4)
+
+
+    @defer.inlineCallbacks
+    def test_merge_overlap_check_fetch_two_overlap(self):
+        """
+        This is a test method for the merge dataset operation (via overlap) of the ingestion service.
+        This runs through an overlap test without first fetching the blobs for the dataset to ensure
+        that the merge methods will fetch blobs when necessary
+        
+        When the supplement overlaps by more than one timestep a different code path is taken -- this test is for code coverage
+        """
+
+        # Step 1: Ingest and merge a supplement which provides overlapping indices
+        #-------------------------------------------------------------------------
+        log.info('test_merge_overlap_check_fetch(): Merging first supplement (2 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=1, supplement_overlap_count=2)
+        log.info('test_merge_overlap_check_fetch(): Merging second supplement (4 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERLAP, supplement_number=2, supplement_overlap_count=4)
+        
+        
     @defer.inlineCallbacks
     def test_merge_overwrite(self):
         """
         This is a test method for the merge dataset operation (via overwrite) of the ingestion service
+        where the supplement being merged is sent as a whole dataset
         """
+        yield self._test_merge_overwrite(send_as_chunks=False)
+
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite_chunks(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service
+        where the supplement being merged is sent in chunks
+        """
+        yield self._test_merge_overwrite(send_as_chunks=True)
+    
+    
+    @defer.inlineCallbacks
+    def _test_merge_overwrite(self, send_as_chunks):
 
         # Step 1: Ingest and merge a supplement
         #--------------------------------------
-        log.debug('test_merge_overwrite(): Merging first supplement (no overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+        log.info('test_merge_overwrite(): Merging first supplement (no overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=send_as_chunks, supplement_number=1)
 
 
         # Test the data in the datastore
@@ -468,14 +550,14 @@ class IngestionTest(IonTestCase):
         
         # Step 2: Now try ingesting some supplements which overlap
         #---------------------------------------------------------
-        log.debug('test_merge_overwrite(): Merging second supplement (3 timestep overlap)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=2, supplement_overlap_count=3)
+        log.info('test_merge_overwrite(): Merging second supplement (3 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=send_as_chunks, supplement_number=2, supplement_overlap_count=3)
         
-        log.debug('test_merge_overwrite(): Merging third supplement (tail data -- to check for origin updates)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=3)
+        log.info('test_merge_overwrite(): Merging third supplement (tail data -- to check for origin updates)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=send_as_chunks, supplement_number=3)
         
-        log.debug('test_merge_overwrite(): Merging fourth supplement (overwrite data in middle of dataset)')
-        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, supplement_number=1)
+        log.info('test_merge_overwrite(): Merging fourth supplement (overwrite data in middle of dataset)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=send_as_chunks, supplement_number=1)
         
         
         
@@ -519,7 +601,7 @@ class IngestionTest(IonTestCase):
         self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].origin, 1)
         self.assertEqual(tvar.content.bounded_arrays[2].bounds[0].size, 1)
         
-        self.assertEqual(tvar.content.bounded_arrays[3].bounds[0].origin, 4)   # bounded_array[2] and bounded_array[3] were switched during overwrite
+        self.assertEqual(tvar.content.bounded_arrays[3].bounds[0].origin, 4)   # bounded_arrays will have been switched during overwrite
         self.assertEqual(tvar.content.bounded_arrays[3].bounds[0].size, 2)     # -- this is expected
         
         self.assertEqual(tvar.content.bounded_arrays[4].bounds[0].origin, 2)
@@ -531,7 +613,7 @@ class IngestionTest(IonTestCase):
             self.assertEqual(len(ba.ndarray.value), ba.bounds[0].size)
         
         
-        # Verify that all values are monotonic there are no duplicate indices (these should have been overwritten)
+        # Verify that all values are monotonic and there are no duplicate indices (duplicates should have been replaced)
         value_list = []
         for i in range(len(tvar.content.bounded_arrays)):
             ba = tvar.content.bounded_arrays[i]
@@ -563,9 +645,70 @@ class IngestionTest(IonTestCase):
 
         # @todo: Validate the arrangement of the salinity data mathematically?  (this should be possible because it is now created mathematically
     
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite_check_fetch_intersects(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service.
+        This runs through an overwrite test where the supplement intersects the existing data.  This is
+        done without first fetching the blobs for the dataset to ensure that the merge methods will
+        fetch blobs when necessary.
+        
+        In this test the dataset is sent in totality as opposed to in chunks to test merging when the supplement
+        is introduced by differing code-paths
+        """
+        log.info('test_merge_overwrite_check_fetch(): Merging first supplement (1 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=False, supplement_number=1, supplement_overlap_count=1)
+    
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite_check_fetch_intersects_chunks(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service.
+        This runs through an overwrite test where the supplement intersects the existing data.  This is
+        done without first fetching the blobs for the dataset to ensure that the merge methods will
+        fetch blobs when necessary.
+        
+        In this test the dataset is sent in chunks as opposed to in totality to test merging when the supplement
+        is introduced by differing code-paths
+        """
+        log.info('test_merge_overwrite_check_fetch(): Merging first supplement (1 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=True, supplement_number=1, supplement_overlap_count=1)
+    
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite_check_fetch_contains(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service.
+        This runs through an overwrite test where the supplement fully contains the existing data.  This is
+        done without first fetching the blobs for the dataset to ensure that the merge methods will
+        fetch blobs when necessary
+        
+        In this test the dataset is sent in totality as opposed to in chunks to test merging when the supplement
+        is introduced by differing code-paths
+        """
+
+        log.info('test_merge_overwrite_check_fetch(): Merging supplement (4 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=False, supplement_number=2, supplement_overlap_count=4)
+    
+    
+    @defer.inlineCallbacks
+    def test_merge_overwrite_check_fetch_contains_chunks(self):
+        """
+        This is a test method for the merge dataset operation (via overwrite) of the ingestion service.
+        This runs through an overwrite test where the supplement fully contains the existing data.  This is
+        done without first fetching the blobs for the dataset to ensure that the merge methods will
+        fetch blobs when necessary
+        
+        In this test the dataset is sent in chunks as opposed to in totality to test merging when the supplement
+        is introduced by differing code-paths
+        """
+        log.info('test_merge_overwrite_check_fetch(): Merging supplement (4 timestep overlap)')
+        dataset_id = yield self._perform_test_ingest(aggregation_rule=AggregationRule.OVERWRITE, send_as_chunks=True, supplement_number=2, supplement_overlap_count=4)
+
 
     @defer.inlineCallbacks
-    def _perform_test_ingest(self, aggregation_rule=None, *args, **kwargs):
+    def _perform_test_ingest(self, aggregation_rule=None, send_as_chunks=False, *args, **kwargs):
         """
         @param kwargs: Key-worded arguments to be sent to bootstrap_profile_dataset() when building the sample dataset for ingestion
         """
@@ -590,11 +733,46 @@ class IngestionTest(IonTestCase):
         
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
-        yield bootstrap_profile_dataset(cdm_dset_msg, *args, **kwargs)
+        bootstrap_profile_dataset(cdm_dset_msg, *args, **kwargs)
         
+        # @todo: If specified, pull the cdm_dset_msg apart and send it as a shell and
+        # subsequently send the data as chunks..
+        if send_as_chunks:
+            
+            # Remove all bounded arrays from the dataset message to create an empty "shell"
+            var_dict = {}
+            for var in cdm_dset_msg.root_group.variables:
 
-        # Send the dataset "chunk" message -- Call the op of the ingest process directly
-        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+                var_name = var.name
+                ba_list = []
+                for i in range(len(var.content.bounded_arrays) - 1, -1, -1):  # Iterate over the list in reverse so we can remove values
+                    ba = var.content.bounded_arrays[i]
+                    del  var.content.bounded_arrays[i]
+                    ba_list.insert(0, ba)
+                    
+                    
+                var_dict[var_name] = ba_list
+            
+            for k, v in var_dict.iteritems():
+                log.debug('%s%s%s' % (k, ':', v))
+                
+            # Send the cdm dataset message as a dataset "shell"
+            yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+            
+            
+            # Send each bounded array as a separate data "chunk"
+            for k, v in var_dict.iteritems():
+                for ba in v:
+                    cdm_supl_msg = yield self.ingest.mc.create_instance(SUPPLEMENT_MSG_TYPE)
+                    cdm_supl_msg.variable_name = k
+                    cdm_supl_msg.bounded_array = ba
+                    cdm_supl_msg.Repository.commit('Storing bounded array chunk for var "%s" before passing to _ingest_op_recv_chunk' % k)
+                    yield self.ingest._ingest_op_recv_chunk(cdm_supl_msg, '', self.fake_msg())
+                
+        else:
+
+            # Send the dataset "chunk" message -- Call the op of the ingest process directly
+            yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
 
 
         # Send the dataset "done" message
@@ -710,7 +888,7 @@ class IngestionTest(IonTestCase):
 
         # Now fake the receipt of the dataset message
         cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
-        yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
+        bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
 
         log.info('Calling Receive Dataset')
 

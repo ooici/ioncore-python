@@ -788,7 +788,8 @@ class IngestionService(ServiceProcess):
 
 
         # Perform the merge
-        result.update(self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex))
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex)
+        result.update(merge_res)
 
 
         log.debug('_merge_overwrite_supplement - Complete')
@@ -842,7 +843,8 @@ class IngestionService(ServiceProcess):
 
 
         # Perform the merge
-        result.update(self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex))
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex)
+        result.update(merge_res)
 
 
         log.debug('_merge_overlapping_supplement - Complete')
@@ -1068,6 +1070,7 @@ class IngestionService(ServiceProcess):
         defer.returnValue(result)
 
 
+    @defer.inlineCallbacks
     def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex):
         result = {}
         
@@ -1162,7 +1165,12 @@ class IngestionService(ServiceProcess):
                         if bound.origin >= sup_sindex and bound.origin + bound.size - 1 <= sup_eindex:
                             # Remove this bounded array
                             if log.getEffectiveLevel() <= logging.DEBUG:
-                                log.debug("(contains) Removing bounded array: %s" % str(var.content.bounded_arrays[i + iter_offset].ndarray.value))
+                                log.debug('(contains) Removing bounded array from variable "%s" [index:%i, origin:(%s), size:(%s)]' % ( \
+                                                                                                                                        var.name.encode('utf-8'), \
+                                                                                                                                        i + iter_offset, \
+                                                                                                                                        str([bbb.origin for bbb in ba.bounds]), \
+                                                                                                                                        str([bbb.size for bbb in ba.bounds]), \
+                                                                                                                                      ))
                             del var.content.bounded_arrays[i + iter_offset]
                             iter_offset -= 1
                         
@@ -1174,25 +1182,39 @@ class IngestionService(ServiceProcess):
                             # if the supplement starts after this bounded_array's origin...
                             if sup_sindex > bound.origin:
                                 # Create a new bounded_array containing only values leading up to the supplement (along the agg dimension)
-                                new_ba = self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, bound.origin, sup_sindex)
+                                new_ba = yield self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, bound.origin, sup_sindex)
                                 ba_link = var.content.bounded_arrays.add()
                                 ba_link.SetLink(new_ba)
                                 if log.getEffectiveLevel() <= logging.DEBUG:
-                                    log.debug("(intersects) Split bounded array and created [left] (origin:%s  size:%s  values:%s)" % (str([bbb.origin for bbb in new_ba.bounds]), str([bbb.size for bbb in new_ba.bounds]), str(new_ba.ndarray.value)))
+                                    log.debug('(intersects) Split bounded array for variable "%s".  Created [left] [index:%i, origin:(%s), size:(%s)]' % ( \
+                                                                                                                                                           var.name.encode('utf-8'), \
+                                                                                                                                                           i + iter_offset, \
+                                                                                                                                                           str([bbb.origin for bbb in new_ba.bounds]), \
+                                                                                                                                                           str([bbb.size for bbb in new_ba.bounds]), \
+                                                                                                                                                         ))
                             
-                            log.debug('check 2 Var:"%s"  BA:%i  BA.origin:%i  BA.size:%i  sup_sindex:%i  sup_eindex:%i' % (var.name, i, bound.origin, bound.size, sup_sindex, sup_eindex))
                             if sup_eindex < (bound.origin + bound.size) - 1:
                                 log.debug('here')
                                 # Create a new bounded_array containing only values from the end of the supplement to the end of the existing bounded_array (along the agg dim)
-                                new_ba = self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, sup_eindex + 1, bound.origin + bound.size)
+                                new_ba = yield self.subset_bounded_array(var.Repository, ba, merge_agg_dim_idx, sup_eindex + 1, bound.origin + bound.size)
                                 ba_link = var.content.bounded_arrays.add()
                                 ba_link.SetLink(new_ba)
                                 if log.getEffectiveLevel() <= logging.DEBUG:
-                                    log.debug("(intersects) Split bounded array and created [right] (origin:%s  size:%s  values:%s)" % (str([bbb.origin for bbb in new_ba.bounds]), str([bbb.size for bbb in new_ba.bounds]), str(new_ba.ndarray.value)))
+                                    log.debug('(intersects) Split bounded array for variable "%s".  Created [right] [index:%i, origin:(%s), size:(%s)]' % ( \
+                                                                                                                                                            var.name.encode('utf-8'), \
+                                                                                                                                                            i + iter_offset, \
+                                                                                                                                                            str([bbb.origin for bbb in new_ba.bounds]), \
+                                                                                                                                                            str([bbb.size for bbb in new_ba.bounds]), \
+                                                                                                                                                          ))
                             
                             # Either way remove this bounded array
                             if log.getEffectiveLevel() <= logging.DEBUG:
-                                log.debug("(intersects) Removing bounded array: %s" % str(var.content.bounded_arrays[i + iter_offset].ndarray.value))
+                                log.debug('(intersects) Removing bounded array from variable "%s" [index:%i, origin:(%s), size:(%s)]' % ( \
+                                                                                                                                          var.name.encode('utf-8'), \
+                                                                                                                                          i + iter_offset, \
+                                                                                                                                          str([bbb.origin for bbb in ba.bounds]), \
+                                                                                                                                          str([bbb.size for bbb in ba.bounds]), \
+                                                                                                                                        ))
                             del var.content.bounded_arrays[i + iter_offset]
                             iter_offset -= 1
                             
@@ -1387,7 +1409,7 @@ class IngestionService(ServiceProcess):
                 log.exception('Attribute merger failed for global attribute "%s".  Cause: %s' % (att_name, str(ex)))
 
 
-        return result
+        defer.returnValue(result)
             
 
 
@@ -1421,6 +1443,11 @@ class IngestionService(ServiceProcess):
 
     @classmethod
     def _get_ndarray_keys(cls, dataset_variable):
+        """
+        @Brief: Retrieves all the ID reference keys for the ndarrays contained in all the bounded_arrays of the given variable.
+                This method is useful to acquire the keys needed in order to fetch blobs from the dataset since, by default,
+                the ndarrays of variables are excluded when datasets are checked out.
+        """
         results = []
         for ba in dataset_variable.content.bounded_arrays:
             results.append(ba.GetLink('ndarray').key)
@@ -1428,6 +1455,22 @@ class IngestionService(ServiceProcess):
     
     @classmethod
     def _get_ndarray_vals(cls, time_variable):
+        """
+        @Brief: Retrieves all the values of all the bounded arrays in the given time_variable
+        @return: A sorted list of tuples containing the values index followed by the value at that index.
+                 Since a variable's bounded array's may contain duplicate data, this array may contain
+                 tuples which specify the same first value.  When this is the case, it is useful to
+                 ensure that the two values specified at the same index match, otherwise the variable
+                 is corrupt.  NOTE: This validation is NOT accomplished by this method.
+                 
+        @note: This method will not yet work on multidimensional variables (more than one item in the
+               bounded array's list of bounds).  This is because iteration over such a structure is
+               quite complicated and currently unnessary since this method is only used for time
+               variables (true time coordinate variables will only ever have one dimension -- time)
+               
+        @note: This method assumes all blobs for the components of the given time_variable (bounded_arrays,
+               ndarrays, etc) have been fetched.  If they have not it will fail with a KeyError.
+        """
         results = []
         for ba in time_variable.content.bounded_arrays:
             if len(ba.bounds) > 1:
@@ -1554,7 +1597,8 @@ class IngestionService(ServiceProcess):
 
         defer.returnValue(results_dict)
 
-    
+
+    @defer.inlineCallbacks
     def subset_bounded_array(self, repo, old_ba, idx, min, max):
         """
         Creates a new bounded array which is a subset of the given bounded_array.  "repo" is used to construct
@@ -1575,12 +1619,15 @@ class IngestionService(ServiceProcess):
                Example:
                  For a 1-D bounded array with: origin=12; size=5; values=[10,11,12,13,14]
                  
-                 subset_bounded_array(..., idx=0, min=1,  max=4)    returns nothing
-                 subset_bounded_array(..., idx=0, min=13, max=16)   returns BA [11,12,13]
+                 yield subset_bounded_array(..., idx=0, min=1,  max=4)    returns nothing
+                 yield subset_bounded_array(..., idx=0, min=13, max=16)   returns BA [11,12,13]
                
         """
         new_ba = repo.create_object(CDM_BOUNDED_ARRAY_TYPE)
         
+        # Step 1: Fetch blobs for this bounded_array
+        need_keys = [old_ba.GetLink('ndarray').key]
+        yield self._fetch_blobs(repo, need_keys)
         
         # Step 1: Create the bounds
         old_shape = []
@@ -1622,7 +1669,7 @@ class IngestionService(ServiceProcess):
 
         
         new_ba.ndarray = new_nd
-        return new_ba
+        defer.returnValue(new_ba)
         
         
 
