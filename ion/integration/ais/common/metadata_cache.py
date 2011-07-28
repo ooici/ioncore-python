@@ -312,22 +312,25 @@ class MetadataCache(object):
         Get the dictionary entry containing the metadata from the data source
         represented by the given ResourceID (dSourceID).
         """
-        
-        try:
-            yield self.__lockCache()
-    
-            log.debug('getDSourceMetadata')
-                    
-            metadata = self.__metadata[dSourceID]
-            log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
-            returnValue = metadata
-        except KeyError:
-            log.info('Metadata not found for datasourceID: ' + dSourceID)
-            returnValue = None
 
-        finally:
-            self.__unlockCache()
-            
+        if dSourceID is None:
+            returnValue = None
+        else:
+            try:
+                yield self.__lockCache()
+        
+                log.debug('getDSourceMetadata')
+                        
+                metadata = self.__metadata[dSourceID]
+                log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
+                returnValue = metadata
+            except KeyError:
+                log.info('Metadata not found for datasourceID: ' + dSourceID)
+                returnValue = None
+    
+            finally:
+                self.__unlockCache()
+                
         defer.returnValue(returnValue)
     
     

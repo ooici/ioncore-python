@@ -178,7 +178,7 @@ class DispatcherTest(IonTestCase):
         proc.spawn()
         log.debug('DispatcherTest.test_dispatcher(): spawned dispatcher')
         # sleeping to let dispatcher startup
-        yield pu.asleep(10)
+        yield pu.asleep(15)
         log.debug('DispatcherTest.test_dispatcher(): ***************** ending test ****************')
         
            

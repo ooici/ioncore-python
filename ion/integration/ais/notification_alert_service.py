@@ -31,8 +31,13 @@ from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.process.process import ProcessFactory
 from ion.core.data import cassandra_bootstrap
 
-from twisted.mail.smtp import sendmail, SMTPClientError
+from twisted.mail.smtp import SMTPSenderFactory, SMTPClientError
 from email.mime.text import MIMEText
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+from twisted.internet import reactor
 
 from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.core.data.store import Query
@@ -116,11 +121,27 @@ class NotificationAlertService(ServiceProcess):
             log.info("Instantiating Memory Store")
             self.index_store = self.index_store_class(self, indices=SUBSCRIPTION_INDEXED_COLUMNS )
 
+        # Create the subscribers for the event handlers
+
+        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
+        self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
+        yield self.sub.register()
+        yield self.sub.initialize()
+        yield self.sub.activate()
+        log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
+
+
+        self.sub = DatasourceUnavailableEventSubscriber(process=self)
+        self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
+        yield self.sub.register()
+        yield self.sub.initialize()
+        yield self.sub.activate()
+        log.info('NotificationAlertService.slc_init DatasourceUnavailableEventSubscriber activation complete')     
+
         
     @defer.inlineCallbacks
     def handle_offline_event(self, content):
         log.info('NotificationAlertService.handle_offline_event notification event received ')
-
         log.info('NotificationAlertService.handle_offline_event content   : %s', content)
         msg = content['content'];
 
@@ -150,11 +171,10 @@ class NotificationAlertService(ServiceProcess):
             yield self.GetUserInformation(rows[key]['user_ooi_id'], tempTbl)
             log.info('NotificationAlertService.handle_offline_event user email: %s', tempTbl['user_email'] )
 
-            #rows[key]['subscription_type'] == SUBSCRIPTION_INFO_TYPE.subscription_type.EMAIL
             subscription_type = int(row['subscription_type'])
             email_alerts_filter = int (row['email_alerts_filter'])
-            if ( subscription_type in (subscriptionInfo.SubscriptionType.EMAIL, subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) 
-                and (email_alerts_filter in (subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE,subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ))) :
+            if (subscription_type in (subscriptionInfo.SubscriptionType.EMAIL, subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER) 
+                and (email_alerts_filter in (subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE,subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE))) :
                 # Send the message via our own SMTP server, but don't include the envelope header.
                 # Create the container (outer) email message.
                 log.info('NotificationAlertService.handle_offline_event CREATE EMAIL')
@@ -168,7 +188,7 @@ class NotificationAlertService(ServiceProcess):
                     
                 try:
                     log.debug("NotificationAlertService.handle_offline_event sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    Resullt = yield sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
                     log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
@@ -188,9 +208,9 @@ class NotificationAlertService(ServiceProcess):
     def handle_update_event(self, content):
         log.info('NotificationAlertService.handle_update_event notification event received')
         log.info('NotificationAlertService.handle_update_event content   : %s', content)
-
-        # build the email from the event content
         msg = content['content']
+        
+        # build the email from the event content
         startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis/1000))))
         enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
@@ -228,8 +248,8 @@ class NotificationAlertService(ServiceProcess):
             log.info('NotificationAlertService.handle_update_event user email: %s', tempTbl['user_email'] )
             subscription_type = int(row['subscription_type'])
             email_alerts_filter = int (row['email_alerts_filter'])
-            if (subscription_type in (subscriptionInfo.SubscriptionType.EMAIL, subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER ) 
-                and ( email_alerts_filter in (subscriptionInfo.AlertsFilter.UPDATES, subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE ))) :
+            if (subscription_type in (subscriptionInfo.SubscriptionType.EMAIL, subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER) 
+                and (email_alerts_filter in (subscriptionInfo.AlertsFilter.UPDATES, subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE))) :
                 # Send the message via our own SMTP server, but don't include the envelope header.
                 # Create the container (outer) email message.
                 log.info('NotificationAlertService.handle_update_event CREATE EMAIL')
@@ -243,7 +263,7 @@ class NotificationAlertService(ServiceProcess):
 
                 try:
                     log.debug("NotificationAlertService.handle_update_event: sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    Resullt = yield sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
                     log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_update_event Error: unable to send email')
@@ -313,27 +333,6 @@ class NotificationAlertService(ServiceProcess):
                                             content.ResponseCodes.BAD_REQUEST)
 
 
-        #Check that the item is in the store
-        updateSubscriptionExists = 0
-        offlineSubscriptionExists = 0
-
-        #Check if subscribers have already been created for these events on this data source
-        log.info("data_src_id")
-        query = Query()
-        query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
-        rows = yield self.index_store.query(query)
-        #log.info("NotificationAlertService  Rows returned from check subscribers query %s " % (rows,))
-        #add each result row into the response message
-        for key, row in rows.iteritems ( ) :
-            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES :
-                updateSubscriptionExists = 1
-            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE :
-                offlineSubscriptionExists = 1
-            if rows[key]['subscription_type'] == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE :
-                updateSubscriptionExists = 1
-                offlineSubscriptionExists = 1
-
-
         log.info("NotificationAlertService subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
         #add the subscription to the index store
         log.info('NotificationAlertService.op_addSubscription add attributes\n ')
@@ -371,45 +370,6 @@ class NotificationAlertService(ServiceProcess):
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info('NotificationAlertService.op_addSubscription attributes keyval id: %s', self.keyval )
         yield self.index_store.put(self.keyval , self.keyval, self.attributes)
-
-        # Create the correct listener for this data source
-
-        #First, check if updates should be subscribed to for this data source
-        if not updateSubscriptionExists:
-            if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
-                  and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-                or \
-                ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
-                  and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATES) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-                ):
-                self.sub = DatasetSupplementAddedEventSubscriber(process=self)
-                log.info('NotificationAlertService.op_addSubscription set handler for DatasetSupplementAddedEventSubscriber')
-                self.sub.ondata = self.handle_update_event    # need to do something with the data when it is received
-                yield self.sub.register()
-                yield self.sub.initialize()
-                yield self.sub.activate()
-                log.info('NotificationAlertService.op_addSubscription DatasetSupplementAddedEvent activation complete')
-
-
-        #Second, check if data source unavailable events should be subscribed to for this data source
-        if not offlineSubscriptionExists:      
-            if ( ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAIL) \
-                  and (content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.email_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE) \
-                or \
-                ((content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER  or content.message_parameters_reference.subscriptionInfo.subscription_type == content.message_parameters_reference.subscriptionInfo.SubscriptionType.DISPATCHER) \
-                  and (content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter.DATASOURCEOFFLINE) or content.message_parameters_reference.subscriptionInfo.dispatcher_alerts_filter == content.message_parameters_reference.subscriptionInfo.AlertsFilter) \
-                ):
-                log.info('NotificationAlertService.op_addSubscription create DatasourceUnavailableEventSubscriber')
-                self.sub = DatasourceUnavailableEventSubscriber(process=self)
-                log.info('NotificationAlertService.op_addSubscription set handler for DatasourceUnavailableEventSubscriber')
-                self.sub.ondata = self.handle_offline_event    # need to do something with the data when it is received
-                yield self.sub.register()
-                yield self.sub.initialize()
-                yield self.sub.activate()
-                log.info('NotificationAlertService.op_addSubscription DatasourceUnavailableEventSubscriber activation complete')
-
-
-        
 
         # create the AIS response GPBs
         log.info('NotificationAlertService.op_addSubscription construct response message')
@@ -658,8 +618,63 @@ class NotificationAlertService(ServiceProcess):
 
         defer.returnValue(None)
 
-    """
 
+    def _sendmail(self, smtphost, from_addr, to_addrs, msg, senderDomainName=None, port=25):
+        # this is a clone of the helper method from twisted.mail.smtp
+        # it has been modified to shorten the timeout for the TCP connection from 30 seconds to 3 seconds
+        # and to setup the SMTPSenderFactory for 0 retries and 3 second timeout
+        
+        """Send an email
+    
+        This interface is intended to be a direct replacement for
+        smtplib.SMTP.sendmail() (with the obvious change that
+        you specify the smtphost as well). Also, ESMTP options
+        are not accepted, as we don't do ESMTP yet. I reserve the
+        right to implement the ESMTP options differently.
+    
+        @param smtphost: The host the message should be sent to
+        @param from_addr: The (envelope) address sending this mail.
+        @param to_addrs: A list of addresses to send this mail to.  A string will
+            be treated as a list of one address
+        @param msg: The message, including headers, either as a file or a string.
+            File-like objects need to support read() and close(). Lines must be
+            delimited by '\\n'. If you pass something that doesn't look like a
+            file, we try to convert it to a string (so you should be able to
+            pass an email.Message directly, but doing the conversion with
+            email.Generator manually will give you more control over the
+            process).
+    
+        @param senderDomainName: Name by which to identify.  If None, try
+        to pick something sane (but this depends on external configuration
+        and may not succeed).
+    
+        @param port: Remote port to which to connect.
+    
+        @rtype: L{Deferred}
+        @returns: A L{Deferred}, its callback will be called if a message is sent
+            to ANY address, the errback if no message is sent.
+    
+            The callback will be called with a tuple (numOk, addresses) where numOk
+            is the number of successful recipient addresses and addresses is a list
+            of tuples (address, code, resp) giving the response to the RCPT command
+            for each address.
+        """
+        if not hasattr(msg,'read'):
+            # It's not a file
+            msg = StringIO(str(msg))
+    
+        d = defer.Deferred()
+        factory = SMTPSenderFactory(from_addr, to_addrs, msg, d, 0, 3)
+    
+        if senderDomainName is not None:
+            factory.domain = senderDomainName
+            
+        reactor.connectTCP(smtphost, port, factory, 3)
+    
+        return d
+
+
+    """
     @defer.inlineCallbacks
     def GetDatasetInformation(self, data_src_id, attributes):
         #

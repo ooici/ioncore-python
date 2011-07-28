@@ -775,6 +775,12 @@ class MulitDataStoreTest(IonTestCase):
              'class':'WorkBenchProcess',
              'spawnargs':{'proc-name':'wb1'}
                 },
+
+            {'name':'workbench_test2',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb2'}
+                },
         ]
 
 
@@ -811,6 +817,11 @@ class MulitDataStoreTest(IonTestCase):
         log.info('Process ID:' + str(child_proc1))
         workbench_process1 = self._get_procinstance(child_proc1)
         self.wb1 = workbench_process1
+
+        child_proc2 = yield self.sup.get_child_id('workbench_test2')
+        log.info('Process ID:' + str(child_proc2))
+        workbench_process2 = self._get_procinstance(child_proc2)
+        self.wb2 = workbench_process2
 
         repo = workbench_process1.workbench.create_repository(addresslink_type)
         ab=repo.root_object
@@ -953,6 +964,54 @@ class MulitDataStoreTest(IonTestCase):
 
             self.assertEqual(repo.root_object.person[0].id,n-1)
 
+
+    @defer.inlineCallbacks
+    def test_divergence(self):
+        log.info('starting multi push test...')
+
+        repo1 = self.wb1.workbench.get_repository(self.repo_key)
+
+        # Initial push to the datastore
+        yield self.wb1.workbench.push('datastore', repo1)
+
+        # make some local changes
+        repo1.root_object.person[0].id = 1
+        repo1.commit('The %d commit!' % 1)
+
+
+        # Get the repo from the datastore in a different workbench
+        yield self.wb2.workbench.pull('datastore', self.repo_key)
+        repo2 = self.wb2.workbench.get_repository(self.repo_key)
+        repo2.checkout('master')
+
+        # make some local changes
+        repo2.root_object.person[0].id = 2
+        repo2.commit('The %d commit!' % 2)
+
+        # Both push to the data store!
+        yield self.wb1.workbench.push('datastore', repo1)
+        yield self.wb2.workbench.push('datastore', repo2)
+
+        # Pick any datastore instance and show that there are two current commit refs on the master branch
+        repo3 = yield self.ds3.workbench._resolve_repo_state(self.repo_key, fail_if_not_found=True)
+
+        self.assertEqual(len(repo3.get_branch('master').commitrefs), 2)
+
+        # pull it back and show that the divergence is resolved during checkout
+        tp = Process()
+        yield tp.spawn()
+
+        yield tp.workbench.pull('datastore', self.repo_key)
+        repo = tp.workbench.get_repository(self.repo_key)
+
+        self.assertEqual(len(repo.get_branch('master').commitrefs), 2)
+
+        repo.checkout('master')
+
+        self.assertEqual(len(repo.get_branch('master').commitrefs), 1)
+
+        # The later state wins... for now
+        self.assertEqual(repo.root_object.person[0].id,repo2.root_object.person[0].id)
 
 
 

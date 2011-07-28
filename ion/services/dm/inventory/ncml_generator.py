@@ -12,7 +12,7 @@ exit with a deferred.
 
 # File template. The filename and 'location' are just the GUID.
 # Note the %s for string substitution.
-file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ooici:%s"/>
+file_template = """<?xml version="1.0" encoding="UTF-8"?>\n<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" location="ion://%s"/>
 """
 
 from os import path, environ, listdir, remove
@@ -61,14 +61,17 @@ def check_for_ncml_files(local_filepath):
 
     try:
         allfiles = listdir(local_filepath)
+        log.debug("all files %s" % (allfiles,))
         ncml_files = []
-        for file in allfiles:
-            if fnmatch.fnmatch(file, '*.ncml'):
-                ncml_files.append(file)
+        for fname in allfiles:
+            log.debug("Got file %s" % (fname,))
+            if fnmatch.fnmatch(fname, '*.ncml'):
+                ncml_files.append(fname)
     except IOError:
         log.exception('Error searching %s for ncml files' % local_filepath)
         return False
-
+    
+    log.debug("len(ncml_files): %s"% (len(ncml_files),))
     if len(ncml_files) > 0:
         return True
 
