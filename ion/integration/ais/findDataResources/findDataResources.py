@@ -57,7 +57,7 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
     def ondata(self, data):
 
         dSetResID = data['content'].additional_data.dataset_id
-        log.debug("DatasetUpdateEventSubscriber received event for dsetID: %s\n" %(dSetResID))
+        log.debug("DatasetUpdateEventSubscriber received event for dsetID: %s" %(dSetResID))
 
         #
         # If the dataset is cached, delete it.  In any case, cache the dataset.
@@ -87,6 +87,8 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
         log.debug('DatasetUpdateEventSubscriber putting new metadata in cache')
         yield self.metadataCache.putDSetMetadata(dSetResID)
 
+        log.debug("DatasetUpdateEventSubscriber event for dsetID: %s exit" %(dSetResID))
+
                 
 class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
@@ -99,7 +101,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
     def ondata(self, data):
 
         dSourceResID = data['content'].additional_data.datasource_id
-        log.debug("DatasourceUpdateEventSubscriber received event for dsrcID: %s\n" %(dSourceResID))
+        log.debug(">>>----> DatasourceUpdateEventSubscriber received event for dsrcID: %s\n" %(dSourceResID))
 
         #
         # If the datasource is cached, delete it.  In any case, cache the
@@ -111,7 +113,8 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         # datasourceID
         #
         dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
-
+        dSource = yield self.metadataCache.getDSource(dSourceResID)
+        
         #
         # If datasource does not exist, this must be a new datasource; skip the
         # delete step.
@@ -129,6 +132,47 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         #
         log.debug('DatasourceUpdateEventSubscriber putting new metadata in cache')
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
+
+        #
+        # If the dSourceMetadata is None, this was a new datasource; it is
+        # possible the dataset metadatacache was populated before this datasource
+        # was populated, so get the dSourceMetadata so that we can get the dataset
+        # and check to see if has an associated dataSource.
+        #
+        if dSourceMetadata is None:
+            dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
+            dSource = yield self.metadataCache.getDSource(dSourceResID)
+            
+        #
+        # Get the assoicated dataset(s) and refresh them (they might not be loaded
+        # into cache because the datasource might have been inactive before this)
+        #
+        datasetList = yield self.metadataCache.getAssociatedDatasets(dSource)
+        log.debug('getAssociatedDatasets returned %s' %(datasetList))
+        for dSetResID in datasetList:
+            dSet = yield self.metadataCache.getDSet(dSetResID)
+            #
+            # if the DSOURCE_ID is None, the datasource wasn't active or
+            # didn't show up in the association service when the event for
+            # the dataset was received, so refresh the dataset.
+            #
+            tempDSourceResID = dSet['DSOURCE_ID']
+            if (tempDSourceResID is None) or (tempDSourceResID != dSourceResID):
+                log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
+                #
+                # Delete the dataset
+                #
+                log.debug('DatasourceUpdateEventSubscriber deleting dataset %s' \
+                          %(dSetResID))
+                yield self.metadataCache.deleteDSetMetadata(dSetResID)
+            
+                #
+                # Now  reload the dataset and datasource metadata
+                #
+                log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
+                yield self.metadataCache.putDSetMetadata(dSetResID)
+
+        log.debug("<----<<<  DatasourceUpdateEventSubscriber event for dsourceID: %s exit" %(dSourceResID))
 
     
 class FindDataResources(object):
@@ -783,7 +827,10 @@ class FindDataResources(object):
         rootAttributes.data_resource_id = dSetResID
         rootAttributes.download_url = self.__createDownloadURL(dSetResID)
         for attrib in dSetMetadata:
-            log.debug('Root Attribute: %s = %s'  % (attrib, dSetMetadata[attrib]))
+            if attrib == 'dset':
+                log.debug('Root Attribute is dset (dataset object); not printing')
+            else:                
+                log.debug('Root Attribute: %s = %s'  % (attrib, dSetMetadata[attrib]))
             if  attrib == 'title':
                 rootAttributes.title = dSetMetadata[attrib]
             elif attrib == 'institution':                
