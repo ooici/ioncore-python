@@ -32,11 +32,14 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
 #
-# Data Set Metadata Constants
+# Common Metadata Constants
 #
 TYPE         = 'type'
+
+#
+# Data Set Metadata Constants
+#
 DSET         = 'dset'
-DSOURCE      = 'dsource'
 KEY          = 'key'
 RESOURCE_ID  = 'ResourceIdentity'
 DSOURCE_ID   = 'DSourceID'
@@ -60,6 +63,7 @@ VERT_POS     = 'ion_geospatial_vertical_positive'
 #
 # Data Source Metadata Constants
 #
+DSOURCE      = 'dsource'
 REGISTRATION_TIME = 'registration_datetime_millis'
 PROPERTY = 'property'
 REQUEST_TYPE = 'request_type'
@@ -188,7 +192,7 @@ class MetadataCache(object):
             log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
             returnValue = metadata[DSET]
         except KeyError:
-            log.error('Metadata not found for datasetID: ' + dSetID)
+            log.error('Metadata not found for datasetID: %s'  %(dSetID))
             returnValue = None
 
         finally:
@@ -427,6 +431,12 @@ class MetadataCache(object):
         with a given data source.  
         """
         log.debug('getAssociatedDatasets() entry')
+        
+        dSetList = []
+
+        if dSource is None:
+            log.error('getAssociatedDatasets: dSource parameter is None')
+            defer.returnValue(dSetList)
 
         try:
             results = yield self.ac.find_associations(subject=dSource, predicate_or_predicates=HAS_A_ID)
@@ -437,15 +447,17 @@ class MetadataCache(object):
                       dSource.ResourceIdentity)
             defer.returnValue(None)
 
-        log.error('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(results)))
+        log.info('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(results)))
         for association in results:
             log.debug('Associated Dataset for Datasource: ' + \
                       association.SubjectReference.key + \
                       ' is: ' + association.ObjectReference.key)
+            dSetList.append(association.ObjectReference.key)
 
-        log.debug('getAssociatedDatasets) exit: returning: %s' %(association.ObjectReference.key))
+        log.debug('getAssociatedDatasets) exit: returning: %s' %(dSetList))
 
-        defer.returnValue(association.ObjectReference.key)
+        #defer.returnValue(association.ObjectReference.key)
+        defer.returnValue(dSetList)
 
 
     @defer.inlineCallbacks
@@ -720,7 +732,7 @@ class MetadataCache(object):
             # If this is a datasource object, don't print
             #
             if key == 'dset' or key == 'dsource':
-                log.debug('value is set or dsource object; not printing')
+                log.debug('value is dset or dsource (object); not printing')
             else:                
                 log.debug('value: ' + str(self.__metadata[res.ResourceIdentity][key]))
             
