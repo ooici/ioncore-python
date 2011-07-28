@@ -457,7 +457,7 @@ class ManageDataResource(object):
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
             # create subscription to catch the ingestion-complete or failure events
-            yield self._createSubscription(my_datasrc_id, msg.user_id)
+            yield self._createSubscription(my_datasrc_id, msg.user_id, datasrc_resource.ion_title)
             
             yield self.rc.put_resource_transaction(resource_transaction)
 
@@ -489,7 +489,7 @@ class ManageDataResource(object):
 
 
     @defer.inlineCallbacks
-    def _createSubscription(self, datasrc_id, user_id):
+    def _createSubscription(self, datasrc_id, user_id, ion_title):
         log.info("AIS.ManageDataResource._createSubscription: ")
         #
         # Add a subscription for this user to this dataset resource
@@ -507,6 +507,7 @@ class ManageDataResource(object):
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = user_id
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = datasrc_id
         reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
+        reqMsg.message_parameters_reference.datasetMetadata.title = "Initial ingestion of " + ion_title;
         # indicate to the NAS that this is an automatically created email subscription that should be deleted after the initial
         # ingestion event is received
         reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path = "AutomaticallyCreatedInitialIngestionSubscription"
