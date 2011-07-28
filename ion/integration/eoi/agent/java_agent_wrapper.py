@@ -464,17 +464,24 @@ class JavaAgentWrapper(ServiceProcess):
             raise JavaAgentWrapperException('Must provide data source or dataset ID!')
     
         # Step 1: Check the ResourceLifeCycleState of the dataset -- don't update if it is inactive, decommissioned, etc
-        dataset = yield self.rc.get_instance(dataset_id)
-        r_state = dataset.ResourceLifeCycleState
-        
         cancel_states = []
+
+        dataset = yield self.rc.get_instance(dataset_id)
         cancel_states.append(dataset.INACTIVE)
         cancel_states.append(dataset.DECOMMISSIONED)
         cancel_states.append(dataset.RETIRED)
         
+        r_state = dataset.ResourceLifeCycleState
         if r_state in cancel_states:
-            log.warn('Dataset Resource for ID "%s" has state "%s" and will not be updated' % (dataset_id, r_state))
+            log.warn('Dataset Resource has state "%s" and will not be updated.  (dataset: "%s", datasource: "%s")' % (r_state, dataset_id, data_source_id))
             defer.returnValue(False)
+
+        datasource = yield self.rc.get_instance(data_source_id)
+        r_state = datasource.ResourceLifeCycleState
+        if r_state in cancel_states:
+            log.warn('Datasource Resource has state "%s"; its dataset will not be updated.  (dataset: "%s", datasource: "%s")' % (r_state, dataset_id, data_source_id))
+            defer.returnValue(False)
+        
 
         # Step 2: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
