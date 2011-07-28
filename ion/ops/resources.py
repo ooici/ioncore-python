@@ -5,8 +5,10 @@
 
 """
 
-
+import time
 from ion.core import ioninit
+from ion.core.object.object_utils import sha1_to_hex
+from ion.services.coi.datastore import CDM_BOUNDED_ARRAY_TYPE
 from ion.services.coi.resource_registry.resource_client import ResourceClient as RC
 from ion.core.object import object_utils
 from ion.core.process.process import Process
@@ -51,7 +53,7 @@ __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROL
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history'])
 
 
 
@@ -228,3 +230,61 @@ def clear(lines=100):
     @param lines: The number of lines to print to the console (default=100)
     """
     print ''.join( ['\n' for i in range(lines)] )
+
+@defer.inlineCallbacks
+def print_dataset_history(dsid):
+    dataset = yield rc.get_instance(dsid, excluded_types=[CDM_BOUNDED_ARRAY_TYPE])
+    repo = dataset.Repository
+
+    outlines = []
+
+    # get all parent commits, similar to list_parent_commits but not just keys
+    commits = []
+    branch = repo._current_branch
+    cref = branch.commitrefs[0]
+
+    while cref:
+        commits.append(cref)
+
+        if cref.parentrefs:
+            cref = cref.parentrefs[0].commitref
+        else:
+            cref = None
+
+    # parent -> child ordering
+    commits.reverse()
+
+    outlines.append('========= Dataset History: ==========')
+    outlines.append('= Dataset ID: %s' % repo.repository_key)
+    outlines.append('= Dataset Branch: %s' % repo.current_branch_key())
+
+    for i, c in enumerate(commits):
+        outlines.append("%d\t%s\t%s\t%s" % (i+1, time.strftime("%d %b, %H:%M:%S", time.gmtime(c.date)), sha1_to_hex(c.MyId), c.comment))
+        links = []
+        try:
+            for var in c.objectroot.resource_object.root_group.variables:
+                links.extend(var.content.bounded_arrays.GetLinks())
+
+            # get em
+            yield repo.fetch_links(links)
+
+            for var in c.objectroot.resource_object.root_group.variables:
+                outsublines = []
+
+                for ba in var.content.bounded_arrays:
+                    outsublines.append("%s%s\t%s" % (" "*40, sha1_to_hex(ba.MyId)[0:6] + "...", " ".join(["[%s+%s]" % (x.origin, x.size) for x in ba.bounds])))
+
+                varname = " "*4 + str(var.name)
+                if len(outsublines) > 1:
+                    varname += " (%d)" % len(outsublines)
+
+                outsublines[0] = varname + outsublines[0][len(varname):]
+
+                outlines.append("\n".join(outsublines))
+
+        except:# Exception, ex:
+            pass
+            #print ex
+
+    outlines.append('=====================================')
+    defer.returnValue("\n".join(outlines))
