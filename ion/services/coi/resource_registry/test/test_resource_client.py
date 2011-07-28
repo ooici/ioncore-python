@@ -193,6 +193,17 @@ class ResourceClientTest(IonTestCase):
 
         self.assertEqual(my_resource.person[0].name, 'David')
 
+        # Modify the metadata in the resource
+        my_resource.person[0].name = 'Alan'
+        yield my_rc.put_instance(my_resource)
+
+        # Get the updated metadata in the original resource client
+        other_resource = yield self.rc.get_instance(res_id)
+        self.assertEqual(other_resource.person[0].name, 'Alan')
+
+
+
+
 
     @defer.inlineCallbacks
     def test_bad_branch(self):
