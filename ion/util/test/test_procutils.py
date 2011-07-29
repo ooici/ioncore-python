@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/util/test/test_timeout.py
+@file ion/util/test/test_procutils.py
 @author David Stuebe
 """
 
