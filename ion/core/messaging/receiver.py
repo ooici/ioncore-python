@@ -404,6 +404,9 @@ class Receiver(BasicLifecycleObject):
                         else:
                             log.debug('Workbench context does not match the Convid - Do not clear anything from the workbench!')
 
+                        log.info(self.process.workbench.cache_info())
+
+
         log.info( 'End Receiver.Receive on proc: %s' % str(self.process))
 
     @defer.inlineCallbacks

@@ -105,7 +105,7 @@ class WorkBench(object):
         '''
         Debugging string method.
         '''
-        retstr = "/ ==== Workbench info (id:%s) ==========\n" % id(self)
+        retstr = "/ ==== Workbench info (id:%s) (ProcName:%s) ==========\n" % (id(self), self._process.proc_name)
         retstr += "++ Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
         #for k,v in self._workbench_cache.iteritems():
         #    retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
@@ -122,7 +122,25 @@ class WorkBench(object):
         retstr += "/ ==== End  Workbench info ===========\n"
 
         return retstr
-      
+
+    def cache_info(self):
+
+        trouble = False
+        convid=None
+        for repo in self._repos.itervalues():
+
+            if convid is None and repo.persistent is False:
+                convid = repo.convid_context
+            elif convid != repo.convid_context and repo.persistent is False:
+                trouble = True
+                break
+
+        if trouble:
+            return str(self)
+        else:
+            return 'Workbench Cache is clear!'
+
+
     def create_repository(self, root_type=None, nickname=None, repository_key=None, persistent=False):
         """
         New better method to initialize a repository.
@@ -503,11 +521,6 @@ class WorkBench(object):
                 exobj = pullmsg.excluded_types.add()
                 exobj.object_id = extype.object_id
                 exobj.version = extype.version
-
-
-        log.info('Before pull - requesting workbench status:')
-        log.info(str(self))
-
 
         try:
             result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)
