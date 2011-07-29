@@ -218,7 +218,7 @@ class IdentityRegistryService(ServiceProcess):
 
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
-        self.asc = AssociationServiceClient()
+        self.asc = AssociationServiceClient(proc=self)
         self.ac = AssociationClient(proc=self)
         self.irc = IdentityRegistryClient(proc=self)
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
