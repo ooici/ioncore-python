@@ -360,6 +360,7 @@ class Process(BasicLifecycleObject):
             workbench_context = current_context.pop()
             self.workbench.manage_workbench_cache(workbench_context)
         else:
+            #log.warn('Current context! %s' % str(current_context))
             log.warn('Process context is not being cleared. Context got reset or changed?')
 
 
