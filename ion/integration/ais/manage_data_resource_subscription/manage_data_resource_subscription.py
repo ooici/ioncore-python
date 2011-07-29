@@ -92,7 +92,7 @@ class ManageDataResourceSubscription(object):
         self.mc  = ais.mc
         self.rc  = ais.rc
         self.ac  = AssociationClient(proc=ais)
-        self.asc = AssociationServiceClient()
+        self.asc = AssociationServiceClient(proc=ais)
 
         self.ais = ais
         # Lazy initialize this when it is needed
