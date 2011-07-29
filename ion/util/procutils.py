@@ -284,23 +284,18 @@ def pprint_to_string(obj):
 def capture_function_stdout(func, *args, **kwargs):
 
     fstream = StringIO.StringIO()
-
     stdout = sys.stdout
-
     sys.stdout = fstream
 
-    func(*args,**kwargs)
+    try:
+        func(*args,**kwargs)
+        result = fstream.getvalue()
 
-    result = fstream.getvalue()
-    fstream.close()
-
-    sys.stdout=stdout
+    finally:
+        fstream.close()
+        sys.stdout=stdout
 
     return result
-
-
-
-
 
 @defer.inlineCallbacks
 def print_memory_usage():
