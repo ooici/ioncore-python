@@ -105,7 +105,12 @@ class WorkBench(object):
         '''
         Debugging string method.
         '''
-        retstr = "/ ==== Workbench info (id:%s) (ProcName:%s) ==========\n" % (id(self), self._process.proc_name)
+        try:
+            proc_name = self._process.proc_name
+        except AttributeError:
+            proc_name = 'No Process Name'
+
+        retstr = "/ ==== Workbench info (id:%s) (ProcName: %s) ==========\n" % (id(self), proc_name)
         retstr += "++ Workbench Blob Cache, (len:%d)\n" % len(self._workbench_cache)
         #for k,v in self._workbench_cache.iteritems():
         #    retstr += "\t%s: %s\n" % (base64.encodestring(k)[0:-1], '')
