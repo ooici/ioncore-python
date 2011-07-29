@@ -15,6 +15,8 @@ from twisted.internet import defer
 from decimal import Decimal
 
 from ion.core.object import object_utils
+from ion.core import ioninit
+
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient
 
@@ -29,6 +31,8 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, 
 
 from ion.integration.ais.notification_alert_service import NotificationAlertServiceClient                                                         
 
+CONF = ioninit.config(__name__)
+
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
@@ -41,10 +45,24 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        FIND_DATA_RESOURCES_BY_OWNER_RSP_MSG_TYPE, \
                                                        FIND_DATA_SUBSCRIPTIONS_REQ_TYPE
 
+#
+# Dataset download URL initialization: can be specified in res/config/ionlocal.config 
+#
+DNLD_BASE_THREDDS_URL = CONF['DNLD_BASE_THREDDS_URL']
+DNLD_DIR_PATH = CONF['DNLD_DIR_PATH']
+DNLD_FILE_TYPE = CONF['DNLD_FILE_TYPE']
 
-DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
-DNLD_DIR_PATH = '/dodsC/ooiciData/'
-DNLD_FILE_TYPE = '.ncml.html'
+if DNLD_BASE_THREDDS_URL is None:
+    DNLD_BASE_THREDDS_URL = 'http://thredds.oceanobservatories.org/thredds'
+    log.error('DNLD_BASE_THREDDS_URL not set in ion.config or ionlocal.config!  Using %s' %(DNLD_BASE_THREDDS_URL))
+
+if DNLD_DIR_PATH is None:
+    DNLD_DIR_PATH = '/dodsC/ooiciData/'
+    log.error('DNLD_DIR_PATH not set in ion.config or ionlocal.config!  Using %s' %(DNLD_DIR_PATH))
+    
+if DNLD_FILE_TYPE is None:
+    DNLD_FILE_TYPE = '.ncml.html'
+    log.error('DNLD_FILE_TYPE not set in ion.config or ionlocal.config!  Using %s' %(DNLD_FILE_TYPE))
 
 class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
@@ -877,6 +895,8 @@ class FindDataResources(object):
                             DNLD_DIR_PATH + \
                             dSetResID + \
                             DNLD_FILE_TYPE
+
+        log.debug('download URL for datasetID %s: %s' %(dSetResID, self.downloadURL))
         
         return self.downloadURL
 
