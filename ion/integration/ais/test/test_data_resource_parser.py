@@ -39,17 +39,25 @@ class AISDataResourceParserTest(IonTestCase):
         log.info("parsing %s", toparse)
         validateUrl(toparse)
 
-        self._doParse(validateUrl(toparse))
+        self._checkParse1(validateUrl(toparse))
 
 
-    def test_parserOnlyPositiveLocal(self):
-        f = open(os.path.abspath(os.path.dirname(__file__)) + os.sep + 'OS_NTAS_2010_R_M-1.nc.das', 'r')
+    #positive local check
+    def _posLocal(self, das_filename):
+        f = open(os.path.abspath(os.path.dirname(__file__)) + os.sep + das_filename, 'r')
         contents = f.read()
         f.close()
         
-        self._doParse(parseText(contents))
+        return parseText(contents)
 
-    def _doParse(self, res):
+    def test_parserOnlyPositiveLocal1(self):
+        self._checkParse1(self._posLocal('OS_NTAS_2010_R_M-1.nc.das'))
+
+    def test_parserOnlyPositiveLocal2(self):
+        self._posLocal('RTV.das')
+
+
+    def _checkParse1(self, res):
 
         self.failUnlessEqual(True, res.has_key("NC_GLOBAL"), "NC global section not found, but we know its there")
 

@@ -66,15 +66,26 @@ def validateUrl(data_resource_url):
     print "\n\nResults of parsing this URL:\n%s" % data_resource_url
     print "\n  Found these sections:"
     for k in parsed_das.keys():
-        print  ("    %s" % k)
-        
-        for k2, v2 in parsed_das[k].iteritems():
-            print "      %s (%s): %s" % (k2, v2['TYPE'], str(v2['VALUE']))
-        print 
+        printSection(k, parsed_das[k], 1)
 
     print "\n"
 
     return parsed_das
+
+
+def printSection(name, values, depth):
+    d1 = "    " + (depth * "  ")
+    d2 = "    " + ((depth + 1) * "  ")
+
+    print  (d1 + name)
+    
+    for k, v in values.iteritems():
+        if v.has_key("TYPE"):
+            print d2 + "%s (%s): %s" % (k, v['TYPE'], str(v['VALUE']))
+        else:
+            printSection(k, v, depth + 1)
+    print 
+    
 
 if __name__ == "__main__":
     validateUrl(sys.argv[1])

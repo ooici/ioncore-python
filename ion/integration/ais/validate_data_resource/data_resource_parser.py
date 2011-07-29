@@ -19,7 +19,7 @@ class Lexer(object):
     t_SEMI        = r";"
     t_COMMA       = r","
     #t_NAME        = r'[a-zA-Z_][a-zA-Z0-9_]*'
-    t_LITERAL     = r'"[^"]*"'
+    t_LITERAL     = r'"((\\")|[^"])*"'
     t_ignore      = ' \t'
 
     def t_NAME(self, t):
@@ -59,7 +59,7 @@ class Parser(object):
 
     def p_dasfile(self, p):
         "dasfile : NAME OPEN sections CLOSE"
-        #  p[0]  : p[1] p[1] p[3]     p[4]    is how you read this
+        #  p[0]  : p[1] p[2] p[3]     p[4]    is how you read this
 
         output = {}
         #list of single-entry dictionaries for sections
@@ -105,16 +105,21 @@ class Parser(object):
 
     def p_lineitem(self, p):
         """lineitem : NAME NAME meat SEMI
-                |   NAME NAME NAME SEMI """
+                |   NAME NAME NAME SEMI 
+                |   section """
 
-        val = p[3]
+        #subsections are ok i think
+        if 2 == len(p):
+            p[0] = p[1]
+        else:
+            val = p[3]
 
-        #collapse number non-lists to just the number
-        if isinstance(val, type([])) and 1 == len(val):
-            val = val[0]
+            #collapse number non-lists to just the number
+            if isinstance(val, type([])) and 1 == len(val):
+                val = val[0]
 
-        ret = {p[2] : {"TYPE" : p[1], "VALUE" : val}}
-        p[0] = ret
+            ret = {p[2] : {"TYPE" : p[1], "VALUE" : val}}
+            p[0] = ret
 
 
     def p_meat(self, p):
