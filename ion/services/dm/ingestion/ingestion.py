@@ -765,6 +765,7 @@ class IngestionService(ServiceProcess):
         sup_etime, \
         sup_agg_dim_length, \
         sup_agg_dim_name, \
+        is_new_ds, \
         result = yield self.__premerge()
 
 
@@ -773,7 +774,6 @@ class IngestionService(ServiceProcess):
         
         sup_sindex, \
         sup_eindex, \
-        agg_offset, \
         insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
         
         log.debug('************* END    __calculate_merge_offsets() *************')
@@ -782,13 +782,12 @@ class IngestionService(ServiceProcess):
         log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
         log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
         log.debug('>> insertion_offset   = %i' % insertion_offset)
-        log.debug('>> agg_offset         = %i' % agg_offset)
         log.debug('>> sup_sindex         = %i' % sup_sindex)
         log.debug('>> sup_eindex         = %i' % sup_eindex)
 
 
         # Perform the merge
-        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex)
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds)
         result.update(merge_res)
 
 
@@ -820,6 +819,7 @@ class IngestionService(ServiceProcess):
         sup_etime, \
         sup_agg_dim_length, \
         sup_agg_dim_name, \
+        is_new_ds, \
         result = yield self.__premerge()
 
 
@@ -828,7 +828,6 @@ class IngestionService(ServiceProcess):
         
         sup_sindex, \
         sup_eindex, \
-        agg_offset, \
         insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
         
         log.debug('************* END    __calculate_merge_offsets() *************')
@@ -837,13 +836,12 @@ class IngestionService(ServiceProcess):
         log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
         log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
         log.debug('>> insertion_offset   = %i' % insertion_offset)
-        log.debug('>> agg_offset         = %i' % agg_offset)
         log.debug('>> sup_sindex         = %i' % sup_sindex)
         log.debug('>> sup_eindex         = %i' % sup_eindex)
 
 
         # Perform the merge
-        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex)
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds)
         result.update(merge_res)
 
 
@@ -960,19 +958,21 @@ class IngestionService(ServiceProcess):
         
         # Get the start/end time indices of the current dataset and applicable offsets
         cur_etime = None
+        is_new_ds = False
         try:
             string_time = cur_root.FindAttributeByName('ion_time_coverage_end')
             cur_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
             log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), cur_etime))
             
         except OOIObjectError, oe:
+            is_new_ds= True
             log.debug(oe)
             log.info('Aggregation offset unchanged - dataset has no ion_time_coverage_end.')
             # This is not an error - it is a new dataset.
             # ATTENTION: Is there any benefit to determining if there is a gap in the sequence here?
 
 
-        return_value = (cur_root, cur_etime, cur_agg_dim_length, sup_root, sup_stime, sup_etime, sup_agg_dim_length, sup_agg_dim_name, result)
+        return_value = (cur_root, cur_etime, cur_agg_dim_length, sup_root, sup_stime, sup_etime, sup_agg_dim_length, sup_agg_dim_name, is_new_ds, result)
         defer.returnValue(return_value)
 
 
@@ -981,7 +981,6 @@ class IngestionService(ServiceProcess):
         
         sup_sindex       = cur_agg_dim_length
         sup_eindex       = cur_agg_dim_length
-        agg_offset       = cur_agg_dim_length     #- Position of supplement relative to existing data along the aggregation dimension
         insertion_offset = sup_agg_dim_length     #- Net change to the dataset along the aggregation dimension (how the length of the dim changes)
                                                   #  defaults to length so that if there are no overlaps (during data append)
                                                   #  we adjust the dimension length by adding this value.. otherwise, this
@@ -1009,7 +1008,6 @@ class IngestionService(ServiceProcess):
                 else:
                     log.info('__calculate_merge_offsets(overwrite): Supplement overlaps -- calculating offsets')
                     # Find where the supplement start time and end time should lay in the dataset (supplement_sindex, supplement_eindex)
-                    # Find how the origins in the supplement's data should change according to this position (agg_offset)
                     # Find how the origins in the dataset's data should change according to this position (insertion_offset)
                     agg_var      = cur_root.FindVariableByName(sup_agg_dim_name)
                     time_indices = yield self._find_time_index(agg_var, [sup_stime, sup_etime])
@@ -1025,8 +1023,6 @@ class IngestionService(ServiceProcess):
                         sup_eindex = -sup_eindex - 2
                         
                         
-                    agg_offset = sup_sindex
-                    
                     # Calculate the insertion offset -- how bounded_arrays ordered after the overwritten section must be offset
                     supplement_impact = (sup_eindex + 1) - sup_sindex  #(number of values displaced by inserting this supplement into the dataset)
                     insertion_offset  = sup_agg_dim_length - supplement_impact
@@ -1061,17 +1057,16 @@ class IngestionService(ServiceProcess):
                     log.info('__calculate_merge_offsets(overlap): Supplement does not overlap.')
             
             
-                agg_offset        -= overlap_count
-                insertion_offset  -= overlap_count
-                sup_sindex -= overlap_count
+                insertion_offset -= overlap_count
+                sup_sindex       -= overlap_count
         
         
-        result = (sup_sindex, sup_eindex, agg_offset, insertion_offset)
+        result = (sup_sindex, sup_eindex, insertion_offset)
         defer.returnValue(result)
 
 
     @defer.inlineCallbacks
-    def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, agg_offset, sup_stime, cur_etime, sup_sindex, sup_eindex):
+    def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds):
         result = {}
         
         ###
@@ -1105,6 +1100,15 @@ class IngestionService(ServiceProcess):
         ### Add/merge the variables from the supplement to the current state if they are not already there
         ### Merge variable if it is dimensioned on the aggregation dimension (merge_agg_dim)
         ###
+        agg_dim_min_offset = 0
+        if not is_new_ds:
+            agg_dim_min_offset = dims[sup_agg_dim_name].min_offset
+        sup_sindex += agg_dim_min_offset            # The start position of the supplement relative to the dataset must be offset by the starting index of the dataset
+        sup_eindex += agg_dim_min_offset            # The end position of the supplement relative to the dataset must be offset by the starting index of the dataset
+        log.debug('>> agg_dim_min_offset    = %i' % agg_dim_min_offset)
+        log.debug('>> sup     min_offset    = %i' % merge_dims[sup_agg_dim_name].min_offset)
+        log.debug('>> sup_sindex (adjusted) = %i' % sup_sindex)
+        log.debug('>> sup_eindex (adjusted) = %i' % sup_eindex)
         for merge_var in sup_root.variables:
             var_name = merge_var.name
 
@@ -1116,13 +1120,17 @@ class IngestionService(ServiceProcess):
                 var = cur_root.FindVariableByName(var_name)
             except OOIObjectError, oe:
                 log.debug(oe)
-                log.info('Variable %s does not yet exist in the dataset!' % var_name)
-
-                v_link = cur_root.variables.add()
-                v_link.SetLink(merge_var, ignore_copy_errors=True)
-
-                log.info('Copied Variable %s into the dataset!' % var_name)
-                continue # Go to next variable...
+                
+                if is_new_ds:
+                    log.info('Variable %s does not yet exist in the dataset!' % var_name)
+    
+                    v_link = cur_root.variables.add()
+                    v_link.SetLink(merge_var, ignore_copy_errors=True)
+    
+                    log.info('Copied Variable %s into the dataset!' % var_name)
+                    continue # Go to next variable...
+                else:
+                    raise IngestionError('Variable %s does not exist in the dataset.  Supplement is invalid!' % var_name)
 
 
             # Step 2: Skip merge for variables which are not dimensioned on the merge_agg_dim
@@ -1141,9 +1149,8 @@ class IngestionService(ServiceProcess):
 
             
             # Step 3: Merge variable values
-            # If cur_etime is None then the dataset doesnt exist yet.  In that case,
-            #   applying all these offsets in this codeblock is not necessary
-            if is_overwrite and cur_etime is not None:
+            # If this is a new dataset applying all these offsets is not necessary
+            if is_overwrite and not is_new_ds:
                 # Step 3a: (overwrite) Restructure the data in the dataset
                 if cur_etime >= sup_stime:
                     #          This requires the following:
@@ -1151,11 +1158,8 @@ class IngestionService(ServiceProcess):
                     #            2) Breaking apart bounded arrays which contain 1 or more overlapping indices
                     #               and throwing away the overlapping region
                     #            3) Adjusting the indices of all bounded_arrays positioned after the overwrite
-                    iter_offset = 0  # iter_offset is used to alter i when iterating the list of
-                                     # bounded_arrays because we are performing a restructuring of the
-                                     # list while iterating over it  (concurrent modification)
-                    for i in range(len(var.content.bounded_arrays)):
-                        ba = var.content.bounded_arrays[i + iter_offset]
+                    for i in reversed(range(len(var.content.bounded_arrays))):  # Iterate in reverse so that we can add and delete items without affecting our indices
+                        ba = var.content.bounded_arrays[i]
                         bound = ba.bounds[merge_agg_dim_idx]
                         
                         log.debug('Var:"%s"  BA:%i  BA.origin:%i  BA.size:%i  sup_sindex:%i  sup_eindex:%i' % (var.name, i, bound.origin, bound.size, sup_sindex, sup_eindex))
@@ -1167,12 +1171,11 @@ class IngestionService(ServiceProcess):
                             if log.getEffectiveLevel() <= logging.DEBUG:
                                 log.debug('(contains) Removing bounded array from variable "%s" [index:%i, origin:(%s), size:(%s)]' % ( \
                                                                                                                                         var.name.encode('utf-8'), \
-                                                                                                                                        i + iter_offset, \
+                                                                                                                                        i, \
                                                                                                                                         str([bbb.origin for bbb in ba.bounds]), \
                                                                                                                                         str([bbb.size for bbb in ba.bounds]), \
                                                                                                                                       ))
-                            del var.content.bounded_arrays[i + iter_offset]
-                            iter_offset -= 1
+                            del var.content.bounded_arrays[i]
                         
                         # (intersects check)
                         # @todo: add unit tests for this case!
@@ -1188,7 +1191,7 @@ class IngestionService(ServiceProcess):
                                 if log.getEffectiveLevel() <= logging.DEBUG:
                                     log.debug('(intersects) Split bounded array for variable "%s".  Created [left] [index:%i, origin:(%s), size:(%s)]' % ( \
                                                                                                                                                            var.name.encode('utf-8'), \
-                                                                                                                                                           i + iter_offset, \
+                                                                                                                                                           i, \
                                                                                                                                                            str([bbb.origin for bbb in new_ba.bounds]), \
                                                                                                                                                            str([bbb.size for bbb in new_ba.bounds]), \
                                                                                                                                                          ))
@@ -1202,7 +1205,7 @@ class IngestionService(ServiceProcess):
                                 if log.getEffectiveLevel() <= logging.DEBUG:
                                     log.debug('(intersects) Split bounded array for variable "%s".  Created [right] [index:%i, origin:(%s), size:(%s)]' % ( \
                                                                                                                                                             var.name.encode('utf-8'), \
-                                                                                                                                                            i + iter_offset, \
+                                                                                                                                                            i, \
                                                                                                                                                             str([bbb.origin for bbb in new_ba.bounds]), \
                                                                                                                                                             str([bbb.size for bbb in new_ba.bounds]), \
                                                                                                                                                           ))
@@ -1211,13 +1214,12 @@ class IngestionService(ServiceProcess):
                             if log.getEffectiveLevel() <= logging.DEBUG:
                                 log.debug('(intersects) Removing bounded array from variable "%s" [index:%i, origin:(%s), size:(%s)]' % ( \
                                                                                                                                           var.name.encode('utf-8'), \
-                                                                                                                                          i + iter_offset, \
+                                                                                                                                          i, \
                                                                                                                                           str([bbb.origin for bbb in ba.bounds]), \
                                                                                                                                           str([bbb.size for bbb in ba.bounds]), \
                                                                                                                                         ))
-                            del var.content.bounded_arrays[i + iter_offset]
-                            iter_offset -= 1
-                            
+                            del var.content.bounded_arrays[i]
+
                         
                         # (post insertion check)
                         # @todo: add unit tests for this case!
@@ -1227,10 +1229,20 @@ class IngestionService(ServiceProcess):
                             bound.origin += insertion_offset
             
             
-            # Step 3b: Merge the supplement into the dataset
+            # Step 3b: Normalize the supplement origins to zero
+            # Since the supplement is ReadOnly calculate the offset here.. and apply to the dataset afterwards
+            merge_var_min_origin = 0
+            if not is_new_ds:
+                merge_var_min_origin = float('inf')
+                for ba in merge_var.content.bounded_arrays:
+                    merge_var_min_origin = min(merge_var_min_origin, ba.bounds[merge_agg_dim_idx].origin)
+                log.debug('>> merge_var_min_origin = %i' % merge_var_min_origin)
+            
+            
+            # Step 3c: Merge the supplement into the dataset
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
-                ba.bounds[merge_agg_dim_idx].origin += agg_offset
+                ba.bounds[merge_agg_dim_idx].origin += sup_sindex - merge_var_min_origin
 
                 ba_link = var.content.bounded_arrays.add()
                 ba_link.SetLink(ba)
@@ -1319,23 +1331,23 @@ class IngestionService(ServiceProcess):
 
                 elif att_name == 'ion_geospatial_vertical_min':
                     
-                    # Check vert min/max for NaN, either is NaN or missing, don't merge
-                    min = False
-                    max = False
+                    # Check vert vmin/vmax for NaN, either is NaN or missing, don't merge
+                    vmin = False
+                    vmax = False
                     if sup_root.HasAttribute('ion_geospatial_vertical_min'):
                         val = sup_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
                         if not pu.isnan(val):
-                            min = True
+                            vmin = True
                     
-                    # Only check for max if min is available (if either value is not available, we can't continue)
-                    if min is not None:
+                    # Only check for vmax if vmin is available (if either value is not available, we can't continue)
+                    if vmin is not None:
                         if sup_root.HasAttribute('ion_geospatial_vertical_max'):
                             val = sup_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
                             if not pu.isnan(val):
-                                max = True
+                                vmax = True
                     
                     
-                    if min and max:
+                    if vmin and vmax:
                         if vertical_positive == 'down':
                             cur_root.MergeAttLesser(att_name, sup_root)
     
@@ -1348,7 +1360,7 @@ class IngestionService(ServiceProcess):
                         root_min = cur_root.HasAttribute('ion_geospatial_vertical_min')
                         root_max = cur_root.HasAttribute('ion_geospatial_vertical_max')
                         
-                        # if cur_root doesnt have min/max, add new attributes with default values...
+                        # if cur_root doesnt have vmin/vmax, add new attributes with default values...
                         if not root_min and not root_max:
                             cur_root.AddAttribute('ion_geospatial_vertical_min', cur_root.DataType.DOUBLE, float('nan'))
                             cur_root.AddAttribute('ion_geospatial_vertical_max', cur_root.DataType.DOUBLE, float('nan'))
@@ -1356,23 +1368,23 @@ class IngestionService(ServiceProcess):
 
                 elif att_name == 'ion_geospatial_vertical_max':
 
-                    # Check vert min/max for NaN, either is NaN or missing, don't merge
-                    min = False
-                    max = False
+                    # Check vert vmin/vmax for NaN, either is NaN or missing, don't merge
+                    vmin = False
+                    vmax = False
                     if sup_root.HasAttribute('ion_geospatial_vertical_min'):
                         val = sup_root.FindAttributeByName('ion_geospatial_vertical_min').GetValue()
                         if not pu.isnan(val):
-                            min = True
+                            vmin = True
                     
-                    # Only check for max if min is available (if either value is not available, we can't continue)
-                    if min is not None:
+                    # Only check for vmax if vmin is available (if either value is not available, we can't continue)
+                    if vmin is not None:
                         if sup_root.HasAttribute('ion_geospatial_vertical_max'):
                             val = sup_root.FindAttributeByName('ion_geospatial_vertical_max').GetValue()
                             if not pu.isnan(val):
-                                max = True
+                                vmax = True
                     
                     
-                    if min and max:
+                    if vmin and vmax:
                         if vertical_positive == 'down':
                             cur_root.MergeAttGreater(att_name, sup_root)
     
@@ -1385,7 +1397,7 @@ class IngestionService(ServiceProcess):
                         root_min = cur_root.HasAttribute('ion_geospatial_vertical_min')
                         root_max = cur_root.HasAttribute('ion_geospatial_vertical_max')
                         
-                        # if cur_root doesnt have min/max, add new attributes with default values...
+                        # if cur_root doesnt have vmin/vmax, add new attributes with default values...
                         if not root_min and not root_max:
                             cur_root.AddAttribute('ion_geospatial_vertical_min', cur_root.DataType.DOUBLE, float('nan'))
                             cur_root.AddAttribute('ion_geospatial_vertical_max', cur_root.DataType.DOUBLE, float('nan'))
