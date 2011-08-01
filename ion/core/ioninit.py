@@ -143,9 +143,16 @@ if loggly_key is not None:
     hostname = platform.node()
     class IonLogglyHandler(hoover.LogglyHttpHandler):
         def emit(self, record):
-            setattr(record, 'hostname', hostname)
-            hoover.LogglyHttpHandler.emit(self, record)
-        
+            try:
+                setattr(record, 'hostname', hostname)
+                hoover.LogglyHttpHandler.emit(self, record)
+
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception, ex:
+                print >> sys.stderr, "ERROR during logging to loggly: %s " % str(ex)
+                self.handleError(record)
+
     loggly_handler = IonLogglyHandler(token=loggly_key)
     loggly_handler.setLevel(logging.DEBUG)
     loggly_formatter = logging.Formatter(

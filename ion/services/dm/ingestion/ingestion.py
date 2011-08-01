@@ -544,8 +544,6 @@ class IngestionService(ServiceProcess):
                                                                             conv_id=convid,
                                                                             processing_step="dataset")
 
-        log.info(headers)
-
         if content.MessageType != CDM_DATASET_TYPE:
             raise IngestionError('Expected message type CDM Dataset Type, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
