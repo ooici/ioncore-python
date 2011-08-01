@@ -10,7 +10,7 @@ there but resource types are not...
 
 """
 import logging
-from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE
+from ion.core.object.object_utils import CDM_ARRAY_INT32_TYPE, CDM_ARRAY_INT64_TYPE, CDM_ARRAY_UINT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_STRING_TYPE, CDM_ARRAY_OPAQUE_TYPE, CDM_ARRAY_UINT32_TYPE, ARRAY_STRUCTURE_TYPE, sha1_to_hex
 from ion.util.cache import LRUDict
 
 import ion.util.ionlog
@@ -1372,24 +1372,50 @@ class DataStoreWorkbench(WorkBench):
         response = yield self._process.message_client.create_instance(GET_OBJECT_REPLY_MESSAGE_TYPE)
 
         key = request.object_id.key
+        branchname = request.object_id.branch or 'master'
         repo = yield self._resolve_repo_state(key)    # gets latest repo state from cassandra
         assert repo
+        commit = None
+
+        # do we have a treeish to resolve?
+        if request.object_id.treeish:
+            commit = repo.resolve_treeish(request.object_id.treeish, branchname)
+
+            # have to monkey patch from the datastore so it doesn't try to contact itself!
+            @defer.inlineCallbacks
+            def _fake_checkout_remote(commit, excluded_types):
+                link = commit.GetLink('objectroot')
+                yield self._get_blobs(repo, [link.key], lambda x: x.type not in excluded_types)
+
+                # expects to return the root object, so load it again
+                element = repo.index_hash[link.key]
+                root_obj = repo._load_element(element)
+
+                defer.returnValue(root_obj)
+
+            oldcheckout = repo._checkout_remote_commit
+            repo._checkout_remote_commit = _fake_checkout_remote
+
+            yield repo.checkout(branchname, commit_id=commit.MyId)
+
+            repo._checkout_remote_commit = oldcheckout
+
         repo.cached = True
 
         # @TODO: use first head for now
         #comms = repo.current_heads()
-        commit = repo.current_heads()[0]
+        #if hasattr(repo, "_current_branch"):
+        #    commit = repo._current_branch.commitrefs[0]
+        #else:
+        if commit is None:
+            commit = repo.current_heads()[0]
+
+        log.debug("GetObject: using commit %s" % sha1_to_hex(commit.MyId))
 
         link = commit.GetLink('objectroot')
 
-        def filtermethod(x):
-            """
-            Returns true if the passed in link's type is not in the excluded_object_types list of the passed in message.
-            """
-            return x.type not in request.excluded_object_types
-
         # get blobs, update into response repository so we don't have to copy
-        blobs = yield self._get_blobs(response.Repository, [link.key], filtermethod)
+        blobs = yield self._get_blobs(response.Repository, [link.key], lambda x: x.type not in request.excluded_object_types)
         response.Repository.index_hash.update(blobs)
         repo.index_hash.update(blobs)
 
