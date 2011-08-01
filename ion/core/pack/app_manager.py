@@ -8,7 +8,7 @@
 import os.path
 
 from twisted.internet import defer
-from setproctitle import setproctitle
+from setproctitle import getproctitle, setproctitle
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -90,7 +90,7 @@ class AppManager(BasicLifecycleObject):
 
         reldef = ReleaseLoader.load_rel_definition(rel_filename)
         if hasattr(reldef, 'name'):
-            setproctitle('ion-%s' % reldef.name)
+            setproctitle('ion-%s -- %s' % (reldef.name, getproctitle()))
 
         if not type(reldef.apps) in (list,tuple):
             raise ConfigurationError("Release config apps entry malformed: %s" % reldef.apps)
