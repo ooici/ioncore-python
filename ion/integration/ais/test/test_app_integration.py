@@ -1378,6 +1378,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Now call AIS to find the subscriptions with no bounds
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        log.debug('Calling findDataResourceSubscriptions with no message_parameters: should fail.')
+        rspMsg = yield self.aisc.findDataResourceSubscriptions(reqMsg, self.user_id)
+        if rspMsg.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('findDataResourceSubscriptions should have returned error')
+        else:
+            log.debug('Failure rspMsg to findDataResourceSubscriptions: this is correct')
+        
+        #
+        # Now call AIS to find the subscriptions with no bounds
+        #
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_SUBSCRIPTIONS_REQ_TYPE)
         reqMsg.message_parameters_reference.user_ooi_id  = self.user_id
         
