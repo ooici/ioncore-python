@@ -10,8 +10,10 @@ create, get, put and update resources.
 @ TODO
 Add methods to access the state of updates which are merging...
 """
+import re
 
 from twisted.internet import defer
+from ion.core.object.object_utils import sha1_to_hex
 
 import ion.util.ionlog
 
@@ -170,6 +172,7 @@ class ResourceClient(object):
         reference = None
         branch = 'master'
         commit = None
+        treeish = None
 
         # Get the type of the argument and act accordingly
         if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == IDREF_TYPE:
@@ -179,10 +182,18 @@ class ResourceClient(object):
 
             reference = resource_id.key
             commit = resource_id.commit
+            treeish = resource_id.treeish
 
         elif isinstance(resource_id, (str, unicode)):
             # if it is a string, us it as an identity
             reference = resource_id
+
+            rtreeish = re.compile('([~^].*)$')
+            m = rtreeish.search(reference)
+            if m:
+                reference = reference[0:m.start()]
+                treeish = m.groups()[0]
+
             # @TODO Some reasonable test to make sure it is valid?
 
         else:
@@ -191,7 +202,7 @@ class ResourceClient(object):
 
             # Pull the repository
         try:
-            result = yield self.workbench.pull(self.datastore_service, reference, excluded_types=excluded_types)
+            result = yield self.workbench.pull(self.datastore_service, reference, get_head_content=False, excluded_types=excluded_types)
         except workbench.WorkBenchError, ex:
             log.error('Resource client error during pull operation: Resource ID "%s" \nException - %s' % (reference, str(ex)))
             raise ResourceClientError(
@@ -199,8 +210,14 @@ class ResourceClient(object):
 
         # Get the repository
         repo = self.workbench.get_repository(reference)
+
+        # do we have a treeish to resolve?
+        if treeish:
+            commitref = repo.resolve_treeish(treeish, branch)
+            commit = commitref.MyId
+
         try:
-            yield repo.checkout(branch)
+            yield repo.checkout(branch, commit_id=commit)
         except repository.RepositoryError, ex:
             log.exception('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
             raise ResourceClientError('Could not checkout branch during get_instance.')

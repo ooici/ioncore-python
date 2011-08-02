@@ -22,7 +22,7 @@ from ion.core.object import workbench
 from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 from ion.core.object import repository
-
+from ion.core.object.repository import RepositoryError
 
 
 INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
@@ -854,7 +854,118 @@ class RepositoryTest(unittest.TestCase):
 
         for item in repo_refs:
             self.assertIdentical(item(),None)
-            
+
+    #@defer.inlineCallbacks
+    def test_resolve_treeish(self):
+        """
+        Treeishes are our ability to go back in time via commit history.
+        """
+
+        # build three level commit history
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
+
+        # Create a resource object
+        p1 = repo.create_object(PERSON_TYPE)
+        p1.name='David'
+        p1.id = 5
+        p1.email = 'd@s.com'
+        ph1 = p1.phone.add()
+        ph1.type = p1.PhoneType.WORK
+        ph1.number = '123 456 7890'
+        ab.owner = p1
+        ab.person.add()
+        ab.person[0] = p1
+
+        ab.title = 'Junk'
+
+        cref1 = repo.commit(comment='commit uno')
+
+        p2 = repo.create_object(PERSON_TYPE)
+        p2.name='Drew'
+        p2.id = 6
+        p2.email = 'drew@s.com'
+        ph1 = p2.phone.add()
+        ph1.type = p2.PhoneType.WORK
+        ph1.number = '123 456 7899'
+        ab.person.add()
+        ab.person[1] = p2
+
+        cref2 = repo.commit(comment='commit dos')
+
+        p3 = repo.create_object(PERSON_TYPE)
+        p3.name='Danny'
+        p3.id = 7
+        p3.email = 'dd@s.com'
+        ph1 = p3.phone.add()
+        ph1.type = p3.PhoneType.WORK
+        ph1.number = '123 456 7897'
+        ab.person.add()
+        ab.person[2] = p3
+
+        cref3 = repo.commit(comment='commit tres')
+
+        # create a merge tree as well - two commits then merge into cref4
+        repo.branch('Merge')
+
+        mp1 = repo.create_object(PERSON_TYPE)
+        mp1.name = "Javeed"
+        mp1.id = 99
+        mp1.email = "jvd@jvd.com"
+        ab.person.add()
+        ab.person[3] = mp1
+
+        mcref1 = repo.commit(comment="merge tree commit uno")
+
+        mp2 = repo.create_object(PERSON_TYPE)
+        mp2.name = "Fitzsimmons"
+        mp2.id = 98
+        mp2.email = "jsf@d.com"
+        ab.person.add()
+        ab.person[4] = mp2
+
+        mcref2 = repo.commit(comment="merge tree commit dos")
+
+        # merge!
+        ab = yield repo.checkout(branchname='master')
+        yield repo.merge_with(branchname='Merge')
+
+        # copy objects over?
+        cref4 = repo.commit(comment='commit quatro, the merge commit')
+
+        # ok now test we can resolve treeishes
+        rref3 = repo.resolve_treeish("^")
+        self.assertEquals(rref3.MyId, cref3)
+
+        rref2 = repo.resolve_treeish("^^")
+        self.assertEquals(rref2.MyId, cref2)
+
+        rref1 = repo.resolve_treeish("^^^")
+        self.assertEquals(rref1.MyId, cref1)
+
+        # test tilde spec
+        rref1 = repo.resolve_treeish("~3")
+        self.assertEquals(rref1.MyId, cref1)
+
+        # go too far
+        self.assertRaises(RepositoryError, repo.resolve_treeish, "~4")
+
+        # over to the merge branch now
+        mref2 = repo.resolve_treeish("^2")
+        self.assertEquals(mref2.MyId, mcref2)
+
+        # over one up one
+        mref1 = repo.resolve_treeish("^2^")
+        self.assertEquals(mref1.MyId, mcref1)
+
+        # mix syntax now
+        mref1 = repo.resolve_treeish("^2~1")
+        self.assertEqual(mref.MyId, mcref1)
+
+        # too many carrots
+        self.assertRaises(RepositoryError, repo.resolve_treeish, "^3")
+
+        # does not exist, despite being "level"
+        self.assertRaises(RepositoryError, repo.resolve_treeish, "^^2")
             
 class MergeContainerTest(unittest.TestCase):
     
@@ -906,9 +1017,3 @@ class MergeContainerTest(unittest.TestCase):
         yield mr.load_root(excluded_types=[])
 
         self.assertEqual(mr.root_object, self.ab)
-
-    
-    
-    
-    
-    

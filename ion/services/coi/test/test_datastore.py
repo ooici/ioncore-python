@@ -7,6 +7,7 @@
 @author Matt Rodriguez
 """
 from twisted.trial import unittest
+from ion.core.exception import ReceivedContainerError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
 from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
@@ -418,6 +419,29 @@ class DataStoreTest(IonTestCase):
 
         # make sure we see the correct things in our repo's excluded types
         self.failUnless(CDM_ARRAY_FLOAT32_TYPE in obj2.Repository.excluded_types)
+
+    @defer.inlineCallbacks
+    def test_get_object_with_treeish(self):
+        """
+        Since SAMPLE_PROFILE_DATASET_ID does not have a history that we know about, we'll ask for something
+        outlandish back in its history to make sure it is parsing/trying to resolve the treeish.  Actual
+        treeish tests are in the Repository's tests.
+        """
+        p = Process(proc_name='test_anon')
+        yield p.spawn()
+
+        msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
+
+        idref = msg.CreateObject(IDREF_TYPE)
+        idref.key = SAMPLE_PROFILE_DATASET_ID
+        idref.treeish = "~20"
+
+        msg.object_id = idref
+
+        dsc = DataStoreClient(proc=p)
+
+        fo = yield self.failUnlessFailure(dsc.get_object(msg), ReceivedContainerError)
+        self.failUnless('resolve treeish' in fo.msg_content.MessageResponseBody)    # @TODO: this will not survive l10n/i18n
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):

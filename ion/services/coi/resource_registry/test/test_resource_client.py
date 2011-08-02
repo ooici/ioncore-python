@@ -5,6 +5,7 @@
 @author David Stuebe
 @brief test service for registering resources and client classes
 """
+from ion.core.object.repository import RepositoryError
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -106,6 +107,31 @@ class ResourceClientTest(IonTestCase):
         my_resource = yield my_rc.get_instance(res_id)
 
         self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
+
+    @defer.inlineCallbacks
+    def test_get_resource_with_treeish(self):
+        """
+        Since let's not bother creating a history here we'll ask for something outlandish back in its history
+        to make sure it is parsing/trying to resolve the treeish.  Actual treeish tests are in the Repository's
+        tests.
+        """
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+
+        res_id = resource.ResourceIdentity
+
+        # Spawn a completely separate resource client and see if we can retrieve the resource...
+        services = [
+            {'name':'my_process','module':'ion.core.process.process','class':'Process'}]
+
+        sup = yield self._spawn_processes(services)
+
+        child_ps1 = yield self.sup.get_child_id('my_process')
+        log.debug('Process ID:' + str(child_ps1))
+        proc_ps1 = self._get_procinstance(child_ps1)
+
+        my_rc = ResourceClient(proc=proc_ps1)
+
+        fo = yield self.failUnlessFailure(my_rc.get_instance(res_id + "~20"), RepositoryError)
 
     @defer.inlineCallbacks
     def test_resource_transaction(self):
