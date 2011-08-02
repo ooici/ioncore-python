@@ -584,7 +584,15 @@ class ManageDataResourceSubscription(object):
         @GPB{Returns,9204,1}
         @retval success
         """
-        log.info('ManageDataResourceSubscription.findDataResourceSubscriptions()\n')
+        log.info('ManageDataResourceSubscription.findDataResourceSubscriptions()')
+
+        # check that the GPB is correct type & has a payload
+        result = yield self._CheckRequest(msg)
+        if result != None:
+            log.error("AIS.findDataResourceSubscriptions: %s " %(result.error_str))
+            result.error_str = "AIS.findDataResourceSubscriptions " + result.error_str
+            defer.returnValue(result)
+            
 
         try:
             log.debug('find: Calling NAS.getSubscriptionList service')

@@ -55,18 +55,18 @@ class SpatialTemporalBounds(object):
         Load up the bounds dictionary object with the given spatial and temporal
         parameters.
         """
-        log.debug('__loadBounds')
+        log.debug('__loadBounds %s' %(bounds))
 
         #
         # Set these flags; they're used for further tests; only set if the field is NOT NaN
         # (not a number); i.e., the field must be a number.
         #
-        self.bIsMinLatitudeSet = (bounds.IsFieldSet(MIN_LATITUDE) and not isnan(bounds.minLatitude))
-        self.bIsMaxLatitudeSet = (bounds.IsFieldSet(MAX_LATITUDE) and not isnan(bounds.maxLatitude))
-        self.bIsMinLongitudeSet = (bounds.IsFieldSet(MIN_LONGITUDE) and not isnan(bounds.minLongitude))
-        self.bIsMaxLongitudeSet = (bounds.IsFieldSet(MAX_LONGITUDE) and not isnan(bounds.maxLongitude))
-        self.bIsMinVerticalSet = (bounds.IsFieldSet(MIN_VERTICAL) and not isnan(bounds.minVertical))
-        self.bIsMaxVerticalSet = (bounds.IsFieldSet(MAX_VERTICAL) and not isnan(bounds.maxVertical))
+        self.bIsMinLatitudeSet = bounds.IsFieldSet(MIN_LATITUDE)
+        self.bIsMaxLatitudeSet = bounds.IsFieldSet(MAX_LATITUDE)
+        self.bIsMinLongitudeSet = bounds.IsFieldSet(MIN_LONGITUDE)
+        self.bIsMaxLongitudeSet = bounds.IsFieldSet(MAX_LONGITUDE)
+        self.bIsMinVerticalSet = bounds.IsFieldSet(MIN_VERTICAL)
+        self.bIsMaxVerticalSet = bounds.IsFieldSet(MAX_VERTICAL)
         self.bIsVerticalPositiveSet = bounds.IsFieldSet(POS_VERTICAL)        
 
         if self.bIsMinLatitudeSet:
@@ -167,24 +167,28 @@ class SpatialTemporalBounds(object):
         self.bIsInAreaBounds = True
         self.bIsInVerticalBounds= True
         self.bIsInTimeBounds = True
+        returnValue = False
 
-        if self.filterByLatitude:
-            self.bIsInAreaBounds = self.__isInLatitudeBounds(dSetMetadata, self.bounds)
-
-        if self.bIsInAreaBounds and self.filterByLongitude:
-            self.bIsInAreaBounds = self.__isInLongitudeBounds(dSetMetadata, self.bounds)
-
-        if self.bIsInAreaBounds and self.filterByVertical:
-            self.bIsInVerticalBounds = self.__isInVerticalBounds(dSetMetadata, self.bounds)
-                                
-        if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
-            self.bIsInTimeBounds = self.__isInTimeBounds(dSetMetadata, self.bounds)
-            
-        if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
-            return True
-        else:
-            return False
-
+        try:
+            if self.filterByLatitude:
+                self.bIsInAreaBounds = self.__isInLatitudeBounds(dSetMetadata, self.bounds)
+    
+            if self.bIsInAreaBounds and self.filterByLongitude:
+                self.bIsInAreaBounds = self.__isInLongitudeBounds(dSetMetadata, self.bounds)
+    
+            if self.bIsInAreaBounds and self.filterByVertical:
+                self.bIsInVerticalBounds = self.__isInVerticalBounds(dSetMetadata, self.bounds)
+                                    
+            if self.bIsInAreaBounds and self.bIsInVerticalBounds and self.filterByTime:
+                self.bIsInTimeBounds = self.__isInTimeBounds(dSetMetadata, self.bounds)
+                
+            if self.bIsInAreaBounds and self.bIsInTimeBounds and self.bIsInVerticalBounds:
+                returnValue = True
+        except KeyError:
+            log.error('AIS: KeyError error checking bounds.')
+        finally:
+            log.debug('__isInBounds is %s' %(returnValue))
+            return returnValue
 
     def __isInLatitudeBounds(self, minMetaData, bounds):
         """
