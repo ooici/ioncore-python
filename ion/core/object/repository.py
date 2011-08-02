@@ -1654,7 +1654,74 @@ class Repository(ObjectContainer):
         object_utils.set_type_from_obj(value, tp)
         #link.type = object_utils.get_type_from_obj(value)
 
+    def resolve_treeish(self, treeish, branch=None):
+        """
+        Resolves a git-style treeish from the specified branch.
 
+        Treeishes have the ability to go back in commit history either linearly (parent) or along merges (2nd parent).
+        You can use a treeish to see the state of an object previously. For example:
+
+            ^^^^^      // 5 parents above the branch head
+            ~3^~2      // 3 parents above, then one parent above, then another 2 parents above
+            ^2~1       // 2nd parent of the branch head (of a merge commit), then 1 parent above that
+
+        Current support is for carrot-parent and tilde spec.  See this document for more details: http://book.git-scm.com/4_git_treeishes.html
+
+        @param  treeish     A string of the treeish characters to follow. O rder is important.  Point of reference is the tip of the
+                            branch's head.
+        @param  branch      A branch name to use as a reference point.  If not specified, master is used.
+        @returns    A commit that the treeish resolves to.  If not found, a RepositoryError is raised.
+                    It is your responsibility to do something with the commit returned - typical procedure
+                    would be to call checkout and specify the commit_id parameter (as the returned object's .MyId
+                    attribute).
+        """
+        origtreeish = treeish
+        log.debug("resolve_treeish: %s" % origtreeish)
+
+        branch = branch or "master"
+
+        curbranch = self.get_branch(branch)
+        curcommit = curbranch.commitrefs[0]
+
+        while treeish:
+            op = treeish[0]
+            num = 1
+
+            treeish = treeish[1:]
+
+            # figure out additional numbers
+            numbuf = ""
+            while len(treeish) > 0 and treeish[0].isdigit():
+                numbuf += treeish[0]
+                treeish = treeish[1:]
+
+            if numbuf.isdigit():
+                num = int(numbuf)
+
+            log.debug("treeish chunk: op %s, num %d, curcommit %s" % (op, num, sha1_to_hex(curcommit.MyId)))
+
+            if op == "~":
+                # Tilde Spec:
+                # The tilde spec will give you the Nth grandparent of a commit object.
+                for i in xrange(num):
+                    if len(curcommit.parentrefs) == 0:
+                        raise RepositoryError("Could not resolve treeish (%s): no parent of commit (%s), still %d parents left" % (origtreeish, sha1_to_hex(curcommit.MyId), num-i))
+
+                    curcommit = curcommit.parentrefs[0].commitref
+            elif op == "^":
+                # Carrot Parent:
+                # This will give you the Nth parent of a particular commit. This format is only useful on merge
+                # commits - commit objects that have more than one direct parent.
+                curparents = curcommit.parentrefs
+                if num > len(curparents):
+                    raise RepositoryError("Could not resolve treeish (%s): parent %d of commit (%s) requested, only %d present" % (origtreeish, num, sha1_to_hex(curcommit.MyId), len(curparents)))
+
+                curcommit = curparents[num-1].commitref
+            else:
+                raise RepositoryError("Unknown treeish char: %s (treeish: %s)" % (op, origtreeish))
+
+        log.debug("Treeish (%s) resolved to commit %s" % (origtreeish, sha1_to_hex(curcommit.MyId)))
+        return curcommit
 
 
 class MergeRepository(ObjectContainer):
