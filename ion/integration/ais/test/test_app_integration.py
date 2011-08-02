@@ -1375,7 +1375,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             log.debug('POSITIVE rspMsg to createDataResourceSubscription')
 
         #
-        # Now call AIS to find the subscriptions with no bounds
+        # Now call AIS with no message_parameters_referene: should fail
         #
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         log.debug('Calling findDataResourceSubscriptions with no message_parameters: should fail.')
