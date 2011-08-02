@@ -217,7 +217,7 @@ class ResourceClient(object):
             commit = commitref.MyId
 
         try:
-            yield repo.checkout(branch, commit_id=commit)
+            yield repo.checkout(branch, commit_id=commit, excluded_types=excluded_types)
         except repository.RepositoryError, ex:
             log.exception('Could not check out branch "%s":\n Current repo state:\n %s' % (branch, str(repo)))
             raise ResourceClientError('Could not checkout branch during get_instance.')
