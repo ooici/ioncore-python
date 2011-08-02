@@ -932,7 +932,13 @@ class Repository(ObjectContainer):
         elif not hasattr(excluded_types, '__iter__'):
             raise RepositoryError('Invalid excluded_types argument passed to checkout')
 
+        if branchname is not None:
+            branchname = str(branchname)
+        if commit_id is not None:
+            commit_id  = str(commit_id)
 
+        if older_than is not None:
+            older_than = float(older_than)
 
         log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, excluded_types))
         if self.status == self.MODIFIED:
