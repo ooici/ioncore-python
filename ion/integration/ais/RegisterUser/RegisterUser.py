@@ -16,6 +16,10 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       subject_has_early_adopter_role, \
                                       subject_has_marine_operator_role, \
                                       subject_has_data_provider_role, \
+                                      user_has_admin_role, \
+                                      user_has_early_adopter_role, \
+                                      user_has_marine_operator_role, \
+                                      user_has_data_provider_role, \
                                       map_ooi_id_to_subject_admin_role, \
                                       map_ooi_id_to_subject_early_adopter_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
@@ -277,8 +281,7 @@ class RegisterUser(object):
       # use authenticate_user to try to update a possibly already existing user 
       try:
          result = yield self.irc.authenticate_user(Request)
-         if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('AIS.registerUser: user exists in IR with ooi_id = '+str(result))
+         log.debug('AIS.registerUser: user exists in IR with ooi_id = %s'%str(result.resource_reference.ooi_id))
          UserAlreadyRegistered = True
       except ReceivedApplicationError, ex:
             log.info("AIS.registerUser: calling irc.register_user with\n"+str(Request.configuration))
@@ -309,28 +312,41 @@ class RegisterUser(object):
       Response.message_parameters_reference[0].ooi_id = ooi_id
       Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
 
-      # Obtain extra user roles/attributes. Also call mapping methods to add ooi_id to role lookup
+      # Obtain extra user roles/attributes, first trying subject then ooid. In case of
+      # subject match, also call mapping methods to add ooi_id to role lookup
       # for use by policy management interceptor
       if subject_has_admin_role(subject):
           Response.message_parameters_reference[0].user_is_admin = True
           map_ooi_id_to_subject_admin_role(subject, ooi_id)
       else:
-          Response.message_parameters_reference[0].user_is_admin = False
+          if user_has_admin_role(ooi_id):
+              Response.message_parameters_reference[0].user_is_admin = True
+          else:
+              Response.message_parameters_reference[0].user_is_admin = False
       if subject_has_early_adopter_role(subject):
           Response.message_parameters_reference[0].user_is_early_adopter = True
           map_ooi_id_to_subject_early_adopter_role(subject, ooi_id)
       else:
-          Response.message_parameters_reference[0].user_is_early_adopter = False
+          if user_has_early_adopter_role(ooi_id):
+              Response.message_parameters_reference[0].user_is_early_adopter = True
+          else:
+              Response.message_parameters_reference[0].user_is_early_adopter = False
       if subject_has_data_provider_role(subject):
           Response.message_parameters_reference[0].user_is_data_provider = True
           map_ooi_id_to_subject_data_provider_role(subject, ooi_id)
       else:
-          Response.message_parameters_reference[0].user_is_data_provider = False
+          if user_has_data_provider_role(ooi_id):
+              Response.message_parameters_reference[0].user_is_data_provider = True
+          else:
+              Response.message_parameters_reference[0].user_is_data_provider = False
       if subject_has_marine_operator_role(subject):
           Response.message_parameters_reference[0].user_is_marine_operator = True
           map_ooi_id_to_subject_marine_operator_role(subject, ooi_id)
       else:
-          Response.message_parameters_reference[0].user_is_marine_operator = False
+          if user_has_marine_operator_role(ooi_id):
+              Response.message_parameters_reference[0].user_is_marine_operator = True
+          else:
+              Response.message_parameters_reference[0].user_is_marine_operator = False
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 
