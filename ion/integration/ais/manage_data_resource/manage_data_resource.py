@@ -585,6 +585,7 @@ class ManageDataResource(object):
             response = yield self.sc.rm_task(req_msg)
             log.debug("not sure what to do with the response: %s" % str(type(response)))
             #fixme: anything to do with this response?  i don't know of anything...
+
             sched_task_rsrc.ResourceLifeCycleState = sched_task_rsrc.RETIRED
             yield self.rc.put_instance(sched_task_rsrc)
 

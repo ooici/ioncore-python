@@ -37,6 +37,7 @@ from google.protobuf import message
 from google.protobuf.internal import containers
 from ion.core.object import object_utils
 
+import weakref
 
 RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
@@ -60,6 +61,7 @@ class ResourceClient(object):
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
     type_map = ion_preload_config.TypeMap()
+
 
 
     def __init__(self, proc=None, datastore_service='datastore'):
@@ -87,6 +89,9 @@ class ResourceClient(object):
         # What about the name of the index services to use?
 
         self.registry_client = ResourceRegistryClient(proc=self.proc)
+
+        # Make a weak value dictionary to hold the resource instance - make sure there is only one wrapper for each repository
+        self.myresources=weakref.WeakValueDictionary()
 
 
     @defer.inlineCallbacks
@@ -154,6 +159,8 @@ class ResourceClient(object):
         yield repo.checkout('master')
         resource = ResourceInstance(repo)
 
+        self.myresources[res_id] = resource
+
         defer.returnValue(resource)
 
 
@@ -181,8 +188,12 @@ class ResourceClient(object):
                 branch = resource_id.branch
 
             reference = resource_id.key
-            commit = resource_id.commit
-            treeish = resource_id.treeish
+
+            if resource_id.IsFieldSet('commit'):
+                commit = resource_id.commit
+
+            if resource_id.IsFieldSet('treeish'):
+                treeish = resource_id.treeish
 
         elif isinstance(resource_id, (str, unicode)):
             # if it is a string, us it as an identity
@@ -212,7 +223,7 @@ class ResourceClient(object):
         repo = self.workbench.get_repository(reference)
 
         # do we have a treeish to resolve?
-        if treeish:
+        if treeish is not None and len(treeish)>0:
             commitref = repo.resolve_treeish(treeish, branch)
             commit = commitref.MyId
 
@@ -224,7 +235,17 @@ class ResourceClient(object):
 
         # Create a resource instance to return
         # @TODO - Check and see if there is already one - what to do?
-        resource = ResourceInstance(repo)
+
+        if reference not in self.myresources:
+            resource = ResourceInstance(repo)
+            self.myresources[reference] = resource
+
+        else:
+            # Use the existing one - it is basically stateless...
+            resource = self.myresources.get(reference)
+            resource._repository = repo
+            resource._merge = None
+
 
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
         # Is this a good use of the resource name? Is it safe?
@@ -314,7 +335,8 @@ class ResourceClient(object):
 
         obj_ref = association.ObjectReference
 
-        resource_instance = yield self.get_instance(obj_ref)
+        # Get the latest of that resource
+        resource_instance = yield self.get_instance(obj_ref.key)
 
         resource_instance.ResourceAssociationsAsObject.add(association)
 
@@ -333,7 +355,8 @@ class ResourceClient(object):
 
         subject_ref = association.SubjectReference
 
-        resource_instance = yield self.get_instance(subject_ref)
+        # Get the latest of that resource
+        resource_instance = yield self.get_instance(subject_ref.key)
 
         resource_instance.ResourceAssociationsAsSubject.add(association)
 

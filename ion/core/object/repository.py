@@ -618,6 +618,10 @@ class Repository(ObjectContainer):
         output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
         output += 'Current context identifier for repository: %s \n' % self.convid_context
         output += 'Cached (%s) and Persistent (%s) settings \n' % (str(self.cached), str(self.persistent))
+        if self._current_branch is not None:
+            output += 'Current branch name: %s \n' % self._current_branch.branchkey
+        else:
+            output += 'Current branch name: %s \n' % None
         output += 'Branch Nicknames: %s \n' % str(self.branchnicknames)
 
 
@@ -934,13 +938,14 @@ class Repository(ObjectContainer):
 
         if branchname is not None:
             branchname = str(branchname)
+
         if commit_id is not None:
             commit_id  = str(commit_id)
 
         if older_than is not None:
             older_than = float(older_than)
 
-        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, excluded_types))
+        log.info('checkout: branchname - "%s", commit id - "%s", older_than - "%s", excluded_types - %s' % (branchname, commit_id, older_than, excluded_types))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 

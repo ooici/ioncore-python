@@ -1283,6 +1283,7 @@ class Wrapper(object):
         output += 'Wrapper ID: %s \n' % key
         output += 'Wrapper repr: %s \n' % repr(self)
         output += 'Wrapper Invalid: %s \n' % self._invalid
+        output += 'Wrapper ReadOnly: %s \n' % self._read_only
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
         # This is dangerous - this can result in an exception loop!
