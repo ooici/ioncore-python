@@ -323,7 +323,7 @@ class ManageResources(object):
          # load the attributes of the resource into response
          Response.message_parameters_reference[0].resources.add()
          if ResourceType == EPU_CONTROLLER_TYPE_ID:
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
+            yield defer.maybeDeferred(LoaderFunc, Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
          else:
             # need to get the actual resource from it's ooi_id
             ResID = Result.idrefs[i].key
@@ -338,7 +338,7 @@ class ManageResources(object):
                 defer.returnValue(Response)
             # debug print for dumping the attributes of the resource
             PrintFunc(Resource)           
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
+            yield defer.maybeDeferred(LoaderFunc, Response.message_parameters_reference[0].resources[i], Resource, ResID)
          i = i + 1
 
       if log.getEffectiveLevel() <= logging.DEBUG:
