@@ -174,7 +174,11 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
             # didn't show up in the association service when the event for
             # the dataset was received, so refresh the dataset.
             #
-            tempDSourceResID = dSet['DSOURCE_ID']
+
+            tempDSourceResID = None
+            if dset is not None:
+                tempDSourceResID = dSet.get('DSOURCE_ID',None)
+                
             if (tempDSourceResID is None) or (tempDSourceResID != dSourceResID):
                 log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
                 #
