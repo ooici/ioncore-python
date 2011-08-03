@@ -14,6 +14,7 @@ from twisted.internet import defer
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.cei.epu_controller_client import EPUControllerClient
 from ion.services.cei.epu_controller_list_client import EPUControllerListClient
 
@@ -78,6 +79,7 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ResourceClient(proc=ais)
       self.eclc = EPUControllerListClient(proc=ais)
+      self.irc = IdentityRegistryClient(proc=ais)
         
 
    @defer.inlineCallbacks
@@ -207,6 +209,7 @@ class ManageResources(object):
          log.exception(estr)
 
 
+   @defer.inlineCallbacks
    def __LoadIdentityColumnData(self, To, From, Id):
       try:
          To.attribute.append(Id)
