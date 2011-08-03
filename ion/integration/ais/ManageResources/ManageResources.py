@@ -227,9 +227,8 @@ class ManageResources(object):
          else:
             To.attribute.append(From.subject)
 
-         #resp = yield self.irc.get_role(Id)
-         #Role = resp['roles']
-         Role = 'Administrator'
+         resp = yield self.irc.get_role(Id)
+         Role = resp['roles']
          To.attribute.append(Role)
       
       except:
