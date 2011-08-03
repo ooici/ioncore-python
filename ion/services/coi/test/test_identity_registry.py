@@ -441,3 +441,19 @@ w/0z56l5aPSP52xpWjzPyywv+4ku+LXEyWF3qj4xJww8SVBP5nmTsYEJwu26g97ZWprehJzOOhWu
         yield self.irc.unset_role(user_id, role)
         self.failIf(user_has_role(user_id, 'EARLY_ADOPTER'))
         self.failIf(user_has_role(user_id, 'MARINE_OPERATOR'))
+
+    @defer.inlineCallbacks
+    def test_get_role(self):
+        role = 'EARLY_ADOPTER, MARINE_OPERATOR'
+        user_id = self.user2_ooi_id
+        yield self.irc.set_role(user_id, role)
+        self.failUnless(user_has_role(user_id, 'EARLY_ADOPTER'))
+        self.failUnless(user_has_role(user_id, 'MARINE_OPERATOR'))
+
+        resp_role = yield self.irc.get_role(user_id)
+        # Order might be random
+        self.assertIn(resp_role['roles'], ['Early Adopter, Marine Operator', 'Marine Operator, Early Adopter'])
+
+        yield self.irc.unset_role(user_id, role)
+        self.failIf(user_has_role(user_id, 'EARLY_ADOPTER'))
+        self.failIf(user_has_role(user_id, 'MARINE_OPERATOR'))

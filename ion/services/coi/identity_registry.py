@@ -33,7 +33,8 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       map_ooi_id_to_subject_data_provider_role, \
                                       subject_has_marine_operator_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
-                                      map_ooi_id_to_role, unmap_ooi_id_from_role
+                                      map_ooi_id_to_role, unmap_ooi_id_from_role, \
+                                      get_current_roles, all_roles
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config \
     import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
@@ -195,6 +196,13 @@ class IdentityRegistryClient(ServiceClient):
         yield self._check_init()
         broadcast_target = self.proc.get_scoped_name(FanoutReceiver.SCOPE_SYSTEM, broadcast_name)
         yield self.proc.send(broadcast_target, 'broadcast', msg)
+
+    @defer.inlineCallbacks
+    def get_role(self, user_id):
+        log.debug("in get_role client")
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('get_role', {'user-id': user_id})
+        defer.returnValue(content)
 
 class IdentityRegistryException(ApplicationError):
     """
@@ -594,10 +602,17 @@ class IdentityRegistryService(ServiceProcess):
         response = True
         yield self.reply_ok(msg, response)
 
+    @defer.inlineCallbacks
+    def op_get_role(self, content, headers, msg):
+        """ Get list of roles as a CSV of friendly names """
+        user_id = content['user-id']
+        roles = ', '.join([all_roles[role] for role in get_current_roles(user_id)])
+        response = {'roles': roles}
+        yield self.reply_ok(msg, response)
 
     def op_broadcast(self, content, headers, msg):
         """
-        Service operation: announce a capability container
+        Service operation: communication amongst identity registry containers
         """
         self.broadcast_count += 1
         log.info('op_broadcast(): Received identity registry broadcast #%d' % (self.broadcast_count))

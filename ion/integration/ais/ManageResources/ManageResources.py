@@ -29,7 +29,6 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RES
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID
-from ion.core.intercept.policy import get_current_roles, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
@@ -228,7 +227,9 @@ class ManageResources(object):
          else:
             To.attribute.append(From.subject)
 
-         Role = ', '.join([all_roles[role] for role in get_current_roles(Id)])
+         #resp = yield self.irc.get_role(Id)
+         #Role = resp['roles']
+         Role = 'Administrator'
          To.attribute.append(Role)
       
       except:
