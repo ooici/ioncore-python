@@ -171,29 +171,31 @@ class IngestionService(ServiceProcess):
         data and notifications about ingestion.
         """
 
-        log.info('op_create_dataset_topics - Start')
+        log.info('op_create_dataset_topics - Start (no-op)')
 
-        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
-        msg = yield self.mc.create_instance(XS_TYPE)
+        # OOIION-4: disabled creation of topics via PSC due to performance
 
-        msg.exchange_space_name = 'swapmeet'
-
-        rc = yield self._pscclient.declare_exchange_space(msg)
-        self._xs_id = rc.id_list[0]
-
-        msg = yield self.mc.create_instance(XP_TYPE)
-        msg.exchange_point_name = 'science_data'
-        msg.exchange_space_id = self._xs_id
-
-        rc = yield self._pscclient.declare_exchange_point(msg)
-        self._xp_id = rc.id_list[0]
-
-        msg = yield self.mc.create_instance(TOPIC_TYPE)
-        msg.topic_name = content.dataset_id
-        msg.exchange_space_id = self._xs_id
-        msg.exchange_point_id = self._xp_id
-
-        rc = yield self._pscclient.declare_topic(msg)
+#        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
+#        msg = yield self.mc.create_instance(XS_TYPE)
+#
+#        msg.exchange_space_name = 'swapmeet'
+#
+#        rc = yield self._pscclient.declare_exchange_space(msg)
+#        self._xs_id = rc.id_list[0]
+#
+#        msg = yield self.mc.create_instance(XP_TYPE)
+#        msg.exchange_point_name = 'science_data'
+#        msg.exchange_space_id = self._xs_id
+#
+#        rc = yield self._pscclient.declare_exchange_point(msg)
+#        self._xp_id = rc.id_list[0]
+#
+#        msg = yield self.mc.create_instance(TOPIC_TYPE)
+#        msg.topic_name = content.dataset_id
+#        msg.exchange_space_id = self._xs_id
+#        msg.exchange_point_id = self._xp_id
+#
+#        rc = yield self._pscclient.declare_topic(msg)
 
         yield self.reply_ok(msg_in)
 
