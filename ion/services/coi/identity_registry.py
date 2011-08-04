@@ -586,8 +586,8 @@ class IdentityRegistryService(ServiceProcess):
         for role in roles:
             map_ooi_id_to_role(user_id, role)
 
-        # Tell all the other identity registry services to update the policy cache
-        yield self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
+            # Tell all the other identity registry services to update the policy cache
+            yield self.irc.broadcast({'op': 'set_user_role', 'user-id': user_id, 'role': role})
 
         response = True
         yield self.reply_ok(msg, response)
