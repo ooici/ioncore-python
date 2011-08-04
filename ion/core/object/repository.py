@@ -898,8 +898,8 @@ class Repository(ObjectContainer):
                 del self.branches[idx]
                 break
         else:
-            log.info('Branch %s not found!' % name)
-            return
+            log.info(str(self))
+            raise KeyError('Branch Key not found in repository %s: Could not delete branch name "%s"' % (self.repository_key, name))
 
         # Clean up the branch nickname if any...
         for k,v in self.branchnicknames.items():
