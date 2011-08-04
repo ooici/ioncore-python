@@ -176,7 +176,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
             #
 
             tempDSourceResID = None
-            if dset is not None:
+            if dSet is not None:
                 tempDSourceResID = dSet.get('DSOURCE_ID',None)
                 
             if (tempDSourceResID is None) or (tempDSourceResID != dSourceResID):
