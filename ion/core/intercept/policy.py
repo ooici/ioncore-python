@@ -23,7 +23,8 @@ import time
 
 from ion.util.config import Config
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config \
+    import OWNED_BY_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
 from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
 from ion.services.dm.inventory.association_service import IDREF_TYPE
 from ion.core.messaging.message_client import MessageClient
@@ -168,6 +169,12 @@ def subject_has_early_adopter_role(subject):
 
 def user_has_early_adopter_role(ooi_id):
     return user_has_role(ooi_id, 'EARLY_ADOPTER')
+
+@defer.inlineCallbacks
+def load_roles_from_associations(asc):
+    role_map = yield asc.get_associations_map({'predicate': HAS_ROLE_ID})
+    for user_id, role_id in role_map.iteritems():
+        map_ooi_id_to_role(user_id, ROLE_NAMES_BY_ID[role_id])
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):

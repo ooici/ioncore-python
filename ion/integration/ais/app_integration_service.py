@@ -22,6 +22,9 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
+from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.coi.identity_registry import IdentityRegistryClient, get_broadcast_receiver
+from ion.core.intercept.policy import load_roles_from_associations, map_ooi_id_to_role, unmap_ooi_id_from_role
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -78,6 +81,7 @@ class AppIntegrationService(ServiceProcess):
 
         self.rc = ResourceClient(proc = self)
         self.mc = MessageClient(proc = self)
+        self.asc = AssociationServiceClient(proc = self)
     
         log.debug('AppIntegrationService.__init__()')
 
@@ -106,10 +110,31 @@ class AppIntegrationService(ServiceProcess):
         self.ManageDataResourcWworker = ManageDataResource(self)
         self.ValidateDataResourceWorker = ValidateDataResource(self)
         self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self)
-        
+
+    @defer.inlineCallbacks
+    def slc_activate(self):
+        # Setup broadcast channel (for policy reloading)
+        self.bc_receiver = yield get_broadcast_receiver(self.receive, self.receive_error)
+
+        # Load current role associations
+        yield load_roles_from_associations(self.asc)
         
     def getMetadataCache(self):
         return self.metadataCache
+
+    def op_broadcast(self, content, headers, msg):
+        """
+        Service operation: communication amongst identity registry containers
+        """
+        log.info('op_broadcast(): Received identity registry broadcast in AppIntegrationService')
+
+        if 'op' in content:
+            op = content['op']
+            log.info('doing op_broadcast operation %s' % (op))
+            if op == 'set_user_role':
+                map_ooi_id_to_role(content['user-id'], content['role'])
+            elif op == 'unset_user_role':
+                unmap_ooi_id_from_role(content['user-id'], content['role'])
 
     @defer.inlineCallbacks
     def op_findDataResources(self, content, headers, msg):

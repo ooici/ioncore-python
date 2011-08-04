@@ -14,7 +14,6 @@ from twisted.internet import defer
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.cei.epu_controller_client import EPUControllerClient
 from ion.services.cei.epu_controller_list_client import EPUControllerListClient
 
@@ -30,6 +29,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import IDENTITY_RES
                                                                     TYPE_OF_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID
+from ion.core.intercept.policy import get_current_roles, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
@@ -79,8 +79,7 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ResourceClient(proc=ais)
       self.eclc = EPUControllerListClient(proc=ais)
-      self.irc = IdentityRegistryClient(proc=ais)
-        
+
 
    @defer.inlineCallbacks
    def getResourceTypes (self, msg):
@@ -209,7 +208,6 @@ class ManageResources(object):
          log.exception(estr)
 
 
-   @defer.inlineCallbacks
    def __LoadIdentityColumnData(self, To, From, Id):
       try:
          To.attribute.append(Id)
@@ -230,8 +228,7 @@ class ManageResources(object):
          else:
             To.attribute.append(From.subject)
 
-         resp = yield self.irc.get_role(Id)
-         Role = resp['roles']
+         Role = ', '.join([all_roles[role] for role in get_current_roles(Id)])
          To.attribute.append(Role)
       
       except:
@@ -323,7 +320,7 @@ class ManageResources(object):
          # load the attributes of the resource into response
          Response.message_parameters_reference[0].resources.add()
          if ResourceType == EPU_CONTROLLER_TYPE_ID:
-            yield defer.maybeDeferred(LoaderFunc, Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
+            LoaderFunc(Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
          else:
             # need to get the actual resource from it's ooi_id
             ResID = Result.idrefs[i].key
@@ -338,7 +335,7 @@ class ManageResources(object):
                 defer.returnValue(Response)
             # debug print for dumping the attributes of the resource
             PrintFunc(Resource)           
-            yield defer.maybeDeferred(LoaderFunc, Response.message_parameters_reference[0].resources[i], Resource, ResID)
+            LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
          i = i + 1
 
       if log.getEffectiveLevel() <= logging.DEBUG:

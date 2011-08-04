@@ -34,7 +34,7 @@ from ion.core.intercept.policy import subject_has_admin_role, \
                                       subject_has_marine_operator_role, \
                                       map_ooi_id_to_subject_marine_operator_role, \
                                       map_ooi_id_to_role, unmap_ooi_id_from_role, \
-                                      get_current_roles, all_roles
+                                      get_current_roles, all_roles, load_roles_from_associations
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config \
     import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
@@ -116,6 +116,14 @@ message ResourceConfigurationResponse{
 """
 
 broadcast_name = 'identity_registry_broadcast'
+
+@defer.inlineCallbacks
+def get_broadcast_receiver(receive, receive_error):
+    bcr = FanoutReceiver(name=broadcast_name, scope=FanoutReceiver.SCOPE_SYSTEM,
+                                           handler=receive, error_handler=receive_error)
+    bc_name = yield bcr.attach()
+    log.info('Listening to identity registry broadcasts: %s' % (bc_name))
+    defer.returnValue(bcr)
 
 class IdentityRegistryClient(ServiceClient):
     """
@@ -234,16 +242,10 @@ class IdentityRegistryService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_activate(self):
         # Setup broadcast channel (for policy reloading)
-        self.bc_receiver = FanoutReceiver(name=broadcast_name, scope=FanoutReceiver.SCOPE_SYSTEM,
-                                           handler=self.receive, error_handler=self.receive_error)
-        self.bc_name = yield self.bc_receiver.attach()
-
-        log.info('Listening to identity registry broadcasts: %s' % (self.bc_name))
+        self.bc_receiver = yield get_broadcast_receiver(self.receive, self.receive_error)
 
         # Load current role associations
-        role_map = yield self.asc.get_associations_map({'predicate': HAS_ROLE_ID})
-        for user_id, role_id in role_map.iteritems():
-            map_ooi_id_to_role(user_id, ROLE_NAMES_BY_ID[role_id])
+        yield load_roles_from_associations(self.asc)
 
     @defer.inlineCallbacks
     def op_register_user_credentials(self, request, headers, msg):
