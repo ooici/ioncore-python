@@ -335,6 +335,9 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Expected message type PerformIngestRequest, received %s'
                                  % str(content), content.ResponseCodes.BAD_REQUEST)
 
+        # Keep track of the update branch name
+        self.update_branch_key = None
+
         yield self._prepare_ingest(content)
 
         log.info('Created dataset details, Now setup subscriber...')
@@ -418,7 +421,25 @@ class IngestionService(ServiceProcess):
         if ingest_res.has_key(EM_ERROR):
             log.info("Ingest Failed! %s" % str(ingest_res))
 
-            self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
+            # Make sure we have the master branch checked out:
+            if self.dataset.Repository.current_branch_key != self.dataset.Repository.branchnicknames.get('master'):
+                self.dataset.Repository.reset()
+                yield self.dataset.Repository.checkout(branchname='master')
+
+            # Make sure we don't push a dataset that is partly merged or ingested
+            if len(self.dataset.Repository.branches) is not 1:
+
+                if self.update_branch_key is None:
+                    log.warn(str(self.dataset))
+                    raise IngestionError('Update branch key is not set but the dataset has more than one branch',500)
+
+                # Remove the branch that was created
+                self.dataset.Repository.remove_branch(self.update_branch_key)
+
+            # Set the LCS to inactive if there was an error during Merge
+            #self.dataset.ResourceLifeCycleState = self.dataset.INACTIVE
+            #@TODO This should only happen if there was an error during merge - since the state is now reset - we don't need it?
+
 
         else:
             log.info("Ingest succeeded!")
@@ -429,6 +450,13 @@ class IngestionService(ServiceProcess):
             if self.dataset.ResourceLifeCycleState != self.dataset.ACTIVE:
 
                 self.dataset.ResourceLifeCycleState = self.dataset.ACTIVE
+
+
+        # Do not push the dataset if it has more than one branch
+        if len(self.dataset.Repository.branches) is not 1:
+            log.warn(str(self.dataset))
+            # raise an exception and kick over the service so the resource is reset
+            raise IngestionError('Dataset was left in an invalid state with more than one branch.',500)
 
 
         try:
@@ -554,7 +582,7 @@ class IngestionService(ServiceProcess):
         if self.dataset.Repository.status is not self.dataset.Repository.UPTODATE:
             raise IngestionError('Calling recv_dataset in an invalid state. Dataset is already modified.')
 
-        self.dataset.CreateUpdateBranch(content.MessageObject)
+        self.update_branch_key = self.dataset.CreateUpdateBranch(content.MessageObject)
 
         group = self.dataset.root_group
 
@@ -687,13 +715,10 @@ class IngestionService(ServiceProcess):
 
         log.info('Cancelling timeout!')
         self.timeoutcb.cancel()
-
-        log.info(headers)
         
 
-
-        log.info(type(content))
-        log.info(str(content.Message))
+        log.debug(type(content))
+        log.debug(str(content.Message))
 
         if content.MessageType != DAQ_COMPLETE_MSG_TYPE:
             raise IngestionError('Expected message type Data Acquasition Complete Message Type, received %s'
