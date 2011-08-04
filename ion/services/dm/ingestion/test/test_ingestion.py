@@ -313,7 +313,46 @@ class IngestionTest(IonTestCase):
         complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
 
         complete_msg.status = complete_msg.StatusCode.OK
-        yield self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
+        self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
+
+        result = yield self.ingest._defer_ingest
+        self.assertNotIn(EM_ERROR, result)
+
+
+
+    @defer.inlineCallbacks
+    def test_recv_error(self):
+        """
+        This is a test method for the recv dataset operation of the ingestion service
+        """
+
+        # Receive a dataset to get setup...
+        content = yield self.ingest.mc.create_instance(PERFORM_INGEST_MSG_TYPE)
+        content.dataset_id = SAMPLE_PROFILE_DATASET_ID
+        content.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+        yield self.ingest._prepare_ingest(content)
+
+        self.ingest.timeoutcb = create_delayed_call()
+
+        # Now fake the receipt of the dataset message
+        cdm_dset_msg = yield self.ingest.mc.create_instance(CDM_DATASET_TYPE)
+        yield bootstrap_profile_dataset(cdm_dset_msg, supplement_number=1, random_initialization=True)
+
+        # Call the op of the ingest process directly
+        yield self.ingest._ingest_op_recv_dataset(cdm_dset_msg, '', self.fake_msg())
+
+
+        complete_msg = yield self.ingest.mc.create_instance(DAQ_COMPLETE_MSG_TYPE)
+
+        complete_msg.status = complete_msg.StatusCode.EXTERNAL_SERVER_UNAVAILABLE
+        self.ingest._ingest_op_recv_done(complete_msg, '', self.fake_msg())
+
+        result = yield self.ingest._defer_ingest
+
+        self.assertIn(EM_ERROR, result)
+
+
 
 
     @defer.inlineCallbacks

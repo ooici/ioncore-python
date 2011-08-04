@@ -683,7 +683,8 @@ class JavaAgentWrapper(ServiceProcess):
         if str(datasetID).startswith(TESTING_SIGNIFIER):
             testing = True
         msg.source_type = datasource.source_type
-
+        msg.dataset_id = datasetID
+        msg.datasource_id = dataSourceID
 
         try:
             # Set the start time of this update to the last time in the dataset (ion_time_coverage_end)
@@ -691,6 +692,7 @@ class JavaAgentWrapper(ServiceProcess):
             string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
             start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
             start_time_seconds -= int(datasource.starttime_offset_millis * 0.001)
+            msg.is_initial = False
 
         except OOIObjectError, oe:
             # Set the start time of this update to the current time minus the initial start time offset
@@ -701,6 +703,7 @@ class JavaAgentWrapper(ServiceProcess):
             if initial_offset == 0:
                 initial_offset = 86400000 # 1 day in millis
             start_time_seconds = int(time.time() - (initial_offset * 0.001))
+            msg.is_initial = True
 
         except AttributeError, ae:
             # Set the start time of this update to the current time minus the initial start time offset
@@ -711,7 +714,7 @@ class JavaAgentWrapper(ServiceProcess):
             if initial_offset == 0:
                 initial_offset = 86400000 # 1 day in millis
             start_time_seconds = int(time.time() - (initial_offset * 0.001))
-
+            msg.is_initial = True
 
         if testing:
             log.debug('Using Test Delta time....')
