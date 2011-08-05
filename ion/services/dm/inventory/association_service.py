@@ -8,6 +8,8 @@
 """
 
 import ion.util.ionlog
+from net.ooici.core.message.ion_message_pb2 import BAD_REQUEST
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
@@ -39,6 +41,7 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16, version=1)
 PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
 ASSOCIATION_QUERY_MSG_TYPE = object_utils.create_type_identifier(object_id=27, version=1)
+ASSOCIATION_GET_STAR_MSG_TYPE = object_utils.create_type_identifier(object_id=28, version=1)
 BOOL_MSG_TYPE = object_utils.create_type_identifier(object_id=30, version=1)
 
 
@@ -104,19 +107,7 @@ class AssociationService(ServiceProcess):
         log.info('SLC_INIT Association Service: index store class - %s' % self.index_store_class)
 
     @defer.inlineCallbacks
-    def op_get_subjects(self, predicate_object_query, headers, msg):
-        """
-        @see AssociationServiceClient.get_subjects
-        """
-        log.info('op_get_subjects: ')
-
-        if predicate_object_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
-            raise AssociationServiceError('Unexpected type received \n %s' % str(predicate_object_query), predicate_object_query.ResponseCodes.BAD_REQUEST)
-
-        if len(predicate_object_query.pairs) == 0:
-            raise AssociationServiceError('Invalid Predicate Object Query received - zero length pairs!', predicate_object_query.ResponseCodes.BAD_REQUEST)
-
-
+    def _get_subjects(self, predicate_pairs):
         life_cycle_pair = None
         type_of_pair = None
 
@@ -127,7 +118,7 @@ class AssociationService(ServiceProcess):
 
         first_pair = True
 
-        for pair in predicate_object_query.pairs:
+        for pair in predicate_pairs:
 
 
             q = store.Query()
@@ -136,19 +127,19 @@ class AssociationService(ServiceProcess):
 
             # Build a query for the predicate of the search
             if pair.predicate.ObjectType != PREDICATE_REFERENCE_TYPE:
-                raise AssociationServiceError('Invlalid predicate type in predicate object pairs request to get_subjects.', predicate_object_query.ResponseCodes.BAD_REQUEST)
+                raise AssociationServiceError('Invalid predicate type in _get_subjects.', BAD_REQUEST)
 
 
             # if the predicate is for life cycle state or type - do not use associations to find it.
             if pair.predicate.key == HAS_LIFE_CYCLE_STATE_ID:
                 if pair.object.ObjectType != LifeCycleStateObject:
-                    raise AssociationServiceError('Invalid object type in predicate object pairs request to get_subjects.', predicate_object_query.ResponseCodes.BAD_REQUEST)
+                    raise AssociationServiceError('Invalid object type in _get_subjects.', BAD_REQUEST)
 
                 if not life_cycle_pair:
                     life_cycle_pair = pair
                 else:
                     # two life cycle pairs in one request is an error!
-                    raise AssociationServiceError('Invalid search by life cycle state - two predicate object pairs in the query specify life cycle. There can be only One!', predicate_object_query.ResponseCodes.BAD_REQUEST)
+                    raise AssociationServiceError('Invalid search by life cycle state - two predicate object pairs in the query specify life cycle. There can be only One!', BAD_REQUEST)  # Highlander!
 
                 continue
 
@@ -159,7 +150,7 @@ class AssociationService(ServiceProcess):
 
                 else:
                     # two life cycle pairs in one request is an error!
-                    raise AssociationServiceError('Invalid search by type - two predicate object pairs in the query specify type_of. There can be only One!', predicate_object_query.ResponseCodes.BAD_REQUEST)
+                    raise AssociationServiceError('Invalid search by type - two predicate object pairs in the query specify type_of. There can be only One!', BAD_REQUEST)
                 continue
 
             q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
@@ -285,10 +276,24 @@ class AssociationService(ServiceProcess):
             # Keep the results from our narrowed search
             subjects = new_set
 
-            
+
         log.info('Found %s subjects!' % len(subjects))
+        defer.returnValue(subjects)
 
+    @defer.inlineCallbacks
+    def op_get_subjects(self, predicate_object_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_subjects
+        """
+        log.info('op_get_subjects: ')
 
+        if predicate_object_query.MessageType != PREDICATE_OBJECT_QUERY_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(predicate_object_query), predicate_object_query.ResponseCodes.BAD_REQUEST)
+
+        if len(predicate_object_query.pairs) == 0:
+            raise AssociationServiceError('Invalid Predicate Object Query received - zero length pairs!', predicate_object_query.ResponseCodes.BAD_REQUEST)
+
+        subjects = yield self._get_subjects(predicate_object_query.pairs)
         list_of_subjects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
 
         for subject in subjects:
@@ -304,22 +309,8 @@ class AssociationService(ServiceProcess):
 
         yield self.reply_ok(msg, list_of_subjects)
 
-
-
     @defer.inlineCallbacks
-    def op_get_objects(self, subject_predicate_query, headers, msg):
-        """
-        @see AssociationServiceClient.get_objects
-        """
-        log.info('op_get_objects: ')
-
-        if subject_predicate_query.MessageType != SUBJECT_PREDICATE_QUERY_TYPE:
-            raise AssociationServiceError('Unexpected type received \n %s' % str(subject_predicate_query), subject_predicate_query.ResponseCodes.BAD_REQUEST)
-
-
-        if len(subject_predicate_query.pairs) is 0:
-            raise AssociationServiceError('Invalid Subject Predicate Query received - zero length pairs!', subject_predicate_query.ResponseCodes.BAD_REQUEST)
-
+    def _get_objects(self, subject_pairs):
         # The resulting set of Objects
         objects = set()
 
@@ -328,7 +319,7 @@ class AssociationService(ServiceProcess):
         # subject_keys is the set of keys for the associated subjects - to reject quickly any that are not present
         object_keys = set()
 
-        for pair in subject_predicate_query.pairs:
+        for pair in subject_pairs:
 
 
             q = store.Query()
@@ -337,8 +328,7 @@ class AssociationService(ServiceProcess):
 
             # Build a query for the predicate of the search
             if pair.predicate.ObjectType != PREDICATE_REFERENCE_TYPE:
-                raise AssociationServiceError('Invlalid predicate type in subject predicate pairs request to get_objects.', subject_predicate_query.ResponseCodes.BAD_REQUEST)
-
+                raise AssociationServiceError('Invalid predicate type in _get_objects.', BAD_REQUEST)
 
             q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
 
@@ -396,8 +386,23 @@ class AssociationService(ServiceProcess):
                 objects.intersection_update(objects_pointers)
 
         log.info('Found %s objects!' % len(objects))
+        defer.returnValue(objects)
+
+    @defer.inlineCallbacks
+    def op_get_objects(self, subject_predicate_query, headers, msg):
+        """
+        @see AssociationServiceClient.get_objects
+        """
+        log.info('op_get_objects: ')
+
+        if subject_predicate_query.MessageType != SUBJECT_PREDICATE_QUERY_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(subject_predicate_query), subject_predicate_query.ResponseCodes.BAD_REQUEST)
 
 
+        if len(subject_predicate_query.pairs) is 0:
+            raise AssociationServiceError('Invalid Subject Predicate Query received - zero length pairs!', subject_predicate_query.ResponseCodes.BAD_REQUEST)
+
+        objects = yield self._get_objects(subject_predicate_query.pairs)
         list_of_objects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
 
         for obj in objects:
@@ -412,7 +417,41 @@ class AssociationService(ServiceProcess):
 
         yield self.reply_ok(msg, list_of_objects)
 
+    @defer.inlineCallbacks
+    def op_get_star(self, content, headers, msg):
+        """
 
+        """
+        log.info('op_get_star')
+
+        if content.MessageType != ASSOCIATION_GET_STAR_MSG_TYPE:
+            raise AssociationServiceError('Unexpected type received \n %s' % str(content), content.ResponseCodes.BAD_REQUEST)
+
+        if len(content.subject_pairs) == 0 or len(content.object_pairs) == 0:
+           raise AssociationServiceError('Invalid getstar query received - zero length pairs!', content.ResponseCodes.BAD_REQUEST)
+
+        subjects = yield self._get_subjects(content.object_pairs)
+        objects = yield self._get_objects(content.subject_pairs)
+
+        stars = set(subjects)
+        stars.intersection_update(objects)
+
+        log.info("Intersection: %d items" % len(stars))
+
+        list_of_star = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
+        for obj in stars:
+
+            link = list_of_star.idrefs.add()
+
+            idref= list_of_star.CreateObject(IDREF_TYPE)
+            idref.key = obj[0]
+            idref.branch = obj[1]
+
+            link.SetLink(idref)
+
+        yield self.reply_ok(msg, list_of_star)
+
+        log.info('/op_get_star')
 
     @defer.inlineCallbacks
     def op_object_associations(self, object_reference, headers, msg):
@@ -813,6 +852,20 @@ class AssociationServiceClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('association_exists', msg)
 
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_star(self, msg):
+        """
+        @brief Get the intersection of two queries - one a set of subject/predicate pairs, one a set of predicate/object pairs.
+        @param params msg, GPB 28/1, an association get star query message with subject_pairs and object_pairs.
+        @retval Query Result Message GPB 22/1
+        @GPB{Input,28,1}
+        @GPB{Returns,30,1}
+        """
+        yield self._check_init()
+
+        content, _, _ = yield self.rpc_send('get_star', msg)
         defer.returnValue(content)
 
 # Spawn of the process using the module name
