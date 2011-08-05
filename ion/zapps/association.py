@@ -39,9 +39,12 @@ def start(container, starttype, app_definition, *args, **kwargs):
     log.info('Starting Association Service Instance: username: %s, password: %s' % (uname, print_pword))
 
 
-    spawnargs = {'username':uname,
-                  'password':pword,
-                  }
+    spawnargs = {}
+    if uname is not None:
+        spawnargs['username']=uname
+    if pword is not None:
+        spawnargs['password']=pword
+
 
     association_proc = [
         {'name':'association_service',
