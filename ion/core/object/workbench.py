@@ -903,10 +903,16 @@ class WorkBench(object):
         """
         blobs_request = yield self._process.message_client.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
 
-        for link in links:
-            assert link.ObjectType == LINK_TYPE, 'Invalid link in list passed to Fetch Links!'
-            blobs_request.blob_keys.append(link.key)
+        wb_has_keys = set(self._workbench_cache.keys())
+        want_keys = set([link.key for link in links])
 
+        need_keys = want_keys.difference(wb_has_keys)
+
+        #for link in links:
+        #    assert link.ObjectType == LINK_TYPE, 'Invalid link in list passed to Fetch Links!'
+        #    blobs_request.blob_keys.append(link.key)
+
+        blobs_request.blob_keys.extend(need_keys)
 
         blobs_msg, headers, msg = yield self._process.rpc_send(address,'fetch_blobs', blobs_request)
 
@@ -915,6 +921,10 @@ class WorkBench(object):
             # Put the new objects in the repository
             element = gpb_wrapper.StructureElement(se.GPBMessage)
             elements[element.key] = element
+
+        already_had_keys = want_keys.difference(need_keys)
+        for key in already_had_keys:
+            elements[key] = self._workbench_cache.get(key)
 
         defer.returnValue(elements)
 
