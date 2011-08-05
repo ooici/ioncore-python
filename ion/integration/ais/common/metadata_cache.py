@@ -23,7 +23,7 @@ from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError
+from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError, ASSOCIATION_GET_STAR_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, \
     SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
@@ -474,26 +474,31 @@ class MetadataCache(object):
             log.error('getAssociatedDatasets: dSource parameter is None')
             defer.returnValue(dSetList)
 
-        try:
-            results = yield self.ac.find_associations(subject=dSource, predicate_or_predicates=HAS_A_ID)
-            #associations = yield ac.find_associations(subject=dsource_resource, predicate_or_predicates=HAS_A_ID)
+        qmsg = yield self.mc.create_instance(ASSOCIATION_GET_STAR_MSG_TYPE)
+        pair = qmsg.subject_pairs.add()
+        pair.subject = qmsg.CreateObject(IDREF_TYPE)
+        pair.subject.key = dSource.ResourceIdentity
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = HAS_A_ID
 
-        except AssociationClientError:
+        pair = qmsg.object_pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = DATASET_RESOURCE_TYPE_ID
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+        try:
+            results = yield self.asc.get_star(qmsg)
+        except:
             log.error('Error getting associated data sets for Datasource: ' + \
                       dSource.ResourceIdentity)
-            defer.returnValue(None)
+            defer.returnValue([])
 
-        log.info('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(results)))
-        for association in results:
-            log.debug('Associated Dataset for Datasource: ' + \
-                      association.SubjectReference.key + \
-                      ' is: ' + association.ObjectReference.key)
-            dSetList.append(association.ObjectReference.key)
+        dsets = [str(x.key) for x in results.idrefs]
 
-        log.debug('getAssociatedDatasets) exit: returning: %s' %(dSetList))
+        log.info('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(dsets)))
+        log.debug('getAssociatedDatasets) exit: returning: %s' %(str(dsets)))
 
-        #defer.returnValue(association.ObjectReference.key)
-        defer.returnValue(dSetList)
+        defer.returnValue(dsets)
 
 
     @defer.inlineCallbacks
