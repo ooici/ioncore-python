@@ -5,8 +5,12 @@
     "description": "Bootlevel 4 release file",
     "ioncore" : "0.1",
     "apps":[
-        {'name':'datastore',            'version':'0.1','args':{'cassandra_username':None,'cassandra_password':None, 'do-init':True}},
-        {'name':'association',          'version':'0.1', 'config':{},'args':{'cassandra_username':None,'cassandra_password':None}},
-        {'name':'resource_registry',    'version':'0.1', 'config':{}},
+        #{'name':'datastore',            'version':'0.1','args':{'cassandra_username':None,'cassandra_password':None, 'do-init':True}},
+        #{'name':'association',          'version':'0.1','args':{'cassandra_username':None,'cassandra_password':None}},
+
+        {'name':'datastore',            'version':'0.1'},
+        {'name':'association',          'version':'0.1'},
+
+        {'name':'resource_registry',    'version':'0.1'},
     ]
 }
