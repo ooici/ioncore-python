@@ -168,7 +168,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         datasetList = yield self.metadataCache.getAssociatedDatasets(dSource)
         log.debug('getAssociatedDatasets returned %s' %(datasetList))
         for dSetResID in datasetList:
-            dSet = yield self.metadataCache.getDSet(dSetResID)
+            dSet = yield self.metadataCache.getDSetMetadata(dSetResID)
             #
             # if the DSOURCE_ID is None, the datasource wasn't active or
             # didn't show up in the association service when the event for
