@@ -32,8 +32,9 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, SAMPLE_PROFILE_DATA_SOURCE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient, ASSOCIATION_QUERY_MSG_TYPE, ASSOCIATION_GET_STAR_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 
 
@@ -730,6 +731,27 @@ class AssociationServiceTest(IonTestCase):
         # make the request
         result = yield self.asc.association_exists(request)
         self.assertEqual(result.result, True)
-    
-        
 
+    @defer.inlineCallbacks
+    def test_get_star(self):
+
+        request = yield self.proc.message_client.create_instance(ASSOCIATION_GET_STAR_MSG_TYPE)
+
+        pair = request.subject_pairs.add()
+        pair.subject = request.CreateObject(IDREF_TYPE)
+        pair.subject.key = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = HAS_A_ID
+
+        pair = request.object_pairs.add()
+        pair.object = request.CreateObject(IDREF_TYPE)
+        pair.object.key = DATASET_RESOURCE_TYPE_ID
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+
+        stars = yield self.asc.get_star(request)
+
+        self.assertEquals(len(stars.idrefs), 1)
+        self.assertEquals(stars.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
