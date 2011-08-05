@@ -25,7 +25,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     uname = ioninit.cont_args.get('cassandra_username', kwargs.get('cassandra_username', None))
     pword = ioninit.cont_args.get('cassandra_password', kwargs.get('cassandra_password', None))
 
-    do_init = ioninit.cont_args.get('do-init', kwargs.get('do-init', True))
+    do_init = ioninit.cont_args.get('do-init', kwargs.get('do-init', None))
 
     if pword is None:
         print_pword = None
@@ -41,30 +41,37 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
     PRELOAD_CFG = 'preload'
 
-    spawnargs = {'username':uname,
-                  'password':pword,
-                  }
 
-    if isinstance(do_init, (str, unicode)):
-        if do_init == 'False':
-            do_init = False
-        elif do_init == 'True':
-            do_init = True
-        else:
+
+    spawnargs = {}
+    if uname is not None:
+        spawnargs['username']=uname
+    if pword is not None:
+        spawnargs['password']=pword
+
+
+    if do_init is not None:
+
+        if isinstance(do_init, (str, unicode)):
+            if do_init == 'False':
+                do_init = False
+            elif do_init == 'True':
+                do_init = True
+            else:
+                raise Exception("Invalid input to datastore app: argument 'do-init' is True or False" )
+        elif not isinstance(do_init, bool):
             raise Exception("Invalid input to datastore app: argument 'do-init' is True or False" )
-    elif not isinstance(do_init, bool):
-        raise Exception("Invalid input to datastore app: argument 'do-init' is True or False" )
 
 
 
-    init ={PRELOAD_CFG:
-           {ION_PREDICATES_CFG:do_init,
-           ION_RESOURCE_TYPES_CFG:do_init,
-           ION_IDENTITIES_CFG:do_init},
-           }
+        init ={PRELOAD_CFG:
+               {ION_PREDICATES_CFG:do_init,
+               ION_RESOURCE_TYPES_CFG:do_init,
+               ION_IDENTITIES_CFG:do_init},
+               }
 
 
-    spawnargs.update(init)
+        spawnargs.update(init)
 
     services =[{ 'name':'datastore',
                      'module':'ion.services.coi.datastore',

@@ -698,10 +698,11 @@ class DataStoreWorkbench(WorkBench):
         @TODO Update to new message pattern!
 
         """
-        log.info('op_fetch_blobs')
 
         if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
             raise DataStoreWorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        log.info('op_fetch_blobs: %d Keys' % len(request.blob_keys))
 
         response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
 
