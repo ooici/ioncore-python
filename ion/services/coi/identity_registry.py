@@ -368,8 +368,7 @@ class IdentityRegistryService(ServiceProcess):
             defer.returnValue(Response)
         except ApplicationError, ex:
             log.debug('get_user: no match')
-            raise IdentityRegistryException("user [%s] not found: %s"%(request.configuration.ooi_id, ex),
-                                            request.ResponseCodes.NOT_FOUND)
+            raise IdentityRegistryException("user [%s] not found: %s"%(request.configuration.ooi_id, ex),request.ResponseCodes.NOT_FOUND)
 
 
     @defer.inlineCallbacks
@@ -418,9 +417,8 @@ class IdentityRegistryService(ServiceProcess):
            Response.result = "OK"
            defer.returnValue(Response)
         else:
-           log.debug('authenticate_user_credentials: no match')
-           raise IdentityRegistryException("user [%s] not found"%cert_info['subject'],
-                                           request.ResponseCodes.NOT_FOUND)
+           log.info('authenticate_user_credentials: Certificate Subject not found - maybe a new user.')
+           raise IdentityRegistryException("User Certificate Subject [%s] not found - may be a new user" % cert_info['subject'],request.ResponseCodes.NOT_FOUND)
   
  
     @defer.inlineCallbacks
@@ -433,8 +431,7 @@ class IdentityRegistryService(ServiceProcess):
         
         # check for required fields
         if not request.configuration.IsFieldSet('subject'):
-            raise IdentityRegistryException("Required field [subject] not found in message",
-                                            request.ResponseCodes.BAD_REQUEST)
+            raise IdentityRegistryException("Required field [subject] not found in message",request.ResponseCodes.BAD_REQUEST)
  
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('in op_get_ooiid_for_user: request.configuration\n'+str(request.configuration))
@@ -459,8 +456,7 @@ class IdentityRegistryService(ServiceProcess):
            defer.returnValue(Response)
         else:
            log.debug('get_ooiid_for_user: user with subject %s not found'%request.configuration.subject)
-           raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
-                                           request.ResponseCodes.NOT_FOUND)
+           raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,request.ResponseCodes.NOT_FOUND)
   
  
     @defer.inlineCallbacks
@@ -527,8 +523,7 @@ class IdentityRegistryService(ServiceProcess):
             Response.result = "OK"
         else:
             log.debug('update_user_profile: no match')
-            raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,
-                                            request.ResponseCodes.NOT_FOUND)
+            raise IdentityRegistryException("user [%s] not found"%request.configuration.subject,request.ResponseCodes.NOT_FOUND)
 
     @defer.inlineCallbacks
     def create_role_association(self, user_id, role_id):
@@ -664,12 +659,10 @@ class IdentityRegistryService(ServiceProcess):
     def _CheckRequest(self, request):
         # Check for correct request protocol buffer type
         if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
-            raise IdentityRegistryException('Bad message type receieved, ignoring',
-                                            request.ResponseCodes.BAD_REQUEST)
+            raise IdentityRegistryException('Bad message type receieved, ignoring',request.ResponseCodes.BAD_REQUEST)
         # Check payload in message
         if not request.IsFieldSet('configuration'):
-            raise IdentityRegistryException("Required field [configuration] not found in message",
-                                            request.ResponseCodes.BAD_REQUEST)
+            raise IdentityRegistryException("Required field [configuration] not found in message",request.ResponseCodes.BAD_REQUEST)
         
 # Spawn of the process using the module name
 factory = ProcessFactory(IdentityRegistryService)
