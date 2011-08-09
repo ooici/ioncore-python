@@ -25,6 +25,7 @@ from ion.core.exception import ReceivedError, ApplicationError
 from ion.services.coi.resource_registry import resource_client
 from ion.core.messaging.message_client import MessageClient
 from types import FunctionType
+import math
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
@@ -1307,7 +1308,7 @@ class DataStoreWorkbench(WorkBench):
         srcidxextents[-1] = 1
 
         # reduce target dim extents to extents after applying stride
-        striddentargetextents = [targetdimextents[i]/strides[i] for i in xrange(len(targetdimextents))]
+        striddentargetextents = [int(math.ceil(targetdimextents[i]/float(strides[i]))) for i in xrange(len(targetdimextents))]
 
         # calculate index extents into target array, using stridden extents
         for x in range(len(targetidxextents)-2, -1, -1):
@@ -1331,9 +1332,13 @@ class DataStoreWorkbench(WorkBench):
             """
             if len(trs) == 0:
                 # exit case: traversed all dimensions, we're on the last dimension, extract our slices
-                yield ((cts+ts[0]/tstrides[0], cts+ts[1]/tstrides[0]),
-                       (css+ss[0], css+ss[1]),
-                       tstrides[0])
+
+                slicetup = ((int(math.ceil(cts+ts[0]/float(tstrides[0]))),
+                             int(math.ceil(cts+ts[1]/float(tstrides[0])))),
+                             (css+ss[0], css+ss[1]),
+                             tstrides[0])
+                #log.debug("slicetuple: %s" % str(slicetup))
+                yield slicetup
             else:
                 # iterative case: look at current dimension, co-iterate over the ranges in target/src,
                 #                 recurse into recslice again one dimension up until we run out.
