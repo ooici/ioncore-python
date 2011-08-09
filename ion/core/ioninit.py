@@ -224,7 +224,7 @@ except ValueError, ex:
 def shutdown_or_die(delay_sec=0):
     """ Wait the given number of seconds and forcibly kill this process if it's still running. """
     
-    def diediedie(sig, frame):
+    def diediedie(sig=None, frame=None):
         pid = os.getpid()
         print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
         os.kill(pid, signal.SIGKILL)
