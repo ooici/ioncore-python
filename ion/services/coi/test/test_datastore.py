@@ -55,7 +55,7 @@ OPAQUE_ARRAY_TYPE = object_utils.create_type_identifier(object_id=10016, version
 @defer.inlineCallbacks
 def create_large_object(wb):
 
-    rand = open('/dev/random','r')
+    rand = open('/dev/urandom','r')
 
     repo = yield wb.create_repository(OPAQUE_ARRAY_TYPE)
     MB = 1024 * 124
