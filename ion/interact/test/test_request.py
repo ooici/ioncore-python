@@ -18,7 +18,6 @@ from ion.core.exception import ReceivedError
 from ion.interact.conversation import Conversation
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
-import pdb
 
 class RequestConvTest(IonTestCase):
     """
@@ -27,8 +26,6 @@ class RequestConvTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout=6000
-        pdb.set_trace()
         yield self._start_container()
 
     @defer.inlineCallbacks
@@ -37,7 +34,6 @@ class RequestConvTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_request_process(self):
-        pdb.set_trace()
         processes = [
             {'name':'req1','module':'ion.interact.test.test_request','class':'ParticipantProcess'},
             {'name':'req2','module':'ion.interact.test.test_request','class':'ParticipantProcess'},
