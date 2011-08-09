@@ -26,62 +26,6 @@ if not hasattr(sys, "version_info") or sys.version_info < (2,5):
 if sys.version_info > (3,0):
     raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
 
-# Monkey Patch logging to include WatchedFileHandler
-if not hasattr(logging.handlers, 'WatchedFileHandler'):
-    from stat import ST_DEV, ST_INO
-    class WatchedFileHandler(logging.FileHandler):
-        """
-        A handler for logging to a file, which watches the file
-        to see if it has changed while in use. This can happen because of
-        usage of programs such as newsyslog and logrotate which perform
-        log file rotation. This handler, intended for use under Unix,
-        watches the file to see if it has changed since the last emit.
-        (A file has changed if its device or inode have changed.)
-        If it has changed, the old file stream is closed, and the file
-        opened to get a new stream.
-
-        This handler is not appropriate for use under Windows, because
-        under Windows open files cannot be moved or renamed - logging
-        opens the files with exclusive locks - and so there is no need
-        for such a handler. Furthermore, ST_INO is not supported under
-        Windows; stat always returns zero for this value.
-
-        This handler is based on a suggestion and patch by Chad J.
-        Schroeder.
-        """
-        def __init__(self, filename, mode='a', encoding=None, delay=0):
-            logging.FileHandler.__init__(self, filename, mode, encoding)
-            if not os.path.exists(self.baseFilename):
-                self.dev, self.ino = -1, -1
-            else:
-                stat = os.stat(self.baseFilename)
-                self.dev, self.ino = stat[ST_DEV], stat[ST_INO]
-
-        def emit(self, record):
-            """
-            Emit a record.
-
-            First check if the underlying file has changed, and if it
-            has, close the old stream and reopen the file to get the
-            current stream.
-            """
-            if not os.path.exists(self.baseFilename):
-                stat = None
-                changed = 1
-            else:
-                stat = os.stat(self.baseFilename)
-                changed = (stat[ST_DEV] != self.dev) or (stat[ST_INO] != self.ino)
-            if changed and self.stream is not None:
-                self.stream.flush()
-                self.stream.close()
-                self.stream = self._open()
-                if stat is None:
-                    stat = os.stat(self.baseFilename)
-                self.dev, self.ino = stat[ST_DEV], stat[ST_INO]
-            logging.FileHandler.emit(self, record)
-
-    setattr(logging.handlers, 'WatchedFileHandler', WatchedFileHandler)
-
 # The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
 # variable can go away with the new ion environment directories 
 
@@ -277,3 +221,23 @@ except ValueError, ex:
     # You're on Windows, no fancy debugging for you!!
     pass
 
+def shutdown_or_die(delay_sec=0):
+    """ Wait the given number of seconds and forcibly kill this process if it's still running. """
+    
+    def diediedie(sig=None, frame=None):
+        pid = os.getpid()
+        print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
+        os.kill(pid, signal.SIGKILL)
+
+    if delay_sec > 0:
+        try:
+            old = signal.signal(signal.SIGALRM, diediedie)
+            signal.alarm(delay_sec)
+
+            if old:
+                print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
+        except ValueError, ex:
+            print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
+            pass
+    else:
+        diediedie()

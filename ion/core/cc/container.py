@@ -146,6 +146,7 @@ class Container(BasicLifecycleObject):
         #yield self._lc_pub.terminate()
         #yield self._lc_pub._process.terminate()
 
+        ioninit.shutdown_or_die(30) # let's see what tenacious containers think of this little number
         if self._fatal_error_encountered:
             log.info("Container terminating hard due to fatal error!")
             yield defer.succeed(None)
