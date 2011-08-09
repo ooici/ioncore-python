@@ -42,7 +42,9 @@ class TaskChain(list):
         """
         #self._list      = []        # implementation backend for MutableSequence methods to use        # MUTABLESEQUENCE
 
-        self.extend(tasks)
+        for t in tasks:
+            self._check_type(t)
+            self.append(t)
 
         self._donetasks = []
         self._results   = []
