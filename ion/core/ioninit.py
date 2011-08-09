@@ -221,3 +221,23 @@ except ValueError, ex:
     # You're on Windows, no fancy debugging for you!!
     pass
 
+def shutdown_or_die(delay_sec=0):
+    """ Wait the given number of seconds and forcibly kill this process if it's still running. """
+    
+    def diediedie(sig, frame):
+        pid = os.getpid()
+        print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
+        os.kill(pid, signal.SIGKILL)
+
+    if delay_sec > 0:
+        try:
+            old = signal.signal(signal.SIGALRM, diediedie)
+            signal.alarm(delay_sec)
+
+            if old:
+                print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
+        except ValueError, ex:
+            print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
+            pass
+    else:
+        diediedie()
