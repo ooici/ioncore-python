@@ -227,7 +227,14 @@ class SchedulerService(ServiceProcess):
 
         for task_id, tdef in rows.iteritems():
             log.debug("slc_activate: scheduling %s" % task_id)
-            self._schedule_event(int(tdef['start_time']), int(tdef['interval_seconds']), task_id)
+
+            # could be None
+            try:
+                start_time = int(tdef['start_time'])
+            except ValueError:
+                start_time = None
+
+            self._schedule_event(start_time, int(tdef['interval_seconds']), task_id)
         
         
         
@@ -242,19 +249,21 @@ class SchedulerService(ServiceProcess):
             if v.active():
                 v.cancel()
 
-    def _schedule_event(self, starttime, interval, task_id):
+    def _schedule_event(self, starttime, interval, task_id, query_result=None):
         """
         Helper method to schedule and record a callback in the service.
         Used by op_add_task and on startup.
 
-        @param  starttime   The time to start the callbacks. This is used with the interval to calculate the
-                            first callback. If None is specified, will use now. Note: the first callback to
-                            occur will not happen immediatly, it will be after the first interval has elapsed,
-                            whether starttime is specified or not. This parameter should be specified in UNIX
-                            epoch format, in ms. You will have to convert the output from time.time() in Python, or
-                            use the IonTime utility class.
-        @param  interval    The interval to trigger scheduler events, in seconds.
-        @param  task_id     The task_id to trigger.
+        @param  starttime       The time to start the callbacks. This is used with the interval to calculate the
+                                first callback. If None is specified, will use now. Note: the first callback to
+                                occur will not happen immediatly, it will be after the first interval has elapsed,
+                                whether starttime is specified or not. This parameter should be specified in UNIX
+                                epoch format, in ms. You will have to convert the output from time.time() in Python, or
+                                use the IonTime utility class.
+        @param  interval        The interval to trigger scheduler events, in seconds.
+        @param  task_id         The task_id to trigger.
+        @param  query_result    Internal param passed on from service activation which contains the query result already
+                                instead of making _send_and_reschedule go get it again.
         """
         assert interval and task_id and interval > 0
         curtime = IonTime().time_ms
@@ -272,7 +281,7 @@ class SchedulerService(ServiceProcess):
 
         log.debug("_schedule_event: calculated next callback time of %d" % calctime)
 
-        ccl = reactor.callLater(calctime, self._send_and_reschedule, task_id)
+        ccl = reactor.callLater(calctime, self._send_and_reschedule, task_id, query_result=query_result)
         self._callback_tasks[task_id] = ccl
 
     @defer.inlineCallbacks
@@ -342,16 +351,16 @@ class SchedulerService(ServiceProcess):
         resp.origin     = desired_origin
 
         # extract content of message
-        self.scheduled_events.put(task_id,
-                                  task_id,  # ok to use for value? seems kind of silly
-                                  index_attributes={'task_id': task_id,
-                                                    'constant': '1',    # used for being able to pull all tasks
-                                                    'user_id': user_id,
-                                                    'start_time': str(starttime),
-                                                    'end_time': str(endtime),
-                                                    'interval_seconds': str(msg_interval),
-                                                    'desired_origin': desired_origin,
-                                                    'payload': payload})
+        yield self.scheduled_events.put(task_id,
+                                        task_id,  # ok to use for value? seems kind of silly
+                                        index_attributes={'task_id': task_id,
+                                                          'constant': '1',    # used for being able to pull all tasks
+                                                          'user_id': user_id,
+                                                          'start_time': str(starttime),
+                                                          'end_time': str(endtime),
+                                                          'interval_seconds': str(msg_interval),
+                                                          'desired_origin': desired_origin,
+                                                          'payload': str(payload)})
 
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
@@ -394,23 +403,33 @@ class SchedulerService(ServiceProcess):
     # Internal methods
 
     @defer.inlineCallbacks
-    def _send_and_reschedule(self, task_id):
+    def _send_and_reschedule(self, task_id, query_result=None):
         """
         Check to see if we're still in the store - if not, we've been removed
         and should abort the run.
+
+        @param  query_result    Internal param - passed in from Scheduler activation, which has already done a query.
+                                Allows us to skip making another query for the info we already have.
         """
         log.debug('Worker activated for task %s' % task_id)
 
-        q = Query()
-        q.add_predicate_eq('task_id', task_id)
+        if query_result is None:
+            q = Query()
+            q.add_predicate_eq('task_id', task_id)
 
-        tdefs = yield self.scheduled_events.query(q)
-        assert len(tdefs) == 1
+            tdefs = yield self.scheduled_events.query(q)
+            if len(tdefs) != 1:
+                log.error("Query did not find task_id: %s, expected 1, got %d" % (task_id, len(tdefs)))
+                defer.returnValue(False)
 
-        tdef = tdefs.values()[0]
+            tdef = tdefs.values()[0]
+        else:
+            tdef = query_result
 
         # pop callback object off of scheduled items
-        assert self._callback_tasks.has_key(task_id)
+        if not self._callback_tasks.has_key(task_id):
+            log.warn("task_id %s no longer in list of callbacks, aborting" % task_id)
+            defer.returnValue(False)
         del self._callback_tasks[task_id]
 
         # deserialize and objectify payload
@@ -426,8 +445,8 @@ class SchedulerService(ServiceProcess):
             msg.Repository.index_hash[payload.MyId]=se
 
             msg.additional_data.payload = payload
-        except TypeError:
-            log.info('No payload found')
+        except:
+            log.info('No payload found or payload in incorrect format')
 
         yield self.pub.publish_event(msg, origin=tdef['desired_origin'])
 
