@@ -75,6 +75,7 @@ class ManageResources(object):
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
+
       self.mc = ais.mc
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ResourceClient(proc=ais)
@@ -343,100 +344,110 @@ class ManageResources(object):
       defer.returnValue(Response)
 
 
+   @defer.inlineCallbacks
    def __LoadDatasetAttributes(self, To, From):
+      
+      class namespace: pass   # stupid hack to get around python variable scoping limitation
+
+      def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
+         To.resource.add()
+         To.resource[ns.Index].name = Name
+         To.resource[ns.Index].value = Value
+         ns.Index = ns.Index + 1
+         
+      Result = yield self.rc.get_instance(From.ResourceTypeID.key)
+      ns = namespace()   # create wrapper class for scoping so worker function can set variable
+      ns.Index = 0 
+
       try:
-         i = 0
          for atrib in From.root_group.attributes:
             #log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
-            To.resource.add()
-            To.resource[i].name = str(atrib.name)
-            To.resource[i].value = str(atrib.GetValue())
-            i = i + 1
+            AddItem(str(atrib.name), str(atrib.GetValue()))
+         AddItem('LifeCycleState', From.ResourceLifeCycleState)
+         AddItem('fields set in data set resource', str(From.ListSetFields()).replace("'", ""))
+         AddItem('resource identity', From.ResourceIdentity)
+         AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
+         AddItem('resource type name', Result.Repository._workspace_root.name)
       
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
 
 
-   def __LoadIdentityAttributes(self, To, From):
+   @defer.inlineCallbacks
+   def __LoadIdentityAttributes(self, To, From):   
+      
+      class namespace: pass   # stupid hack to get around python variable scoping limitation
+
+      def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
+         To.resource.add()
+         To.resource[ns.Index].name = Name
+         To.resource[ns.Index].value = Value
+         ns.Index = ns.Index + 1
+         
+      Result = yield self.rc.get_instance(From.ResourceTypeID.key)
+      ns = namespace()   # create wrapper class for scoping so worker function can set variable
+      ns.Index = 0 
+
       try:
-         To.resource.add()
-         To.resource[0].name = 'subject'
-         To.resource[0].value = From.subject
-         To.resource.add()
-         To.resource[1].name = 'name'
-         To.resource[1].value = From.name
-         To.resource.add()
-         To.resource[2].name = 'institution'
-         To.resource[2].value = From.institution
-         To.resource.add()
-         To.resource[3].name = 'authenticating organization'
-         To.resource[3].value = From.authenticating_organization
-         To.resource.add()
-         To.resource[4].name = 'email'
-         To.resource[4].value = From.email
-         i = 5
+         AddItem('subject', From.subject)
+         AddItem('name', From.name)
+         AddItem('institution', From.institution)
+         AddItem('authenticating organization', From.authenticating_organization)
+         AddItem('email', From.email)
          for item in From.profile:
-            To.resource.add()
-            To.resource[i].name = item.name
-            To.resource[i].value = item.value
-            i = i + 1
-      
+            AddItem(item.name, item.value)
+         AddItem('LifeCycleState', From.ResourceLifeCycleState)
+         AddItem('fields set in identity resource', str(From.ListSetFields()).replace("'", ""))
+         AddItem('resource identity', From.ResourceIdentity)
+         AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
+         AddItem('resource type name', Result.Repository._workspace_root.name)
+              
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
-
-
+         
+         
+   @defer.inlineCallbacks
    def __LoadDatasourceAttributes(self, To, From):
+      
+      class namespace: pass   # stupid hack to get around python variable scoping limitation
+
+      def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
+         To.resource.add()
+         To.resource[ns.Index].name = Name
+         To.resource[ns.Index].value = Value
+         ns.Index = ns.Index + 1
+         
+      Result = yield self.rc.get_instance(From.ResourceTypeID.key)
+      ns = namespace()   # create wrapper class for scoping so worker function can set variable
+      ns.Index = 0 
+
       try:
-         To.resource.add()
-         To.resource[0].name = 'source_type'
-         To.resource[0].value = self.SourceTypes[From.source_type]
-         To.resource.add()
-         To.resource[1].name = 'property'
-         To.resource[1].value = From.property[0]
-         To.resource.add()
-         To.resource[2].name = 'station_id'
-         To.resource[2].value = From.station_id[0]
-         To.resource.add()
-         To.resource[3].name = 'request_type'
-         To.resource[3].value = self.RequestTypes[From.request_type]
-         To.resource.add()
-         To.resource[4].name = 'request_bounds_north'
-         To.resource[4].value = str(From.request_bounds_north)
-         To.resource.add()
-         To.resource[5].name = 'request_bounds_south'
-         To.resource[5].value = str(From.request_bounds_south)
-         To.resource.add()
-         To.resource[6].name = 'request_bounds_west'
-         To.resource[6].value = str(From.request_bounds_west)
-         To.resource.add()
-         To.resource[7].name = 'request_bounds_east'
-         To.resource[7].value = str(From.request_bounds_east)
-         To.resource.add()
-         To.resource[8].name = 'base_url'
-         To.resource[8].value = From.base_url
-         To.resource.add()
-         To.resource[9].name = 'dataset_url'
-         To.resource[9].value = From.dataset_url
-         To.resource.add()
-         To.resource[10].name = 'ncml_mask'
-         To.resource[10].value = From.ncml_mask
-         To.resource.add()
-         To.resource[11].name = 'max_ingest_millis'
-         To.resource[11].value = str(From.max_ingest_millis)
-         To.resource.add()
-         To.resource[12].name = 'ion_title'
-         To.resource[12].value = From.ion_title
-         To.resource.add()
-         To.resource[13].name = 'ion_institution_id'
-         To.resource[13].value = From.ion_institution_id
-         To.resource.add()
-         To.resource[14].name = 'update_interval_seconds'
-         To.resource[14].value = str(From.update_interval_seconds)
-         To.resource.add()
-         To.resource[15].name = 'visualization_url'
-         To.resource[15].value = From.visualization_url
+         AddItem('source_type', self.SourceTypes[From.source_type])
+         AddItem('property', From.property[0])
+         AddItem('station_id', From.station_id[0])
+         AddItem('request_type', self.RequestTypes[From.request_type])
+         AddItem('request_bounds_north', str(From.request_bounds_north))
+         AddItem('request_bounds_south', str(From.request_bounds_south))
+         AddItem('request_bounds_west', str(From.request_bounds_west))
+         AddItem('request_bounds_east', str(From.request_bounds_east))
+         AddItem('base_url', From.base_url)
+         AddItem('dataset_url', From.dataset_url)
+         AddItem('ncml_mask', From.ncml_mask)
+         AddItem('max_ingest_millis', str(From.max_ingest_millis))
+         AddItem('ion_title', From.ion_title)
+         AddItem('ion_description', From.ion_description)
+         AddItem('registration_datetime_millis', str(From.registration_datetime_millis))
+         AddItem('ion_institution_id', From.ion_institution_id)
+         AddItem('update_interval_seconds', str(From.update_interval_seconds))
+         AddItem('visualization_url', From.visualization_url)
+         AddItem('is_public', str(From.is_public))
+         AddItem('LifeCycleState', From.ResourceLifeCycleState)
+         AddItem('fields set in data source resource', str(From.ListSetFields()).replace("'", ""))
+         AddItem('resource identity', From.ResourceIdentity)
+         AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
+         AddItem('resource type name', Result.Repository._workspace_root.name)
       
       except:
          estr = 'Object ERROR!'
@@ -549,7 +560,7 @@ class ManageResources(object):
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCE_RESPONSE_TYPE)
       LoaderFunc = self.ResourceTypes[ResourceType][4]
-      LoaderFunc(Response.message_parameters_reference[0], Result)
+      yield LoaderFunc(Response.message_parameters_reference[0], Result)
       Response.result = Response.ResponseCodes.OK
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResource(): returning\n'+str(Response))
