@@ -343,9 +343,6 @@ class Process(BasicLifecycleObject):
         try:
             yield defer.maybeDeferred(self.plc_activate)
         except Exception, ex:
-            import sys, pdb
-            tb = sys.exc_info()[2]
-            pdb.post_mortem(tb)
             log.exception('----- Process %s ACTIVATE ERROR -----' % (self.id))
             raise ex
 
