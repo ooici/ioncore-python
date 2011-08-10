@@ -171,31 +171,34 @@ class IngestionService(ServiceProcess):
         data and notifications about ingestion.
         """
 
-        log.info('op_create_dataset_topics - Start (no-op)')
+        log.info('op_create_dataset_topics - Start')
 
-        # OOIION-4: disabled creation of topics via PSC due to performance
+        # OOIION-4: made creation of topics via PSC configurable (def: false) due to performance
 
-#        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
-#        msg = yield self.mc.create_instance(XS_TYPE)
-#
-#        msg.exchange_space_name = 'swapmeet'
-#
-#        rc = yield self._pscclient.declare_exchange_space(msg)
-#        self._xs_id = rc.id_list[0]
-#
-#        msg = yield self.mc.create_instance(XP_TYPE)
-#        msg.exchange_point_name = 'science_data'
-#        msg.exchange_space_id = self._xs_id
-#
-#        rc = yield self._pscclient.declare_exchange_point(msg)
-#        self._xp_id = rc.id_list[0]
-#
-#        msg = yield self.mc.create_instance(TOPIC_TYPE)
-#        msg.topic_name = content.dataset_id
-#        msg.exchange_space_id = self._xs_id
-#        msg.exchange_point_id = self._xp_id
-#
-#        rc = yield self._pscclient.declare_topic(msg)
+        if CONF.getValue('create_psc_dataset_topics', False):
+            # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
+            msg = yield self.mc.create_instance(XS_TYPE)
+
+            msg.exchange_space_name = 'swapmeet'
+
+            rc = yield self._pscclient.declare_exchange_space(msg)
+            self._xs_id = rc.id_list[0]
+
+            msg = yield self.mc.create_instance(XP_TYPE)
+            msg.exchange_point_name = 'science_data'
+            msg.exchange_space_id = self._xs_id
+
+            rc = yield self._pscclient.declare_exchange_point(msg)
+            self._xp_id = rc.id_list[0]
+
+            msg = yield self.mc.create_instance(TOPIC_TYPE)
+            msg.topic_name = content.dataset_id
+            msg.exchange_space_id = self._xs_id
+            msg.exchange_point_id = self._xp_id
+
+            rc = yield self._pscclient.declare_topic(msg)
+        else:
+            log.info("create_psc_dataset_topics CONF option not set or False, no-op'ing this method")
 
         yield self.reply_ok(msg_in)
 
