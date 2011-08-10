@@ -31,6 +31,8 @@ from ion.services.dm.inventory.association_service import AssociationServiceClie
 from ion.services.coi.resource_registry.association_client import AssociationClient
 
 
+from ion.services.coi.identity_registry import IdentityRegistryClient, RESOURCE_CFG_REQUEST_TYPE
+
 # Create a process
 resource_process = Process()
 resource_process.spawn()
@@ -47,13 +49,15 @@ ac = AssociationClient(resource_process)
 # Capture the message client
 mc = resource_process.message_client
 
+irc = IdentityRegistryClient(resource_process)
+
 # Set ALL for import *
 __all__= ['resource_process','rc','asc','ac','mc','ROOT_USER_ID', 'MYOOICI_USER_ID', 'ANONYMOUS_USER_ID']
 __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROLE_ID', 'HAS_A_ID', 'IS_A_ID'])
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject'])
 
 
 
@@ -288,3 +292,62 @@ def print_dataset_history(dsid):
 
     outlines.append('=====================================')
     defer.returnValue("\n".join(outlines))
+
+
+
+@defer.inlineCallbacks
+def update_identity_subject(old_subject, new_subject):
+
+    if old_subject == new_subject:
+        raise RuntimeError('The old CI Login subject must be different than the new one')
+
+    # get all the identity resources out of the Association Service
+    request = yield mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+    pair = request.pairs.add()
+
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = TYPE_OF_ID
+    pair.predicate = pref
+
+    # Set the Object search term
+    type_ref = request.CreateObject(IDREF_TYPE)
+    type_ref.key = IDENTITY_RESOURCE_TYPE_ID
+    pair.object = type_ref
+
+    ooi_id_list = yield asc.get_subjects(request)
+
+    # Now we have a list of ooi_ids. Gotta pull and search them individually.
+    old_id = None
+    new_id = None
+    for ooi_id in ooi_id_list.idrefs:
+        id_res = yield rc.get_instance(ooi_id)
+        if old_subject == id_res.subject:
+            old_id = id_res
+
+        if new_subject == id_res.subject:
+             new_id = id_res
+
+        if old_id is not None and new_id is not None:
+            break
+
+    else:
+        if old_id is None:
+            raise RuntimeError('No identity resource found with the specified original subject "%s"' % old_subject)
+
+
+    old_id.subject = new_subject
+
+    resources=[old_id]
+    if new_id is not None:
+        new_id.ResourceLifeCycleState = new_id.RETIRED
+        resources.append(new_id)
+
+    yield rc.put_resource_transaction(resources)
+
+    # Do we need to set roles?
+    #old_roles = yield irc.get_roles(old_uuid)
+    #op_unset_role(old_uuid)
+    #op_set_role(new_uuid, old_roles)
+
+    defer.returnValue('Success!')

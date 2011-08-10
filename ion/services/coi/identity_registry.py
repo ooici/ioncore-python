@@ -39,7 +39,8 @@ from ion.core.intercept.policy import subject_has_admin_role, \
 from ion.services.coi.datastore_bootstrap.ion_preload_config \
     import IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_ROLE_ID, ROLE_NAMES_BY_ID, ROLE_IDS_BY_NAME
 
-from ion.services.coi.datastore import ASSOCIATION_TYPE, DataStoreError
+from ion.services.coi.datastore import ASSOCIATION_TYPE
+from ion.core.object.workbench import WorkBenchError
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
@@ -576,7 +577,7 @@ class IdentityRegistryService(ServiceProcess):
         try:
             for role_id in role_ids:
                 yield self.create_role_association(user_id, role_id)
-        except DataStoreError, ex:
+        except WorkBenchError, ex:
             log.error('Failed to create role association: %s' % (ex))
             raise
 
