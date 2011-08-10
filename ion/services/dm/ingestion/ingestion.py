@@ -173,27 +173,32 @@ class IngestionService(ServiceProcess):
 
         log.info('op_create_dataset_topics - Start')
 
-        # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
-        msg = yield self.mc.create_instance(XS_TYPE)
+        # OOIION-4: made creation of topics via PSC configurable (def: false) due to performance
 
-        msg.exchange_space_name = 'swapmeet'
+        if CONF.getValue('create_psc_dataset_topics', False):
+            # @TODO: adapted from temp reg publisher code in publisher_subscriber, update as appropriate
+            msg = yield self.mc.create_instance(XS_TYPE)
 
-        rc = yield self._pscclient.declare_exchange_space(msg)
-        self._xs_id = rc.id_list[0]
+            msg.exchange_space_name = 'swapmeet'
 
-        msg = yield self.mc.create_instance(XP_TYPE)
-        msg.exchange_point_name = 'science_data'
-        msg.exchange_space_id = self._xs_id
+            rc = yield self._pscclient.declare_exchange_space(msg)
+            self._xs_id = rc.id_list[0]
 
-        rc = yield self._pscclient.declare_exchange_point(msg)
-        self._xp_id = rc.id_list[0]
+            msg = yield self.mc.create_instance(XP_TYPE)
+            msg.exchange_point_name = 'science_data'
+            msg.exchange_space_id = self._xs_id
 
-        msg = yield self.mc.create_instance(TOPIC_TYPE)
-        msg.topic_name = content.dataset_id
-        msg.exchange_space_id = self._xs_id
-        msg.exchange_point_id = self._xp_id
+            rc = yield self._pscclient.declare_exchange_point(msg)
+            self._xp_id = rc.id_list[0]
 
-        rc = yield self._pscclient.declare_topic(msg)
+            msg = yield self.mc.create_instance(TOPIC_TYPE)
+            msg.topic_name = content.dataset_id
+            msg.exchange_space_id = self._xs_id
+            msg.exchange_point_id = self._xp_id
+
+            rc = yield self._pscclient.declare_topic(msg)
+        else:
+            log.info("create_psc_dataset_topics CONF option not set or False, no-op'ing this method")
 
         yield self.reply_ok(msg_in)
 

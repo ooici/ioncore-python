@@ -237,7 +237,6 @@ class ExchangeManagementService(ServiceProcess):
 class ExchangeManagementClient(ServiceClient):
     
     def __init__(self, proc=None, **kwargs):
-        log.info("ExchangeManagementService.slc_init(...)")
         self.helper = ClientHelper(proc)
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "exchange_management"
@@ -268,7 +267,7 @@ class ExchangeManagementClient(ServiceClient):
     @defer.inlineCallbacks
     def create_exchangespace(self, 
             name,
-            description,
+            description
             ):
         """
         Creates an ExchangeSpace.
@@ -294,7 +293,7 @@ class ExchangeManagementClient(ServiceClient):
             name,
             description,
             exchangespace,
-            type='EXCHANGE_POINT', 
+            type='EXCHANGE_POINT'
         ):
             """
             Creates an ExchangeName.

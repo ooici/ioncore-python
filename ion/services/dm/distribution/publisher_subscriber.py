@@ -16,6 +16,9 @@ from ion.util import procutils as pu
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+
 class PSCRegisterable(object):
     """
     An object that is registerable with the PubSubController.
@@ -263,8 +266,10 @@ class PublisherFactory(object):
         pub = publisher_type(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
         yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
 
-        # Register does the PSC invocations
-        yield pub.register(xp_name, topic_name, publisher_name, credentials)
+        # OOIION-4: making automatic registration of publishers optional due to speed
+        if CONF.getValue('register_on_build', False):
+            # Register does the PSC invocations
+            yield pub.register(xp_name, topic_name, publisher_name, credentials)
 
         defer.returnValue(pub)
 
@@ -482,7 +487,11 @@ class SubscriberFactory(object):
 
         sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name,
                               process=process, credentials=credentials, *args, **kwargs)
-        yield sub.register()
+
+        # OOIION-4: making automatic registration of subscribers optional due to access speed
+        if CONF.getValue('register_on_build', False):
+            yield sub.register()
+
         # brings the subscriber up to the same state as the process
         yield process.register_life_cycle_object(sub)
 
