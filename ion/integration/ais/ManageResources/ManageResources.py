@@ -368,6 +368,8 @@ class ManageResources(object):
          AddItem('resource identity', From.ResourceIdentity)
          AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
          AddItem('resource type name', Result.Repository._workspace_root.name)
+         AddItem('resource name', From.ResourceName)
+         AddItem('resource description', From.ResourceDescription)
       
       except:
          estr = 'Object ERROR!'
@@ -402,6 +404,8 @@ class ManageResources(object):
          AddItem('resource identity', From.ResourceIdentity)
          AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
          AddItem('resource type name', Result.Repository._workspace_root.name)
+         AddItem('resource name', From.ResourceName)
+         AddItem('resource description', From.ResourceDescription)
               
       except:
          estr = 'Object ERROR!'
@@ -448,6 +452,8 @@ class ManageResources(object):
          AddItem('resource identity', From.ResourceIdentity)
          AddItem('resource object type', str(From.ResourceObjectType).replace('\n', ', ', 1).strip())
          AddItem('resource type name', Result.Repository._workspace_root.name)
+         AddItem('resource name', From.ResourceName)
+         AddItem('resource description', From.ResourceDescription)
       
       except:
          estr = 'Object ERROR!'
