@@ -125,7 +125,7 @@ class DatasetController(ServiceProcess):
         if not self.walrus:
             defer.returnValue(None)
 
-        log.debug('Removing scheduled task')
+        log.debug('Removing scheduled task: %s' % self.sched_task_id)
         msg = yield self.message_client.create_instance(RMTASK_REQ_TYPE)
         msg.task_id = self.sched_task_id
         yield self.ssc.rm_task(msg)

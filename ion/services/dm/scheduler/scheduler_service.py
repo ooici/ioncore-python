@@ -341,8 +341,9 @@ class SchedulerService(ServiceProcess):
         # check to see if the task_id already exists in the store
         existing_task = yield self.scheduled_events.get(task_id)
         if existing_task is not None:
-            log.warn("Already have task with id %s scheduled." % task_id)
+            log.info("Already have task with id %s scheduled." % task_id)
             resp.duplicate = True
+            resp.task_id = task_id
             yield self.reply_ok(msg, resp)
             defer.returnValue(None)
 
@@ -495,6 +496,7 @@ class SchedulerServiceClient(ServiceClient):
         yield self._check_init()
 
         (ret, heads, message) = yield self.rpc_send('add_task', msg)
+        log.debug("RETURNING %s %s" % (ret.origin, ret.task_id))
         defer.returnValue(ret)
 
 
