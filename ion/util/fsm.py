@@ -217,9 +217,17 @@ class FSM(object):
         pre-action handler into a post-action handler.
         @return True if transitioned, False otherwise
         """
-        if self.next_state is not None:
+
+        # daf 11 aug 2011
+        # Calling _so_transition() which subsequently calls here would successfully transition the state during an action handler,
+        # but would then set the state to None after the handler had finished.  The problem is the code in the method above which
+        # sets the current state to the next state after the handler completes has no knowledge of the transition performed in
+        # this method.  It now works by never changing what the next_state is, and allowing the method above to set current_state
+        # to next_state, which is as if we just called this method.
+
+        if self.next_state is not None and self.current_state != self.next_state:
             self.current_state = self.next_state
-            self.next_state = None
+            #self.next_state = None
             return True
         else:
             return False
