@@ -466,12 +466,12 @@ class ObjectContainer(object):
 
         except KeyError, ke:
 
-            log.info('Making none local checkout')
+            log.info('Making non-local checkout')
 
         if root_obj is None:
 
             root_obj = self._checkout_remote_commit(commit, excluded_types)
-
+            # This is a deferred!
 
         return root_obj
 
@@ -924,7 +924,7 @@ class Repository(ObjectContainer):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None, excluded_types=None):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, excluded_types=None, auto_merge=True):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
@@ -972,6 +972,7 @@ class Repository(ObjectContainer):
         self._current_branch = branch
         
         cref = None
+        merge_refs = False
             
         if commit_id:
             
@@ -1057,11 +1058,18 @@ class Repository(ObjectContainer):
             
             if len(branch.commitrefs) ==1:
                 cref = branch.commitrefs[0]
-                
+
+            elif len(branch.commitrefs) == 0:
+                raise RepositoryError('This branch has not commits - cant check it out!')
             else:
-                log.warn('BRANCH STATE HAS DIVERGED - MERGING') 
-                
-                cref = self.merge_by_date(branch)
+
+                if auto_merge:
+                    cref = self.merge_by_date(branch)
+
+                else:
+                    merge_refs = True
+
+                    cref = self.get_common_ancestor(branch.commitrefs)
 
 
         # Do some clean up!
@@ -1072,6 +1080,7 @@ class Repository(ObjectContainer):
             
         # Automatically fetch the object from the hashed dictionary
         rootobj = yield defer.maybeDeferred(self.checkout_commit, cref, excluded_types)
+
         self._workspace_root = rootobj
 
         self._detached_head = detached
@@ -1085,6 +1094,10 @@ class Repository(ObjectContainer):
             
             rootobj.SetStructureReadOnly()
 
+        if merge_refs:
+            yield self.merge_with(branchname=branchname)
+
+
         log.debug('Checkout Complete!')
         defer.returnValue(rootobj)
 
@@ -1093,13 +1106,31 @@ class Repository(ObjectContainer):
     def merge_by_date(self, branch):
         
         crefs=branch.commitrefs[:]
-        
+
+        keys_are_the_same = True
+        last_key = None
         newest = -999.99
         for cref in crefs:
             if cref.date > newest:
                 head_cref = cref
                 newest = cref.date
-            
+
+
+            key = cref.GetLink('objectroot').key
+
+            if last_key is None:
+                last_key = key
+
+            if key != last_key:
+                keys_are_the_same = False
+
+
+        if keys_are_the_same:
+            log.warn('BRANCH STATE HAS DIVERGED BUT CONTENT IS THE SAME - MERGING WITH NO INFORMATION LOST')
+        else:
+            log.warn('BRANCH STATE HAS DIVERGED - MERGING BY DATE WITH INFORMATION LOST')
+
+
         # Deal with the newest ref seperately
         crefs.remove(head_cref)
             
@@ -1113,7 +1144,9 @@ class Repository(ObjectContainer):
         pref.SetLinkByName('commitref',head_cref)
         pref.relationship = pref.Relationship.PARENT
 
-        cref.SetLinkByName('objectroot', head_cref.objectroot)
+        new_link = cref.GetLink('objectroot')
+        old_link = head_cref.GetLink('objectroot')
+        new_link.CopyLink(old_link)
 
         cref.comment = 'Merged divergent branch by date keeping the newest value'
 
@@ -1140,7 +1173,35 @@ class Repository(ObjectContainer):
         bref.SetLink(cref)
         
         return cref
-        
+
+
+    def get_common_ancestor(self,crefs):
+
+        ancestor = crefs[0]
+        found_common = False
+        tested = set()
+
+        # Now look for the common ancestor
+        while not found_common:
+
+            tested.add(ancestor.MyId)
+
+            for cref in crefs:
+
+                if not ancestor.InParents(cref):
+                    break
+            else:
+                found_common = True
+                break
+
+            try:
+                ancestor = ancestor.parentrefs[0].commitref
+            except IndexError, ex:
+                log.exception('No common ancestor found in Repository!\n%s' % str(self))
+                raise RepositoryError('No common ancestor found for commit ref.')
+
+        return ancestor
+
     def reset(self):
         
         if self.status != self.MODIFIED:
@@ -1296,7 +1357,7 @@ class Repository(ObjectContainer):
         """
         
         if self.status == self.MODIFIED:
-            log.warn('Merging while the workspace is dirty better to make a new commit first!')
+            raise RepositoryError('Merging while the workspace is dirty better to make a new commit first!')
             #What to do for uninitialized?
             
         if self.status == self.NOTINITIALIZED:
@@ -1323,9 +1384,10 @@ class Repository(ObjectContainer):
                     raise RepositoryError('Can not merge with current branch head (self into self)')
                 
                 # Merge the divergent states of this branch!
-                crefs = branch.commitrefs
-                crefs.pop(self._current_branch.commitrefs[0])
-                
+                crefs = branch.commitrefs[:]
+                if self.root_object.MyId == self._current_branch.commitrefs[0].GetLink('objectroot').key:
+                    crefs.remove(self._current_branch.commitrefs[0])
+
             else:
                 # Assume we merge any and all states of this branch?
                 crefs.extend( branch.commitrefs)
@@ -1340,7 +1402,7 @@ class Repository(ObjectContainer):
         for cref in crefs:
             # Create a merge container to hold the merge object state for access
 
-            mr = MergeRepository(cref, self.index_hash.cache)
+            mr = MergeRepository(cref, self.index_hash.cache, process=self._process, upstream=self.upstream)
 
             yield mr.load_root(excluded_types = self.excluded_types)
 
@@ -1738,11 +1800,15 @@ class Repository(ObjectContainer):
 class MergeRepository(ObjectContainer):
 
 
-    def __init__(self, commit, cache):
+    def __init__(self, commit, cache, process=None, upstream=None):
 
         ObjectContainer.__init__(self)
 
         self.index_hash.cache = cache
+
+        self._process = process
+
+        self.upstream = upstream
 
         # The commit does not belong to the Merge container - it is an object from the repository
         self.commit = commit

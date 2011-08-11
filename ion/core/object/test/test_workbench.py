@@ -569,6 +569,110 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
     @defer.inlineCallbacks
+    def test_pull_diverge(self):
+
+
+        log.info('Pushing to: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        ab.title='Other Title'
+        repo2.commit('Another updated addressbook')
+
+        # update and commit an new head object
+        ### Different Content
+        #self.repo1.root_object.title = 'This Title'
+        #self.repo1.commit('An updated addressbook')
+        ### SAME CONTENT....
+        self.repo1.root_object.title = 'Other Title'
+        self.repo1.commit('Another updated addressbook')
+
+        # Push the object in proc2 back to proc1 - it will have both divergent states
+        log.info('Pushing back to proc1')
+        result = yield self.proc2.workbench.push(self.proc1.id.full, repo2)
+
+        self.assertEqual(len(self.repo1.branches[0].commitrefs),2)
+
+        log.info('Clearing proc2 workbench!')
+        self.proc2.workbench.clear_repository(repo2)
+
+        log.info('Pulling to: %s' % str(self.proc2.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key,get_head_content=False)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        ab = yield repo2.checkout('master')
+
+        # Show that merge by date on checkout resolved the conflict
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_pull_no_automerge(self):
+
+
+        log.info('Pushing to: %s' % str(self.proc2.id.full))
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        ab.title='Other Title'
+        repo2.commit('Another updated addressbook')
+
+        # update and commit an new head object
+        ### Different Content
+        self.repo1.root_object.title = 'This Title'
+        self.repo1.commit('An updated addressbook')
+        ### SAME CONTENT....
+        #self.repo1.root_object.title = 'Other Title'
+        #self.repo1.commit('Another updated addressbook')
+
+        # Push the object in proc2 back to proc1 - it will have both divergent states
+        log.info('Pushing back to proc1')
+        result = yield self.proc2.workbench.push(self.proc1.id.full, repo2)
+
+        self.assertEqual(len(self.repo1.branches[0].commitrefs),2)
+
+        log.info('Clearing proc2 workbench!')
+        self.proc2.workbench.clear_repository(repo2)
+
+        log.info('Pulling to: %s' % str(self.proc2.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key,get_head_content=False)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        self.assertEqual(repo2.upstream, self.proc1.id.full)
+
+
+        ab = yield repo2.checkout('master', auto_merge=False)
+
+        # Show that merge by date on checkout resolved the conflict
+        self.assertEqual(ab.title, 'an addressbook')
+
+
+
+
+    @defer.inlineCallbacks
     def test_pull_branch_same_head(self):
         """
         Test that we can have more than one branch point to the same commit!

@@ -1026,10 +1026,16 @@ class WorkBench(object):
         return repo.index_hash.keys()
 
 
-
-
     def _update_repo_to_head(self, repo, head):
         log.debug('_update_repo_to_head: Loading a repository!')
+
+        existing_commits = repo._commit_index.copy()
+
+        log.info('Running load commits...')
+        loaded={}
+        for branch in head.branches:
+            for link in branch.commitrefs.GetLinks():
+                self._load_commits(link,loaded=loaded)
 
         if repo._dotgit == head:
             return
@@ -1043,11 +1049,11 @@ class WorkBench(object):
             return
         
         # The current repository state must be merged with the new head.
-        self._merge_repo_heads(repo._dotgit, head)
+        self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
 
 
 
-    def _merge_repo_heads(self, existing_head, new_head):
+    def _merge_repo_heads(self, existing_head, new_head, existing_commits=None):
 
         log.debug('_merge_repo_heads: merging the state of repository heads!')
         log.debug('existing repository head:\n' + existing_head.Debug())
@@ -1067,7 +1073,7 @@ class WorkBench(object):
                 if new_branchkey == existing_branch.branchkey:
                     # We need to merge the state of these branches
 
-                    self._resolve_branch_state(existing_branch, new_branch)
+                    self._resolve_branch_state(existing_branch, new_branch, existing_commits=existing_commits)
 
                     # We found the new branch in existing - exit the inner for loop - next branch....
                     break
@@ -1086,7 +1092,7 @@ class WorkBench(object):
         log.debug('_merge_repo_heads: merge repository complete')
 
 
-    def _resolve_branch_state(self, existing_branch, new_branch):
+    def _resolve_branch_state(self, existing_branch, new_branch, existing_commits=None):
         """
         Move everything in new into an updated existing!
         """
@@ -1109,7 +1115,7 @@ class WorkBench(object):
 
                 # Look in the commit index of the existing repo to see if the head of the received message is an old commit
                 # This works one way but not the other - it is a short cut!
-                elif repo._commit_index.has_key(new_link.key):
+                elif new_link.key in existing_commits:
                     # The branch in new_repo is out of date with what exists here.
                     # We can completely ignore the new link!
                     break
@@ -1117,9 +1123,6 @@ class WorkBench(object):
                 # Look in the commit index of the new repo to see if the existing link is an old commit in new repository
                 else:
 
-                    log.debug('Loading all commits in the repository')
-                    self._load_commits(new_link) # Load the new ancestors!
-                    log.debug('Loaded all commits!')
 
                     existing_cref = repo.get_linked_object(existing_link)
                     new_cref = repo.get_linked_object(new_link)
@@ -1181,8 +1184,8 @@ class WorkBench(object):
         try:
             cref = repo.get_linked_object(link)
         except repository.RepositoryError, ex:
-            log.debug(ex)
-            raise WorkBenchError('Commit id not found while loding commits: \n %s' % link.key)
+            log.exception(str(repo))
+            raise WorkBenchError('Commit id not found while loading commits: \n %s' % link.key)
             # This commit ref was not actually sent!
 
         if cref.ObjectType != COMMIT_TYPE:
@@ -1192,6 +1195,9 @@ class WorkBench(object):
 
         for parent in cref.parentrefs:
             link = parent.GetLink('commitref')
+            # load the linked object no matter what to realize parent child relationships
+            obj = repo.get_linked_object(link)
+
             # Call this method recursively for each link
             if link.key not in loaded:
                 self._load_commits(link, loaded=loaded)

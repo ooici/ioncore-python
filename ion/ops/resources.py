@@ -57,7 +57,7 @@ __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROL
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject'])
 
 
 
@@ -352,3 +352,36 @@ def update_identity_subject(old_subject, new_subject):
     #op_set_role(new_uuid, old_roles)
 
     defer.returnValue('Success!')
+
+
+
+
+
+@defer.inlineCallbacks
+def get_identities_by_subject(subject):
+
+
+    # get all the identity resources out of the Association Service
+    request = yield mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+    pair = request.pairs.add()
+
+    # Set the predicate search term
+    pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+    pref.key = TYPE_OF_ID
+    pair.predicate = pref
+
+    # Set the Object search term
+    type_ref = request.CreateObject(IDREF_TYPE)
+    type_ref.key = IDENTITY_RESOURCE_TYPE_ID
+    pair.object = type_ref
+
+    ooi_id_list = yield asc.get_subjects(request)
+
+    res = []
+    for ooi_id in ooi_id_list.idrefs:
+        id_res = yield rc.get_instance(ooi_id)
+
+        if id_res.subject == subject:
+            res.append(id_res)
+
+    defer.returnValue(id_res)
