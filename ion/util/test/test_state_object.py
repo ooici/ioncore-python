@@ -230,6 +230,9 @@ class StateObjectTest(IonTestCase):
         self._assertCounts(so, 1, 1, 0, 0, 0)
         self.assertEqual(res2, BasicStates.S_ACTIVE)
 
+        # make sure the current state of the object is still ACTIVE
+        self.assertEqual(so._get_state(), BasicStates.S_ACTIVE)
+
 
     def _assertCounts(self, so, init, act, deact, term, error, errerr=0):
         self.assertEqual(so.cnt_init, init)
