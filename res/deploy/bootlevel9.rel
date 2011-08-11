@@ -9,16 +9,8 @@
         {'name':'ccagent',              'version':'0.1',
         },
 
-        {'name':'ingestion',    'version':'0.1',
-
-        },
-
         {'name':'notification_alert', 'version':'0.1',
                                       'processapp':('notification_alert_service', 'ion.integration.ais.notification_alert_service', 'NotificationAlertService'),
-        },
-
-        {'name':'store_service',      'version':'0.1',
-                                      'processapp':('store_service', 'ion.core.data.store_service', 'StoreService'),
         },
 
         {'name':'cdm_validation_service', 'version':'0.1',
