@@ -341,11 +341,12 @@ def update_identity_subject(old_subject, new_subject):
     resources=[old_id]
     if new_id is not None:
         new_id.ResourceLifeCycleState = new_id.RETIRED
+        new_id.subject = 'Junk - identity provider changed the subject. This is a bogus ID!'
         resources.append(new_id)
 
     yield rc.put_resource_transaction(resources)
 
-    # Do we need to set roles?
+    # Do we need to set roles? It is not a new UUID - it is a new subject!
     #old_roles = yield irc.get_roles(old_uuid)
     #op_unset_role(old_uuid)
     #op_set_role(new_uuid, old_roles)
