@@ -48,6 +48,8 @@ from ion.services.dm.scheduler.scheduler_service import SCHEDULE_TYPE_PERFORM_IN
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE, SUBJECT_PREDICATE_QUERY_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID
+from ion.util import timeout
+
 DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
 CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
 PERFORM_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
@@ -198,7 +200,7 @@ class JavaAgentWrapper(ServiceProcess):
         self.mc = MessageClient(proc=self)
         self.rc = ResourceClient(proc=self)
         self._asc = None   # Access using the property self.asc
-        
+
         # Step 2: Spawn the associated external child process (if not already done)
         yield defer.maybeDeferred(self._spawn_dataset_agent)
 
@@ -211,11 +213,11 @@ class JavaAgentWrapper(ServiceProcess):
         # Add the receiver as a registered life cycle object
         yield self.register_life_cycle_object(self.update_handler)
 
-
+    @timeout.timeout(10.0)
+    @defer.inlineCallbacks
     def slc_activate(self):
         '''
-        @brief: Service activation during spawning.  Returns a deferred which does not resolve
-                until the external Dataset Agent remotely invokes op_binding_key_callback()
+        @brief: Service activation during spawning.  Awaits callback of DAC.
         
         @see:   Dataset Agent Diagram (Activation) - https://docs.google.com/drawings/d/1YVySMhsuzl0PWIW5Xk9BSCz6mYzdmuGXoKXYdzXNvc8/edit?hl=en_US&authkey=CMDan_EN
         
@@ -223,18 +225,12 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered slc_activate(); state=%s" % (str(self._get_state())))
-       
-        # Step 1: Suspend execution until receipt of the external child process's binding key
-        def _recieve_binding_key(self):
-            d = self.__binding_key_deferred
-            if d is None:
-                d = defer.Deferred()
-                self.__binding_key_deferred = d
-            return d
-        
-        
-        reactor.callLater(0, lambda: _recieve_binding_key(self))
 
+        # must change to ACTIVE so we can receive the binding callback
+        self._so_transition()
+
+        self.__binding_key_deferred = defer.Deferred()
+        yield self.__binding_key_deferred
     
     @defer.inlineCallbacks
     def slc_deactivate(self):
