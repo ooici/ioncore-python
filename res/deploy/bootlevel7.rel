@@ -17,9 +17,5 @@
                                         'processapp':('identity_registry','ion.services.coi.identity_registry','IdentityRegistryService'),
         },
 
-        # Add scheduler service
-        {'name':'scheduler', 'version':'0.1',
-        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
-        },
     ]
 }

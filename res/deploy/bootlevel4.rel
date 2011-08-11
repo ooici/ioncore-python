@@ -10,7 +10,5 @@
 
         {'name':'datastore',            'version':'0.1'},
         {'name':'association',          'version':'0.1'},
-
-        {'name':'resource_registry',    'version':'0.1'},
     ]
 }
