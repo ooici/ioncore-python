@@ -1138,6 +1138,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        log.debug('getResource returned:\n')
+        for item in reply.message_parameters_reference[0].resource:
+            log.debug(str(item)+'\n')
         
         msg.message_parameters_reference.ooi_id = "3319A67F-81F3-424F-8E69-4F28C4E047F1"  #data set
         reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
@@ -1150,6 +1153,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        log.debug('getResource returned:\n')
+        for item in reply.message_parameters_reference[0].resource:
+            log.debug(str(item)+'\n')
         
         msg.message_parameters_reference.ooi_id = "A3D5D4A0-7265-4EF2-B0AD-3CE2DC7252D8"   #anonymous identity
         reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
@@ -1162,6 +1168,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        log.debug('getResource returned:\n')
+        for item in reply.message_parameters_reference[0].resource:
+            log.debug(str(item)+'\n')
         
         msg.message_parameters_reference.ooi_id = "3319A67F-91F3-424F-8E69-4F28C4E047F2"  #data source
         reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
@@ -1174,6 +1183,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response to getResourcesOfType is not a GET_RESOURCE_RESPONSE_TYPE GPB')           
         if not reply.message_parameters_reference[0].IsFieldSet('resource'):
             self.fail('response to getResourcesOfType has no resource field')
+        log.debug('getResource returned:\n')
+        for item in reply.message_parameters_reference[0].resource:
+            log.debug(str(item)+'\n')
         
         msg.message_parameters_reference.ooi_id = "bogus-ooi_id"  #non-existant item
         reply = yield self.aisc.getResource(msg, MYOOICI_USER_ID)
