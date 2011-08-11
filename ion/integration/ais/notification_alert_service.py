@@ -125,7 +125,6 @@ class NotificationAlertService(ServiceProcess):
 
         self.sub = DatasetSupplementAddedEventSubscriber(process=self)
         self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
-        yield self.sub.register()
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
@@ -133,7 +132,6 @@ class NotificationAlertService(ServiceProcess):
 
         self.sub = DatasourceUnavailableEventSubscriber(process=self)
         self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
-        yield self.sub.register()
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasourceUnavailableEventSubscriber activation complete')     
