@@ -110,15 +110,24 @@ class CdmValidationService(ServiceProcess):
         # Step 1: Get the data_url
         log.debug('op_validate(): Retrieving data_url...')
         data_url = str(content.data_url)
-        
+
+        # Step 1a: Check that this is a DAP server by ensuring that the reply to a simple HTTP GET of "data_url + .das" does NOT return an error
+        try:
+            #fetch file
+            surl = str(data_url)
+            dasfile = yield getPage(surl + ".das")
+        except Exception, ex:
+            log.error('Invalid URL: the dataset is not hosted on a DAP server and cannot be validated')
+            cdm_resp = {'cdm_result':False, 'exception':'Invalid URL: the dataset is not hosted on a DAP server and cannot be validated'}
 
         # Step 2: Validate the URL against the CDM Validator WebService
-        try:
-            cdm_output = yield self.validate_cdm(data_url)
-            cdm_resp = yield self.process_cdm_validation_output(cdm_output)
-        except Exception, ex:
-            log.warn('CDM Validation or validation output processing failed:  Cause: %s' % str(ex))
-            cdm_resp = {'cdm_result':False, 'exception':'Could not perform CDM Validation.  Please check the CDM Validator configuration.  Inner exception: %s' % ex}
+        if cdm_resp['cdm_result']:
+            try:
+                cdm_output = yield self.validate_cdm(data_url)
+                cdm_resp = yield self.process_cdm_validation_output(cdm_output)
+            except Exception, ex:
+                log.warn('CDM Validation or validation output processing failed:  Cause: %s' % str(ex))
+                cdm_resp = {'cdm_result':False, 'exception':'Could not perform CDM Validation.  Please check the CDM Validator configuration.  Inner exception: %s' % ex}
         
         # Step 3: Validate the URL against the CF Checks Script
         cf_resp = {}
