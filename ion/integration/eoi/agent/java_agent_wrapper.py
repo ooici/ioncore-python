@@ -137,6 +137,16 @@ class UpdateHandler(ScheduleEventSubscriber):
         ScheduleEventSubscriber.__init__(self, *args, **kwargs)
 
     @defer.inlineCallbacks
+    def _receive_handler(self, data, msg):
+        """
+        Custom receive handler - need to wait until ondata completes before acking.
+        """
+        try:
+            yield self.ondata(data)
+        finally:
+            yield msg.ack()
+
+    @defer.inlineCallbacks
     def ondata(self, data):
         """
         @brief callback used to handle incoming notifications of this subscriber.
