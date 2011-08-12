@@ -4,11 +4,12 @@
 @file ion/util/test/test_procutils.py
 @author David Stuebe
 """
+import os
 
 from twisted.trial import unittest
+from twisted.internet import defer
 
 from ion.util import procutils as pu
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -39,4 +40,9 @@ My Kwargs are: "1", "2"
 
         self.assertEqual(res,val)
 
-
+    @defer.inlineCallbacks
+    def test_print_memory_usage(self):
+        #os.putenv("ION_TEST_CASE_PIDS","5925")
+        output = yield pu.print_memory_usage()
+        log.info(output)
+        
