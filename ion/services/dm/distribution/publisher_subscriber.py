@@ -394,8 +394,9 @@ class Subscriber(BasicLifecycleObject, PSCRegisterable):
         @brief Remove a subscription
         @retval Return code only
         """
+        log.warn("Subscriber unsubscribe not implemented")
         # @TODO: is this even used anywhere?
-        self._pscr_pscc.unsubscribe(self._resource_id)
+        #yield self._pscr_pscc.unsubscribe(self._resource_id)
 
     def _receive_handler(self, data, msg):
         """

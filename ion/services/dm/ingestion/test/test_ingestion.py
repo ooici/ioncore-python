@@ -142,13 +142,157 @@ class IngestionTest(IonTestCase):
         """
 
         msg = yield self.proc.message_client.create_instance(CREATE_DATASET_TOPICS_MSG_TYPE)
-
         msg.dataset_id = 'ABC'
-
         result = yield self._ic.create_dataset_topics(msg)
+        self.failUnlessEquals(result.MessageResponseCode, result.ResponseCodes.OK)
 
-        result.MessageResponseCode = result.ResponseCodes.OK
+        # let's try again, monkeypatching the config object alltogether
+        class FakeConf(object):
+            def getValue(self, *args, **kwargs):
+                return True
+        fakeconf = FakeConf()
 
+        import ion.services.dm.ingestion.ingestion as im
+        oldconf = im.CONF
+        im.CONF = fakeconf
+
+        msg = yield self.proc.message_client.create_instance(CREATE_DATASET_TOPICS_MSG_TYPE)
+        msg.dataset_id = 'DEF'
+        result = yield self._ic.create_dataset_topics(msg)
+        self.failUnlessEquals(result.MessageResponseCode, result.ResponseCodes.OK)
+        self.failUnless(self.ingest._xs_id is not None)
+        self.failUnless(self.ingest._xp_id is not None)
+
+        im.CONF = oldconf
+
+    @defer.inlineCallbacks
+    def test_prepare_ingest(self):
+        class FakeContent(object):
+            dataset_id = "1"
+            datasource_id = "2"
+
+        ex = yield self.failUnlessFailure(self.ingest._prepare_ingest(FakeContent()), IngestionError)
+        self.failUnlessIn("dataset resource", str(ex))
+
+        fc = FakeContent()
+        fc.dataset_id = SAMPLE_PROFILE_DATASET_ID
+
+        ex = yield self.failUnlessFailure(self.ingest._prepare_ingest(fc), IngestionError)
+        self.failUnlessIn("datasource resource", str(ex))
+
+        # make it through ok
+        fc.datasource_id = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+        yield self.ingest._prepare_ingest(fc)
+
+    @defer.inlineCallbacks
+    def test_setup_ingestion_topic(self):
+        class FakeContent(object):
+            dataset_id = "1"
+            datasource_id = "2"
+
+        bk = yield self.ingest._setup_ingestion_topic(FakeContent(), "convid")
+        self.failUnless(bk is not None)
+
+        # monkey patch validity checker!
+        def invalid(*args):
+            return False
+
+        self.ingest._ingest_data_topic_valid = invalid
+
+        # still works! just prints a log error
+        bk = yield self.ingest._setup_ingestion_topic(FakeContent(), "confid")
+        self.failUnless(bk is not None)
+
+    @defer.inlineCallbacks
+    def test_handle_ingestion_msg(self):
+        class FakeMsg(object):
+            def __init__(self):
+                self._state = "NONE"
+
+            def ack(self):
+                self._state = "SELFACKED"
+
+        # monkeypatch ingestion's _recv methods
+        self.recv_dataset_count = 0
+        self.recv_chunk_count = 0
+        self.recv_done_count = 0
+
+        def fake_recv_dataset(*args):
+            self.recv_dataset_count += 1
+            d = defer.Deferred()
+            reactor.callLater(0, d.callback, self.recv_dataset_count)
+            return d
+
+        def fake_recv_chunk(*args):
+            self.recv_chunk_count += 1
+            d = defer.Deferred()
+            reactor.callLater(0, d.callback, self.recv_chunk_count)
+            return d
+
+        def fake_recv_done(*args):
+            self.recv_done_count += 1
+            d = defer.Deferred()
+            reactor.callLater(0, d.callback, self.recv_done_count)
+            return d
+
+        self.ingest._ingest_op_recv_dataset = fake_recv_dataset
+        self.ingest._ingest_op_recv_chunk = fake_recv_chunk
+        self.ingest._ingest_op_recv_done = fake_recv_done
+
+        # setup over, test ingestion terminating path (first check)
+        self.ingest._ingestion_terminating = True
+        fm = FakeMsg()
+        meh = yield self.ingest._handle_ingestion_msg({}, fm, "confid")
+        self.failUnlessEquals(meh, False)
+        self.failUnlessEquals(fm._state, "ACKED")
+
+        self.ingest._ingestion_terminating = False
+
+        # now test each op - first, no op specified - error
+        yield self.ingest._handle_ingestion_msg({}, FakeMsg(), "convid")
+        self.failUnlessEquals(self.ingest._ingestion_terminating, True)
+
+        # must clear out deferred or trial will complain
+        try:
+            yield self.ingest._defer_ingest
+        except Exception, ex:
+            self.failUnlessIn("Unknown operation", str(ex))
+
+        self.ingest._ingestion_terminating = False
+        self.ingest._defer_ingest = defer.Deferred()
+
+        # now recv dataset
+        yield self.ingest._handle_ingestion_msg({'op':'recv_dataset'}, FakeMsg(), "convid")
+        self.failUnlessEquals(self.recv_dataset_count, 1)
+
+        # now recv chunk
+        yield self.ingest._handle_ingestion_msg({'op':'recv_chunk'}, FakeMsg(), "convid")
+        self.failUnlessEquals(self.recv_chunk_count, 1)
+
+        # now recv done
+        yield self.ingest._handle_ingestion_msg({'op':'recv_done'}, FakeMsg(), "convid")
+        self.failUnlessEquals(self.recv_done_count, 1)
+
+        # now patch one method to error and make sure exception path is taken too
+        def recv_ex(*args):
+            raise Exception("i am a robot")
+
+        self.ingest._ingest_op_recv_dataset = recv_ex
+        self.ingest._defer_ingest = defer.Deferred()
+
+        fm = FakeMsg()
+        yield self.ingest._handle_ingestion_msg({'op':'recv_dataset'}, fm, "convid")
+
+        self.failUnlessEquals(self.ingest._ingestion_terminating, True)
+        self.failUnlessEquals(fm._state, "SELFACKED")
+        self.failUnless(self.ingest._defer_ingest.called)
+
+        # must clear out deferred or trial will complain
+        try:
+            yield self.ingest._defer_ingest
+        except Exception, ex:
+            self.failUnlessIn("robot", str(ex))
 
     @defer.inlineCallbacks
     def test_recv_dataset(self):

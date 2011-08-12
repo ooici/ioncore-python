@@ -20,6 +20,7 @@ from ion.core import ioninit
 
 from ion.core.process.process import Process
 import ion.util.procutils as pu
+import time
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
@@ -109,7 +110,7 @@ class TestEventPublisher(IonTestCase):
         msg3.additional_data.state = msg3.additional_data.State.TERMINATED
         self.failUnlessEqual(msg3.additional_data.state, msg3.additional_data.State.TERMINATED)
 
-        msg4 = yield pub3.create_event(state=msg3.additional_data.State.ERROR)
+        msg4 = yield pub3.create_event(state=msg3.additional_data.State.ERROR, datetime=time.time())
         self.failUnlessEqual(msg4.additional_data.state, msg3.additional_data.State.ERROR)
         self.failUnlessEqual(msg4.additional_data.state, msg4.additional_data.State.ERROR)
 
@@ -121,6 +122,10 @@ class TestEventPublisher(IonTestCase):
         msg6 = yield pub3.create_event(state=ResourceLifecycleEventPublisher.State.READY, status=ResourceLifecycleEventPublisher.Status.NO_CACHE)
         self.failUnlessEqual(msg6.status, msg3.Status.NO_CACHE)
         self.failUnlessEqual(msg6.additional_data.state, msg3.additional_data.State.READY)
+
+        msg7_def = pub3.create_event(this_doesnt_exist="i dont exist")
+        ex = yield self.failUnlessFailure(msg7_def, Exception)
+        self.failUnlessIn("unused kwargs", str(ex))
 
     @defer.inlineCallbacks
     def test_publish_event(self):
