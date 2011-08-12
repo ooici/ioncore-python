@@ -380,7 +380,7 @@ class IngestionService(ServiceProcess):
             ingest_res={EM_ERROR:'Ingestion Failed: %s' % str(ex.message)}
             ingest_res.update(data_details)
 
-            log.error("Error occured while waiting for ingestion to complete: %s" % str(ex.message))
+            log.exception("Error occured while waiting for ingestion to complete:")
 
             yield self._notify_ingest(ingest_res)
 
@@ -1257,27 +1257,27 @@ class IngestionService(ServiceProcess):
         ###
         ### Adjust the values of the model time and forecast time in the supplement if this is FMRC:
         ###
-        log.debug('before FMRC time var normalize')
-        if runtime_offset is not 0:
-            runtime_var = sup_root.FindVariableByName(sup_agg_dim_name)
-            need_keys = [ba.GetLink('ndarray').key for ba in runtime_var.content.bounded_arrays]
-            yield self._fetch_blobs(cur_root.Repository, need_keys)
-
-            # @attention: 
-            # @bug:       The following lines fail because the merge dataset cannot be modified, we have to figure out a way to modify these values before merging
-            # @attention:             
-            for ba in runtime_var.content.bounded_arrays:
-                for i in range(len(ba.ndarray.value)):
-                    ba.ndarray.value[i] += runtime_offset
+#        log.debug('before FMRC time var normalize')
+#        if runtime_offset is not 0:
+#            runtime_var = sup_root.FindVariableByName(sup_agg_dim_name)
+#            need_keys = [ba.GetLink('ndarray').key for ba in runtime_var.content.bounded_arrays]
+#            yield self._fetch_blobs(cur_root.Repository, need_keys)
+#
+#            # @attention:
+#            # @bug:       The following lines fail because the merge dataset cannot be modified, we have to figure out a way to modify these values before merging
+#            # @attention:
+#            for ba in runtime_var.content.bounded_arrays:
+#                for i in range(len(ba.ndarray.value)):
+#                    ba.ndarray.value[i] += runtime_offset
                     
-        if forecast_offset is not 0:
-            forecast_var = sup_root.FindVariableByName(sup_fcst_dim_name)
-            need_keys = [ba.GetLink('ndarray').key for ba in forecast_var.content.bounded_arrays]
-            yield self._fetch_blobs(cur_root.Repository, need_keys)
-            
-            for ba in forecast_var.content.bounded_arrays:
-                for i in range(len(ba.ndarray.value)):
-                    ba.ndarray.value[i] += forecast_offset
+#        if forecast_offset is not 0:
+#            forecast_var = sup_root.FindVariableByName(sup_fcst_dim_name)
+#            need_keys = [ba.GetLink('ndarray').key for ba in forecast_var.content.bounded_arrays]
+#            yield self._fetch_blobs(cur_root.Repository, need_keys)
+#
+#            for ba in forecast_var.content.bounded_arrays:
+#                for i in range(len(ba.ndarray.value)):
+#                    ba.ndarray.value[i] += forecast_offset
                     
         
         ###
@@ -1417,6 +1417,7 @@ class IngestionService(ServiceProcess):
             # Since the supplement is ReadOnly calculate the offset here.. and apply to the dataset afterwards
             merge_var_min_origin = 0
             if not is_new_ds:
+                # Replace with Dim - min_offset?
                 merge_var_min_origin = float('inf')
                 for ba in merge_var.content.bounded_arrays:
                     merge_var_min_origin = min(merge_var_min_origin, ba.bounds[merge_agg_dim_idx].origin)
@@ -1424,12 +1425,41 @@ class IngestionService(ServiceProcess):
             
             
             # Step 3c: Merge the supplement into the dataset
+            new_bas = []
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
                 ba.bounds[merge_agg_dim_idx].origin += sup_sindex - merge_var_min_origin
 
                 ba_link = var.content.bounded_arrays.add()
                 ba_link.SetLink(ba)
+
+                # Keep track of these in case we need to adjust the values
+                new_bas.append(ba)
+
+            log.debug('before FMRC time var normalize')
+            if runtime_offset is not 0 and var_name == sup_agg_dim_name:
+
+                need_keys = [ba.GetLink('ndarray').key for ba in merge_var.content.bounded_arrays]
+                yield self._fetch_blobs(cur_root.Repository, need_keys)
+
+                # @attention:
+                # @bug:       The following lines fail because the merge dataset cannot be modified, we have to figure out a way to modify these values before merging
+                # @attention:
+                for ba in new_bas:
+                    for i in range(len(ba.ndarray.value)):
+                        ba.ndarray.value[i] += runtime_offset
+
+
+            if forecast_offset is not 0 and var_name == sup_fcst_dim_name:
+
+                need_keys = [ba.GetLink('ndarray').key for ba in merge_var.content.bounded_arrays]
+                yield self._fetch_blobs(cur_root.Repository, need_keys)
+
+                for ba in new_bas:
+                    for i in range(len(ba.ndarray.value)):
+                        ba.ndarray.value[i] += forecast_offset
+
+
 
             log.info('Merged Variable %s into the dataset!' % var_name)
 
