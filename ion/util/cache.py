@@ -220,6 +220,8 @@ class LRUDict(object):
         self.first = None
         self.last = None
 
+# Remove for code coverage
+'''
 if __name__ == '__main__':
     def main():
         class ObjectWithSize(object):
@@ -259,3 +261,4 @@ if __name__ == '__main__':
         print 'Should be false: ', lru.has_key('monkey')
 
     main()
+'''
