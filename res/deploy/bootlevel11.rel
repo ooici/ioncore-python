@@ -11,7 +11,7 @@
 
 
         {'name':'instrument_integration_service', 'version':'0.1',
-                                     'processapp':('instrument_integration_service', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationS
+                                     'processapp':('instrument_integration_service', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationService')
         },
  
         {'name':'eventmonitor',       'version':'0.1',
