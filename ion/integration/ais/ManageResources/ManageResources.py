@@ -10,6 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import logging
 from twisted.internet import defer
+import time
 
 from ion.core.exception import ApplicationError
 from ion.services.dm.inventory.association_service import AssociationServiceClient
@@ -461,40 +462,29 @@ class ManageResources(object):
 
 
    def __LoadEpucontrollerAttributes(self, To, From):
+      
+      class namespace: pass   # stupid hack to get around python variable scoping limitation
+
+      def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
+         To.resource.add()
+         To.resource[ns.Index].name = Name
+         To.resource[ns.Index].value = Value
+         ns.Index = ns.Index + 1
+         
+      ns = namespace()   # create wrapper class for scoping so worker function can set variable
+      ns.Index = 0
+      
       try:
-         To.resource.add()
-         To.resource[0].name = 'Decision Engine State'
-         To.resource[0].value = From['de_state']
-         To.resource.add()
-         To.resource[1].name = 'Decision Engine Configuration Report'
-         To.resource[1].value = From['de_conf_report']
-         To.resource.add()
-         To.resource[2].name = 'Last Queue Length Size'
-         To.resource[2].value = str(From['last_queuelen_size'])
-         To.resource.add()
-         To.resource[3].name = 'Last Queue Length Time'
-         To.resource[3].value = str(From['last_queuelen_time'])
-         i = 4
+         AddItem('Decision Engine State', From['de_state'])
+         AddItem('Decision Engine Configuration Report', From['de_conf_report'])
+         AddItem('Last Queue Length Size', str(From['last_queuelen_size']))
+         AddItem('Last Queue Length Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['last_queuelen_time'])))
          for instance in From['instances']:
-            To.resource.add()
-            To.resource[i].name = 'Instance Name'
-            To.resource[i].value = instance
-            i = i + 1
-            To.resource.add()
-            To.resource[i].name = 'Instance State'
-            To.resource[i].value = From['instances'][instance]['iaas_state']
-            i = i + 1
-            To.resource.add()
-            To.resource[i].name = 'Instance State Time'
-            To.resource[i].value = str(From['instances'][instance]['iaas_state_time'])
-            i = i + 1
-            To.resource.add()
-            To.resource[i].name = 'Heartbeat Time'
-            To.resource[i].value = str(From['instances'][instance]['heartbeat_time'])
-            i = i + 1
-            To.resource.add()
-            To.resource[i].name = 'Heartbeat State'
-            To.resource[i].value = From['instances'][instance]['heartbeat_state']
+            AddItem('Instance Name', instance)
+            AddItem('Instance State', From['instances'][instance]['iaas_state'])
+            AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
+            AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
+            AddItem('Heartbeat State', From['instances'][instance]['heartbeat_state'])
     
       except:
          estr = 'Object ERROR!'

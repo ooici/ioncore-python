@@ -58,19 +58,19 @@ class EPUControllerClient(ServiceClient):
             de_conf_report = "NpreservingEngine: preserves %d instances (%d unique), sites: %s, types: %s, allocations: %s" \
                         % (2, 1, ["ec2-east"], ["epu_work_consumer"], ["small"])
             instances = {"instance_id_01" : {"iaas_state" : '600-RUNNING',       # from epu/states.py
-                                             "iaas_state_time" : 1293833966,
-                                             "heartbeat_time" : 1293833967,
+                                             "iaas_state_time" : 1312908413.77,
+                                             "heartbeat_time" : 1293833967.23,
                                              "heartbeat_state" : "OK"            # from pu/epucontroller/health.py
                                              },
                          "instance_id_02" : {"iaas_state" : '500-STARTED',       # from epu/states.py
-                                             "iaas_state_time" : 1293833968,
+                                             "iaas_state_time" : 1293833968.44,
                                              "heartbeat_time" : 1293833969,
                                              "heartbeat_state" : "ZOMBIE"        # from pu/epucontroller/health.py
                                              }}
             defer.returnValue({"de_state": de_state,
                                "de_conf_report": de_conf_report,
                                "last_queuelen_size": 2,
-                               "last_queuelen_time": 1293833966,   # ~ number of seconds since 1970
+                               "last_queuelen_time": 1293833966.36,   # ~ number of seconds since 1970
                                "instances": instances})
         log.debug("%s.whole_state: sending whole_state query to epu_controller" % self.epu_controller_name)
         (content, headers, msg) = yield self.rpc_send('whole_state', {})
