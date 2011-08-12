@@ -59,6 +59,8 @@ class Receiver(BasicLifecycleObject):
     SCOPE_SYSTEM = 'system'
     SCOPE_LOCAL = 'local'
 
+    non_rpc_index = 0
+
     # Debugging information
     rec_messages = {}
     rec_shutoff = False
@@ -294,6 +296,9 @@ class Receiver(BasicLifecycleObject):
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
+
+                    self.non_rpc_index += 1
+                    convid = 'Non RPC request ID %d' % self.non_rpc_index
 
                     log.info('Setting NON RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
                     current_context.append( convid)
