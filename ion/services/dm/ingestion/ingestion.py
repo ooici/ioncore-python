@@ -388,7 +388,7 @@ class IngestionService(ServiceProcess):
             # do NOT reraise in the case of a timeout on our side - JAW will timeout client-side
             if hasattr(ex, 'response_code') and ex.response_code == content.ResponseCodes.TIMEOUT:
                 # ack the msg
-                yield msg.ack()
+                #yield msg.ack()
 
                 # just return from here
                 defer.returnValue(False)
