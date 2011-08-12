@@ -421,6 +421,10 @@ xN/XW/CKTL9f05RpuHULaoNHcOqi56m+Cs6jUaOuVwPxn5T0YoN/Tp24hbRfxFvMG34V
 
     @defer.inlineCallbacks
     def test_set_role(self):
+        # Prevent broadcasts from interfering
+        irs = self._get_service_by_name('identity_registry')
+        setattr(irs, 'op_broadcast', lambda *args: None)
+
         role = 'ADMIN'
         user_id = self.user2_ooi_id
         log.info('test user id: %s to get role: %s' % (user_id, role))
@@ -444,6 +448,10 @@ xN/XW/CKTL9f05RpuHULaoNHcOqi56m+Cs6jUaOuVwPxn5T0YoN/Tp24hbRfxFvMG34V
 
     @defer.inlineCallbacks
     def test_get_role(self):
+        # Prevent broadcasts from interfering
+        irs = self._get_service_by_name('identity_registry')
+        setattr(irs, 'op_broadcast', lambda *args: None)
+        
         role = 'EARLY_ADOPTER, MARINE_OPERATOR'
         user_id = self.user2_ooi_id
         yield self.irc.set_role(user_id, role)
