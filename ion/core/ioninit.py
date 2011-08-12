@@ -100,7 +100,7 @@ if loggly_key is not None:
     loggly_handler = IonLogglyHandler(token=loggly_key)
     loggly_handler.setLevel(logging.DEBUG)
     loggly_formatter = logging.Formatter(
-        '%(hostname)s> %(asctime)s.%(msecs)03d [%(levelname)s] {%(module)s:%(lineno)3d} %(message)s')
+        '%(hostname)s #%(process)s> %(asctime)s.%(msecs)03d [%(levelname)s] {%(module)s:%(lineno)3d} %(message)s')
     loggly_handler.setFormatter(loggly_formatter)
     logging.root.addHandler(loggly_handler)
 
