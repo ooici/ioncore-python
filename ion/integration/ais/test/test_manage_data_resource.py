@@ -48,7 +48,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATA_SOURCE_ID, \
-                                                                    SAMPLE_PROFILE_DATASET_ID
+                                                                    SAMPLE_PROFILE_DATASET_ID, \
+                                                                    SAMPLE_TRAJ_DATASET_ID
 
 
 
@@ -200,7 +201,7 @@ class AISManageDataResourceTest(IonTestCase):
         create_resp = yield self._createDataResource()
 
         #try the delete
-        yield self._deleteDataResource(create_resp.data_set_id)
+        yield self._deleteDataResource([create_resp.data_set_id])
 
     @defer.inlineCallbacks
     def test_createUpdateDeleteDataResource(self):
@@ -215,7 +216,7 @@ class AISManageDataResourceTest(IonTestCase):
 
         #try the delete
         log.info("FULL USAGE 3/3: delete")
-        yield self._deleteDataResource(create_resp.data_set_id)
+        yield self._deleteDataResource([create_resp.data_set_id])
         log.info("Create/Update/Delete/COMPLETE")
 
 
@@ -410,13 +411,29 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete one of the sample data sources
         """
-        yield self._deleteDataResource(SAMPLE_PROFILE_DATASET_ID)
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID])
         #yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
 
 
+    @defer.inlineCallbacks
+    def test_deleteDataResourceMultiple(self):
+        """
+        @brief try to delete 2 of the sample data sources
+        """
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, SAMPLE_TRAJ_DATASET_ID])
+
 
     @defer.inlineCallbacks
-    def _deleteDataResource(self, data_set_id):
+    def test_deleteDataResourceSequential(self):
+        """
+        @brief try to delete 2 of the sample data sources
+        """
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID])
+        yield self._deleteDataResource([SAMPLE_TRAJ_DATASET_ID])
+
+
+    @defer.inlineCallbacks
+    def _deleteDataResource(self, data_set_ids):
 
 
         log.info("Creating and wrapping delete request")
@@ -424,8 +441,8 @@ class AISManageDataResourceTest(IonTestCase):
         delete_req_msg  = ais_req_msg.CreateObject(DELETE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = delete_req_msg
 
-
-        delete_req_msg.data_set_resource_id.append(data_set_id)
+        for dsid in data_set_ids:
+            delete_req_msg.data_set_resource_id.append(dsid)
 
 
         result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg, MYOOICI_USER_ID)
@@ -440,16 +457,19 @@ class AISManageDataResourceTest(IonTestCase):
 
         result = result_wrapped.message_parameters_reference[0]
 
-        #check number of deleted ids (we deleted one, so should be one!)
+        #check number of deleted ids
         result = result_wrapped.message_parameters_reference[0]
         num_deletions = len(result.successfully_deleted_id)
-        self.failUnlessEqual(1, num_deletions,
-                             "Expected 1 deletion, got " + str(num_deletions))
+        log.info("Apparently we deleted %d ids" % num_deletions)
+        self.failUnlessEqual(len(data_set_ids), num_deletions,
+                             "Expected %d deletion(s), got %d" % (len(data_set_ids), num_deletions))
 
         #check that it's gone
-        dsrc = yield self.rc.get_instance(data_set_id)
-        self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
-                             "deleteDataResource apparently didn't mark anything retired")
+        for dsid in data_set_ids:
+            dsrc = yield self.rc.get_instance(dsid)
+            log.info("checking successful deletion of data source with id = '%s'" % dsid)
+            self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
+                                 "deleteDataResource apparently didn't mark anything retired")
 
         defer.returnValue(None)
 
