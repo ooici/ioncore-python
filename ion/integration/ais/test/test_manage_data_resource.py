@@ -221,6 +221,23 @@ class AISManageDataResourceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
+    def test_reproduceOOIION451(self):
+
+        #run the create
+        log.info("creating 3 data sets")
+        create_resp1 = yield self._createDataResource()
+        create_resp2 = yield self._createDataResource()
+        create_resp3 = yield self._createDataResource()
+
+        #try the delete
+        log.info("deleting 2 data sets")
+        yield self._deleteDataResource([create_resp1.data_set_id, create_resp2.data_set_id])
+
+        log.info("deleting last data set")
+        yield self._deleteDataResource([create_resp3.data_set_id])
+        
+
+    @defer.inlineCallbacks
     def test_updateDataResource_BadInput(self):
         """
         run through the update code but don't specify any ids.
