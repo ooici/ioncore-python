@@ -127,6 +127,33 @@ class ContextLocal(threading.local):
     def clear(self):
         self.__dict__.clear()
 
+
+class ConversationContext(object):
+
+
+    def __init__(self):
+
+        self.d = {}
+
+    def create_contex(self,name):
+        context = {}
+        self.d[name] = context
+        return context
+
+
+    def get_context(self,name):
+        return self.d.get(name)
+
+
+    def reference_context(self, name, context):
+        self.d[name] = context
+        return None
+    
+
+
+
+
+"""
 if __name__ == '__main__':
     context = StackLocal()
     frame = sys._getframe()
@@ -184,3 +211,5 @@ if __name__ == '__main__':
         request_context_6()
 
     fake_request() 
+
+"""

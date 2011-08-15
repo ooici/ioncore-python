@@ -186,11 +186,6 @@ class Process(BasicLifecycleObject):
         # TCP Connectors and Listening Ports
         self.connectors = []
         self.listeners = []
-
-        # Set a context for the startup of the process - to be cleared after activate is finished.
-        current_context = request.get('workbench_context', [])
-        current_context.append( 'process_initialization')
-        request.workbench_context = current_context
         
         # publisher for lifecycle change notifications
         self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
@@ -355,19 +350,8 @@ class Process(BasicLifecycleObject):
 
         # last step in activation - cleanup!
         log.debug('Process activation complete - clearing workbench:\n%s' % str(self.workbench))
-        current_context = request.get('workbench_context', [])
-        #        if current_context[-1] == 'process_initialization':
-        #            workbench_context = current_context.pop()
-        #            self.workbench.manage_workbench_cache(workbench_context)
-        #        else:
-        #            log.warn('Current context! %s' % str(current_context))
-        #            log.warn('Process context is not being cleared. Context got reset or changed?')
 
-        try:
-            current_context.remove('process_initialization')
-        except ValueError:
-            log.warn('Workbench Cache: "process_initialization" not found in current context at end of activation')
-        self.workbench.manage_workbench_cache('process_initialization')
+        self.workbench.manage_workbench_cache(request.get('workbench_context', 'Default Context'))
 
 
     def plc_activate(self):

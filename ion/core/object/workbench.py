@@ -369,9 +369,7 @@ class WorkBench(object):
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
 
-        wc = request.get('workbench_context',[])
-
-        repo.convid_context = pu.get_last_or_default(wc, 'Default Context')
+        repo.convid_context = request.get('workbench_context','Default Context')
 
        
     def reference_repository(self, repo_key, current_state=False):

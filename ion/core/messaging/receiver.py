@@ -12,6 +12,7 @@ import types
 from zope.interface import implements, Interface
 from twisted.internet import defer, threads, reactor
 
+import threading
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -25,9 +26,11 @@ from ion.core.object.codec import ION_R1_GPB
 
 from ion.core.exception import IonError
 
+from threading import currentThread, activeCount
+
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
-from ion.core.ioninit import request
+from ion.core.ioninit import request, threadpool
 
 
 class ReceiverError(IonError):
@@ -211,24 +214,36 @@ class Receiver(BasicLifecycleObject):
         """
 
         # Wrapping the handler in a thread to allow thread-local context during message processing.
-        def do_receive_and_wait():
-            threads.blockingCallFromThread(reactor, self._do_receive, msg)
+        @defer.inlineCallbacks
+        def do_receive_and_wait(current_context):
+            #threads.blockingCallFromThread(reactor, self._do_receive, msg)
             request.test='New Thread'
-            print 'In Thread: %s' % str(request.__dict__.items())
+            yield self._do_receive(msg, current_context)
+            log.debug('In Thread: request - %s, Thread - %s, active - %s' % (str(request.__dict__.items()), str(currentThread()), activeCount()))
 
 
         request.test = 'Before thread'
-        print 'Before Thread: %s' % str(request.__dict__.items())
+        log.debug('Before Thread: request - %s, Thread - %s, active - %s' % (str(request.__dict__.items()), str(currentThread()), activeCount()))
 
-        log.debug('before thread: %s' % str(request.get('workbench_context', [])))
-        yield threads.deferToThread(do_receive_and_wait)
-        log.debug('after thread: %s' % str(request.get('workbench_context', [])))
+        current_context = request.get('workbench_context')
+        #thread = threading.Thread()
+        #thread.start()
+        #thread.join()
 
-        print 'After Thread: %s' % str(request.__dict__.items())
+        #threadpool.startAWorker()
+
+        #print dir(threadpool)
+        #print threadpool.threads
+
+        #yield threads.deferToThread(do_receive_and_wait, current_context)
+        yield threads.deferToThreadPool(reactor, threadpool, do_receive_and_wait, current_context)
+
+        log.debug('After Thread: request - %s, Thread - %s, active - %s' % (str(request.__dict__.items()), str(currentThread()), activeCount()))
+
 
 
     @defer.inlineCallbacks
-    def _do_receive(self, msg):
+    def _do_receive(self, msg, current_context):
         """
         @brief entry point for received messages; callback from Carrot. All
                 registered handlers will be called in sequence
@@ -285,25 +300,7 @@ class Receiver(BasicLifecycleObject):
                 else:
                     workbench = None
 
-
-                current_context = request.get('workbench_context', [])
-
-                # Set the stack local context for known entries
-                #request.convid = convid
-                #request.protocol = protocol
-                #request.performative = performative
-
-
-                log.info(dir(request))
-
-                log.debug( 'BEFORE YIELD to Message Handler')
-                log.debug('OP "%s"' % op)
-                log.debug('CONVID "%s"' %  convid)
-                log.debug('PERFORMATIVE "%s"' % performative)
-                log.debug('PROTOCOL "%s"' % protocol)
-                log.debug('Current Context "%s"' % str(current_context))
-
-                #log.debug("WORKBENCH STATE before incoming message is added:\n%s" % str(workbench))
+                log.info('BEFORE Message Handler: OP - %s, Convid - %s, Performative - %s, Protocol - %s' % (op, convid, performative, protocol))
 
                 if protocol != 'rpc':
                     # if it is not an rpc conversation - set the context
@@ -312,23 +309,25 @@ class Receiver(BasicLifecycleObject):
                     convid = 'Non RPC request ID %d' % self.non_rpc_index
 
                     log.info('Setting NON RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
-                    current_context.append( convid)
+                    #current_context.append( convid)
                     #request.workbench_context = current_context
-                    request.workbench_context = [convid]
+                    request.workbench_context = convid
 
                 elif performative == 'request':
                     # if it is an rpc request - set the context
                     log.info('Setting RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
 
-                    current_context.append( convid)
+                    #current_context.append( convid)
                     #request.workbench_context = current_context
-                    request.workbench_context = [convid]
+                    request.workbench_context = convid
 
 
                 else:
                     #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
                     log.info('Dont set context if it is not a request: %s, in Proc: %s ' % (convid, self.process))
+                    request.workbench_context = current_context
 
+                log.debug('In Do Receive: request - %s, Thread - %s, active - %s' % (str(request.__dict__.items()), str(currentThread()), activeCount()))
 
                 # If this is a GPB message add it to the process workbench
                 encoding = data.get('encoding', None)
@@ -360,73 +359,59 @@ class Receiver(BasicLifecycleObject):
                         self.completion_deferred.callback(None)
                         self.completion_deferred = None
 
-                    # Cleanup the workbench after an op...
-                    workbench_context = 'Not a real context - never remove during inform result!'
-                    if protocol != 'rpc':
-                        # if it is not an rpc conversation - set the context
-                        workbench_context = current_context.pop()
-                        log.info('Popping Non RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
 
-                    elif performative == 'request':
-                        # if it is an rpc request - set the context
+                    log.info('After Message Handler: OP - %s, Convid - %s, Performative - %s, Protocol - %s' % (op, convid, performative, protocol))
 
-                        workbench_context = current_context.pop()
-                        log.info('Popping RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
+                    log.debug('After Message Handler: request - %s, Thread - %s, active - %s' % (str(request.__dict__.items()), str(currentThread()), activeCount()))
 
-                        # if it is an RPC result message - do not set the context!
+                    if workbench is not None:
 
-                    else:
+                        # Cleanup the workbench after an op...
+                        if protocol != 'rpc':
+                            # if it is not an rpc conversation - set the context
+                            workbench_context = request.get('workbench_context', 'None Set!')
+                            log.info('Clearing Non RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
 
-                        #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
-                        log.info('Dont use context if it is not a request: %s, in Proc: %s ' % (workbench_context, self.process))
+                        elif performative == 'request':
+                            # if it is an rpc request - set the context
 
+                            workbench_context = request.get('workbench_context', 'None Set!')
+                            log.info('Clearing RPC request workbench_context: %s, in Proc: %s ' % (workbench_context, self.process))
 
-                    if hasattr(self.process, 'workbench'):
-
-                        log.debug('AFTER YIELD to message handler')
-                        log.debug('OP "%s"' % op)
-                        log.debug('CONVID: %s' % convid)
-                        log.debug('PERFORMATIVE: %s',performative)
-                        log.debug('PROTOCOL "%s"' % protocol)
-                        log.debug('Current CONTXT: %s' % current_context)
-                        log.debug('WORKBENCH CONTXT: %s' % workbench_context)
-
-
-
-
-                        if convid == workbench_context:
-
-                            log.info('Receiver Process: Calling workbench clear:')
-
-                            #log.debug("WORKBENCH STATE Before Clear:\n%s" % str(self.process.workbench))
-
-                            self.process.workbench.manage_workbench_cache(workbench_context)
-
-                            nrepos = len(self.process.workbench._repos)
-                            if  nrepos > 0:
-
-                                pname = self.process.proc_name
-
-                                count = 0
-                                for repo in self.process.workbench._repos.itervalues():
-                                    #if repo.convid_context != 'Test runner context!' or repo.persistent is True:
-                                    if repo.persistent is True:
-                                        count +=1
-
-                                if count > 0:
-
-                                    # Print a warning if someone else is using the persistence tricks...
-                                    log.warn('The "%s" process is holding persistent state in %d repository objects!' % (pname, count))
-
-                            #log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
+                            # if it is an RPC result message - do not set the context!
 
                         else:
-                            log.debug('Workbench context does not match the Convid - Do not clear anything from the workbench!')
+
+                            #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
+                            log.info('No context to clear in Proc: %s ' % (self.process))
+                            workbench_context = 'Not a real context - never remove during inform result!'
+
+
+                        self.process.workbench.manage_workbench_cache(workbench_context)
+
+                        nrepos = len(self.process.workbench._repos)
+                        if  nrepos > 0:
+
+                            pname = self.process.proc_name
+
+                            count = 0
+                            for repo in self.process.workbench._repos.itervalues():
+                                #if repo.convid_context != 'Test runner context!' or repo.persistent is True:
+                                if repo.persistent is True:
+                                    count +=1
+
+                            if count > 0:
+
+                                # Print a warning if someone else is using the persistence tricks...
+                                log.warn('The "%s" process is holding persistent state in %d repository objects!' % (pname, count))
+
+                            #log.debug("WORKBENCH STATE After Clear:\n%s" % str(self.process.workbench))
 
                         log.info(self.process.workbench.cache_info())
 
 
         log.info( 'End Receiver.Receive on proc: %s' % str(self.process))
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
