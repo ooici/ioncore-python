@@ -87,6 +87,8 @@ class NotificationAlertService(ServiceProcess):
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         
         self.MailServer = CONF.getValue('mail_server', default='mail.oceanobservatories.org')
+        self.update_event_queue_name = CONF.getValue('update_event_queue_name', default='nas_update_event')
+        self.offline_event_queue_name = CONF.getValue('offline_event_queue_name', default='nas_offline_event')
         
         self.index_store_class = pu.get_class(index_store_class_name)
         self._storage_conf = get_cassandra_configuration()
@@ -123,14 +125,14 @@ class NotificationAlertService(ServiceProcess):
 
         # Create the subscribers for the event handlers
 
-        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
+        self.sub = DatasetSupplementAddedEventSubscriber(process=self, queue_name=self.update_event_queue_name)
         self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
 
 
-        self.sub = DatasourceUnavailableEventSubscriber(process=self)
+        self.sub = DatasourceUnavailableEventSubscriber(process=self, queue_name=self.offline_event_queue_name)
         self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
