@@ -12,22 +12,12 @@ from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
 
-from ion.core.ioninit import request
-
 from ion.core.process.process import Process
 from ion.core.messaging.receiver_test_service import ReceiverService, ReceiverServiceClient
 from ion.core import bootstrap
 from twisted.trial import unittest
 
 from ion.core.object import object_utils
-from ion.core.object import workbench
-from ion.core.messaging import message_client
-
-
-
-# Static entry point for "thread local" context storage during request
-# processing, eg. to retaining user-id from request message
-from ion.core.ioninit import request
 
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -52,7 +42,7 @@ class ReceiverTest(IonTestCase):
     @defer.inlineCallbacks
     def test_op_a(self):
 
-        rs = ReceiverService(spawnargs={'a_time':1,'b_time':1,'proc-name':'ReceiverService'})
+        rs = ReceiverService(spawnargs={'proc-name':'ReceiverService'})
         yield rs.spawn()
 
         msg = yield self.proc.message_client.create_instance(PERSON_TYPE)
@@ -71,7 +61,7 @@ class ReceiverTest(IonTestCase):
     @defer.inlineCallbacks
     def test_op_b(self):
 
-        rs = ReceiverService(spawnargs={'a_time':1,'b_time':1,'proc-name':'ReceiverService'})
+        rs = ReceiverService(spawnargs={'proc-name':'ReceiverService'})
         yield rs.spawn()
 
         msg = yield self.proc.message_client.create_instance(PERSON_TYPE)
@@ -92,8 +82,8 @@ class ReceiverTest(IonTestCase):
     @defer.inlineCallbacks
     def test_op_a_and_b(self):
 
-        rs_1 = ReceiverService(spawnargs={'a_time':1,'b_time':3,'proc-name':'ReceiverService1'})
-        rs_2 = ReceiverService(spawnargs={'a_time':1,'b_time':3,'proc-name':'ReceiverService2'})
+        rs_1 = ReceiverService(spawnargs={'proc-name':'ReceiverService1'})
+        rs_2 = ReceiverService(spawnargs={'proc-name':'ReceiverService2'})
         yield rs_1.spawn()
         yield rs_2.spawn()
 
@@ -104,7 +94,6 @@ class ReceiverTest(IonTestCase):
         b_fed = self.rsc.b(msg)
 
         context_1 = yield rs_1.action
-
         context_2 = yield rs_2.action
 
 
@@ -114,7 +103,24 @@ class ReceiverTest(IonTestCase):
         self.failUnless(context_1 == a_heads['conv-id'] and context_2 == b_heads['conv-id'] or
             context_1 == b_heads['conv-id'] and context_2 == a_heads['conv-id'])
         self.assertNotEqual(context_1,context_2)
-        #self.assertEqual(context[-1],heads['conv-id'])
+
+        self.assertEqual(a_resp.name,'David')
+        self.assertEqual(b_resp.name,'David')
+
+
+        b_fed = self.rsc.b(msg)
+        a_fed = self.rsc.a(msg)
+
+        context_1 = yield rs_1.action
+        context_2 = yield rs_2.action
+
+
+        a_resp, a_heads, a_message = yield a_fed
+        b_resp, b_heads, b_message = yield b_fed
+
+        self.failUnless(context_1 == a_heads['conv-id'] and context_2 == b_heads['conv-id'] or
+            context_1 == b_heads['conv-id'] and context_2 == a_heads['conv-id'])
+        self.assertNotEqual(context_1,context_2)
 
         self.assertEqual(a_resp.name,'David')
         self.assertEqual(b_resp.name,'David')

@@ -28,8 +28,7 @@ import weakref
 
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
-from ion.core.ioninit import request
-from net.ooici.core.container import container_pb2
+#from net.ooici.core.container import container_pb2
 
 
 from ion.util.cache import LRUDict
@@ -144,6 +143,18 @@ class WorkBench(object):
             return str(self)
         else:
             return 'Workbench Cache is clear!'
+
+    def count_persistent(self):
+        nrepos = len(self._repos)
+        count = 0
+        if  nrepos > 0:
+
+            for repo in self._repos.itervalues():
+                if repo.persistent is True:
+                    count +=1
+        return count
+
+
 
 
     def create_repository(self, root_type=None, nickname=None, repository_key=None, persistent=False):
@@ -369,8 +380,10 @@ class WorkBench(object):
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
 
-        repo.convid_context = request.get('workbench_context','Default Context')
-
+        try:
+            repo.convid_context = self._process.context.get('progenitor_convid')
+        except AttributeError, ae:
+            log.warn('Workbench Process (%s) does not have have a context object!' % self._process)
        
     def reference_repository(self, repo_key, current_state=False):
 
