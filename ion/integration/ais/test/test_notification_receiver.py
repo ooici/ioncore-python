@@ -83,6 +83,11 @@ class NotificationReceiverTest(IonTestCase):
                 'module':'ion.integration.ais.notification_alert_service',
                 'class':'NotificationAlertService'
             },
+            {
+                'name':'notification_alert',                               # add two nas to test for one email from subscriber queue
+                'module':'ion.integration.ais.notification_alert_service',
+                'class':'NotificationAlertService'
+            },
 
             ]
 
