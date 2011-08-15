@@ -213,10 +213,19 @@ class Receiver(BasicLifecycleObject):
         # Wrapping the handler in a thread to allow thread-local context during message processing.
         def do_receive_and_wait():
             threads.blockingCallFromThread(reactor, self._do_receive, msg)
+            request.test='New Thread'
+            print 'In Thread: %s' % str(request.__dict__.items())
 
-        log.debug('before thread')
+
+        request.test = 'Before thread'
+        print 'Before Thread: %s' % str(request.__dict__.items())
+
+        log.debug('before thread: %s' % str(request.get('workbench_context', [])))
         yield threads.deferToThread(do_receive_and_wait)
-        log.debug('after thread')
+        log.debug('after thread: %s' % str(request.get('workbench_context', [])))
+
+        print 'After Thread: %s' % str(request.__dict__.items())
+
 
     @defer.inlineCallbacks
     def _do_receive(self, msg):
@@ -285,6 +294,8 @@ class Receiver(BasicLifecycleObject):
                 #request.performative = performative
 
 
+                log.info(dir(request))
+
                 log.debug( 'BEFORE YIELD to Message Handler')
                 log.debug('OP "%s"' % op)
                 log.debug('CONVID "%s"' %  convid)
@@ -302,14 +313,17 @@ class Receiver(BasicLifecycleObject):
 
                     log.info('Setting NON RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
                     current_context.append( convid)
-                    request.workbench_context = current_context
+                    #request.workbench_context = current_context
+                    request.workbench_context = [convid]
 
                 elif performative == 'request':
                     # if it is an rpc request - set the context
                     log.info('Setting RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
 
                     current_context.append( convid)
-                    request.workbench_context = current_context
+                    #request.workbench_context = current_context
+                    request.workbench_context = [convid]
+
 
                 else:
                     #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
