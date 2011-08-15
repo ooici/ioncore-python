@@ -167,10 +167,11 @@ class ManageResources(object):
    def __PrintEpucontrollerAttributes(self, ds):
       log.debug('de_state = '+str(ds['de_state']))
       log.debug('de_conf_report = '+str(ds['de_conf_report']))
-      log.debug('last_queuelen_size = '+str(ds['last_queuelen_size']))
-      log.debug('last_queuelen_time = '+str(ds['last_queuelen_time']))
       for instance in ds['instances']:
          log.debug('Instance Name = '+instance)
+         log.debug('Instance IAAS ID', ds['instances'][instance]['iaas_id'])
+         log.debug('Instance Public IP', ds['instances'][instance]['public_ip'])
+         log.debug('Instance Private IP', ds['instances'][instance]['private_ip'])
          log.debug('iaas_state = '+ds['instances'][instance]['iaas_state'])
          log.debug('iaas_state = '+str(ds['instances'][instance]['iaas_state_time']))
          log.debug('iaas_state = '+str(ds['instances'][instance]['heartbeat_time']))
@@ -477,10 +478,11 @@ class ManageResources(object):
       try:
          AddItem('Decision Engine State', From['de_state'])
          AddItem('Decision Engine Configuration Report', From['de_conf_report'])
-         AddItem('Last Queue Length Size', str(From['last_queuelen_size']))
-         AddItem('Last Queue Length Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['last_queuelen_time'])))
          for instance in From['instances']:
             AddItem('Instance Name', instance)
+            AddItem('Instance IAAS ID', From['instances'][instance]['iaas_id'])
+            AddItem('Instance Public IP', From['instances'][instance]['public_ip'])
+            AddItem('Instance Private IP', From['instances'][instance]['private_ip'])
             AddItem('Instance State', From['instances'][instance]['iaas_state'])
             AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
             AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
