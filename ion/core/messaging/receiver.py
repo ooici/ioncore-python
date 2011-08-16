@@ -284,8 +284,13 @@ class Receiver(BasicLifecycleObject):
                         try:
                             process.context = process.conversation_context.get_context(convid)
                         except KeyError, ke:
-                            log.exception("Invalid convid which has no context: \nMessage Content - %s\nConversation Context - %s " % (str(data.items()), process.conversation_context))
-                            raise ReceiverError('Could not set Conversation Context!')
+
+                            if self.name not in data['receiver']:
+                                log.info('Recieved an RPC message for which I have no conversation - I am eavesdropping on another conversation!')
+                            else:
+                                log.exception("Invalid convid which has no context: \nMessage Content - %s\nConversation Context - %s " % (str(data.items()), str(process.conversation_context)))
+                                raise ReceiverError('Could not set Conversation Context!')
+
 
                     log.info('Receiver Context: %s' % str(self.process.context))
 
@@ -334,7 +339,11 @@ class Receiver(BasicLifecycleObject):
                         try:
                             process.conversation_context.remove(convid)
                         except KeyError, ke:
-                            log.warn('Conversation context was not registered...')
+
+                            if self.name not in data['receiver']:
+                                log.info('Conversation context was not registered... but I am just eavesdropping')
+                            else:
+                                log.info('Conversation context was not registered... something is screwy with this conversation')
 
                         # Cleanup the workbench after an op...
                         if protocol != 'rpc':
