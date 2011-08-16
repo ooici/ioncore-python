@@ -183,6 +183,14 @@ class ConversationContext(object):
 
         self.d.clear()
 
+    def replace_context(self):
+        """
+        If a context completes, we don't really know what to set it back to afterward... so just pick one. Hopefully it doesn't matter....
+        """
+        try:
+            return self.d.values()[0]
+        except IndexError, ie:
+            return None
 
 
 """

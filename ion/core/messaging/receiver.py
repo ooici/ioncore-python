@@ -24,6 +24,8 @@ from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
 from ion.core.object.codec import ION_R1_GPB
 
+from ion.util.context import ContextObject
+
 from ion.core.exception import IonError
 
 
@@ -258,6 +260,7 @@ class Receiver(BasicLifecycleObject):
 
                     log.info('Process "%s" Receiver Message Headers: OP - %s, Convid - %s, Performative - %s, Protocol - %s' % (process.proc_name, op, convid, performative, protocol))
 
+
                     if protocol != 'rpc':
                         # if it is not an rpc conversation - set the context
 
@@ -266,20 +269,20 @@ class Receiver(BasicLifecycleObject):
 
                         log.info('Setting NON RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
 
-                        self.process.context = process.conversation_context.create_context(convid)
+                        process.context = process.conversation_context.create_context(convid)
 
                     elif performative == 'request':
                         # if it is an rpc request - set the context
                         log.info('Setting RPC request workbench_context: %s, in Proc: %s ' % (convid, self.process))
 
-                        self.process.context = process.conversation_context.create_context(convid)
+                        process.context = process.conversation_context.create_context(convid)
 
                     else:
                         #log.warn('Message headers: \n%s' % pu.pprint_to_string(data))
                         log.info('Dont set context if it is not a request: %s, in Proc: %s ' % (convid, self.process))
 
                         try:
-                            self.process.context = process.conversation_context.get_context(convid)
+                            process.context = process.conversation_context.get_context(convid)
                         except KeyError, ke:
                             log.exception("Invalid convid which has no context: \nMessage Content - %s\nConversation Context - %s " % (str(data.items()), process.conversation_context))
                             raise ReceiverError('Could not set Conversation Context!')
@@ -327,35 +330,57 @@ class Receiver(BasicLifecycleObject):
 
                         log.info('Receiver Context: %s' % str(process.context))
 
-                        # Cleanup the workbench after an op...
-                        if protocol != 'rpc':
-                            # if it is not an rpc conversation - set the context
-                            pc  = process.context.get('progenitor_convid','No Context')
-                            log.info('Clearing Non RPC request workbench_context: %s, in Proc: %s ' % (pc, process))
-
-                            workbench.manage_workbench_cache(pc)
-
-                            process.context.clear()
-
-                        elif performative == 'request':
-                            # if it is an rpc request - set the context
-
-                            pc  = process.context.get('progenitor_convid','No Context')
-                            log.info('Clearing RPC request workbench_context: %s, in Proc: %s ' % (pc, process))
-
-                            workbench.manage_workbench_cache(pc)
-
-                            process.context.clear()
-
-                        else:
-
-                            log.info('No context to clear in Proc: %s ' % (process))
-
-
+                        # Try to remove the conversation from the conversation dictionary - no matter what we are done with this convid...
                         try:
                             process.conversation_context.remove(convid)
                         except KeyError, ke:
-                            log.debug('Conversation context was not registered...')
+                            log.warn('Conversation context was not registered...')
+
+                        # Cleanup the workbench after an op...
+                        if protocol != 'rpc':
+                            # if it is not an rpc conversation - clean up the context
+                            log.info('Clearing Non RPC request workbench_context: %s, in Proc: %s ' % (convid, process))
+
+                            # Clear anything created in this context
+                            workbench.manage_workbench_cache(convid)
+
+                            # Reset the context to something sensible on the way our - but what?
+                            if process.context.get('progenitor_convid') == convid:
+                                last_context = process.conversation_context.replace_context()
+
+                                if last_context is None:
+                                    # If there are no active conversations reset to a default
+                                    process.context = ContextObject()
+                                    # Lets try to clear everything!
+                                    workbench.manage_workbench_cache()
+
+
+                                else:
+                                    process.context = last_context
+
+                        elif performative == 'request':
+                            # if it is the end of an rpc request - clean up the context
+
+                            log.info('Clearing RPC request workbench_context: %s, in Proc: %s ' % (convid, process))
+
+                            # Clear anything created in this context
+                            workbench.manage_workbench_cache(convid)
+
+                            # Reset the context to something sensible on the way our - but what?
+                            if process.context.get('progenitor_convid') == convid:
+                                last_context = process.conversation_context.replace_context()
+
+                                if last_context is None:
+                                    # If there are no active conversations reset to a default
+                                    process.context = ContextObject()
+                                    # Lets try to clear everything!
+                                    workbench.manage_workbench_cache()
+
+                                else:
+                                    process.context = last_context
+
+                        else:
+                            log.info('No context to clear in Proc: %s ' % (process))
 
                         count = workbench.count_persistent()
                         if count > 0:

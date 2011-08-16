@@ -336,7 +336,7 @@ class WorkBench(object):
             if repo.persistent is True:
                 continue
 
-            if repo.convid_context == convid_context or repo.convid_context is None:
+            if repo.convid_context == convid_context or convid_context is None:
 
                 if repo.cached is False:
                     self.clear_repository(repo)

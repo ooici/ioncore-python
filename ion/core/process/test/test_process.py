@@ -147,11 +147,8 @@ class ProcessTest(IonTestCase):
         self.assertEquals(pid1, proc.id)
         log.info('Process 1 spawned and initd correctly')
 
-        print 'CONTEXT: %s' % str(self.test_sup.context)
 
-        print 'KSNDKNSDLKSDNLKSND'
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
-        print 'KSNDKNSDLKSDNLKSND2222'
 
         #self.assertEquals(cont['value'], 'content123')
         self.assertEquals(cont, 'content123')
