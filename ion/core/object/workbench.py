@@ -131,16 +131,18 @@ class WorkBench(object):
 
         trouble = False
         convid=None
+        convids = set()
         for repo in self._repos.itervalues():
 
             if convid is None and repo.persistent is False:
                 convid = repo.convid_context
+                convids.add(repo.convid_context)
             elif convid != repo.convid_context and repo.persistent is False:
                 trouble = True
-                break
+                convids.add(repo.convid_context)
 
         if trouble:
-            return str(self)
+            return str('Workbench Cache is holding %d repositories in %d conversations' % (len(self._repos), len(convids)) )
         else:
             return 'Workbench Cache is clear!'
 
