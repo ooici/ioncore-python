@@ -65,6 +65,9 @@ class SchedulerTest(IonTestCase):
         self.proc = Process(spawnargs={'proc-name':'SchedulerTestProcess'})
         yield self.proc.spawn()
 
+        # Pretend like everything in the Scheduler test process is happening in response to a message...
+        self.proc.context = self.proc.conversation_context.create_context('dont delete me!')
+
         # setup subscriber for trigger event
         self._notices = []
         self.sub = ScheduleEventSubscriber(process=self.proc,
@@ -194,7 +197,6 @@ class SchedulerTest(IonTestCase):
 
         log.debug(resp_msg.task_id)
         self.failIf(resp_msg.task_id is None)
-
 
         #fixme: also fail if we don't get GPB #2602 back
 

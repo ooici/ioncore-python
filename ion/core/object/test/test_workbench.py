@@ -595,6 +595,8 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.root_object.title = 'Other Title'
         self.repo1.commit('Another updated addressbook')
 
+        self.repo1.persistent=True
+
         # Push the object in proc2 back to proc1 - it will have both divergent states
         log.info('Pushing back to proc1')
         result = yield self.proc2.workbench.push(self.proc1.id.full, repo2)
@@ -644,6 +646,8 @@ class WorkBenchProcessTest(IonTestCase):
         ### SAME CONTENT....
         #self.repo1.root_object.title = 'Other Title'
         #self.repo1.commit('Another updated addressbook')
+
+        self.repo1.persistent = True
 
         # Push the object in proc2 back to proc1 - it will have both divergent states
         log.info('Pushing back to proc1')
