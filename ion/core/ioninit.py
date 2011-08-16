@@ -12,7 +12,8 @@ import logging.handlers
 import re
 import os, os.path
 
-from ion.util.context import ContextLocal
+
+from ion.util.context import ConversationContext
 from ion.util.path import adjust_dir
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -59,11 +60,6 @@ sys_name = None
 
 # Global flag determining whether currently running unit test
 testing = True
-
-# Static entry point for "thread local" context storage during request
-# processing, eg. to retaining user-id from request message
-request = ContextLocal()
-
 
 # Optionally use Loggly for logging, just an experiment for now
 loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)

@@ -127,6 +127,73 @@ class ContextLocal(threading.local):
     def clear(self):
         self.__dict__.clear()
 
+
+class ContextObject(object):
+
+
+    def __init__(self, convid="Default Context"):
+        self.progenitor_convid = convid
+
+    def get(self, key, defaultVal=None):
+        try:
+            return self.__getattribute__(key)
+        except AttributeError:
+            return defaultVal
+
+
+    def clear(self, convid="Default Context"):
+        self.__dict__.clear()
+        self.progenitor_convid = convid
+        
+    def __str__(self):
+        return str(self.__dict__.items())
+
+
+
+class ConversationContext(object):
+
+
+    def __init__(self):
+        self.d = {}
+
+    def create_context(self,name):
+        context = ContextObject(name)
+        self.d[name] = context
+        return context
+
+
+    def get_context(self,name):
+        context = self.d.get(name,None)
+        if context is None:
+            raise KeyError('Conversation Context not found!')
+        return context
+
+
+    def reference_context(self, name, context):
+        self.d[name] = context
+        return None
+
+    def remove(self,name):
+        del self.d[name]
+
+    def __str__(self):
+        return str(self.d.items())
+
+    def clear(self):
+
+        self.d.clear()
+
+    def replace_context(self):
+        """
+        If a context completes, we don't really know what to set it back to afterward... so just pick one. Hopefully it doesn't matter....
+        """
+        try:
+            return self.d.values()[0]
+        except IndexError, ie:
+            return None
+
+
+"""
 if __name__ == '__main__':
     context = StackLocal()
     frame = sys._getframe()
@@ -184,3 +251,5 @@ if __name__ == '__main__':
         request_context_6()
 
     fake_request() 
+
+"""

@@ -15,7 +15,6 @@ from twisted.internet import defer
 
 from ion.core import bootstrap
 from ion.core import ioninit
-from ion.core.ioninit import request
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -42,12 +41,6 @@ class BootstrapTest2(IonTestCase):
 
     def test_1(self):
         pass
-
-    @defer.inlineCallbacks
-    def test_2(self):
-
-        yield pu.asleep(1)
-        self.assertEqual(request.workbench_context, ['Test runner context!'])
 
 ##  Potential tests for bootstrap_profile_dataset()  ## 
 # @todo: test ion start and end time match the data in the time variable

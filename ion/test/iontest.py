@@ -20,9 +20,10 @@ from ion.core.cc import service
 from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
-from ion.core.process.process import Process, request
+from ion.core.process.process import Process
 from ion.core.data.store import Store
 import ion.util.procutils as pu
+
 
 # The following modules must be imported here, because they load config
 # files. If done while in test, it does not work!
@@ -234,10 +235,6 @@ class IonTestCase(unittest.TestCase):
         # stack to allow running of tests within the policy enforcement environment
         # as well as force certain policy enforcement failures, etc.
 
-        request.clear()
-        #request.user_id = 'MYUSERID'
-        #request.expiry = '999999999'
-        request.workbench_context = ['Test runner context!']
         unittest.TestCase.run(self, result)
 
 
