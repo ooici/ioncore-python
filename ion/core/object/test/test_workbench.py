@@ -238,12 +238,15 @@ class WorkBenchTest(unittest.TestCase):
         self.assertIn(key, self.wb._repos)
         self.assertNotIn(key, self.wb._repo_cache)
 
+        # Decided to change this behavior - no arguments should clear...
+        """
         # Call manage without context
         self.wb.manage_workbench_cache()
 
         # Still there...
         self.assertIn(key, self.wb._repos)
         self.assertNotIn(key, self.wb._repo_cache)
+        """
 
         # Call manage other context
         self.wb.manage_workbench_cache('Not Mine')
