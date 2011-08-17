@@ -29,7 +29,7 @@ class NotificationReceiverTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
+        yield self._start_container(sysname='nas_unit_test')
 
         services = [
             {
@@ -147,7 +147,7 @@ class NotificationReceiverTest(IonTestCase):
 
 
         yield pubSupplementAdded.create_and_publish_event(origin='UnitTest',
-                                                          dataset_id="UnitTest_dataresrc123",
+                                                          dataset_id="UnitTest_dataset123",
                                                           datasource_id="UnitTest_dataresrc123",
                                                           title="Unit Test Datasource",
                                                           url="Some URL",
@@ -156,9 +156,9 @@ class NotificationReceiverTest(IonTestCase):
                                                           number_of_timesteps = 7)
 
         yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
+                                                        dataset_id="UnitTest_dataset123",
                                                         datasource_id="UnitTest_dataresrc123",
                                                         error_explanation="UnitTest_explanation")
-        
 
         yield pu.asleep(5.0)
         

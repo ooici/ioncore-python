@@ -142,11 +142,13 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_offline_event(self, content):
         log.info('NotificationAlertService.handle_offline_event notification event received ')
-        log.info('NotificationAlertService.handle_offline_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_offline_event content   : %s', content)
         msg = content['content'];
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
 
         # build the email from the event content
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
         BODY = string.join(("This data resource is currently unavailable.",
                             "",
                             "Explanation: %s" %  msg.additional_data.error_explanation,
@@ -207,15 +209,17 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_update_event(self, content):
         log.info('NotificationAlertService.handle_update_event notification event received')
-        log.info('NotificationAlertService.handle_update_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_update_event content   : %s', content)
         msg = content['content']
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
         
         # build the email from the event content
         startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis/1000))))
         enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
         log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
         BODY = string.join((
