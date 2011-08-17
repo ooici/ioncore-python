@@ -48,8 +48,7 @@ from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATA_SOURCE_ID, \
-                                                                    SAMPLE_PROFILE_DATASET_ID, \
-                                                                    SAMPLE_TRAJ_DATASET_ID
+                                                                    SAMPLE_PROFILE_DATASET_ID
 
 
 
@@ -228,10 +227,11 @@ class AISManageDataResourceTest(IonTestCase):
         create_resp1 = yield self._createDataResource()
         create_resp2 = yield self._createDataResource()
         create_resp3 = yield self._createDataResource()
+        create_resp4 = yield self._createDataResource()
 
         #try the delete
         log.info("deleting 2 data sets (new/existing)")
-        yield self._deleteDataResource([create_resp1.data_set_id, SAMPLE_TRAJ_DATASET_ID])
+        yield self._deleteDataResource([create_resp1.data_set_id, create_resp4.data_set_id])
 
         log.info("deleting 2 data sets (existing/new)")
         yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, create_resp2.data_set_id])
@@ -343,7 +343,7 @@ class AISManageDataResourceTest(IonTestCase):
                                                                 fr_is_public))
 
         log.info("Creating and wrapping update request message")
-        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)        
         update_req_msg  = ais_req_msg.CreateObject(UPDATE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = update_req_msg
 
@@ -440,7 +440,10 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete 2 of the sample data sources
         """
-        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, SAMPLE_TRAJ_DATASET_ID])
+        #run the create
+        create_resp = yield self._createDataResource()
+
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, create_resp.data_set_id])
 
 
     @defer.inlineCallbacks
@@ -448,8 +451,10 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete 2 of the sample data sources
         """
+        #run the create
+        create_resp = yield self._createDataResource()
         yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID])
-        yield self._deleteDataResource([SAMPLE_TRAJ_DATASET_ID])
+        yield self._deleteDataResource([create_resp.data_set_id])
 
 
     @defer.inlineCallbacks
