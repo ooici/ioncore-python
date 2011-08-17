@@ -469,7 +469,10 @@ class ManageResources(object):
       def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
          To.resource.add()
          To.resource[ns.Index].name = Name
-         To.resource[ns.Index].value = Value
+         if Value == None:
+            To.resource[ns.Index].value = 'None'
+         else:
+            To.resource[ns.Index].value = Value
          ns.Index = ns.Index + 1
          
       ns = namespace()   # create wrapper class for scoping so worker function can set variable
@@ -484,8 +487,14 @@ class ManageResources(object):
             AddItem('Instance Public IP', From['instances'][instance]['public_ip'])
             AddItem('Instance Private IP', From['instances'][instance]['private_ip'])
             AddItem('Instance State', From['instances'][instance]['iaas_state'])
-            AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
-            AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
+            if From['instances'][instance]['iaas_state_time'] == None:
+               AddItem('Instance State Time', 'None')
+            else:
+               AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
+            if From['instances'][instance]['heartbeat_time'] == None:
+               AddItem('Heartbeat Time', 'None')
+            else:
+               AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
             AddItem('Heartbeat State', From['instances'][instance]['heartbeat_state'])
     
       except:
