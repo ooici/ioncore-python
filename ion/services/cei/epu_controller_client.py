@@ -67,7 +67,7 @@ class EPUControllerClient(ServiceClient):
                                              },
                          "instance_id_02" : {"iaas_id" : 'i-98765432',
                                              "public_ip" : '9.8.7.6',
-                                             "private_ip" : '5.4.3.2',
+                                             "private_ip" : None,
                                              "iaas_state" : '500-STARTED',       # from epu/states.py
                                              "iaas_state_time" : 1293833968.44,
                                              "heartbeat_time" : 1293833969,
