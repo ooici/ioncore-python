@@ -648,8 +648,8 @@ class ManageDataResource(object):
         # Set the lifecycle state to active
         datasrc_resource.ResourceLifeCycleState        = datasrc_resource.ACTIVE
 
-        #put it with the others
-        yield self.rc.put_instance(datasrc_resource)
+        #Do not put the resource at this time!
+        #yield self.rc.put_instance(datasrc_resource)
         log.info("created data source ") # + str(datasrc_resource))
 
         defer.returnValue(datasrc_resource)
