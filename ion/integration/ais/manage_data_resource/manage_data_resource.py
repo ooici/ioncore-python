@@ -670,8 +670,8 @@ class ManageDataResource(object):
         for a in found:
             mystery_resource = yield self.rc.get_instance(a.ObjectReference.key)
             mystery_resource_type = mystery_resource.ResourceTypeID.key
-            log.info("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
-            log.info("Want type %s, got type %s" 
+            log.debug("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
+            log.debug("Want type %s, got type %s" 
                      % (the_object_type, mystery_resource_type))
             if the_object_type == mystery_resource.ResourceTypeID.key:
                 if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
@@ -702,8 +702,8 @@ class ManageDataResource(object):
         for a in found:
             mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
             mystery_resource_type = mystery_resource.ResourceTypeID.key
-            log.info("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
-            log.info("Want type %s, got type %s" 
+            log.debug("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
+            log.debug("Want type %s, got type %s" 
                      % (the_subject_type, mystery_resource_type))
             if the_subject_type == mystery_resource.ResourceTypeID.key:
                 if mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
