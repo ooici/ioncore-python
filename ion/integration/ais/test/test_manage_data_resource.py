@@ -224,14 +224,17 @@ class AISManageDataResourceTest(IonTestCase):
     def test_reproduceOOIION451(self):
 
         #run the create
-        log.info("creating 3 data sets")
+        log.info("creating 3 data sets (and using 2 existing data sets)")
         create_resp1 = yield self._createDataResource()
         create_resp2 = yield self._createDataResource()
         create_resp3 = yield self._createDataResource()
 
         #try the delete
-        log.info("deleting 2 data sets")
-        yield self._deleteDataResource([create_resp1.data_set_id, create_resp2.data_set_id])
+        log.info("deleting 2 data sets (new/existing)")
+        yield self._deleteDataResource([create_resp1.data_set_id, SAMPLE_TRAJ_DATASET_ID])
+
+        log.info("deleting 2 data sets (existing/new)")
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, create_resp2.data_set_id])
 
         log.info("deleting last data set")
         yield self._deleteDataResource([create_resp3.data_set_id])
