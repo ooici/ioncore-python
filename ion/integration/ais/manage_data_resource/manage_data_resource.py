@@ -75,7 +75,9 @@ class ManageDataResource(object):
         self.dscc  = DatasetControllerClient(proc=ais)
         self.ac    = AssociationClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
-        self.ing   = IngestionClient(proc=ais)
+
+        # Not needed...
+        #self.ing   = IngestionClient(proc=ais)
         self.nac   = NotificationAlertServiceClient(proc=ais)
          
         #necessary to receive events i think
