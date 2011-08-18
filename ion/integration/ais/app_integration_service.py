@@ -481,7 +481,8 @@ class AppIntegrationServiceClient(ServiceClient):
         (content, headers, payload) = yield self.rpc_send_protected('createDataResource',
                                                                     message,
                                                                     user_ooi_id,
-                                                                    "0")
+                                                                    "0",
+                                                                    timeout=30)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.createDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
@@ -494,7 +495,8 @@ class AppIntegrationServiceClient(ServiceClient):
         (content, headers, payload) = yield self.rpc_send_protected('updateDataResource',
                                                                     message,
                                                                     user_ooi_id,
-                                                                    "0")
+                                                                    "0",
+                                                                    timeout=30)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.updateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
@@ -507,7 +509,8 @@ class AppIntegrationServiceClient(ServiceClient):
         (content, headers, payload) = yield self.rpc_send_protected('deleteDataResource',
                                                                     message,
                                                                     user_ooi_id,
-                                                                    "0")
+                                                                    "0",
+                                                                    timeout=30)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.deleteDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
@@ -520,7 +523,8 @@ class AppIntegrationServiceClient(ServiceClient):
         (content, headers, payload) = yield self.rpc_send_protected('validateDataResource',
                                                                     message,
                                                                     user_ooi_id,
-                                                                    "0")
+                                                                    "0",
+                                                                    timeout=120)
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('AIS_client.validateDataResource: AIS reply:\n' + str(content))
         defer.returnValue(content)
