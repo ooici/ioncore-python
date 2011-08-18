@@ -61,11 +61,11 @@ class AISManageDataResourceTest(IonTestCase):
     Testing Application Integration Service.
     """
 
+    timeout = 120
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-
-        self.timeout = self.timeout * 3
 
         #store.Store.kvs.clear()
         #store.IndexStore.kvs.clear()
