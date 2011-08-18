@@ -867,7 +867,8 @@ class Process(BasicLifecycleObject):
         # Timeout handling
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf():
-            log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,conv.conv_id))
+            log.info('Timeout on blocking send - headers: \n%s' % str(headers))
+            log.warn("Process %s RPC conv-id=%s timed out on operation - '%s' ! " % (self.proc_name,conv.conv_id, operation))
             p_headers = pu.pprint_to_string(headers)
             p_content = pu.pprint_to_string(content)
 
