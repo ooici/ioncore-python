@@ -418,11 +418,14 @@ class ManageDataResource(object):
             log.info("created data set ") # + str(dataset_resource))
 
             # create topics
+            """
+            ### Do not do this - it is not needed in the R1 Deployment configuration
             topics_msg = yield self.mc.create_instance(INGESTER_CREATETOPICS_REQ_MSG)
             topics_msg.dataset_id = my_dataset_id
-            #don't yield on this.
+            #don't yield on this. - It may be that you don't need to yield here because you don't need the result but
+            # it is exetremely dangerous to do this in the R1 architecture!
             self.ing.create_dataset_topics(topics_msg)
-
+            """
             #make associations
             association_d = yield self.ac.create_association(datasrc_resource, HAS_A_ID, dataset_resource)
 
