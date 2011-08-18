@@ -5,12 +5,16 @@
 @author Ian Katz
 @brief The worker class that implements the data resource functions for the AIS  (workflow #105, #106)
 """
+from ion.core.object.workbench import IDREF_TYPE
+from ion.services.coi.datastore import DataStoreClient
+from ion.services.dm.inventory.association_service import ASSOCIATION_GET_STAR_MSG_TYPE, PREDICATE_REFERENCE_TYPE, AssociationServiceClient, PREDICATE_OBJECT_QUERY_TYPE
 
 import ion.util.ionlog
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.exception import ReceivedApplicationError
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 #from ion.core.messaging.message_client import MessageClient
 #from ion.services.coi.resource_registry.resource_client import ResourceClient
 
@@ -35,9 +39,7 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     DATASET_RESOURCE_TYPE_ID, \
                                                                     DATASOURCE_RESOURCE_TYPE_ID, \
-                                                                    DATARESOURCE_SCHEDULE_TYPE_ID
-
-
+                                                                    DATARESOURCE_SCHEDULE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
@@ -60,6 +62,8 @@ SCHEDULER_ADD_RSP_TYPE         = object_utils.create_type_identifier(object_id=2
 SCHEDULER_DEL_REQ_TYPE         = object_utils.create_type_identifier(object_id=2603, version=1)
 SCHEDULER_DEL_RSP_TYPE         = object_utils.create_type_identifier(object_id=2604, version=1)
 SCHEDULER_PERFORM_INGEST       = object_utils.create_type_identifier(object_id=2607, version=1)
+LCS_REFERENCE_TYPE             = object_utils.create_type_identifier(object_id=26, version=1)
+GET_LCS_REQUEST_MESSAGE_TYPE   = object_utils.create_type_identifier(object_id=58, version=1)
 
 
 DEFAULT_MAX_INGEST_MILLIS = 30000
@@ -72,8 +76,10 @@ class ManageDataResource(object):
         self._proc = ais
         self.mc    = ais.mc
         self.rc    = ais.rc
+        self.dsc   = DataStoreClient(proc=ais)
         self.dscc  = DatasetControllerClient(proc=ais)
         self.ac    = AssociationClient(proc=ais)
+        self.asc   = AssociationServiceClient(proc=ais)
         self.sc    = SchedulerServiceClient(proc=ais)
 
         # Not needed...
@@ -575,16 +581,13 @@ class ManageDataResource(object):
 
         log.info("Getting instances of scheduled task resources associated with this data source: %s"
                  % data_source_resource.ResourceIdentity)
-        while True:
-            sched_task_rsrc = yield self._getOneAssociationObject(data_source_resource, 
-                                                                  HAS_A_ID, 
-                                                                  DATARESOURCE_SCHEDULE_TYPE_ID)
 
-            #how we exit
-            if None is sched_task_rsrc: 
-                log.info("No scheduled ingest events found")
-                defer.returnValue(None)
-            
+        sched_task_ids = yield self._getAllAssociationObjects(data_source_resource,
+                                                              HAS_A_ID,
+                                                              DATARESOURCE_SCHEDULE_TYPE_ID)
+        for sched_task_id in sched_task_ids:
+            sched_task_rsrc = yield self.rc.get_instance(sched_task_id)
+
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
             response = yield self.sc.rm_task(req_msg)
@@ -594,6 +597,7 @@ class ManageDataResource(object):
             sched_task_rsrc.ResourceLifeCycleState = sched_task_rsrc.RETIRED
             yield self.rc.put_instance(sched_task_rsrc)
 
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def _createDataSourceResource(self, msg):
@@ -659,71 +663,127 @@ class ManageDataResource(object):
 
         defer.returnValue(datasrc_resource)
 
+    @defer.inlineCallbacks
+    def _getAllAssociationObjects(self, the_subject, the_predicate, the_object_type):
+        """
+        Get a list of all resource key ids that are the object side of an association to the passed in subject.
+        The resource's LCS is checked to make sure it is not RETIRED.
+
+        @return A list of resource id strings, or an empty list.
+        """
+        request = yield self._proc.message_client.create_instance(ASSOCIATION_GET_STAR_MSG_TYPE)
+
+        pair = request.subject_pairs.add()
+        pair.subject = request.CreateObject(IDREF_TYPE)
+        pair.subject.key = the_subject.ResourceIdentity
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = the_predicate
+
+        # first right side: TYPEOF == the_object_type
+        pair = request.object_pairs.add()
+        pair.object = request.CreateObject(IDREF_TYPE)
+        pair.object.key = the_object_type
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+
+        results = yield self.asc.get_star(request)
+        stars = [str(x.key) for x in results.idrefs]
+
+        log.debug("stars is %s" % str(stars))
+
+        if len(stars) > 1:
+            log.info("_getAllAssociationObjects found %d objects prior to LCS check" % len(stars))
+        elif len(stars) == 0:
+            log.info("_getAllAssociationObjects: NO association found")
+            defer.returnValue(None)
+
+        # unfortunatly, we have no way to query for something != something, so we have to check LCS manually
+        # we do this more optimizedly by querying the DS for the most recent commit
+        request = yield self._proc.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.extend(stars)
+
+        lcses = yield self.dsc.get_lcs(request)
+
+        # filter them for RETIRED
+        res_keys = [x.key for x in filter(lambda pair: pair.lcs != pair.LifeCycleState.RETIRED, lcses.key_lcs_pairs)]
+        log.debug("_getAllAssociationObjects: returning keys %s" % str(res_keys))
+        defer.returnValue(res_keys)
 
     @defer.inlineCallbacks
     def _getOneAssociationObject(self, the_subject, the_predicate, the_object_type):
         """
-        @brief get the subject side of an association when you only expect one
+        @brief get the object side of an association when you only expect one
         @return id of what you're after
         """
-
-        #can also do obj=
-        found = yield self.ac.find_associations(subject=the_subject, \
-                                                predicate_or_predicates=HAS_A_ID)
-
-        association = None
-        for a in found:
-            mystery_resource = yield self.rc.get_instance(a.ObjectReference.key)
-            mystery_resource_type = mystery_resource.ResourceTypeID.key
-            log.debug("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
-            log.debug("Want type %s, got type %s" 
-                     % (the_object_type, mystery_resource_type))
-            if the_object_type == mystery_resource.ResourceTypeID.key:
-                if not mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
-                    #FIXME: if not association is None then we have data inconsistency!
-                    association = a
-
-        #this is an error case!
-        if None is association:
-            log.info('getOneAssociateionObject: NO association found')
+        res_keys = yield self._getAllAssociationObjects(the_subject, the_predicate, the_object_type)
+        if len(res_keys) == 0:
+            log.info("_getOneAssociationObject: no matching objects with LCS != RETIRED found, returning None")
             defer.returnValue(None)
 
-        the_resource = yield self.rc.get_associated_resource_object(association)
-        defer.returnValue(the_resource)
+        resource = yield self.rc.get_instance(res_keys[0])
+        defer.returnValue(resource)
 
+    @defer.inlineCallbacks
+    def _getAllAssociationSubjects(self, the_object, the_predicate, the_subject_type):
+        """
+        Get a list of all resource key ids that are the subject side of an association to the passed in object.
+        The resource's LCS is checked to make sure it is not RETIRED.
+
+        @return A list of resource id strings, or an empty list.
+        """
+        request = yield self._proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = request.pairs.add()
+        pair.object = request.CreateObject(IDREF_TYPE)
+        pair.object.key = the_object.ResourceIdentity
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = the_predicate
+
+        pair = request.pairs.add()
+        pair.object = request.CreateObject(IDREF_TYPE)
+        pair.object.key = the_subject_type
+
+        pair.predicate = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+
+        results = yield self.asc.get_subjects(request)
+        subjs = [str(x.key) for x in results.idrefs]
+
+        #log.debug("assocs is %s" % str(subjs))
+
+        if len(subjs) > 1:
+            log.info("_getAllAssociationSubjects: found %d subjects prior to LCS check" % len(stars))
+        elif len(subjs) == 0:
+            log.info("_getAllAssociationSubjects: NO association found")
+            defer.returnValue([])
+
+        # unfortunatly, we have no way to query for something != something, so we have to check LCS manually
+        # we do this more optimizedly by querying the DS for the most recent commit
+        request = yield self._proc.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.extend(subjs)
+
+        lcses = yield self.dsc.get_lcs(request)
+
+        # filter them for RETIRED
+        res_keys = [x.key for x in filter(lambda pair: pair.lcs != pair.LifeCycleState.RETIRED, lcses.key_lcs_pairs)]
+        log.debug("_getAllAssociationSubjects: returning keys %s" % str(res_keys))
+        defer.returnValue(res_keys)
 
     @defer.inlineCallbacks
     def _getOneAssociationSubject(self, the_object, the_predicate, the_subject_type):
         """
         @brief get the subject side of an association when you only expect one
-        @return id of what you're after
+        @return A resource, or None
         """
-
-        #can also do subject=
-        found = yield self.ac.find_associations(obj=the_object, \
-                                                predicate_or_predicates=HAS_A_ID)
-
-        association = None
-        for a in found:
-            mystery_resource = yield self.rc.get_instance(a.SubjectReference.key)
-            mystery_resource_type = mystery_resource.ResourceTypeID.key
-            log.debug("Checking mystery resource %s " % mystery_resource.ResourceIdentity)
-            log.debug("Want type %s, got type %s" 
-                     % (the_subject_type, mystery_resource_type))
-            if the_subject_type == mystery_resource.ResourceTypeID.key:
-                if mystery_resource.RETIRED == mystery_resource.ResourceLifeCycleState:
-                    log.info("FOUND ONE, but it's retired")
-                else:
-                    #FIXME: if not association is None then we have data inconsistency!
-                    association = a
-
-        #this is an error case!
-        if None is association:
+        res_keys = yield self._getAllAssociationSubjects(the_object, the_predicate, the_subject_type)
+        if len(res_keys) == 0:
+            log.info("_getOneAssociationSubject: no matching subjects with LCS != RETIRED found, returning None")
             defer.returnValue(None)
 
-        the_resource = yield self.rc.get_associated_resource_subject(association)
-        defer.returnValue(the_resource)
-
+        resource = yield self.rc.get_instance(res_keys[0])
+        defer.returnValue(resource)
 
     def _missingResourceRequestFields(self, msg):
         """
