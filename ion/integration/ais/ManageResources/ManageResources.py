@@ -38,7 +38,7 @@ EPU_CONTROLLER_TYPE_ID = 'dummy_type_id_for_epu_controllers'
 DATASET_KEY = 'datasets'
 DATASOURCE_KEY = 'datasources'
 IDENTITY_KEY = 'identities'
-EPUCONTROLLER_KEY = 'epu_controllers'
+EPUCONTROLLER_KEY = 'epucontrollers'
 
 
 class DictObj(object):
