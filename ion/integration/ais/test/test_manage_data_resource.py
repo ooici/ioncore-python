@@ -65,6 +65,8 @@ class AISManageDataResourceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
+        self.timeout = self.timeout * 3
+
         #store.Store.kvs.clear()
         #store.IndexStore.kvs.clear()
         #store.IndexStore.indices.clear()
@@ -221,8 +223,6 @@ class AISManageDataResourceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_reproduceOOIION451(self):
-
-        self.timeout = self.timeout * 3
 
         #run the create
         log.info("creating 3 data sets (and using 2 existing data sets)")
