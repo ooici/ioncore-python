@@ -72,7 +72,8 @@ if loggly_key is not None:
     _post_to_endpoint = hoover.utils.post_to_endpoint
     def post_to_endpoint(endpoint, message):
         h = httplib2.Http(disable_ssl_certificate_validation=True)
-        h.request(endpoint, 'POST', message)
+        headers = {'connection': 'close'}
+        h.request(endpoint, 'POST', message, headers=headers)
     async_post_to_endpoint = hoover.utils.async(post_to_endpoint)
     setattr(hoover.utils, 'post_to_endpoint', post_to_endpoint)
     setattr(hoover.utils, 'async_post_to_endpoint', async_post_to_endpoint)
