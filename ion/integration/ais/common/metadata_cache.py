@@ -316,7 +316,7 @@ class MetadataCache(object):
                 log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
                 returnValue = metadata[DSOURCE]
             except KeyError:
-                log.error('Metadata not found for datasourceID: ' + dSourceID)
+                log.info('Metadata not found for datasourceID: ' + dSourceID)
                 returnValue = None
     
             finally:
@@ -386,7 +386,7 @@ class MetadataCache(object):
         
         if dSourceID is None:
             log.error('deleteDSourceMetadata: dSourceID is None')
-            returnValue is False
+            returnValue = False
         else:            
             log.debug('deleteDSourceMetadata for %s' %(dSourceID))
 
