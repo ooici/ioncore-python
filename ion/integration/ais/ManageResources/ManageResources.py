@@ -34,7 +34,12 @@ from ion.core.intercept.policy import get_current_roles, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
-EPU_CONTROLLER_TYPE_ID = 'type_id_for_epu_controllers'
+EPU_CONTROLLER_TYPE_ID = 'dummy_type_id_for_epu_controllers'
+DATASET_KEY = 'datasets'
+DATASOURCE_KEY = 'datasources'
+IDENTITY_KEY = 'identities'
+EPUCONTROLLER_KEY = 'epu_controllers'
+
 
 class DictObj(object):
     def __getattr__(self, attr):
@@ -65,14 +70,14 @@ class ManageResources(object):
                          self.__PrintEpucontrollerAttributes, \
                          self.__LoadEpucontrollerColumnHeadrers, \
                          self.__LoadEpucontrollerAttributes
-      self.ResourceTypes = {'datasets' : DatasetValues,
-                            'identities' : IdentityValues,
-                            'datasources' : DatasourceValues,
-                            'epucontrollers' : EpucontrollerValues
+      self.ResourceTypes = {DATASET_KEY : DatasetValues,
+                            IDENTITY_KEY : IdentityValues,
+                            DATASOURCE_KEY : DatasourceValues,
+                            EPUCONTROLLER_KEY : EpucontrollerValues
                            }
-      self.MapGpbTypeToResourceType = {10001 : 'datasets',
-                                       1401 : 'identities',
-                                       4503 : 'datasources'                                     
+      self.MapGpbTypeToResourceType = {10001 : DATASET_KEY,
+                                       1401 : IDENTITY_KEY,
+                                       4503 : DATASOURCE_KEY                                     
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
@@ -81,6 +86,7 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ResourceClient(proc=ais)
       self.eclc = EPUControllerListClient(proc=ais)
+      self.metadataCache = ais.getMetadataCache()
 
 
    @defer.inlineCallbacks
@@ -376,6 +382,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    @defer.inlineCallbacks
@@ -412,6 +420,9 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
+      
          
          
    @defer.inlineCallbacks
@@ -460,6 +471,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    def __LoadEpucontrollerAttributes(self, To, From):
@@ -500,6 +513,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      return ns.Index
 
 
    @defer.inlineCallbacks
@@ -540,7 +555,7 @@ class ManageResources(object):
          # debug print for dumping the attributes of the resource
          if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("got back resource \n"+str(Result))
-         ResourceType = 'epucontrollers'
+         ResourceType = EPUCONTROLLER_KEY
       else:
          # get resource from resource registry
          log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
@@ -567,7 +582,21 @@ class ManageResources(object):
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCE_RESPONSE_TYPE)
       LoaderFunc = self.ResourceTypes[ResourceType][4]
-      yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      Index = yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      if (ResourceType == DATASET_KEY):
+         ResourceID = yield self.metadataCache.getAssociatedSource(Result.ResourceIdentity)
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Source ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
+      elif (ResourceType == DATASOURCE_KEY):
+         ResourceIDs = yield self.metadataCache.getAssociatedDatasets(Result)
+         if len(ResourceIDs) == 0:
+            ResourceID = 'None'
+         else:
+            ResourceID = ResourceIDs[0]
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Set ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
       Response.result = Response.ResponseCodes.OK
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResource(): returning\n'+str(Response))
