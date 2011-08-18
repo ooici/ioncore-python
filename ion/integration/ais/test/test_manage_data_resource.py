@@ -222,6 +222,8 @@ class AISManageDataResourceTest(IonTestCase):
     @defer.inlineCallbacks
     def test_reproduceOOIION451(self):
 
+        self.timeout = self.timeout * 3
+
         #run the create
         log.info("creating 3 data sets (and using 2 existing data sets)")
         create_resp1 = yield self._createDataResource()
