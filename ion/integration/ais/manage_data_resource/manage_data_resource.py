@@ -697,7 +697,7 @@ class ManageDataResource(object):
             log.info("_getAllAssociationObjects found %d objects prior to LCS check" % len(stars))
         elif len(stars) == 0:
             log.info("_getAllAssociationObjects: NO association found")
-            defer.returnValue(None)
+            defer.returnValue([])
 
         # unfortunatly, we have no way to query for something != something, so we have to check LCS manually
         # we do this more optimizedly by querying the DS for the most recent commit
