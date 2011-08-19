@@ -29,7 +29,7 @@ import math
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
-from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE
+from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GET_OBJECT_REPLY_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, DATA_REPLY_MESSAGE_TYPE, DATA_CHUNK_MESSAGE_TYPE, GET_LCS_REQUEST_MESSAGE_TYPE, GET_LCS_RESPONSE_MESSAGE_TYPE
 from ion.core.data import store
 from ion.core.data import cassandra
 #from ion.core.data import cassandra_bootstrap
@@ -676,6 +676,45 @@ class DataStoreWorkbench(WorkBench):
         # The following line shows how to reply to a message
         yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
+
+    @defer.inlineCallbacks
+    def op_get_lcs(self, request, headers, msg):
+        '''
+        test: get list of ids, return list of tuples of ids -> LCSs
+        '''
+
+        log.info("op_get_lcs")
+
+        if not hasattr(request, 'MessageType') or request.MessageType != GET_LCS_REQUEST_MESSAGE_TYPE:
+            raise DataStoreWorkBenchError('Invalid put blobs request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(GET_LCS_RESPONSE_MESSAGE_TYPE)
+
+        for repo_key in request.keys:
+            q = Query()
+            q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+            q.add_predicate_gt(BRANCH_NAME, '')
+
+            rows = yield self._commit_store.query(q)
+            if len(rows) == 0:
+                from net.ooici.core.message.ion_message_pb2 import NOT_FOUND
+                raise DataStoreWorkBenchError("op_get_lcs: Repo key (%s) has no rows in store" % repo_key, response_code=NOT_FOUND)
+            if len(rows) > 1:
+                # more than one branch - divergent state, but they may all agree on the LCS, so check that!
+                lcses = [x[RESOURCE_LIFE_CYCLE_STATE] for x in rows.values()]
+                lcsset = set(lcses)
+                if len(lcsset) > 0:
+                    raise DataStoreWorkBenchError("op_get_lcs: Multiple branch heads with differing LCS found for repo key (%s), cannot determine newest" % repo_key)
+
+            key_lcs_pair = response.key_lcs_pairs.add()
+            key_lcs_pair.key = repo_key
+            key_lcs_pair.lcs = int(rows.values()[0][RESOURCE_LIFE_CYCLE_STATE])
+
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                log.debug("repo_key: %s, LCS: %s" % (repo_key, str(key_lcs_pair.lcs)))
+
+        yield self._process.reply_ok(msg, response)
+        log.info("/op_get_lcs")
 
     @defer.inlineCallbacks
     def op_put_blobs(self, request, headers, message):
@@ -1597,6 +1636,7 @@ class DataStoreService(ServiceProcess):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
         self.op_checkout = self.workbench.op_checkout
+        self.op_get_lcs = self.workbench.op_get_lcs
         self.op_put_blobs = self.workbench.op_put_blobs
         self.op_get_object = self.workbench.op_get_object
         self.op_extract_data = self.workbench.op_extract_data
@@ -1940,6 +1980,13 @@ class DataStoreClient(ServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('fetch_blobs', content)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_lcs(self, content):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_lcs', content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
