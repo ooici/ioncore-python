@@ -25,23 +25,23 @@ OFF = 'Off'
 ON = 'On'
 
 # Open a null stream to pipe unwanted console messages to nowhere
-nullDesc = open (os.devnull, NULLPORTMODE)
+nullDesc = open(os.devnull, NULLPORTMODE)
 
-def DecDegToNMEAStr (dd):
+def DecDegToNMEAStr(dd):
     """
     Converts standard decimal degrees into NMEA's weird degree representation
     """
 
-    # d = degrees (right side of decimal point is fraction of degree)
-    # m = minutes (right side of decimal point is fraction of minute)
-    # Input:  ddd.ddddddddd  (ex: 34.12341015)
-    # Output: dddmm.mmmmmmm  (ex: 3407.404609)
+    # d = degrees(right side of decimal point is fraction of degree)
+    # m = minutes(right side of decimal point is fraction of minute)
+    # Input:  ddd.ddddddddd (ex: 34.12341015)
+    # Output: dddmm.mmmmmmm (ex: 3407.404609)
 
-    deg = int (dd)
-    min = 60 * (dd - deg)
-    return '%.6f' % (min + 100 * deg)
+    deg = int(dd)
+    min = 60 *(dd - deg)
+    return '%.6f' %(min + 100 * deg)
 
-def DateTimeToDDMMYY (dt):
+def DateTimeToDDMMYY(dt):
     """
     Converts a python datetime into DDMMYY
     """
@@ -50,9 +50,9 @@ def DateTimeToDDMMYY (dt):
     y = dt.year
     if m > 12 or d > 31 or y > 2100:
         return '000000'
-    return '%02u%02u%02u' % (d, m, y)
+    return '%02u%02u%02u' %(d, m, y)
 
-def DateTimeToHHMMSS (dt):
+def DateTimeToHHMMSS(dt):
     """
     Converts a python datetime into HHMMSS.
     """
@@ -61,31 +61,31 @@ def DateTimeToHHMMSS (dt):
     s = dt.second
     if h > 24 or m > 60 or s > 60:
         return '000000'
-    return '%02u%02u%02u' % (h, m, s)
+    return '%02u%02u%02u' %(h, m, s)
 
-def CalcMagVar (lat, lon):
+def CalcMagVar(lat, lon):
     if lat > 90.0 or lat < -90.0 or lon > 180.0 or lon < -180.0:
         return '999.9', 'X'
     # TODO: Properly Calculate the magnetic variation
     return '001.2', 'E'
 
-def CalcChecksum (str):
-    if len (str) < 1:
+def CalcChecksum(str):
+    if len(str) < 1:
         return '00'
     # Calculate checksum
     # checksum = 8-bit XOR of all chars in string
-    # checksum is an 8-bit number (0 to 255)
+    # checksum is an 8-bit number(0 to 255)
     # result is a hex byte version of the checksum
-    cs = ord (reduce (lambda x, y: chr (ord (x) ^ ord (y)), str))
-    calcHigh = 48 + ((cs & 240) >> 4)  # CS and 11110000
-    calcLow = 48 + (cs & 15)           # CS and 00001111
+    cs = ord(reduce(lambda x, y: chr(ord(x) ^ ord(y)), str))
+    calcHigh = 48 +((cs & 240) >> 4)  # CS and 11110000
+    calcLow = 48 +(cs & 15)           # CS and 00001111
     if calcHigh > 57:
         calcHigh += 7
     if calcLow > 57:
         calcLow += 7
     return chr(calcHigh) + chr(calcLow)
 
-def BuildPGRMC ():
+def BuildPGRMC():
     """
     Assemble an outgoing GPGGA sentence from stored configuration values.
     """
@@ -94,90 +94,90 @@ def BuildPGRMC ():
 
     # 1     Fix Mode
     if NMEA0183SimBase.cfg_FIXMODE[0]:
-        str.append (NMEA0183SimBase.cfg_FIXMODE[0])
+        str.append(NMEA0183SimBase.cfg_FIXMODE[0])
     else:
-        str.append ('')
+        str.append('')
 
     # 2     Alt above/below MSL
     if NMEA0183SimBase.cfg_ALT:
-        fVal = float (NMEA0183SimBase.cfg_ALT)
+        fVal = float(NMEA0183SimBase.cfg_ALT)
     else:
-        fVal = float (0.0)
-    str.append ('%.1f' % fVal)
+        fVal = float(0.0)
+    str.append('%.1f' % fVal)
 
     # 3     Earth Datum Index
     if NMEA0183SimBase.cfg_DATUMINDEX:
-        iVal = int (NMEA0183SimBase.cfg_DATUMINDEX)
+        iVal = int(NMEA0183SimBase.cfg_DATUMINDEX)
     else:
-        iVal = int (0)
-    str.append ('%d' % iVal)
+        iVal = int(0)
+    str.append('%d' % iVal)
 
     # 4     User earth datum
-    str.append ('0')
+    str.append('0')
 
     # 5     User earth datum inverse flattening factor
-    str.append ('0')
+    str.append('0')
 
     # 6     User earth datum delta X
-    str.append ('0')
+    str.append('0')
 
     # 7     User earth datum delta Y
-    str.append ('0')
+    str.append('0')
 
     # 8     User earth datum delta Z
-    str.append ('0')
+    str.append('0')
 
     # 9     Differential mode
     if NMEA0183SimBase.cfg_DIFFMODE[0]:
-        str.append (NMEA0183SimBase.cfg_DIFFMODE[0])
+        str.append(NMEA0183SimBase.cfg_DIFFMODE[0])
     else:
-        str.append ('')
+        str.append('')
 
     # 10     NMEA 0183 Baud rate
     if NMEA0183SimBase.cfg_BAUD:
-        iVal = int (NMEA0183SimBase.cfg_BAUD)
+        iVal = int(NMEA0183SimBase.cfg_BAUD)
     else:
-        iVal = int (0)
-    str.append ('%d' % iVal)
+        iVal = int(0)
+    str.append('%d' % iVal)
 
     # 11     Velocity Filter
     if NMEA0183SimBase.cfg_VELFILTER:
-        iVal = int (NMEA0183SimBase.cfg_VELFILTER)
+        iVal = int(NMEA0183SimBase.cfg_VELFILTER)
     else:
-        iVal = int (0)
-    str.append ('%d' % iVal)
+        iVal = int(0)
+    str.append('%d' % iVal)
 
     # 12     Measurement Pulse Output
     if NMEA0183SimBase.cfg_MPO:
-        iVal = int (NMEA0183SimBase.cfg_MPO)
+        iVal = int(NMEA0183SimBase.cfg_MPO)
     else:
-        iVal = int (0)
-    log.debug ('iVal type: %s' % type (iVal))
-    str.append ('%d' % iVal)
+        iVal = int(0)
+    log.debug('iVal type: %s' % type(iVal))
+    str.append('%d' % iVal)
 
     # 13     Measurement Pulse Output Length
     if NMEA0183SimBase.cfg_MPOLEN:
-        iVal = int (NMEA0183SimBase.cfg_MPOLEN)
+        iVal = int(NMEA0183SimBase.cfg_MPOLEN)
     else:
-        iVal = int (0)
-    str.append ('%d' % iVal)
+        iVal = int(0)
+    str.append('%d' % iVal)
 
-    coreStr = ','.join (str)
-    cs = CalcChecksum (coreStr)
+    coreStr = ','.join(str)
+    cs = CalcChecksum(coreStr)
 
     # 14    Dead reckoning valid time
     if NMEA0183SimBase.cfg_DEDRECKON:
-        fVal = float (NMEA0183SimBase.cfg_DEDRECKON)
+        fVal = float(NMEA0183SimBase.cfg_DEDRECKON)
     else:
-        fVal = float (0.0)
-    str.append ('%.1f' % fVal)
+        fVal = float(0.0)
+    str.append('%.1f' % fVal)
 
-    coreStr = ','.join (str)
+    coreStr = ','.join(str)
     return '$' + coreStr + '*' + cs + '\r\n'
 
 
 
-def BuildGPGGA (n):
+def BuildGPGGA(n):
     """
     Assemble an outgoing GPGGA sentence from the given dict info.
     """
@@ -193,7 +193,7 @@ def BuildGPGGA (n):
     except:
         errFlag = True
         dt = datetime.min
-    str.append (DateTimeToHHMMSS (dt))
+    str.append(DateTimeToHHMMSS(dt))
 
     # 2     Latitude as dd.mmmmmm
     try:
@@ -201,10 +201,10 @@ def BuildGPGGA (n):
     except:
         errFlag = True
         lat = 0.0
-    str.append (DecDegToNMEAStr (lat))
+    str.append(DecDegToNMEAStr(abs(lat)))
 
-    # 3     Latitude hemisphere (pos lat = N, neg lat = S)
-    str.append ('S' if lat < 0 else 'N')
+    # 3     Latitude hemisphere(pos lat = N, neg lat = S)
+    str.append('S' if lat < 0 else 'N')
 
     # 4     Longitude as ddd.mmmmmm
     try:
@@ -212,57 +212,56 @@ def BuildGPGGA (n):
     except:
         errFlag = True
         lon = 0.0
-    str.append (DecDegToNMEAStr (lon))
+    str.append(DecDegToNMEAStr(abs(lon)))
 
-    # 5     Longitude hemisphere (pos lat = E, neg lat = W)
-    str.append ('W' if lon < 0 else 'E')
+    # 5     Longitude hemisphere(pos lat = E, neg lat = W)
+    str.append('W' if lon < 0 else 'E')
 
-    # 6     GPS quality info (0=nofix, 1=nondiff, 2=diff, 6=est)
+    # 6     GPS quality info(0=nofix, 1=nondiff, 2=diff, 6=est)
     if errFlag:
-        str.append ('0')
+        str.append('0')
     else:
-        str.append ('2')
+        str.append('2')
 
-    # 7     Number of satellites (00 to 12, incl. leading zero)
+    # 7     Number of satellites(00 to 12, incl. leading zero)
     if errFlag:
-        str.append ('00')
+        str.append('00')
     else:
-        str.append ('%02u' % (5 + dt.minute % 4))
+        str.append('%02u' %(5 + dt.minute % 4))
 
-    # 8     HDOP (0.5 to 99.9)
+    # 8     HDOP(0.5 to 99.9)
     if errFlag:
-        str.append ('99.9')
+        str.append('99.9')
     else:
-        str.append ('%.1f' %
-                    ((3.9 + dt.minute % 5.0) + ((dt.second % 17.0) / 100.0)))
+        str.append('%.1f' %
+                   ((3.9 + dt.minute % 5.0) +((dt.second % 17.0) / 100.0)))
 
-    # 9     Altitude above MSL (-9999.9 to 99999.9)
-    altMSL = 3.2 + (dt.second % 30.0) / 100.0
-    str.append ('%.1f' % altMSL)
+    # 9     Altitude above MSL(-9999.9 to 99999.9)
+    altMSL = 3.2 +(dt.second % 30.0) / 100.0
+    str.append('%.1f' % altMSL)
 
-    # 10    Altitude units (always 'M')
-    str.append ('M' if altMSL else '')
+    # 10    Altitude units(always 'M')
+    str.append('M' if altMSL else '')
 
-    # 11    Altitude above geoid (-999.9 to 9999.9)
-    altGeo = 78.8 + (dt.second % 30.0) / 100.0
-    str.append ('%.1f' % altGeo)
+    # 11    Altitude above geoid(-999.9 to 9999.9)
+    altGeo = 78.8 +(dt.second % 30.0) / 100.0
+    str.append('%.1f' % altGeo)
 
-    # 12    Altitude units (always 'M')
-    str.append ('M' if altGeo else '')
+    # 12    Altitude units(always 'M')
+    str.append('M' if altGeo else '')
 
     # 13    Not used
-    str.append ('')
+    str.append('')
 
     # 14    Not used
-    str.append ('')
+    str.append('')
 
-    coreStr = ','.join (str)
-    cs = CalcChecksum (coreStr)
+    coreStr = ','.join(str)
+    cs = CalcChecksum(coreStr)
 
     return '$' + coreStr + '*' + cs + '\r\n'
 
-
-def BuildGPRMC (n):
+def BuildGPRMC(n):
     """
     Assemble an outgoing GPRMC sentence from the given dict info.
     """
@@ -278,10 +277,10 @@ def BuildGPRMC (n):
     except:
         errFlag = True
         dt = datetime.min
-    str.append (DateTimeToHHMMSS (dt))
+    str.append(DateTimeToHHMMSS(dt))
 
-    # 2     Status (A = valid position, V = NAV receiver warning
-    str.append ('A')
+    # 2     Status(A = valid position, V = NAV receiver warning
+    str.append('A')
 
     # 3     Latitude as dd.mmmmmm
     try:
@@ -289,10 +288,10 @@ def BuildGPRMC (n):
     except:
         errFlag = True
         lat = 0.0
-    str.append (DecDegToNMEAStr (lat))
+    str.append(DecDegToNMEAStr(abs(lat)))
 
-    # 4     Latitude hemisphere (pos lat = N, neg lat = S)
-    str.append ('S' if lat < 0 else 'N')
+    # 4     Latitude hemisphere(pos lat = N, neg lat = S)
+    str.append('S' if lat < 0 else 'N')
 
     # 5     Longitude as ddd.mmmmmm
     try:
@@ -300,24 +299,24 @@ def BuildGPRMC (n):
     except:
         errFlag = True
         lon = 0.0
-    str.append (DecDegToNMEAStr (lon))
+    str.append(DecDegToNMEAStr(abs(lon)))
 
-    # 6     Longitude hemisphere (pos lat = E, neg lat = W)
-    str.append ('W' if lon < 0 else 'E')
+    # 6     Longitude hemisphere(pos lat = E, neg lat = W)
+    str.append('W' if lon < 0 else 'E')
 
-    # 7     Speed Over Ground (000.0 to 999.9 knots with leading zeros)
+    # 7     Speed Over Ground(000.0 to 999.9 knots with leading zeros)
     try:
         sogStr = n['sog']
     except:
         sogStr = '999.9'
-    str.append (sogStr)
+    str.append(sogStr)
 
-    # 8     Course Over Ground (000.0 to 359.9 degrees with leading zeros)
+    # 8     Course Over Ground(000.0 to 359.9 degrees with leading zeros)
     try:
         cogStr = n['cog']
     except:
         cogStr = '999.9'
-    str.append (cogStr)
+    str.append(cogStr)
 
     # 9     UTC date of position fix, ddmmyy
     try:
@@ -325,26 +324,108 @@ def BuildGPRMC (n):
     except:
         errFlag = True
         dt = datetime.min
-    str.append (DateTimeToDDMMYY (dt))
+    str.append(DateTimeToDDMMYY(dt))
 
-    # 10    Magnetic variation (000.0 to 180.0 degrees with leading zeros)
-    # 11    Magnetic variation direction (E or W west adds to true course)
+    # 10    Magnetic variation(000.0 to 180.0 degrees with leading zeros)
+    # 11    Magnetic variation direction(E or W west adds to true course)
     if errFlag:
-        str.append ('999.9')
-        str.append ('X')
+        str.append('999.9')
+        str.append('X')
     else:
-        var, varDir = CalcMagVar (lat, lon)
-        str.append (var)
-        str.append (varDir)
+        var, varDir = CalcMagVar(lat, lon)
+        str.append(var)
+        str.append(varDir)
 
-    # 12    Mode indicator (A=Autonomous, D=Differental, E=Estimated, N=invalid)
-    str.append ('A')
+    # 12    Mode indicator(A=Autonomous, D=Differental, E=Estimated, N=invalid)
+    str.append('A')
 
-    coreStr = ','.join (str)
-    cs = CalcChecksum (coreStr)
+    coreStr = ','.join(str)
+    cs = CalcChecksum(coreStr)
 
     return '$' + coreStr + '*' + cs + '\r\n'
 
+def BuildOOIXX(n):
+    """
+    Assemble an outgoing OOIXX sentence from the given dict info.
+    """
+
+    errFlag = False
+    
+    # 0     Sentence header
+    str = ['OOIXX']
+
+    # 1     UTC time of position fix in format hhmmss
+    try:
+        dt = n['time']
+    except:
+        errFlag = True
+        dt = datetime.min
+    str.append(DateTimeToHHMMSS(dt))
+
+    # 2     Latitude as dd.mmmmmm
+    try:
+        lat = n['lat']
+    except:
+        errFlag = True
+        lat = 0.0
+    str.append(DecDegToNMEAStr(abs(lat)))
+
+    # 3     Latitude hemisphere(pos lat = N, neg lat = S)
+    str.append('S' if lat < 0 else 'N')
+
+    # 4     Longitude as ddd.mmmmmm
+    try:
+        lon = n['lon']
+    except:
+        errFlag = True
+        lon = 0.0
+    str.append(DecDegToNMEAStr(abs(lon)))
+
+    # 5     Longitude hemisphere(pos lat = E, neg lat = W)
+    str.append('W' if lon < 0 else 'E')
+
+    # 6     GPS quality info(0=nofix, 1=nondiff, 2=diff, 6=est)
+    if errFlag:
+        str.append('0')
+    else:
+        str.append('2')
+
+    # 7     Number of satellites(00 to 12, incl. leading zero)
+    if errFlag:
+        str.append('00')
+    else:
+        str.append('%02u' %(5 + dt.minute % 4))
+
+    # 8     HDOP(0.5 to 99.9)
+    if errFlag:
+        str.append('99.9')
+    else:
+        str.append('%.1f' %
+                   ((3.9 + dt.minute % 5.0) +((dt.second % 17.0) / 100.0)))
+
+    # 9     Altitude above MSL(-9999.9 to 99999.9)
+    altMSL = 3.2 +(dt.second % 30.0) / 100.0
+    str.append('%.1f' % altMSL)
+
+    # 10    Altitude units(always 'M')
+    str.append('M' if altMSL else '')
+
+    # 11    Course over ground COG (HEADING) in degrees from true north (0.0 to 359.9)
+    str.append(n['cog'])
+
+    # 12    Speed over ground SOG (SPEEDMS) in meters per second (0.0 to 999.9)
+    str.append(n['sog'])
+
+    # 13    Not used
+    str.append('')
+
+    # 14    Not used
+    str.append('')
+
+    coreStr = ','.join(str)
+    cs = CalcChecksum(coreStr)
+
+    return '$' + coreStr + '*' + cs + '\r\n'
 
 class NMEA0183SimBase:
     """
@@ -360,7 +441,7 @@ class NMEA0183SimBase:
 
     # <1> FIX MODE
     #       A = automatic
-    #       2 = 2D (host must supply alt)
+    #       2 = 2D(host must supply alt)
     #       3 = 3D exclusively
     cfg_FIXMODE = 'A'
 
@@ -369,7 +450,7 @@ class NMEA0183SimBase:
     cfg_ALT = 0.0
 
     # <3> EARTH DATUM INDEX
-    #       0 to 109 (IDs of valid earth datum indices)
+    #       0 to 109(IDs of valid earth datum indices)
     #       96 IS NOT ALLOWED, it is user specified and not supported here
     #       100 is WGS84
     #       NOTE        Setting to any value except 96 will work but GPS
@@ -392,8 +473,8 @@ class NMEA0183SimBase:
     #       Always set to 0
 
     # <9> DIFFERENTIAL MODE
-    #       A = automatic (DGPS when available)
-    #       D = differential exclusively (no output if not diff fix)
+    #       A = automatic(DGPS when available)
+    #       D = differential exclusively(no output if not diff fix)
     #       NOTE        Setting will store but will make no difference
     #                   in GPS output.
     cfg_DIFFMODE = 'A'
@@ -436,14 +517,14 @@ class NMEA0183SimBase:
     #                   in GPS output.
     cfg_DEDRECKON = 0
 
-    def __init__ (self):
+    def __init__(self):
         """
         Initializes the GPS Simulator
             - Generally best to not override this method
             - Calls SimGPSSetup() which should have an override
         """
 
-        log.info ('simBase __init__')
+        log.info('simBase __init__')
         self._goodComms = False
         self._workingSim = False
         
@@ -451,13 +532,13 @@ class NMEA0183SimBase:
     def SetupSimulator(self):
         yield self.SerialPortSetup()       # Sets up the serial port
         if not self._goodComms:
-            log.error ('Serial ports not configured.')
+            log.error('Serial ports not configured.')
             return
-        log.info ('Serial ports configured.')
+        log.info('Serial ports configured.')
         yield self.SimGPSSetup()           # Inits the selected simulator
 
     @defer.inlineCallbacks
-    def SerialPortSetup (self):
+    def SerialPortSetup(self):
         """
         Creates virtual serial ports then Launches the NEMA0183 GPS simulator
         @param None
@@ -469,22 +550,22 @@ class NMEA0183SimBase:
         master = 'pty,link=' + SERPORTMASTER + ',raw,echo=0'
         slave = 'pty,link=' + SERPORTSLAVE + ',raw,echo=0'
         try:
-            log.info ('Creating virtual serial port. Running %s...' % SOCATapp)
-            self._vsp = subprocess.Popen ([SOCATapp, master, slave],
+            log.info('Creating virtual serial port. Running %s...' % SOCATapp)
+            self._vsp = subprocess.Popen([SOCATapp, master, slave],
                                          stdout = nullDesc.fileno(),
                                          stderr = nullDesc.fileno())
         except OSError, e:
-            log.error ('Failure:  Could not create virtual serial port(s): %s' % e)
+            log.error('Failure:  Could not create virtual serial port(s): %s' % e)
             return
         yield pu.asleep(1) # wait just a bit for connect
-        if not os.path.exists (SERPORTMASTER) and os.path.exists (SERPORTSLAVE):
-            log.error ('Failure:  Unknown reason.')
+        if not os.path.exists(SERPORTMASTER) and os.path.exists(SERPORTSLAVE):
+            log.error('Failure:  Unknown reason.')
             return
-        log.debug ('Successfully created virtual serial ports. socat PID: %d'
+        log.debug('Successfully created virtual serial ports. socat PID: %d'
             % self._vsp.pid)
-        self._serMaster = os.readlink (SERPORTMASTER)
-        self._serSlave = os.readlink (SERPORTSLAVE)
-        log.debug ('Master port: %s   Slave port: %s' % (self._serMaster, self._serSlave))
+        self._serMaster = os.readlink(SERPORTMASTER)
+        self._serSlave = os.readlink(SERPORTSLAVE)
+        log.debug('Master port: %s   Slave port: %s' %(self._serMaster, self._serSlave))
         self._goodComms = True
 
     @defer.inlineCallbacks
@@ -504,15 +585,15 @@ class NMEA0183SimBase:
         @retval None
         """
         self.SimShutdown()               # Stop the simulator
-        log.debug ('Freeing the serial ports...')
+        log.debug('Freeing the serial ports...')
 
         # If the process isn't running any more, nothing to stop
         if  self.IsSocatRunning():
 
             # Force the socat app to stop
-            # (Python 2.6 and later would let us send a control-C to stop it)
-            os.kill (self._vsp.pid, signal.SIG_IGN)
-        log.debug ('Socat no longer running; serial ports freed.')
+            #(Python 2.6 and later would let us send a control-C to stop it)
+            os.kill(self._vsp.pid, signal.SIG_IGN)
+        log.debug('Socat no longer running; serial ports freed.')
 
     def SimShutdown(self):
         """
@@ -521,7 +602,7 @@ class NMEA0183SimBase:
         """
         self._workingSim = False
 
-    def IsSocatRunning (self):
+    def IsSocatRunning(self):
         """
         Checks if the socat app is still running.
         @param None
@@ -534,14 +615,14 @@ class NMEA0183SimBase:
                 return True
         return False
 
-    def IsSimulatorRunning (self):
+    def IsSimulatorRunning(self):
         """
         Returns status of simulator.
             - Override in child simulator class
         """
         return False
 
-    def IsSimOK (self):
+    def IsSimOK(self):
         self._goodComms = self.IsSocatRunning()
         self._workingSim = self.IsSimulatorRunning()
         return self._workingSim
