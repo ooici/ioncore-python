@@ -105,10 +105,18 @@ class MetadataCache(object):
 
     def getDatasets(self):
         dSetList = []                
-        for ds in self.__metadata.keys():
-            if (self.__metadata[ds][TYPE] is DSET):
-                dSetList.append(self.__metadata[ds])
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSET):
+                dSetList.append(ds)
         return dSetList                
+
+
+    def getDataSources(self):
+        dSourceList = []
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSOURCE):
+                dSourceList.append(ds)
+        return dSourceList
 
     @defer.inlineCallbacks
     def loadDataSets(self):
@@ -285,7 +293,7 @@ class MetadataCache(object):
                 log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
                 returnValue = False
             else:
-                self.numDSets = self.numDSets - 1
+                self.numDSets -= 1
                 returnValue = True
     
             finally:
@@ -405,7 +413,7 @@ class MetadataCache(object):
                 log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
                 returnValue = False
             else:
-                self.numDSources = self.numDSources - 1
+                self.numDSources -= 1
                 returnValue = True
     
             finally:
@@ -566,7 +574,7 @@ class MetadataCache(object):
         #
         if (dSet.ResourceLifeCycleState == dSet.ACTIVE):
             dSetMetadata = {}
-            self.numDSets = self.numDSets + 1
+            self.numDSets += 1
             #
             # Store the entire dataset now; should be doing only that anyway.
             # Set persisence to true.  NOTE: remember to set this to false
@@ -623,11 +631,6 @@ class MetadataCache(object):
         else:
             log.info('data set %s is not ACTIVE: Not caching.' %(dSet.ResourceIdentity))
 
-            try:
-                self.__metadata[dSet.ResourceIdentity]
-            except KeyError:
-                log.info('Dataset was not yet in the cache.')
-
 
     def __loadDSourceMetadata(self, dSource):
         """
@@ -643,7 +646,7 @@ class MetadataCache(object):
         #
         if (dSource.ResourceLifeCycleState == dSource.ACTIVE):
             dSourceMetadata = {}
-            self.numDSources = self.numDSources + 1
+            self.numDSources += 1
             #
             # Store the entire datasource now; should be doing only that anyway
             # Set persisence to true.  NOTE: remember to set this to false
@@ -678,10 +681,7 @@ class MetadataCache(object):
                 self.__printMetadata('Datasource Metadata', dSource)
         else:
             log.info('data source %s is not ACTIVE: Not caching.' %(dSource.ResourceIdentity))
-            try:
-                self.__metadata[dSource.ResourceIdentity]
-            except KeyError:
-                log.info('Datasource was not yet in the cache.')
+
                 
 
     @defer.inlineCallbacks

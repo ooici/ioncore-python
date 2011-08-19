@@ -65,11 +65,12 @@ if DNLD_FILE_TYPE is None:
     log.error('DNLD_FILE_TYPE not set in ion.config or ionlocal.config!  Using %s' %(DNLD_FILE_TYPE))
 
 class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
-    def __init__(self, ais, *args, **kwargs):
-        self.msgs = []
-        self.ais = ais
-        self.metadataCache = ais.getMetadataCache()
+    def __init__(self, *args, **kwargs):
+        self.ais = kwargs.get('process')
+        self.metadataCache = self.ais.metadataCache
         DatasetChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+        self._hook_for_testing = defer.Deferred()
 
 
     @defer.inlineCallbacks
@@ -96,13 +97,16 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
 
         log.debug("DatasetUpdateEventSubscriber event for dsetID: %s exit" %(dSetResID))
 
-                
+        if not self._hook_for_testing.called:
+            self._hook_for_testing.callback(True)
+
 class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
-    def __init__(self, ais, *args, **kwargs):
-        self.msgs = []
-        self.metadataCache = ais.getMetadataCache()
-        self.ais = ais
+    def __init__(self, *args, **kwargs):
+        self.ais = kwargs.get('process')
+        self.metadataCache = self.ais.metadataCache
         DatasourceChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+        self._hook_for_testing = defer.Deferred()
 
 
     @defer.inlineCallbacks
@@ -147,7 +151,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
             #
             
             if dSet is None:
-                log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
+                log.info('DataSet Metadata not found %s; refreshing dataset' %(dSetResID))
 
                 #
                 # Now  load the dataset metadata
@@ -156,7 +160,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
                 yield self.metadataCache.putDSetMetadata(dSetResID)
 
             elif dSet.get('DSOURCE_ID') != dSourceResID:
-                log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
+                log.info('DataSet Metadata DSOURCE_ID was none or did not match for dSetID %s; refreshing dataset' %(dSetResID))
                 #
                 # Delete the dataset
                 #
@@ -169,7 +173,8 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
                 log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
                 yield self.metadataCache.putDSetMetadata(dSetResID)
 
-
+        if not self._hook_for_testing.called:
+            self._hook_for_testing.callback(True)
 
         log.debug("<----<<<  DatasourceUpdateEventSubscriber event for dsourceID: %s exit" %(dSourceResID))
 
