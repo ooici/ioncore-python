@@ -27,8 +27,10 @@
 from datetime import datetime
 from twisted.internet import task, reactor, defer
 from twisted.internet.serialport import SerialPort
-import sim_NMEA0183
-from gpsSimPath import simPath
+# import sim_NMEA0183
+# from gpsSimPath import simPath
+import ion.agents.instrumentagents.simulators.sim_NMEA0183 as sim_NMEA0183
+from ion.agents.instrumentagents.simulators.gpsSimPath import simPath
 from twisted.protocols import basic
 import ion.agents.instrumentagents.helper_NMEA0183 as NMEA
 
