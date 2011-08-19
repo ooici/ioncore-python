@@ -7,12 +7,13 @@
 @author Matt Rodriguez
 """
 from twisted.trial import unittest
-from ion.core.exception import ReceivedContainerError
+from ion.core.exception import ReceivedContainerError, ReceivedApplicationError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
 from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
 
 import ion.util.ionlog
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
@@ -35,11 +36,11 @@ from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient, CDM_BOUNDED_ARRAY_TYPE
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, ION_RESOURCE_TYPES_CFG, ION_PREDICATES_CFG, ION_IDENTITIES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, ION_RESOURCE_TYPES_CFG, ION_PREDICATES_CFG, ION_IDENTITIES_CFG, SAMPLE_PROFILE_DATA_SOURCE_ID
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID, HAS_A_ID
 
-from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, GET_LCS_REQUEST_MESSAGE_TYPE
 from ion.core.object.gpb_wrapper import StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -668,6 +669,50 @@ class DataStoreTest(IonTestCase):
             default_obj = yield repo.checkout(branchname='master')
 
             self.assertEqual(default_obj.word, value[PREDICATE_CFG])
+
+    @defer.inlineCallbacks
+    def test_get_lcs(self):
+        p = Process(proc_name='test_anon')
+        yield p.spawn()
+
+        #msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
+
+        #idref = msg.CreateObject(IDREF_TYPE)
+        #idref.key = SAMPLE_PROFILE_DATASET_ID
+        #msg.object_id = idref
+
+        dsc = DataStoreClient(proc=p)
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append(SAMPLE_PROFILE_DATASET_ID)
+
+        obj = yield dsc.get_lcs(request)
+
+        self.failUnlessEquals(len(obj.key_lcs_pairs), 1)
+        self.failUnlessEqual(obj.key_lcs_pairs[0].lcs, obj.key_lcs_pairs[0].LifeCycleState.ACTIVE)
+
+        # now get multiple
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append(SAMPLE_PROFILE_DATASET_ID)
+        request.keys.append(SAMPLE_PROFILE_DATA_SOURCE_ID)
+
+        obj2 = yield dsc.get_lcs(request)
+
+        self.failUnlessEquals(len(obj2.key_lcs_pairs), 2)
+        self.failUnlessEquals([x.lcs for x in obj2.key_lcs_pairs], [obj.key_lcs_pairs[0].LifeCycleState.ACTIVE] * len(obj2.key_lcs_pairs))
+
+    @defer.inlineCallbacks
+    def test_get_lcs_invalid_key(self):
+        p = Process(proc_name='test_anon')
+        yield p.spawn()
+
+
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append("this key does not exist")
+
+        dsc = DataStoreClient(proc=p)
+        lcsdef = dsc.get_lcs(request)
+
+        yield self.failUnlessFailure(lcsdef, ReceivedApplicationError)
 
     """
 

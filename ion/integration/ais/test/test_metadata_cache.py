@@ -379,7 +379,7 @@ class MetadataCacheTest(IonTestCase):
         for dSetID in dSetIDOrphanList:
             dSet = yield self.cache.getDSetMetadata(dSetID)
             if dSet is None:
-                log.info('dSet for dSetID %s is None' %s(dSetID))
+                log.info('dSet for dSetID %s is None' % (dSetID))
                 continue
             
             dSourceID = dSet['DSourceID']

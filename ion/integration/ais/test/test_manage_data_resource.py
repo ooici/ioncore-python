@@ -103,38 +103,20 @@ class AISManageDataResourceTest(IonTestCase):
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
             },
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
-            },
-            {
-                'name':'attributestore',
-                'module':'ion.services.coi.attributestore',
-                'class':'AttributeStoreService'
-            },
+
             {
                 'name':'identity_registry',
                 'module':'ion.services.coi.identity_registry',
                 'class':'IdentityRegistryService'
             },
-            {
-                'name':'store_service',
-                'module':'ion.core.data.store_service',
-                'class':'StoreService'
-            },
-            {
-                'name':'pubsub_service',
-                'module':'ion.services.dm.distribution.pubsub_service',
-                'class':'PubSubService'
-            },
+
             {
                 'name':'dataset_controller',
                 'module':'ion.services.dm.inventory.dataset_controller',
                 'class':'DatasetControllerClient'
             },
             {
-                'name':'scheduler_service_client',
+                'name':'scheduler_service',
                 'module':'ion.services.dm.scheduler.scheduler_service',
                 'class':'SchedulerServiceClient'
             },
