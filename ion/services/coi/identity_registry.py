@@ -593,6 +593,11 @@ class IdentityRegistryService(ServiceProcess):
     @defer.inlineCallbacks
     def op_unset_role(self, content, headers, msg):
         user_id, roles = content['user-id'], content['role'].replace(' ', '').split(',')
+        # First remove locally
+        for role in roles:
+            unmap_ooi_id_from_role(user_id, role)
+
+        # Broadcast to other containers to remove
         role_ids = [ROLE_IDS_BY_NAME[role] for role in roles]
         for role_id in role_ids:
             yield self._unset_roles(user_id, role_id)

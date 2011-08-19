@@ -516,7 +516,7 @@ class AssociationService(ServiceProcess):
         """
         @see AssociationServiceClient.subject_associations
         """
-        log.info('op_get_objects: ')
+        log.info('op_subject_associations: ')
 
         if subject_reference.MessageType != IDREF_TYPE:
             raise AssociationServiceError('Unexpected type received \n %s' % str(subject_reference), subject_reference.ResponseCodes.BAD_REQUEST)
@@ -565,7 +565,7 @@ class AssociationService(ServiceProcess):
             link.SetLink(idref)
 
         yield self.reply_ok(msg, list_of_associations)
-
+        log.info("/op_subject_associations")
 
 
     @defer.inlineCallbacks

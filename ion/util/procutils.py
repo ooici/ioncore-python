@@ -307,25 +307,20 @@ def print_memory_usage():
 
     @TODO convert to use the twisted subprocess!
     """
+    cc_pids = os.getenv("ION_TEST_CASE_PIDS","")
+    pids = cc_pids + str(os.getpid()) if cc_pids == "" else ",".join((cc_pids,str(os.getpid())))
 
-    pids = os.getenv("ION_TEST_CASE_PIDS",'')
-    #log.info("Started the containers")
-    pids += ' ' + str(os.getpid())
-    #print 'Got str_pids: "%s"' % pids
-    ps_args = ["-o args,command,rss,vsize",  "-p", pids]
-    #I'd rather not execute this through the shell, but the output from the command was truncated
-    #when I did not set shell=True.
+        
+    pid_arg = "-p" + pids
+    #CentOS doesn't handle the spaces between options and arguments
+    ps_args = ["-oargs,command,rss,vsize",  pid_arg]
     p = os_process.OSProcess(binary="/bin/ps", spawnargs=ps_args)
     result = yield p.spawn()
-    std_output = result.get('outlines', None)
+    std_output = result.get("outlines", None)
 
     if std_output is None or std_output == []:
-        defer.returnValue( 'print_memory_usage Failed!')
+        defer.returnValue( "print_memory_usage Failed!")
 
-    #p = subprocess.Popen(args=ps_args, executable="/bin/ps", stdout=subprocess.PIPE, shell=True)
-    #std_output = p.communicate()[0]
-
-    #This should probably become a logging statement.
     header = "================================================================================="
     ret = "\n%s\nOS Process Status Memory Use: \n%s%s" % (header,std_output[0],header)
     defer.returnValue(ret)

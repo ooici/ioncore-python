@@ -436,9 +436,6 @@ class WrapperType(type):
         if obj_type == LINK_TYPE:
             @_gpb_source
             def obj_setlink(self, value, ignore_copy_errors=False):
-                if self.Invalid:
-                    raise OOIObjectError(
-                        'Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
                 self.Repository.set_linked_object(self, value, ignore_copy_errors=ignore_copy_errors)
                 if not self.Modified:
@@ -446,6 +443,26 @@ class WrapperType(type):
                 return
 
             clsDict['SetLink'] = obj_setlink
+
+            @_gpb_source
+            def copy_link(self,link):
+
+                if link.ObjectType != LINK_TYPE:
+                    log.error(link.Debug())
+                    log.error(self.Debug())
+                    raise OOIObjectError('Can not copy_link from an object that is not a link!')
+
+                self.GPBMessage.CopyFrom(link.GPBMessage)
+
+                self.ChildLinks.add(self)
+
+                try:
+                    obj = self.Repository.get_linked_object(link)
+                    obj.AddParentLink(link)
+                except KeyError:
+                    log.warn('Copy Link does not have the linked object!')
+
+            clsDict['CopyLink'] = copy_link
 
         elif obj_type == CDM_DATASET_TYPE:
             clsDict['MakeRootGroup'] = dataset._make_root_group

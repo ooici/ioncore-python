@@ -316,7 +316,7 @@ class MetadataCache(object):
                 log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
                 returnValue = metadata[DSOURCE]
             except KeyError:
-                log.error('Metadata not found for datasourceID: ' + dSourceID)
+                log.info('Metadata not found for datasourceID: ' + dSourceID)
                 returnValue = None
     
             finally:
@@ -386,7 +386,7 @@ class MetadataCache(object):
         
         if dSourceID is None:
             log.error('deleteDSourceMetadata: dSourceID is None')
-            returnValue is False
+            returnValue = False
         else:            
             log.debug('deleteDSourceMetadata for %s' %(dSourceID))
 
@@ -422,43 +422,39 @@ class MetadataCache(object):
         """
 
         if dSetID is None:
-            log.error('getAssociatyedSource: dSetID is None')
+            log.error('getAssociatedSource: dSetID is None')
             defer.returnValue(None)
-        else:            
-            log.debug('getAssociatedSource for dSetID %s' %(dSetID))
 
-            try:
-                dSet = yield self.rc.get_instance(dSetID)
-                
-            except ResourceClientError:    
-                log.error('Error getting dataset instance for datasetID: %s!' %(dSetID))
-                defer.returnValue(None)
-                
-            try:
-                results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
-    
-            except AssociationClientError:
-                log.error('Error getting associated data source for Dataset: ' + \
-                          dSet.ResourceIdentity)
-                defer.returnValue(None)
-    
-            #
-            # If there is not exactly 1 associated data source, log an error and
-            # return None.  
-            #
-            if len(results) != 1:
-                log.error('Dataset %s has %d associated sources.' %(dSetID, len(results)))
-                defer.returnValue(None)
-            else:
-                for association in results:
-                    log.debug('Associated Source for Dataset: ' + \
-                              association.ObjectReference.key + \
-                              ' is: ' + association.SubjectReference.key)
-    
-            log.debug('getAssociatedSource() exit: returning: %s' %(association.SubjectReference.key))
+        log.debug('getAssociatedSource for dSetID %s' %(dSetID))
 
-        defer.returnValue(association.SubjectReference.key)
+        qmsg = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = qmsg.pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = dSetID
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = HAS_A_ID
 
+        pair = qmsg.pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = DATASOURCE_RESOURCE_TYPE_ID
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+        try:
+            results = yield self.asc.get_subjects(qmsg)
+        except:
+            log.exception('Error getting associated data source for Dataset: %s' % dSetID)
+            defer.returnValue(None)
+
+        dsrcs = [str(x.key) for x in results.idrefs]
+
+        # we expect one:
+        if len(dsrcs) != 1:
+            log.error('Expected 1 datasource, got %d' % len(dsrcs))
+            defer.returnValue(None)
+
+        log.debug('getAssociatedSource() exit: returning: %s' % dsrcs[0])
+
+        defer.returnValue(dsrcs[0])
 
     @defer.inlineCallbacks
     def getAssociatedDatasets(self, dSource):

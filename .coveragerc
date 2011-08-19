@@ -1,5 +1,4 @@
 [run]
-branch = True
 source =
     ion
 omit =
@@ -11,6 +10,31 @@ omit =
     /*/utilities/SBE37_util*
     /*/utilities/client_*
     /*/utilities/inst_*
+    /*/simulators/sim_WHSentinelADCP*
+
+    /*/ion/zapps*
+    /*/ion/play*
+    /*/ion/core/cc/shell*
+    *cassandra_performance*
+    *gviz_api*
+    /*/ops/resources*
+    /*/eoi/dispatcher*
+    /*/interact/int_observer*
+    *instrument_web_monitor*
+    *mscweb*
+    *lazy_eye*
+    *notify_web_monitor*
+    /*/itv_trial/*
+    /*/itv*
+    /*/iontest*
+    /*/trial*
+    *cassandra_teardown*
+    *cassandra_schema*
+    *vandv*
+    *dbmanhole*
+    *parse_url_tester*
+    /*/coi/conversation_repository*
+    /*/sa/data_processing*
 
 [report]
 # Regexes for lines to exclude from consideration
@@ -31,6 +55,8 @@ exclude_lines =
 
     # 'pass' generally means 'this won't be called'
     ^ *pass *$
+
+precision = 2
 
 [html]
 directory = coverage_results

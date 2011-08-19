@@ -101,6 +101,22 @@ class TestPublisher(IonTestCase):
 
         self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
 
+    @defer.inlineCallbacks
+    def test_publisher_create_and_register(self):
+        # Publishers need to be owned by a process
+        proc = Process()
+        yield proc.spawn()
+        args = [('xp_name', 'magnet_topic'),
+                ('routing_key', 'arf.test'),
+                ('process', proc)]
+
+        pub1 = Publisher(**dict(args))      # all requirements satisfied
+
+        # now attach it to the process
+        yield proc.register_life_cycle_object(pub1)
+        yield pub1.register(xp_name=args[0][1], topic_name=args[1][1], credentials=None, publisher_name="testpub1")
+
+
     #noinspection PyUnreachableCode
     @defer.inlineCallbacks
     def test_psc_plus_factory(self):
@@ -151,6 +167,21 @@ class TestPublisher(IonTestCase):
         self.failUnless(pub3._process == proc)
         self.failUnless(pub3._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(pub3._recv.publisher_config.has_key("exchange") and pub3._recv.publisher_config['exchange'] == "afakeexchange")
+
+        # test auto registration of Publisher
+        class FakeConf(object):
+            def getValue(self, *args, **kwargs):
+                return True
+        fakeconf = FakeConf()
+
+        import ion.services.dm.distribution.publisher_subscriber as psm
+        oldconf = psm.CONF
+        psm.CONF = fakeconf
+
+        pub4 = yield fact2.build(routing_key="arf.test", xp_name="magnet.topic", process=proc)
+        self.failUnless(pub4._topic_id is not None)
+
+        psm.CONF = oldconf
 
     class TestPubRecv(Receiver):
         """
@@ -276,6 +307,27 @@ class TestSubscriber(IonTestCase):
         sub = Subscriber(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
 
+        # queue name must be specified if either durable or auto_delete is true, only triggers a log warning currently
+        sub2 = Subscriber(**dict(args).update({'durable':True}))
+        sub3 = Subscriber(**dict(args).update({'auto_delete':True}))
+
+    @defer.inlineCallbacks
+    def test_subscriber_create_and_register(self):
+        """
+        Create subscriber and register it with the PSC.
+        """
+
+        # subscriber needs a process
+        proc = Process()
+        yield proc.spawn()
+
+        args = [('xp_name','magnet.topic'),
+                ('process',proc)]
+
+        sub = Subscriber(**dict(args))
+        yield sub.register()
+        yield sub.unsubscribe()     # unused in production
+
     @defer.inlineCallbacks
     def test_subscriber_factory_create(self):
         # subscriber needs a process
@@ -323,6 +375,21 @@ class TestSubscriber(IonTestCase):
         self.failUnless(sub3._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(sub3._recv.consumer_config.has_key("exchange") and sub3._recv.consumer_config['exchange'] == "afakeexchange")
         self.failUnless(sub3._process == proc)
+
+        # test auto registration of subscriber
+        class FakeConf(object):
+            def getValue(self, *args, **kwargs):
+                return True
+        fakeconf = FakeConf()
+
+        import ion.services.dm.distribution.publisher_subscriber as psm
+        oldconf = psm.CONF
+        psm.CONF = fakeconf
+
+        sub4 = yield sf2.build()
+        self.failUnless(sub4._subscriber_id is not None)
+
+        psm.CONF = oldconf
 
     @defer.inlineCallbacks
     def test_subscriber_queue_bindings(self):

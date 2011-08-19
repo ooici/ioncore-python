@@ -61,6 +61,8 @@ class AISManageDataResourceTest(IonTestCase):
     Testing Application Integration Service.
     """
 
+    timeout = 120
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -101,38 +103,20 @@ class AISManageDataResourceTest(IonTestCase):
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
             },
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
-            },
-            {
-                'name':'attributestore',
-                'module':'ion.services.coi.attributestore',
-                'class':'AttributeStoreService'
-            },
+
             {
                 'name':'identity_registry',
                 'module':'ion.services.coi.identity_registry',
                 'class':'IdentityRegistryService'
             },
-            {
-                'name':'store_service',
-                'module':'ion.core.data.store_service',
-                'class':'StoreService'
-            },
-            {
-                'name':'pubsub_service',
-                'module':'ion.services.dm.distribution.pubsub_service',
-                'class':'PubSubService'
-            },
+
             {
                 'name':'dataset_controller',
                 'module':'ion.services.dm.inventory.dataset_controller',
                 'class':'DatasetControllerClient'
             },
             {
-                'name':'scheduler_service_client',
+                'name':'scheduler_service',
                 'module':'ion.services.dm.scheduler.scheduler_service',
                 'class':'SchedulerServiceClient'
             },
@@ -200,7 +184,7 @@ class AISManageDataResourceTest(IonTestCase):
         create_resp = yield self._createDataResource()
 
         #try the delete
-        yield self._deleteDataResource(create_resp.data_set_id)
+        yield self._deleteDataResource([create_resp.data_set_id])
 
     @defer.inlineCallbacks
     def test_createUpdateDeleteDataResource(self):
@@ -215,9 +199,30 @@ class AISManageDataResourceTest(IonTestCase):
 
         #try the delete
         log.info("FULL USAGE 3/3: delete")
-        yield self._deleteDataResource(create_resp.data_set_id)
+        yield self._deleteDataResource([create_resp.data_set_id])
         log.info("Create/Update/Delete/COMPLETE")
 
+
+    @defer.inlineCallbacks
+    def test_reproduceOOIION451(self):
+
+        #run the create
+        log.info("creating 3 data sets (and using 2 existing data sets)")
+        create_resp1 = yield self._createDataResource()
+        create_resp2 = yield self._createDataResource()
+        create_resp3 = yield self._createDataResource()
+        create_resp4 = yield self._createDataResource()
+
+        #try the delete
+        log.info("deleting 2 data sets (new/existing)")
+        yield self._deleteDataResource([create_resp1.data_set_id, create_resp4.data_set_id])
+
+        log.info("deleting 2 data sets (existing/new)")
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, create_resp2.data_set_id])
+
+        log.info("deleting last data set")
+        yield self._deleteDataResource([create_resp3.data_set_id])
+        
 
     @defer.inlineCallbacks
     def test_updateDataResource_BadInput(self):
@@ -322,7 +327,7 @@ class AISManageDataResourceTest(IonTestCase):
                                                                 fr_is_public))
 
         log.info("Creating and wrapping update request message")
-        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        ais_req_msg  = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)        
         update_req_msg  = ais_req_msg.CreateObject(UPDATE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = update_req_msg
 
@@ -410,13 +415,34 @@ class AISManageDataResourceTest(IonTestCase):
         """
         @brief try to delete one of the sample data sources
         """
-        yield self._deleteDataResource(SAMPLE_PROFILE_DATASET_ID)
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID])
         #yield self._deleteDataResource(SAMPLE_STATION_DATA_SOURCE_ID)
 
 
+    @defer.inlineCallbacks
+    def test_deleteDataResourceMultiple(self):
+        """
+        @brief try to delete 2 of the sample data sources
+        """
+        #run the create
+        create_resp = yield self._createDataResource()
+
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID, create_resp.data_set_id])
+
 
     @defer.inlineCallbacks
-    def _deleteDataResource(self, data_set_id):
+    def test_deleteDataResourceSequential(self):
+        """
+        @brief try to delete 2 of the sample data sources
+        """
+        #run the create
+        create_resp = yield self._createDataResource()
+        yield self._deleteDataResource([SAMPLE_PROFILE_DATASET_ID])
+        yield self._deleteDataResource([create_resp.data_set_id])
+
+
+    @defer.inlineCallbacks
+    def _deleteDataResource(self, data_set_ids):
 
 
         log.info("Creating and wrapping delete request")
@@ -424,8 +450,8 @@ class AISManageDataResourceTest(IonTestCase):
         delete_req_msg  = ais_req_msg.CreateObject(DELETE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = delete_req_msg
 
-
-        delete_req_msg.data_set_resource_id.append(data_set_id)
+        for dsid in data_set_ids:
+            delete_req_msg.data_set_resource_id.append(dsid)
 
 
         result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg, MYOOICI_USER_ID)
@@ -440,16 +466,19 @@ class AISManageDataResourceTest(IonTestCase):
 
         result = result_wrapped.message_parameters_reference[0]
 
-        #check number of deleted ids (we deleted one, so should be one!)
+        #check number of deleted ids
         result = result_wrapped.message_parameters_reference[0]
         num_deletions = len(result.successfully_deleted_id)
-        self.failUnlessEqual(1, num_deletions,
-                             "Expected 1 deletion, got " + str(num_deletions))
+        log.info("Apparently we deleted %d ids" % num_deletions)
+        self.failUnlessEqual(len(data_set_ids), num_deletions,
+                             "Expected %d deletion(s), got %d" % (len(data_set_ids), num_deletions))
 
         #check that it's gone
-        dsrc = yield self.rc.get_instance(data_set_id)
-        self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
-                             "deleteDataResource apparently didn't mark anything retired")
+        for dsid in data_set_ids:
+            dsrc = yield self.rc.get_instance(dsid)
+            log.info("checking successful deletion of data source with id = '%s'" % dsid)
+            self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
+                                 "deleteDataResource apparently didn't mark anything retired")
 
         defer.returnValue(None)
 

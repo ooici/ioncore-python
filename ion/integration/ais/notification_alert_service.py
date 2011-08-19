@@ -87,6 +87,8 @@ class NotificationAlertService(ServiceProcess):
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         
         self.MailServer = CONF.getValue('mail_server', default='mail.oceanobservatories.org')
+        self.update_event_queue_name = CONF.getValue('update_event_queue_name', default='nas_update_event')
+        self.offline_event_queue_name = CONF.getValue('offline_event_queue_name', default='nas_offline_event')
         
         self.index_store_class = pu.get_class(index_store_class_name)
         self._storage_conf = get_cassandra_configuration()
@@ -123,17 +125,15 @@ class NotificationAlertService(ServiceProcess):
 
         # Create the subscribers for the event handlers
 
-        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
+        self.sub = DatasetSupplementAddedEventSubscriber(process=self, queue_name=self.update_event_queue_name)
         self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
-        yield self.sub.register()
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
 
 
-        self.sub = DatasourceUnavailableEventSubscriber(process=self)
+        self.sub = DatasourceUnavailableEventSubscriber(process=self, queue_name=self.offline_event_queue_name)
         self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
-        yield self.sub.register()
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasourceUnavailableEventSubscriber activation complete')     
@@ -142,11 +142,13 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_offline_event(self, content):
         log.info('NotificationAlertService.handle_offline_event notification event received ')
-        log.info('NotificationAlertService.handle_offline_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_offline_event content   : %s', content)
         msg = content['content'];
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
 
         # build the email from the event content
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
         BODY = string.join(("This data resource is currently unavailable.",
                             "",
                             "Explanation: %s" %  msg.additional_data.error_explanation,
@@ -207,15 +209,17 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_update_event(self, content):
         log.info('NotificationAlertService.handle_update_event notification event received')
-        log.info('NotificationAlertService.handle_update_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_update_event content   : %s', content)
         msg = content['content']
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
         
         # build the email from the event content
         startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis/1000))))
         enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
+        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
         log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
         BODY = string.join((

@@ -447,8 +447,26 @@ class RepositoryTest(unittest.TestCase):
         repo.remove_branch('Arthur')
         self.assertEqual(len(repo.branches),1)
 
-        
-        
+    def test_get_common_ancestor(self):
+
+        repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)
+        ancestor = repo.commit('1')
+
+        repo.branch("Arthur")
+
+        repo.commit('2')
+        ref1 = repo.commit('3')
+
+        repo.checkout(branchname='master')
+
+        ref2 = repo.commit('4')
+
+        crefs = [repo._commit_index.get(ref1), repo._commit_index.get(ref2)]
+
+        common_cref = repo.get_common_ancestor(crefs)
+
+        self.assertEqual(ancestor, common_cref.MyId)
+
         
     def test_create_commit_ref(self):
         repo, ab = self.wb.init_repository(ADDRESSLINK_TYPE)

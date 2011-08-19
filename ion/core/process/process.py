@@ -39,9 +39,8 @@ from ion.core.object import workbench
 # despite being from services.dm this is safe - events should be moved to core sometime soon! @TODO
 from ion.services.dm.distribution.events import ProcessLifecycleEventPublisher
 
-# Static entry point for "thread local" context storage during request
-# processing, eg. to retaining user-id from request message
-from ion.core.ioninit import request
+# Conversation Context object - used to manage workbench GC and identity...
+from ion.util.context import ContextObject, ConversationContext
 
 CONF = ioninit.config(__name__)
 CF_fail_fast = CONF['fail_fast']
@@ -186,11 +185,6 @@ class Process(BasicLifecycleObject):
         # TCP Connectors and Listening Ports
         self.connectors = []
         self.listeners = []
-
-        # Set a context for the startup of the process - to be cleared after activate is finished.
-        current_context = request.get('workbench_context', [])
-        current_context.append( 'process_initialization')
-        request.workbench_context = current_context
         
         # publisher for lifecycle change notifications
         self._plcc_pub = ProcessLifecycleEventPublisher(origin=self.id.full, process=self)
@@ -199,6 +193,12 @@ class Process(BasicLifecycleObject):
         # Callbacks before and after ops (handy for unittests)
         self.op_cbs_before = {}
         self.op_cbs_after = {}
+
+        # Context default dictionary
+        self.context = ContextObject()
+        self._last_context = None
+
+        self.conversation_context = ConversationContext()
 
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
@@ -355,19 +355,8 @@ class Process(BasicLifecycleObject):
 
         # last step in activation - cleanup!
         log.debug('Process activation complete - clearing workbench:\n%s' % str(self.workbench))
-        current_context = request.get('workbench_context', [])
-        #        if current_context[-1] == 'process_initialization':
-        #            workbench_context = current_context.pop()
-        #            self.workbench.manage_workbench_cache(workbench_context)
-        #        else:
-        #            log.warn('Current context! %s' % str(current_context))
-        #            log.warn('Process context is not being cleared. Context got reset or changed?')
 
-        try:
-            current_context.remove('process_initialization')
-        except ValueError:
-            log.warn('Workbench Cache: "process_initialization" not found in current context at end of activation')
-        self.workbench.manage_workbench_cache('process_initialization')
+        self.workbench.manage_workbench_cache('Default Context')
 
 
     def plc_activate(self):
@@ -609,34 +598,34 @@ class Process(BasicLifecycleObject):
         """
         try:
             # Establish security context for request processing
-            request.proc_name = self.proc_name
+            self.context.proc_name = self.proc_name
             # Check if there is a user id in the header, stash if so
             _pre_uid = payload.get('user-id', None)
             _pre_exp = payload.get('expiry', None)
             _action = ''
             if 'user-id' in payload:
-                request.user_id = payload.get('user-id')
+                self.context.user_id = payload.get('user-id')
                 _action = 'set user_id'
             else:
                 log.debug('[%s] receive(): payload anonymous request' % (self.proc_name))
-                if request.get('user_id', 'Not set') == 'Not set':
-                    request.user_id = 'ANONYMOUS'
+                if self.context.get('user_id', 'Not set') == 'Not set':
+                    self.context.user_id = 'ANONYMOUS'
                     _action = 'set ANONYMOUS user_id'
                 else:
-                    _action = "keep stashed user_id='%s'" % request.get('user_id')
-            _post_uid = request.get('user_id')
+                    _action = "keep stashed user_id='%s'" % self.context.get('user_id')
+            _post_uid = self.context.get('user_id')
 
             # User session expiry.
             if 'expiry' in payload:
-                request.expiry = payload.get('expiry')
+                self.context.expiry = payload.get('expiry')
                 _action = _action + '/set expiry'
             else:
-                if request.get('expiry', 'Not set') == 'Not set':
-                    request.expiry = '0'
+                if self.context.get('expiry', 'Not set') == 'Not set':
+                    self.context.expiry = '0'
                     _action = _action + '/set 0 expiry'
                 else:
-                    _action = _action + "/keep stashed expiry='%s'" % request.get('expiry')
-            _post_exp = request.get('expiry')
+                    _action = _action + "/keep stashed expiry='%s'" % self.context.get('expiry')
+            _post_exp = self.context.get('expiry')
 
             log.debug("[%s] receive(): IN:user-id='%s',expiry='%s' ACTION:%s SET:user-id='%s',expiry='%s'" % (
                 self.proc_name, _pre_uid, _pre_exp, _action, _post_uid, _post_exp))
@@ -878,7 +867,8 @@ class Process(BasicLifecycleObject):
         # Timeout handling
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf():
-            log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,conv.conv_id))
+            log.info('Timeout on blocking send - headers: \n%s' % str(headers))
+            log.warn("Process %s RPC conv-id=%s timed out on operation - '%s' ! " % (self.proc_name,conv.conv_id, operation))
             p_headers = pu.pprint_to_string(headers)
             p_content = pu.pprint_to_string(content)
 
@@ -933,12 +923,12 @@ class Process(BasicLifecycleObject):
             msgheaders['protocol'] = CONV_TYPE_NONE
 
         if not 'user-id' in msgheaders:
-            msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
+            msgheaders['user-id'] = self.context.get('user_id', 'ANONYMOUS')
             log.debug('[%s] send(): set user id in msgheaders from stashed user_id [%s]' % (self.proc_name, msgheaders['user-id']))
         else:
             log.debug('[%s] send(): using user id from msgheaders [%s]' % (self.proc_name, msgheaders['user-id']))
         if not 'expiry' in msgheaders:
-            msgheaders['expiry'] = request.get('expiry', '0')
+            msgheaders['expiry'] = self.context.get('expiry', '0')
             log.debug('[%s] send(): set expiry in msgheaders from stashed expiry [%s]' % (self.proc_name, msgheaders['expiry']))
         else:
             log.debug('[%s] send(): using expiry from msgheaders [%s]' % (self.proc_name, msgheaders['expiry']))
