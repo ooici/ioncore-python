@@ -1250,15 +1250,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('POSITIVE rspMsg to createDataResourceSubscription without message_parameters_reference')
             
         #
-        # Send a request without subscription_type to test that the appropriate error is returned.
+        # Send a request without subscriptionInfo to test that the appropriate error is returned.
         #
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
-        log.debug('Calling createDataResourceSubscription without subscription_type.')
+        log.debug('Calling createDataResourceSubscription without subscriptionInfo.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            log.debug('ERROR rspMsg to createDataResourceSubscription without subscription_type')
+            log.debug('ERROR rspMsg to createDataResourceSubscription without subscriptionInfo')
         else:
-            self.fail('POSITIVE rspMsg to createDataResourceSubscription without subscription_type')
+            self.fail('POSITIVE rspMsg to createDataResourceSubscription without subscriptionInfo')
             
         #
         # Send a request without datasetMetadata to test that the appropriate error is returned.
@@ -1272,9 +1272,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('POSITIVE rspMsg to createDataResourceSubscription without datasetMetadata')
             
         #
-        # Send a request without user_ooi_id to test that the appropriate error is returned.
+        # Send a request without subscriptionInfo.user_ooi_id to test that the appropriate error is returned.
         #
-        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
+        reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id    # setting something in datasetMetadata
         log.debug('Calling createDataResourceSubscription without user_ooi_id.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
@@ -1300,7 +1300,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
         reqMsg.message_parameters_reference.subscriptionInfo.data_src_id = 'dataset123'
-        log.debug('Calling createDataResourceSubscription without data_src_id.')
+        log.debug('Calling createDataResourceSubscription without subscription_type.')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
             log.debug('ERROR rspMsg to createDataResourceSubscription without subscription_type')
@@ -1356,7 +1356,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('POSITIVE rspMsg to createDataResourceSubscription with mis-matched info ')
             
         #
-        # Send a request with no dispatcher to test that the appropriate error is returned.
+        # Send a request with non-existant dispatcher to test that the appropriate error is returned.
         #
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = self.user_id
@@ -1372,12 +1372,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lat_max = -40.0
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
-        log.debug('Calling createDataResourceSubscription with bad user_id.')
+        log.debug('Calling createDataResourceSubscription with non-existant dispatcher .')
         rspMsg = yield self.aisc.createDataResourceSubscription(reqMsg, self.user_id)
         if rspMsg.MessageType == AIS_RESPONSE_ERROR_TYPE:
-            log.debug('ERROR rspMsg to createDataResourceSubscription with bad user_id')
+            log.debug('ERROR rspMsg to createDataResourceSubscription with non-existant dispatcher ')
         else:
-            self.fail('POSITIVE rspMsg to createDataResourceSubscription with bad user_id')
+            self.fail('POSITIVE rspMsg to createDataResourceSubscription with non-existant dispatcher ')
             
         #
         # Create dispatchers and associations
