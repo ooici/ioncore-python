@@ -304,12 +304,15 @@ class ManageDataResource(object):
                 datasrc_resource.ResourceLifeCycleState = datasrc_resource.RETIRED
                 delete_resources.append(datasrc_resource)
 
+                """
+                ### Don't make changes to the data set resource - you AIS doesn't own it...
                 if not None is dataset_resource:
                     log.info("Setting data set resource lifecycle = retired")
                     dataset_resource.ResourceLifeCycleState = dataset_resource.RETIRED
                     delete_resources.append(dataset_resource)
+                """
+                deletions.append(datasrc_resource.ResourceIdentity)
 
-                deletions.append(data_set_resource_id)
 
             log.info("putting all resource changes in one big transaction, " \
                          + str(len(delete_resources)))
@@ -333,8 +336,8 @@ class ManageDataResource(object):
         Response.result = 200
         Response.message_parameters_reference.add()
         Response.message_parameters_reference[0] = Response.CreateObject(DELETE_DATA_RESOURCE_RSP_TYPE)
-        for d in deletions:
-            Response.message_parameters_reference[0].successfully_deleted_id.append(d)
+
+        Response.message_parameters_reference[0].successfully_deleted_id.extend(deletions)
 
         defer.returnValue(Response)
 

@@ -67,6 +67,7 @@ if DNLD_FILE_TYPE is None:
 class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
         self.msgs = []
+        self.ais = ais
         self.metadataCache = ais.getMetadataCache()
         DatasetChangeEventSubscriber.__init__(self, *args, **kwargs)
 
@@ -82,22 +83,10 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
         #
 
         #
-        # Check the cache to see if there's currently metadata for this
-        # datasetID
+        # Delete the dataset
         #
-        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-
-        #
-        # If dataset does not exist, this must be a new dataset; skip the
-        # delete step.
-        #
-        if dSetMetadata is not None:
-            #
-            # Delete the dataset
-            #
-            log.debug('DatasetUpdateEventSubscriber deleting %s' \
-                      %(dSetResID))
-            yield self.metadataCache.deleteDSetMetadata(dSetResID)
+        log.debug('DatasetUpdateEventSubscriber deleting %s' %(dSetResID))
+        yield self.metadataCache.deleteDSetMetadata(dSetResID)
 
         #
         # Now  reload the dataset and datasource metadata
@@ -112,6 +101,7 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
     def __init__(self, ais, *args, **kwargs):
         self.msgs = []
         self.metadataCache = ais.getMetadataCache()
+        self.ais = ais
         DatasourceChangeEventSubscriber.__init__(self, *args, **kwargs)
 
 
@@ -126,24 +116,8 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         # datasource.
         #
 
-        #
-        # Check the cache to see if there's currently metadata for this
-        # datasourceID
-        #
-        dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
-        dSource = yield self.metadataCache.getDSource(dSourceResID)
-        
-        #
-        # If datasource does not exist, this must be a new datasource; skip the
-        # delete step.
-        #
-        if dSourceMetadata is not None:
-            #
-            # Delete the datasource
-            #
-            log.debug('DatasourceUpdateEventSubscriber deleting %s' \
-                      %(dSourceResID))
-            yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
+        log.debug('DatasourceUpdateEventSubscriber deleting %s' %(dSourceResID))
+        yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
 
         #
         # Now  reload the datasource metadata
@@ -152,14 +126,10 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
 
         #
-        # If the dSourceMetadata is None, this was a new datasource; it is
-        # possible the dataset metadatacache was populated before this datasource
-        # was populated, so get the dSourceMetadata so that we can get the dataset
-        # and check to see if has an associated dataSource.
+        # Get the latest datasource metadata
         #
-        if dSourceMetadata is None:
-            dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
-            dSource = yield self.metadataCache.getDSource(dSourceResID)
+
+        dSource = yield self.ais.rc.get_instance(dSourceResID)
             
         #
         # Get the assoicated dataset(s) and refresh them (they might not be loaded
@@ -168,31 +138,38 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         datasetList = yield self.metadataCache.getAssociatedDatasets(dSource)
         log.debug('getAssociatedDatasets returned %s' %(datasetList))
         for dSetResID in datasetList:
+            # Should be only one in the list!!!
             dSet = yield self.metadataCache.getDSetMetadata(dSetResID)
             #
             # if the DSOURCE_ID is None, the datasource wasn't active or
             # didn't show up in the association service when the event for
             # the dataset was received, so refresh the dataset.
             #
+            
+            if dSet is None:
+                log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
 
-            tempDSourceResID = None
-            if dSet is not None:
-                tempDSourceResID = dSet.get('DSOURCE_ID',None)
-                
-            if (tempDSourceResID is None) or (tempDSourceResID != dSourceResID):
+                #
+                # Now  load the dataset metadata
+                #
+                log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
+                yield self.metadataCache.putDSetMetadata(dSetResID)
+
+            elif dSet.get('DSOURCE_ID') != dSourceResID:
                 log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
                 #
                 # Delete the dataset
                 #
-                log.debug('DatasourceUpdateEventSubscriber deleting dataset %s' \
-                          %(dSetResID))
+                log.debug('DatasourceUpdateEventSubscriber deleting dataset %s' %(dSetResID))
                 yield self.metadataCache.deleteDSetMetadata(dSetResID)
-            
+
                 #
                 # Now  reload the dataset and datasource metadata
                 #
                 log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
                 yield self.metadataCache.putDSetMetadata(dSetResID)
+
+
 
         log.debug("<----<<<  DatasourceUpdateEventSubscriber event for dsourceID: %s exit" %(dSourceResID))
 

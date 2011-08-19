@@ -276,11 +276,11 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSetMetadata = self.__metadata[dSetID]
+                dSetMetadata = self.__metadata.pop(dSetID)
                 dSet = dSetMetadata[DSET]
                 dSet.Repository.persistent = False
     
-                self.__metadata.pop(dSetID)
+
             except KeyError:
                 log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
                 returnValue = False
@@ -396,11 +396,11 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSourceMetadata = self.__metadata[dSourceID]
+                dSourceMetadata = self.__metadata.pop(dSourceID)
                 dSource = dSourceMetadata[DSOURCE]
                 dSource.Repository.persistent = False
     
-                self.__metadata.pop(dSourceID)
+
             except KeyError:
                 log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
                 returnValue = False
@@ -623,6 +623,12 @@ class MetadataCache(object):
         else:
             log.info('data set %s is not ACTIVE: Not caching.' %(dSet.ResourceIdentity))
 
+            try:
+                self.__metadata[dSet.ResourceIdentity]
+            except KeyError:
+                log.info('Dataset was not yet in the cache.')
+
+
     def __loadDSourceMetadata(self, dSource):
         """
         Create and load a dictionary entry with the metadata from the given
@@ -672,7 +678,11 @@ class MetadataCache(object):
                 self.__printMetadata('Datasource Metadata', dSource)
         else:
             log.info('data source %s is not ACTIVE: Not caching.' %(dSource.ResourceIdentity))
-
+            try:
+                self.__metadata[dSource.ResourceIdentity]
+            except KeyError:
+                log.info('Datasource was not yet in the cache.')
+                
 
     @defer.inlineCallbacks
     def __findResourcesOfType(self, resourceType):
