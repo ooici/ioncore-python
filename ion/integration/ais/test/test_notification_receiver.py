@@ -32,11 +32,7 @@ class NotificationReceiverTest(IonTestCase):
         yield self._start_container(sysname='nas_unit_test')
 
         services = [
-            {
-                'name':'pubsub_service',
-                'module':'ion.services.dm.distribution.pubsub_service',
-                'class':'PubSubService'
-            },
+
             {
                 'name':'ds1',
                 'module':'ion.services.coi.datastore',
@@ -47,32 +43,21 @@ class NotificationReceiverTest(IonTestCase):
                 'name':'resource_registry1',
                 'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
-                    'spawnargs':{'datastore_service':'datastore'}},
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
+                    'spawnargs':{'datastore_service':'datastore'}
             },
+
             {
                 'name':'association_service',
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
             },
-            {
-                'name':'attributestore',
-                'module':'ion.services.coi.attributestore',
-                'class':'AttributeStoreService'
-            },
+
             {
                 'name':'identity_registry',
                 'module':'ion.services.coi.identity_registry',
                 'class':'IdentityRegistryService'
             },
-            {
-                'name':'store_service',
-                'module':'ion.core.data.store_service',
-                'class':'StoreService'
-            },
+            
             {
                 'name':'app_integration',
                 'module':'ion.integration.ais.app_integration_service',

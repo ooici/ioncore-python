@@ -427,22 +427,22 @@ class MetadataCache(object):
 
         log.debug('getAssociatedSource for dSetID %s' %(dSetID))
 
-        qmsg = yield self.mc.create_instance(ASSOCIATION_GET_STAR_MSG_TYPE)
-        pair = qmsg.subject_pairs.add()
-        pair.subject = qmsg.CreateObject(IDREF_TYPE)
-        pair.subject.key = dSetID
+        qmsg = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = qmsg.pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = dSetID
         pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
         pair.predicate.key = HAS_A_ID
 
-        pair = qmsg.object_pairs.add()
+        pair = qmsg.pairs.add()
         pair.object = qmsg.CreateObject(IDREF_TYPE)
         pair.object.key = DATASOURCE_RESOURCE_TYPE_ID
         pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
         pair.predicate.key = TYPE_OF_ID
         try:
-            results = yield self.asc.get_star(qmsg)
+            results = yield self.asc.get_subjects(qmsg)
         except:
-            log.error('Error getting associated data source for Dataset: %s' % dSetID)
+            log.exception('Error getting associated data source for Dataset: %s' % dSetID)
             defer.returnValue(None)
 
         dsrcs = [str(x.key) for x in results.idrefs]
