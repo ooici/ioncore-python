@@ -1005,7 +1005,7 @@ class Wrapper(object):
 
         self.recurse_count.count += 1
         local_cnt = self.recurse_count.count
-        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d:\n %s' %
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d, Modified - %s' %
               (local_cnt, type(self), len(self.ChildLinks), len(structure), self.Modified))
 
         if not  self.Modified:
