@@ -15,11 +15,7 @@ from ion.core.object import object_utils
 from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-#from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
-#from ion.integration.ais.getDataResourceDetail.cfdata import cfData
 
-# Temporary, until assocation of dataset and datasource are there.
-from ion.integration.ais.findDataResources.findDataResources import FindDataResources
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -36,7 +32,7 @@ class GetDataResourceDetail(object):
     def __init__(self, ais):
         log.info('GetDataResourceDetail.__init__()')
         self.ais = ais
-        self.rc = ResourceClient(proc=ais)
+        self.rc = ais.rc
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
         self.metadataCache = ais.getMetadataCache()
@@ -116,17 +112,10 @@ class GetDataResourceDetail(object):
                 RspMsg.error_str = 'AIS.getDataResourceDetail: Error calling RR.get_instance: '+ex.msg_content.MessageResponseBody
                 defer.returnValue(RspMsg)
 
-            #
-            # Find the datasource associated with this dataset, and then find the
-            # owner associated with the dataset; for now, instantiate
-            # a FindDataResources worker object. The getAssociatedSource should be
-            # moved into a common worker class; it's currently in the FindDataResources
-            # class, which doesn't use it.
-            #
+
             log.debug('getDataResourceDetail getting datasource resource instance')
-            worker = FindDataResources(self.ais)
-            dSourceResID = yield worker.getAssociatedSource(dSetResID)
-            ownerID = yield worker.getAssociatedOwner(dSetResID)
+            dSourceResID = yield self.ais.getAssociatedSource(dSetResID)
+            ownerID = yield self.ais.getAssociatedOwner(dSetResID)
         
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)

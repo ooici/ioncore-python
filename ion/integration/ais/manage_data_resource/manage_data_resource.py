@@ -75,12 +75,6 @@ DEFAULT_MAX_INGEST_MILLIS = 30000
 class ManageDataResource(object):
 
     def __init__(self, ais):
-
-        # Isolate teh Data Resource Manager in a separate process from the metadata cache
-        ais = Process(**{'proc-name':'ManagDataResource Process'})
-        ais.spawn()
-        ais.mc = ais.message_client
-        ais.rc = ResourceClient(ais)
         
         log.debug('ManageDataResource.__init__()')
         self._proc = ais
@@ -96,7 +90,7 @@ class ManageDataResource(object):
         #self.ing   = IngestionClient(proc=ais)
         self.nac   = NotificationAlertServiceClient(proc=ais)
          
-        #necessary to receive events i think
+        #necessary to publish events
         self.pub_schd   = ScheduleEventPublisher(process=ais)
         self.pub_dsrc   = DatasourceChangeEventPublisher(process=ais)
 

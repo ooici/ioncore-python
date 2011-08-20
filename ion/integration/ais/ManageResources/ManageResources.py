@@ -84,7 +84,7 @@ class ManageResources(object):
 
       self.mc = ais.mc
       self.asc = AssociationServiceClient(proc=ais)
-      self.rc = ResourceClient(proc=ais)
+      self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
       self.metadataCache = ais.getMetadataCache()
 

@@ -196,7 +196,7 @@ class FindDataResources(object):
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
         self.ais = ais
-        self.rc = ResourceClient(proc=ais)
+        self.rc = ais.rc
         self.mc = ais.mc
         self.asc = AssociationServiceClient(proc=ais)
         self.ac = AssociationClient(proc=ais)
@@ -384,56 +384,6 @@ class FindDataResources(object):
         response = yield self.__getDataResources(msg, ownedByList, rspMsg, typeFlag = self.BY_USER)
         
         defer.returnValue(response)
-
-
-    @defer.inlineCallbacks
-    def getAssociatedOwner(self, dsID):
-        """
-        Worker class method to find the owner associated with a data set.
-        This is a public method because it can be called from the
-        findDataResourceDetail worker class.
-        """
-        log.debug('getAssociatedOwner() entry')
-
-        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
-
-        #
-        # Set up an owned_by_id search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(subject)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = dsID
-        
-        pair.subject = type_ref
-
-        log.info('Calling get_objects with dsID: ' + dsID)
-
-        try:
-            result = yield self.asc.get_objects(request)
-        
-        except AssociationServiceError:
-            log.error('getAssociatedOwner: association error!')
-            defer.returnValue(None)
-
-        if len(result.idrefs) == 0:
-            log.error('Owner not found!')
-            defer.returnValue('OWNER NOT FOUND!')
-        elif len(result.idrefs) == 1:
-            log.debug('getAssociatedOwner() exit')
-            defer.returnValue(result.idrefs[0].key)
-        else:
-            log.error('More than 1 owner found!')
-            defer.returnValue('MULTIPLE OWNERS!')
 
 
     @defer.inlineCallbacks
