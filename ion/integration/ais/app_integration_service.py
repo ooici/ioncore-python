@@ -94,11 +94,11 @@ class AppIntegrationService(ServiceProcess):
         yield self.metadataCache.loadDataSources()
 
         log.info('instantiating DatasetUpdateEventSubscriber')
-        self.dataset_subscriber = DatasetUpdateEventSubscriber(self, process = self)
+        self.dataset_subscriber = DatasetUpdateEventSubscriber(process = self)
         self.register_life_cycle_object(self.dataset_subscriber)
         
         log.info('instantiating DatasourceUpdateEventSubscriber')
-        self.datasource_subscriber = DatasourceUpdateEventSubscriber(self, process = self)
+        self.datasource_subscriber = DatasourceUpdateEventSubscriber(process = self)
         self.register_life_cycle_object(self.datasource_subscriber)
         
         # create worker instances

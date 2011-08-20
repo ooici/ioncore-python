@@ -15,8 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
-#from ion.core.messaging.message_client import MessageClient
-#from ion.services.coi.resource_registry.resource_client import ResourceClient
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 from ion.core.object import object_utils
 
@@ -30,6 +29,10 @@ from ion.services.dm.distribution.events import ScheduleEventPublisher, \
 
 from ion.util.iontime import IonTime
 import time
+
+from ion.core.process.process import Process
+
+
 
 from ion.util.url import urlRe
 
@@ -72,6 +75,13 @@ DEFAULT_MAX_INGEST_MILLIS = 30000
 class ManageDataResource(object):
 
     def __init__(self, ais):
+
+        # Isolate teh Data Resource Manager in a separate process from the metadata cache
+        ais = Process(**{'proc-name':'ManagDataResource Process'})
+        ais.spawn()
+        ais.mc = ais.message_client
+        ais.rc = ResourceClient(ais)
+        
         log.debug('ManageDataResource.__init__()')
         self._proc = ais
         self.mc    = ais.mc
@@ -594,8 +604,7 @@ class ManageDataResource(object):
             req_msg = yield self.mc.create_instance(SCHEDULER_DEL_REQ_TYPE)
             req_msg.task_id = sched_task_rsrc.task_id
             response = yield self.sc.rm_task(req_msg)
-            log.debug("not sure what to do with the response: %s" % str(type(response)))
-            #fixme: anything to do with this response?  i don't know of anything...
+            log.info("Scheduler rm_task response %s" % str(response.MessageResponseCode))
 
             sched_task_rsrc.ResourceLifeCycleState = sched_task_rsrc.RETIRED
             yield self.rc.put_instance(sched_task_rsrc)
