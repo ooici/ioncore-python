@@ -104,8 +104,6 @@ class ManageDataResourceSubscription(object):
         self.pfd = None
 
         self.nac = NotificationAlertServiceClient(proc=ais)
-        self.metadataCache = ais.getMetadataCache()
- 
 
     @defer.inlineCallbacks
     def update(self, msg):
@@ -625,7 +623,7 @@ class ManageDataResourceSubscription(object):
         j = 0
         for result in reply.message_parameters_reference[0].subscriptionListResults:
             dSetResID = result.datasetMetadata.data_resource_id
-            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
+            dSetMetadata = yield self.ais.getDSetMetadata(dSetResID)
             if dSetMetadata is None:
                 log.error('Metadata not found for dataset: %s' %(dSetResID))
             else:

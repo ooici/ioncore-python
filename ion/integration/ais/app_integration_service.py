@@ -94,6 +94,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
     @defer.inlineCallbacks
     def slc_init(self):
 
+        # Create the Worker that uses the metadata cache
         data_resource_worker = yield self.spawn_worker('data_resource_worker')
         data_resource_worker.metadataCache = MetadataCache(data_resource_worker)
         log.debug('Instantiated AIS Metadata Cache Object')
@@ -108,11 +109,12 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
         data_resource_worker.datasource_subscriber = DatasourceUpdateEventSubscriber(process = data_resource_worker)
         data_resource_worker.register_life_cycle_object(data_resource_worker.datasource_subscriber)
         
-        # create worker instances of the many AIS CLASSES
+
         self.FindDataResourcesWorker = FindDataResources(data_resource_worker)
         self.GetDataResourceDetailWorker = GetDataResourceDetail(data_resource_worker)
 
 
+        # create worker instances of the many AIS CLASSES
         manage_resource_worker = yield self.spawn_worker('manage_resource_worker')
         self.ManageResourcesWorker = ManageResources(manage_resource_worker)
         

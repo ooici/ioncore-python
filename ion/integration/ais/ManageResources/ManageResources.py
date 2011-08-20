@@ -86,7 +86,6 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
-      self.metadataCache = ais.getMetadataCache()
 
 
    @defer.inlineCallbacks
@@ -584,12 +583,12 @@ class ManageResources(object):
       LoaderFunc = self.ResourceTypes[ResourceType][4]
       Index = yield LoaderFunc(Response.message_parameters_reference[0], Result)
       if (ResourceType == DATASET_KEY):
-         ResourceID = yield self.metadataCache.getAssociatedSource(Result.ResourceIdentity)
+         ResourceID = yield self.ais.getAssociatedSource(Result.ResourceIdentity)
          Response.message_parameters_reference[0].resource.add()
          Response.message_parameters_reference[0].resource[Index].name = "Data Source ID"
          Response.message_parameters_reference[0].resource[Index].value = ResourceID
       elif (ResourceType == DATASOURCE_KEY):
-         ResourceIDs = yield self.metadataCache.getAssociatedDatasets(Result)
+         ResourceIDs = yield self.ais.getAssociatedDatasets(Result)
          if len(ResourceIDs) == 0:
             ResourceID = 'None'
          else:

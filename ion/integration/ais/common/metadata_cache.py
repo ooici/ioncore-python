@@ -78,7 +78,13 @@ VISUALIZATION_URL = 'visualization_url'
 VISIBILITY = 'visibility'
 
 class MetadataCache(AIS_Mixin):
-    
+    """
+    Metadata cache inherits from mixin because it used to contain most of these methods.
+
+    Most of the other AIS workers use an instance of the AIS worker process which is a proper mixin
+    """
+
+
     __metadata = {}
 
     def __init__(self, ais):
