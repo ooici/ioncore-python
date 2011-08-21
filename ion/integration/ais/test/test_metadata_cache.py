@@ -65,9 +65,7 @@ class MetadataCacheTest(IonTestCase, AIS_Mixin):
         
     @defer.inlineCallbacks
     def setUp(self):
-        log.debug('AppIntegrationTest.setUp(): waiting for any update events to clear...')
-
-        yield pu.asleep(0.5)
+        log.debug('AppIntegrationTest.setUp():')
 
         yield self._start_container()
         
@@ -124,11 +122,6 @@ class MetadataCacheTest(IonTestCase, AIS_Mixin):
         yield self.cache.loadDataSources()
 
         self.subproc = subproc
-
-        if self.AnalyzeTiming != None:
-            self.TimeStamps.StartTime = time.time()
-            self.TimeStamps.LastTime = self.TimeStamps.StartTime
-
 
         # Setup the publishers
         datasetPublisher = DatasetChangeEventPublisher(process=self.publisher_proc)
