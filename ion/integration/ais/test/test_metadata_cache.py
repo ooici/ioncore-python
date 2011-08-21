@@ -12,7 +12,9 @@ import ion.util.procutils as pu
 
 from twisted.internet import defer
 import time
-    
+
+
+from ion.integration.ais.common.ais_utils import AIS_Mixin
 from ion.core.process.process import Process
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
@@ -51,7 +53,7 @@ TEST_RESOURCE_ID = '01234567-8abc-def0-1234-567890123456'
 DISPATCHER_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=7002, version=1)
 
 
-class MetadataCacheTest(IonTestCase):
+class MetadataCacheTest(IonTestCase, AIS_Mixin):
    
     """
     Testing Metadata Cache.
@@ -59,28 +61,14 @@ class MetadataCacheTest(IonTestCase):
 
     # Set timeout for Trial tests
     timeout = 40
-    
-    # set to None to turn off timing logging, set to anything else to turn on timing logging
-    AnalyzeTiming = None
-    
-    class TimeStampsClass (object):
-        pass
-    
-    TimeStamps = TimeStampsClass()
-    
-    def TimeStamp (self):
-        TimeNow = time.time()
-        TimeStampStr = "(wall time = " + str (TimeNow) + \
-                       ", elapse time = " + str(TimeNow - self.TimeStamps.StartTime) + \
-                       ", delta time = " + str(TimeNow - self.TimeStamps.LastTime) + \
-                       ")"
-        self.TimeStamps.LastTime = TimeNow
-        return TimeStampStr
-    
+
         
     @defer.inlineCallbacks
     def setUp(self):
-        log.debug('AppIntegrationTest.setUp():')
+        log.debug('AppIntegrationTest.setUp(): waiting for any update events to clear...')
+
+        yield pu.asleep(0.5)
+
         yield self._start_container()
         
         services = [
@@ -174,9 +162,6 @@ class MetadataCacheTest(IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
-    def getMetadataCache(self):
-        return self.cache
-
     @defer.inlineCallbacks
     def test_metadataCache(self):
         log.debug('Testing updateMetadataCache.')
@@ -222,6 +207,8 @@ class MetadataCacheTest(IonTestCase):
 
         dsourcelist = self.cache.getDataSources()
         for ds in dsourcelist:
+
+            print 'DKLS KLSD DSKLD LKS DSLNFLSKDNFIOFHLBLJSKDB   KLSNDKLSN'
             dSourceResID = ds['dsource'].ResourceIdentity
 
             dSourceMetadata = yield self.cache.getDSourceMetadata(dSourceResID)

@@ -77,7 +77,7 @@ class ManageResources(object):
                            }
       self.MapGpbTypeToResourceType = {10001 : DATASET_KEY,
                                        1401 : IDENTITY_KEY,
-                                       4503 : DATASOURCE_KEY                                     
+                                       4503 : DATASOURCE_KEY
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
@@ -87,12 +87,14 @@ class ManageResources(object):
       self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
 
+      self.ais = ais
+
 
    @defer.inlineCallbacks
    def getResourceTypes (self, msg):
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResourceTypes()\n'+str(msg))
-      
+
       # no input for this message, just build AIS response with list of resource types
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourceTypes response')
       Response.message_parameters_reference.add()

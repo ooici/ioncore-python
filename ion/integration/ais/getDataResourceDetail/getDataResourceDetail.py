@@ -29,13 +29,13 @@ RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, ve
 
 class GetDataResourceDetail(object):
     
-    def __init__(self, ais):
+    def __init__(self, ais, metadataCache):
         log.info('GetDataResourceDetail.__init__()')
         self.ais = ais
         self.rc = ais.rc
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
-        self.metadataCache = ais.getMetadataCache()
+        self.metadataCache = metadataCache
         self.bUseMetadataCache = True
 
         

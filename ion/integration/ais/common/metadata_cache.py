@@ -84,9 +84,6 @@ class MetadataCache(AIS_Mixin):
     Most of the other AIS workers use an instance of the AIS worker process which is a proper mixin
     """
 
-
-    __metadata = {}
-
     def __init__(self, ais):
         log.info('MetadataCache.__init__()')
 
@@ -97,6 +94,9 @@ class MetadataCache(AIS_Mixin):
 
         self.numDSets    = 0
         self.numDSources = 0
+
+        self.__metadata = {}
+
 
         #
         # A lock to ensure exclusive access to cache when updating

@@ -4,7 +4,7 @@ import time
 
 from twisted.internet import defer
 
-from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError, ASSOCIATION_GET_STAR_MSG_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceError, ASSOCIATION_GET_STAR_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, \
     SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE, PREDICATE_REFERENCE_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
@@ -14,9 +14,9 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, 
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-import logging
 
-class AIS_Mixin(object)
+
+class AIS_Mixin(object):
 
 
     # set to None to turn off timing logging, set to anything else to turn on timing logging

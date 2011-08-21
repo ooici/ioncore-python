@@ -82,7 +82,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
         worker.mc = worker.message_client
         worker.rc = ResourceClient(worker)
 
-        worker.getMetadataCache = AppIntegrationService.getMetadataCache
+        worker.asc = AssociationServiceClient(proc = worker)
 
         yield worker.spawn()
 
@@ -94,42 +94,92 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
     @defer.inlineCallbacks
     def slc_init(self):
 
-        # Create the Worker that uses the metadata cache
+        #== Create a process for the metadata cache and data resource workers
         data_resource_worker = yield self.spawn_worker('data_resource_worker')
-        data_resource_worker.metadataCache = MetadataCache(data_resource_worker)
+        self._data_resource_worker = data_resource_worker
+
+        metadataCache = MetadataCache(data_resource_worker)
+        data_resource_worker.metadataCache = metadataCache
         log.debug('Instantiated AIS Metadata Cache Object')
         yield data_resource_worker.metadataCache.loadDataSets()
         yield data_resource_worker.metadataCache.loadDataSources()
 
         log.info('instantiating DatasetUpdateEventSubscriber')
         data_resource_worker.dataset_subscriber = DatasetUpdateEventSubscriber(process = data_resource_worker)
-        data_resource_worker.register_life_cycle_object(data_resource_worker.dataset_subscriber)
+        yield data_resource_worker.register_life_cycle_object(data_resource_worker.dataset_subscriber)
         
         log.info('instantiating DatasourceUpdateEventSubscriber')
         data_resource_worker.datasource_subscriber = DatasourceUpdateEventSubscriber(process = data_resource_worker)
-        data_resource_worker.register_life_cycle_object(data_resource_worker.datasource_subscriber)
-        
-
-        self.FindDataResourcesWorker = FindDataResources(data_resource_worker)
-        self.GetDataResourceDetailWorker = GetDataResourceDetail(data_resource_worker)
+        yield data_resource_worker.register_life_cycle_object(data_resource_worker.datasource_subscriber)
 
 
-        # create worker instances of the many AIS CLASSES
-        manage_resource_worker = yield self.spawn_worker('manage_resource_worker')
-        self.ManageResourcesWorker = ManageResources(manage_resource_worker)
-        
-        manage_data_resource_worker = yield self.spawn_worker('manage_data_resource_worker')
-        self.ManageDataResourceWorker = ManageDataResource(manage_data_resource_worker)
-
-        manage_subscription_worker = yield self.spawn_worker('manage_subscription_worker')
-        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(manage_subscription_worker)
+        self.FindDataResourcesWorker = FindDataResources(self, metadataCache)
+        self.GetDataResourceDetailWorker = GetDataResourceDetail(self, metadataCache)
 
 
-        # These are okay to use self... they don't use resources
+        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self, metadataCache)
+
+        self.ManageResourcesWorker = ManageResources(self)
+
+        self.ManageDataResourceWorker = ManageDataResource(self)
+
         self.CreateDownloadURLWorker = CreateDownloadURL(self)
         self.RegisterUserWorker = RegisterUser(self)
         self.ValidateDataResourceWorker = ValidateDataResource(self)
 
+
+        """
+        self.FindDataResourcesWorker = FindDataResources(data_resource_worker)
+        self.GetDataResourceDetailWorker = GetDataResourceDetail(data_resource_worker)
+
+        # Clear up the junk left over from startup
+        data_resource_worker.workbench.manage_workbench_cache('Default Context')
+        #=== End
+
+        #== Create a process for the manage data resource subscription worker
+        manage_subscription_worker = yield self.spawn_worker('manage_subscription_worker')
+        # This is cheating - passing in the matadata cache object - but I think it is safe
+        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(manage_subscription_worker, data_resource_worker.metadataCache)
+        self._manage_subscription_worker = manage_subscription_worker
+
+        # Clear up the junk left over from startup
+        manage_subscription_worker.workbench.manage_workbench_cache('Default Context')
+        #== End
+
+
+        #== Create a process for the Manage Resource worker
+        manage_resource_worker = yield self.spawn_worker('manage_resource_worker')
+        self.ManageResourcesWorker = ManageResources(manage_resource_worker)
+
+        self._manage_resource_worker = manage_resource_worker
+
+        # Clear up the junk left over from startup
+        manage_resource_worker.workbench.manage_workbench_cache('Default Context')
+        #== End
+
+        #== Create a process for the Manage Data Resource worker
+        manage_data_resource_worker = yield self.spawn_worker('manage_data_resource_worker')
+        self.ManageDataResourceWorker = ManageDataResource(manage_data_resource_worker)
+
+        self._manage_data_resource_worker = manage_data_resource_worker
+
+        # Clear up the junk left over from startup
+        manage_data_resource_worker.workbench.manage_workbench_cache('Default Context')
+        #== End
+
+        # These are okay to use self... they don't use resources
+        non_resource_worker = yield self.spawn_worker('non_resource_worker')
+
+        self.CreateDownloadURLWorker = CreateDownloadURL(non_resource_worker)
+        self.RegisterUserWorker = RegisterUser(non_resource_worker)
+        self.ValidateDataResourceWorker = ValidateDataResource(non_resource_worker)
+
+        self._non_resource_worker = non_resource_worker
+        # Clear up the junk left over from startup
+        non_resource_worker.workbench.manage_workbench_cache('Default Context')
+        #== End
+
+        """
 
     @defer.inlineCallbacks
     def slc_activate(self):
@@ -152,6 +202,30 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
                 map_ooi_id_to_role(content['user-id'], content['role'])
             elif op == 'unset_user_role':
                 unmap_ooi_id_from_role(content['user-id'], content['role'])
+
+
+    def DataResourceMemManager(op):
+
+        def call_op(self, *args, **kwargs):
+
+            op_name = op.__name__
+            print 'ais_mem_manager'
+            print 'Worker Process: %s' % self._data_resource_worker
+            print 'op name', op_name, op
+            self._data_resource_worker.context.progenitor_convid = 'data_resource_worker'
+            #print 'Workbench: %s' % self._data_resource_worker.workbench
+            #print 'args', args
+            #print 'kwargs', kwargs
+
+            result = op(self, *args, **kwargs)
+
+            self._data_resource_worker.workbench.manage_workbench_cache('data_resource_worker')
+            print 'Workbench: %s' % self._data_resource_worker.workbench
+
+
+            return result
+        return call_op
+
 
     @defer.inlineCallbacks
     def op_findDataResources(self, content, headers, msg):
@@ -191,6 +265,29 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
         log.info('op_getDataResourceDetail service method')
         returnValue = yield self.GetDataResourceDetailWorker.getDataResourceDetail(content)
         yield self.reply_ok(msg, returnValue)
+
+
+    def NonResourceMemManager(op):
+
+        def call_op(self, *args, **kwargs):
+
+            op_name = op.__name__
+            print 'ais_mem_manager'
+            print 'Worker Process: %s' % self._non_resource_worker
+            print 'op name', op_name, op
+            self._non_resource_worker.context = self.context
+            #print 'Workbench: %s' % self._data_resource_worker.workbench
+            #print 'args', args
+            #print 'kwargs', kwargs
+
+            result = op(self, *args, **kwargs)
+
+            self._non_resource_worker.workbench.manage_workbench_cache('data_resource_worker')
+            print 'Workbench: %s' % self._non_resource_worker.workbench
+
+            return result
+        return call_op
+
 
     @defer.inlineCallbacks
     def op_createDownloadURL(self, content, headers, msg):

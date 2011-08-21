@@ -87,7 +87,7 @@ message ResourceConfigurationResponse{
 
 class ManageDataResourceSubscription(object):
 
-    def __init__(self, ais):
+    def __init__(self, ais, metadata_cache):
         log.debug('ManageDataResourceSubscription.__init__()')
         self.mc  = ais.mc
         self.rc  = ais.rc
@@ -104,6 +104,8 @@ class ManageDataResourceSubscription(object):
         self.pfd = None
 
         self.nac = NotificationAlertServiceClient(proc=ais)
+
+        self.metadata_cache = metadata_cache
 
     @defer.inlineCallbacks
     def update(self, msg):
@@ -623,7 +625,7 @@ class ManageDataResourceSubscription(object):
         j = 0
         for result in reply.message_parameters_reference[0].subscriptionListResults:
             dSetResID = result.datasetMetadata.data_resource_id
-            dSetMetadata = yield self.ais.getDSetMetadata(dSetResID)
+            dSetMetadata = yield self.metadata_cache.getDSetMetadata(dSetResID)
             if dSetMetadata is None:
                 log.error('Metadata not found for dataset: %s' %(dSetResID))
             else:

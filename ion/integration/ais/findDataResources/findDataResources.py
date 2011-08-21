@@ -193,7 +193,7 @@ class FindDataResources(object):
     PRIVATE = 0
     PUBLIC = 1
     
-    def __init__(self, ais):
+    def __init__(self, ais, metadataCache):
         log.info('FindDataResources.__init__()')
         self.ais = ais
         self.rc = ais.rc
@@ -203,7 +203,8 @@ class FindDataResources(object):
         self.nac = NotificationAlertServiceClient(proc=ais)
 
         self.__subscriptionList = None
-        self.metadataCache = ais.getMetadataCache()
+
+        self.metadataCache = metadataCache
 
     @defer.inlineCallbacks
     def findDataResources(self, msg):
