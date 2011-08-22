@@ -78,7 +78,6 @@ VISIBILITY = 'visibility'
 
 class MetadataCache(object):
     
-    __metadata = {}
 
     def __init__(self, ais):
         log.info('MetadataCache.__init__()')
@@ -90,6 +89,9 @@ class MetadataCache(object):
 
         self.numDSets    = 0
         self.numDSources = 0
+
+        self.__metadata = {}
+
 
         #
         # A lock to ensure exclusive access to cache when updating
@@ -105,10 +107,18 @@ class MetadataCache(object):
 
     def getDatasets(self):
         dSetList = []                
-        for ds in self.__metadata.keys():
-            if (self.__metadata[ds][TYPE] is DSET):
-                dSetList.append(self.__metadata[ds])
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSET):
+                dSetList.append(ds)
         return dSetList                
+
+
+    def getDataSources(self):
+        dSourceList = []
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSOURCE):
+                dSourceList.append(ds)
+        return dSourceList
 
     @defer.inlineCallbacks
     def loadDataSets(self):
@@ -276,16 +286,16 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSetMetadata = self.__metadata[dSetID]
+                dSetMetadata = self.__metadata.pop(dSetID)
                 dSet = dSetMetadata[DSET]
                 dSet.Repository.persistent = False
     
-                self.__metadata.pop(dSetID)
+
             except KeyError:
                 log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
                 returnValue = False
             else:
-                self.numDSets = self.numDSets - 1
+                self.numDSets -= 1
                 returnValue = True
     
             finally:
@@ -396,16 +406,16 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSourceMetadata = self.__metadata[dSourceID]
+                dSourceMetadata = self.__metadata.pop(dSourceID)
                 dSource = dSourceMetadata[DSOURCE]
                 dSource.Repository.persistent = False
     
-                self.__metadata.pop(dSourceID)
+
             except KeyError:
                 log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
                 returnValue = False
             else:
-                self.numDSources = self.numDSources - 1
+                self.numDSources -= 1
                 returnValue = True
     
             finally:
@@ -566,7 +576,7 @@ class MetadataCache(object):
         #
         if (dSet.ResourceLifeCycleState == dSet.ACTIVE):
             dSetMetadata = {}
-            self.numDSets = self.numDSets + 1
+            self.numDSets += 1
             #
             # Store the entire dataset now; should be doing only that anyway.
             # Set persisence to true.  NOTE: remember to set this to false
@@ -623,6 +633,7 @@ class MetadataCache(object):
         else:
             log.info('data set %s is not ACTIVE: Not caching.' %(dSet.ResourceIdentity))
 
+
     def __loadDSourceMetadata(self, dSource):
         """
         Create and load a dictionary entry with the metadata from the given
@@ -637,7 +648,7 @@ class MetadataCache(object):
         #
         if (dSource.ResourceLifeCycleState == dSource.ACTIVE):
             dSourceMetadata = {}
-            self.numDSources = self.numDSources + 1
+            self.numDSources += 1
             #
             # Store the entire datasource now; should be doing only that anyway
             # Set persisence to true.  NOTE: remember to set this to false
@@ -673,6 +684,7 @@ class MetadataCache(object):
         else:
             log.info('data source %s is not ACTIVE: Not caching.' %(dSource.ResourceIdentity))
 
+                
 
     @defer.inlineCallbacks
     def __findResourcesOfType(self, resourceType):
