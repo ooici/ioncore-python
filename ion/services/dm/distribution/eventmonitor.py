@@ -116,13 +116,13 @@ class EventMonitorService(ServiceProcess):
 
         # terminate collected active subscribers
         for sub in termsubs:
+            log.debug("Unsubscribing from session_id: %s, subscription_id: %s", session_id, subscription_id)
             sub.terminate()
 
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
     def op_getdata(self, content, headers, msg):
-
         # extract possible message contents
         session_id      = content.session_id
         timestamp       = content.timestamp
@@ -145,18 +145,24 @@ class EventMonitorService(ServiceProcess):
             log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
 
             for subid, subdata in self._subs[session_id]['subscribers'].iteritems():
-
+                log.debug("*** Got here 1")
                 # skip if we have a list of sub ids to give back and this subid is not in the list
                 if len(subscriber_ids) > 0 and not subid in subscriber_ids:
                     continue
-
+                log.debug("*** Got here 2")
                 dataobj = response.data.add()
+                log.debug("***Got here 3")
                 dataobj.subscription_id = subid
+                log.debug("***Got here 4")
                 dataobj.subscription_desc = subdata['subscriber']._binding_key #"none for now"
+                log.debug("*** Got here 5")
                 for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
+                    log.debug("*** Got here 6, event: %s", event)
                     link = dataobj.events.add()
+                    log.debug("*** Got here 7")
                     link.SetLink(event['content'].MessageObject)
-
+                    log.debug("*** Got here 8")
+                log.debug("*** Got here 9")
         yield self.reply_ok(msg, response)
 
 class EventMonitorServiceClient(ServiceClient):

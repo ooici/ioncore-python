@@ -122,6 +122,13 @@
 
         });
     </script>
+    
+    <script type="text/javascript">
+      window.onbeforeunload = function() {
+	$.getJSON('/ctl/unsub', function(data) {});
+      }
+    </script>
+    
 </head>
 <body id="body" onload="initialize()">
 <div id="loading_message"><span class="msg">Loading...</span></div>
