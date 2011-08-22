@@ -78,7 +78,6 @@ VISIBILITY = 'visibility'
 
 class MetadataCache(object):
     
-    __metadata = {}
 
     def __init__(self, ais):
         log.info('MetadataCache.__init__()')
@@ -90,6 +89,9 @@ class MetadataCache(object):
 
         self.numDSets    = 0
         self.numDSources = 0
+
+        self.__metadata = {}
+
 
         #
         # A lock to ensure exclusive access to cache when updating

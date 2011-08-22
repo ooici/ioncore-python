@@ -76,11 +76,6 @@ class ManageDataResource(object):
 
     def __init__(self, ais):
 
-        # Isolate teh Data Resource Manager in a separate process from the metadata cache
-        ais = Process(**{'proc-name':'ManagDataResource Process'})
-        ais.spawn()
-        ais.mc = ais.message_client
-        ais.rc = ResourceClient(ais)
         
         log.debug('ManageDataResource.__init__()')
         self._proc = ais
