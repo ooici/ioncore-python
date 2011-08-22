@@ -15,10 +15,6 @@ from ion.core.object import object_utils
 from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
-#from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
-#from ion.integration.ais.getDataResourceDetail.cfdata import cfData
-
-# Temporary, until assocation of dataset and datasource are there.
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
 
 # import GPB type identifiers for AIS
@@ -40,7 +36,6 @@ class GetDataResourceDetail(object):
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
         self.metadataCache = ais.getMetadataCache()
-        self.bUseMetadataCache = True
 
         
     @defer.inlineCallbacks
@@ -73,61 +68,19 @@ class GetDataResourceDetail(object):
             Response.error_str = "AIS.getDataResourceDetail: Required field [data_resource_id] not found in message"
             defer.returnValue(Response)
 
-        if self.bUseMetadataCache:            
-            ds = yield self.metadataCache.getDSet(dSetResID)
-            if ds is None:
-                # build AIS error response
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                      MessageName='AIS getDataResourceDetail error response')
-                Response.error_num = Response.ResponseCodes.NOT_FOUND
-                Response.error_str = "AIS.getDataResourceDetail: No Data Set Found for Dataset ID: " + dSetResID
-                defer.returnValue(Response)
+        ds = yield self.metadataCache.getDSet(dSetResID)
+        if ds is None:
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
+                                  MessageName='AIS getDataResourceDetail error response')
+            Response.error_num = Response.ResponseCodes.NOT_FOUND
+            Response.error_str = "AIS.getDataResourceDetail: No Data Set Found for Dataset ID: " + dSetResID
+            defer.returnValue(Response)
 
-            dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-            dSourceResID = dSetMetadata['DSourceID']
-            ownerID = dSetMetadata['OwnerID']
+        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
+        dSourceResID = dSetMetadata['DSourceID']
+        ownerID = dSetMetadata['OwnerID']
 
-        else:            
-            try:        
-                log.debug('getDataResourceDetail getting dataset resource instance: ' + dSetResID)
-                #
-                # Get this out of the cache
-                #
-                ds = yield self.rc.get_instance(dSetResID)
-    
-                """
-                for atrib in ds.root_group.attributes:
-                    log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
-        
-                for var in ds.root_group.variables:
-                    log.debug('Root Variable: %s' % str(var.name))
-                    for atrib in var.attributes:
-                        log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
-                    log.debug("....Dimensions:")
-                    for dim in var.shape:
-                        log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
-                """                                    
-    
-            except ReceivedApplicationError, ex:
-                # build AIS error response
-                RspMsg = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
-                                    MessageName='AIS getDataResourceDetail error response')
-                RspMsg.error_num = ex.msg_content.MessageResponseCode
-                RspMsg.error_str = 'AIS.getDataResourceDetail: Error calling RR.get_instance: '+ex.msg_content.MessageResponseBody
-                defer.returnValue(RspMsg)
-
-            #
-            # Find the datasource associated with this dataset, and then find the
-            # owner associated with the dataset; for now, instantiate
-            # a FindDataResources worker object. The getAssociatedSource should be
-            # moved into a common worker class; it's currently in the FindDataResources
-            # class, which doesn't use it.
-            #
-            log.debug('getDataResourceDetail getting datasource resource instance')
-            worker = FindDataResources(self.ais)
-            dSourceResID = yield worker.getAssociatedSource(dSetResID)
-            ownerID = yield worker.getAssociatedOwner(dSetResID)
-        
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
 
@@ -146,12 +99,8 @@ class GetDataResourceDetail(object):
             defer.returnValue(Response)
 
         log.debug('Associated datasourceID: ' + dSourceResID)
-        if self.bUseMetadataCache:
-            log.debug('getting cached dSource')
-            dSource = yield self.metadataCache.getDSource(dSourceResID)
-        else:
-            dSource = yield self.rc.get_instance(dSourceResID)
-
+        log.debug('getting cached dSource')
+        dSource = yield self.metadataCache.getDSource(dSourceResID)
         if (dSource is None):
             Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE,
                                   MessageName='AIS getDataResourceDetail error response')

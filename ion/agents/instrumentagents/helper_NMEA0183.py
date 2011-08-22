@@ -128,6 +128,36 @@ class NMEADefs (BaseEnum):
                           'ALT_GEO',
                           'GEOUNIT',
                           'DATA_AC']},
+    'OOIXX': {'Parsing': ['OOI Custom Sentence',    #0
+                          'UTC_HMS',         #1
+                          'RAW_LAT',         #2
+                          'LAT_DIR',         #3
+                          'RAW_LON',         #4
+                          'LON_DIR',         #5
+                          'FIX_QUA',         #6
+                          'NUM_SAT',         #7
+                          'HOR_DOP',         #8
+                          'ALT_MSL',         #9
+                          'MSLUNIT',         #10
+                          'COURSE',          #11
+                          'SPD_MPS'],        #12
+               'Output': ['NMEA_CD',
+                          'DESC',
+                          'HOUR',
+                          'MIN',
+                          'SEC',
+                          'MS',              # Only if GPS > 1hz
+                          'GPS_LAT',
+                          'GPS_LON',
+                          'FIX_QUA',
+                          'NUM_SAT',
+                          'HDOP',
+                          'ALT_MSL',
+                          'MSLUNIT',
+                          'ALT_GEO',
+                          'COURSE',
+                          'SPD_MPS',
+                          'SPD_KPH']},
     'XXXXX': {'Parsing': ['Dummy Heartbeat',  # 0
                           'IGNORE'],         # 1
                'Output': ['NMEA_CD']},
@@ -693,6 +723,14 @@ class NMEAString ():
                 kph = self.NMEAStrToFloat (item)
                 if kph != gpsNAN:
                     mps = kph * 0.277777778
+                    dataOut['SPD_KPH']  = kph
+                    dataOut['SPD_MPS']  = mps
+
+            # SPEEDMS  double  Speed over ground in meters per second
+            if howTo == 'SPD_MPS':
+                mps = self.NMEAStrToFloat(item)
+                if mps != gpsNAN:
+                    kph = mps / 0.277777778
                     dataOut['SPD_KPH']  = kph
                     dataOut['SPD_MPS']  = mps
 

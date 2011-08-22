@@ -91,8 +91,9 @@ class NMEADeviceParam(DriverParameter):
     """
     Add specific NMEA device parameters here.
     """
-    GPGGA = 'GPGGA'       # Global Position Fix Position
+    GPGGA = 'GPGGA'        # Global Position Fix Position
     GPGLL = 'GPGLL'        # Global Position Latitude and Longitude
+    OOIXX = 'OOIXX'        # Custom sentence for demonstrating OOI UI
     GPRMC = 'GPRMC'        # Recommended Minimum Sentence C
     PGRMF = 'PGRMF'        # Garmin GPS Fix Data Sentence
     PGRMC = 'PGRMC'        # Garmin configuration information
@@ -156,6 +157,7 @@ class CfgNMEADevice(object):
     cfgParams = {'GPGGA':        'OFF',
                  'GPGLL':        'OFF',
                  'GPRMC':        'OFF',
+                 'OOIXX':        'OFF',
                  'PGRMF':        'OFF',
                  'PGRMC':        'OFF',
                  'FIX_MODE':     'A',
