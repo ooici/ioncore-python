@@ -1126,9 +1126,9 @@ class Repository(ObjectContainer):
 
 
         if keys_are_the_same:
-            log.warn('BRANCH STATE HAS DIVERGED BUT CONTENT IS THE SAME - MERGING WITH NO INFORMATION LOST')
+            log.warn('BRANCH STATE HAS DIVERGED BUT CONTENT IS THE SAME - MERGING WITH NO INFORMATION LOST, REPO KEY %s' % self.repository_key)
         else:
-            log.warn('BRANCH STATE HAS DIVERGED - MERGING BY DATE WITH INFORMATION LOST')
+            log.warn('BRANCH STATE HAS DIVERGED - MERGING BY DATE WITH INFORMATION LOST, REPO KEY %s' % self.repository_key)
 
 
         # Deal with the newest ref seperately

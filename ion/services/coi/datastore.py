@@ -535,9 +535,14 @@ class DataStoreWorkbench(WorkBench):
             element = self._workbench_cache.get(key)
 
             def_list.append(self._blob_store.put(key, element.serialize()))
-        yield defer.DeferredList(def_list)
-        # @TODO - check the results - for what?
 
+        # we need to check problems in the put here
+        # @TODO: not sure if consumeErrors is necessary
+        dl_res = yield defer.DeferredList(def_list, consumeErrors=True)
+        for idx, d_res in enumerate(dl_res):
+            d_res_suc, d_res_res = d_res
+            if not d_res_suc:
+                log.error("Error putting blob to blob store: %s\nelement: %s" % (str(d_res_res), str(self._workbench_cache.get(new_blob_keys[idx]))))
 
         # now put any new commits that are not at the head
         def_list = []
@@ -615,7 +620,7 @@ class DataStoreWorkbench(WorkBench):
                     defd = self._commit_store.put(key = key,
                                        value = wse.serialize(),
                                        index_attributes = attributes)
-                    def_list.append(defd)
+                    def_list.append((defd, key, wse))
 
                 else:
 
@@ -647,23 +652,40 @@ class DataStoreWorkbench(WorkBench):
                     # Any commit which is currently a head will have the correct branch names set.
                     # Just delete the branch names for the ones that are no longer heads.
 
-        yield defer.DeferredList(def_list)
-        #@TODO - check the return vals?
+        # @TODO: not sure if consumeErrors is necessary
+        dl_res = yield defer.DeferredList([x[0] for x in def_list], consumeErrors=True)
+
+        for idx, d_res in enumerate(dl_res):
+            d_res_suc, d_res_res = d_res
+            if not d_res_suc:
+                _, ckey, cwse = def_list[idx]
+                log.error("Error putting commit to store: %s\nkey: %s\nelement: %s" % (str(d_res_res), sha1_to_hex(ckey), str(cwse)))
 
         def_list = []
         for new_head in new_head_list:
 
             def_list.append(self._commit_store.put(**new_head))
 
-        yield defer.DeferredList(def_list)
-        #@TODO - check the return vals?
+        # @TODO: not sure if consumeErrors is necessary
+        dl_res = yield defer.DeferredList(def_list, consumeErrors=True)
+        for idx, d_res in enumerate(dl_res):
+            d_res_suc, d_res_res = d_res
+            if not d_res_suc:
+                log.error("Error putting new_head_list commit to store: %s\nkey: %s\nelement: %s" % (str(d_res_res), sha1_to_hex(new_head_list[idx]['key']), str(new_head_list[idx]['value'])))
+
 
         def_list = []
         for key in clear_head_list:
 
-            def_list.append(self._commit_store.update_index(key=key, index_attributes={BRANCH_NAME:''}))
+            def_list.append((self._commit_store.update_index(key=key, index_attributes={BRANCH_NAME:''}), key))
 
-        yield defer.DeferredList(def_list)
+        # @TODO: not sure if consumeErrors is necessary
+        dl_res = yield defer.DeferredList([x[0] for x in def_list], consumeErrors=True)
+        for idx, d_res in enumerate(dl_res):
+            d_res_suc, d_res_res = d_res
+            if not d_res_suc:
+                key = def_list[idx][1]
+                log.error("Error updating index to commit store: %s\nkey: %s" % (str(d_res_res), sha1_to_hex(key)))
 
         #import pprint
         #print 'After update to heads'
