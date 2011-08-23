@@ -785,7 +785,8 @@ class DataStoreWorkbench(WorkBench):
         res_list = yield defer.DeferredList(def_list)
 
         for result, blob in res_list:
-
+            if not result:
+                raise DataStoreWorkBenchError("Blob Store get returned a failure: %s" % str(blob))
             if blob is None:
                 raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
