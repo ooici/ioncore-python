@@ -180,6 +180,7 @@ class ResourceClient(object):
         branch = 'master'
         commit = None
         treeish = None
+        has_treeish = False
 
         # Get the type of the argument and act accordingly
         if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == IDREF_TYPE:
@@ -204,6 +205,7 @@ class ResourceClient(object):
             if m:
                 reference = reference[0:m.start()]
                 treeish = m.groups()[0]
+                has_treeish = True
 
             # @TODO Some reasonable test to make sure it is valid?
 
@@ -213,7 +215,7 @@ class ResourceClient(object):
 
             # Pull the repository
         try:
-            result = yield self.workbench.pull(self.datastore_service, reference, get_head_content=False, excluded_types=excluded_types)
+            result = yield self.workbench.pull(self.datastore_service, reference, get_head_content=not has_treeish, excluded_types=excluded_types)
         except workbench.WorkBenchError, ex:
             log.error('Resource client error during pull operation: Resource ID "%s" \nException - %s' % (reference, str(ex)))
             raise ResourceClientError(
@@ -223,7 +225,7 @@ class ResourceClient(object):
         repo = self.workbench.get_repository(reference)
 
         # do we have a treeish to resolve?
-        if treeish is not None and len(treeish)>0:
+        if has_treeish and treeish is not None and len(treeish)>0:
             commitref = repo.resolve_treeish(treeish, branch)
             commit = commitref.MyId
 

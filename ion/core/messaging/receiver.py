@@ -253,12 +253,13 @@ class Receiver(BasicLifecycleObject):
                 protocol = data.get('protocol', None)
                 performative = data.get('performative', None)
                 op = data.get('op', None)
+                sender = data.get('sender', None)
 
                 if hasattr(self.process, 'workbench'):
                     workbench = self.process.workbench
                     process = self.process
 
-                    log.info('Process "%s" Receiver Message Headers: OP - %s, Convid - %s, Performative - %s, Protocol - %s' % (process.proc_name, op, convid, performative, protocol))
+                    log.info('Process "%s" Receiver Message Headers: OP - %s, Sender - %s, Convid - %s, Performative - %s, Protocol - %s' % (process.proc_name, op, sender, convid, performative, protocol))
 
 
                     if protocol != 'rpc':
