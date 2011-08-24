@@ -638,6 +638,7 @@ class ManageDataResource(object):
         datasrc_resource.update_start_datetime_millis  = msg.update_start_datetime_millis
         datasrc_resource.is_public                     = msg.is_public
         datasrc_resource.visualization_url             = msg.visualization_url
+        datasrc_resource.timestep_file_count           = msg.timestep_file_count
 
         # from bug OOIION-131
         datasrc_resource.initial_starttime_offset_millis  = msg.initial_starttime_offset_millis
