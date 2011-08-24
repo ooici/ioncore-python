@@ -519,6 +519,7 @@ class DataStoreWorkbench(WorkBench):
                     for idx, bfail in bl_fails:
                         msg += "B Key: %s, Failure %s\n" % (sha1_to_hex(def_blob_list[idx][1]), str(cfail[1]))
 
+                    # no local modifications at this point - don't need to clear
                     raise DataStoreWorkBenchError(msg)
 
                 # Remove
@@ -536,6 +537,8 @@ class DataStoreWorkbench(WorkBench):
                 except ReceivedError, re:
 
                    log.debug('ReceivedError', str(re))
+
+                   # no local modifications at this point - don't need to clear
                    raise DataStoreWorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
 
 
@@ -574,6 +577,9 @@ class DataStoreWorkbench(WorkBench):
             msg = "Errors (%s) putting blob to blob store\n\n" % len(dl_fails)
             for idx, d_res in dl_fails:
                 msg += "%s\nFailure: %s\n\n" % (str(self._workbench_cache.get(new_blob_keys[idx])), str(d_res[1]))
+
+            for repostate in pushmsg.repositories:
+                self.clear_repository_key(repostate.repository_key)
 
             raise DataStoreWorkBenchError(msg)
 
@@ -693,6 +699,9 @@ class DataStoreWorkbench(WorkBench):
                 _, ckey, cwse = def_list[idx]
                 msg += "Key: %s\nElement: %s\nFailure: %s" % (sha1_to_hex(ckey), str(cwse), str(d_res[1]))
 
+            for repostate in pushmsg.repositories:
+                self.clear_repository_key(repostate.repository_key)
+
             raise DataStoreWorkBenchError(msg)
 
         def_list = []
@@ -709,6 +718,9 @@ class DataStoreWorkbench(WorkBench):
                 nhlval = new_head_list[idx]['value']
                 msg += "Key: %s\nElement: %s\nFailure: %s" % (sha1_to_hex(nhlkey), str(nhlval), str(d_res[1]))
 
+            for repostate in pushmsg.repositories:
+                self.clear_repository_key(repostate.repository_key)
+
             raise DataStoreWorkBenchError(msg)
 
         def_list = []
@@ -723,6 +735,9 @@ class DataStoreWorkbench(WorkBench):
             for idx, d_res in dl_fails:
                 key = def_list[idx][1]
                 msg += "Key: %s, Failure: %s" % (sha1_to_hex(key), str(d_res[1]))
+
+            for repostate in pushmsg.repositories:
+                self.clear_repository_key(repostate.repository_key)
 
             raise DataStoreWorkBenchError(msg)
 
