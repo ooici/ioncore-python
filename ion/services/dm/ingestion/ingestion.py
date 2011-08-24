@@ -375,6 +375,9 @@ class IngestionService(ServiceProcess):
             ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
         except Exception, ex:
 
+            # clear the repository
+            self.workbench.clear_repository_key(content.dataset_id)
+
             # we have to notify that there is a failure, so get details and setup the dict to pass to notify_ingest.
             data_details = self.get_data_details(content)
             ingest_res={EM_ERROR:'Ingestion Failed: %s' % str(ex.message)}
@@ -645,7 +648,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
 
         if self.dataset.ResourceLifeCycleState is not self.dataset.UPDATE:
-            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch!')
+            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch! (currently: %s)' % str(self.dataset.ResourceLifeCycleState))
 
         # OOIION-191: sanity check field dataset_id disabled as DatasetAgent does not have the information when making these messages.
         #if content.dataset_id != self.dataset.ResourceIdentity:
@@ -946,7 +949,7 @@ class IngestionService(ServiceProcess):
         
         # A little sanity check on entering recv_done...
         if len(self.dataset.Repository.branches) != 2:
-            raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
+            raise IngestionError('The dataset is in a bad state - there should be two branches (currently %d) in the repository state on entering recv_done.' % len(self.dataset.Repository.branches), 500)
 
 
         # Commit the current state of the supplement - ingest of new content is complete
