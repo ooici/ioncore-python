@@ -12,6 +12,7 @@
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
 import os
+import time
 
 from twisted.internet import defer
 
@@ -36,6 +37,48 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+
+#import binascii
+
+
+def stats(ltuples):
+    len_tuples = len(ltuples)
+    means = None
+    maxs = None
+    for tup in ltuples:
+        if means is None:
+            means = [0] * len(tup)
+        if maxs is None:
+            maxs = [0] * len(tup)
+
+        for ind, val in enumerate(tup):
+            means[ind] += val
+            maxs[ind] = max(maxs[ind], val)
+    means = [val/float(len_tuples) for val in means]
+    return (means, maxs)
+
+def query_stats(ltuples):
+    len_tuples = len(ltuples)
+
+    # Assume no more than six predicates in one request
+    vals = [0.] * 5
+    counts = [0.] * 5
+    maxs = [0.] * 5
+
+    for tup in ltuples:
+
+        try:
+            vals[tup[1]-1] += tup[0]
+            counts[tup[1]-1] += 1
+            maxs[tup[1]-1] = max(maxs[tup[1]-1], tup[0])
+        except IndexError:
+            pass
+
+    means = [val/float(max(cnt,1)) for cnt, val in zip(counts,vals)]
+
+    return (means, maxs, counts)
+
 
 
 cassandra_timeout = CONF.getValue('CassandraTimeout',10.0)
@@ -64,6 +107,9 @@ class CassandraStore(TCPConnection):
     """
 
     implements(store.IStore)
+
+    cassandra_stats={'get':[],'put':[],'has_key':[]}
+    stats_out = 1000
 
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
@@ -105,12 +151,29 @@ class CassandraStore(TCPConnection):
         """
         
         #log.debug("CassandraStore: Calling get on key %s " % key)
+
+        tic = time.time()
+        lval = 0
         try:
             result = yield self.client.get(key, self._cache_name, column='value')
             value = result.column.value
+
+            lval = len(value)
+
         except NotFoundException:
-            log.debug("Didn't find the key: %s. Returning None" % key)     
+            #log.info("Didn't find the key: %s. Returning None" % binascii.b2a_hex(key))
             value = None
+
+        toc = time.time()
+        get_list = self.cassandra_stats['get']
+        get_list.append((toc - tic,lval))
+
+        if len(get_list) >= self.stats_out:
+
+            means, maxs = stats(get_list)
+            log.critical('Cassandra Get Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
+            self.cassandra_stats['get'] = []
+
         defer.returnValue(value)
 
     @timeout(cassandra_timeout)
@@ -125,8 +188,23 @@ class CassandraStore(TCPConnection):
         """
         #log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
+
+        tic = time.time()
+
         columns = {"value": value, "has_key":"1"}
         yield self.client.batch_insert(key, self._cache_name, columns)
+
+        toc = time.time()
+
+        put_list = self.cassandra_stats['put']
+        put_list.append((toc - tic,len(value)))
+
+        if len(put_list) >= self.stats_out:
+
+            means, maxs = stats(put_list)
+            log.critical('Cassandra Put Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
+            self.cassandra_stats['put'] = []
+
 
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
@@ -136,11 +214,25 @@ class CassandraStore(TCPConnection):
         @param key is the key to check in the column family
         @retVal Returns a bool in a deferred
         """
+        tic = time.time()
+
         try:
             yield self.client.get(key, self._cache_name, column="has_key")
             ret = True
         except NotFoundException:
             ret = False
+
+        toc = time.time()
+        has_key_list = self.cassandra_stats['has_key']
+        has_key_list.append((toc - tic,))
+
+        if len(has_key_list) >= self.stats_out:
+
+            means, maxs = stats(has_key_list)
+
+            log.critical('Cassandra Has_Key Stats: time (mean/max) %f/%f seconds;' % (means[0], maxs[0]))
+            self.cassandra_stats['has_key'] = []
+
         defer.returnValue(ret)
 
     @timeout(cassandra_timeout)
@@ -187,7 +279,11 @@ class CassandraIndexedStore(CassandraStore):
     for associating attributes with a value. These attributes are used in the query functionality. 
     """
     implements(store.IIndexStore)
-    
+
+    cassandra_stats={'get':[],'put':[],'has_key':[],'query':[],'update_index':[]}
+
+    stats_out = 1000
+
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
@@ -206,6 +302,9 @@ class CassandraIndexedStore(CassandraStore):
         @param value The value of the value column in the Cassandra row
         @param index_attributes The dictionary contains keys for the column name and the index value
         """
+
+        tic = time.time()
+
         if index_attributes is None:
             index_cols = {}
         else:
@@ -218,6 +317,19 @@ class CassandraIndexedStore(CassandraStore):
         
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
+
+        toc = time.time()
+
+        put_list = self.cassandra_stats['put']
+        put_list.append((toc - tic,len(value)))
+
+        if len(put_list) >= self.stats_out:
+
+            means, maxs = stats(put_list)
+            log.critical('Cassandra Put Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
+            self.cassandra_stats['put'] = []
+
+
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
@@ -227,12 +339,27 @@ class CassandraIndexedStore(CassandraStore):
         @param index_attributes A dictionary of column names and values. These attributes
         can be used to query the store to return rows based on the value of the attributes.
         """
+        tic = time.time()
+
         yield self._check_index(index_attributes)
         #log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         defer.succeed(None)
 
-    
+
+        toc = time.time()
+
+        update_index_list = self.cassandra_stats['update_index']
+        update_index_list.append((toc - tic,))
+
+        if len(update_index_list) >= self.stats_out:
+
+            means, maxs = stats(update_index_list)
+            log.critical('Cassandra Update_Index Stats: time (mean/max) %f/%f seconds;' % (means[0], maxs[0],))
+            self.cassandra_stats['put'] = []
+
+
+
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def _check_index(self, index_attributes):
@@ -281,6 +408,10 @@ class CassandraIndexedStore(CassandraStore):
         raises a CassandraError if the query_predicate object is malformed.
         """
         #log.info('Query against cache: %s' % self._cache_name)
+
+        tic = time.time()
+
+
         predicates = query_predicates.get_predicates()
         def fix_preds(query_tuple):
             if query_tuple[2] == Query.EQ:
@@ -302,6 +433,23 @@ class CassandraIndexedStore(CassandraStore):
             for column in row.columns:
                 row_vals[column.column.name] = column.column.value
             result[row.key] = row_vals
+
+
+        toc = time.time()
+
+        query_list = self.cassandra_stats['query']
+        query_list.append((toc - tic,len(predicates)))
+
+        if len(query_list) >= self.stats_out:
+
+            means, maxs, counts= query_stats(query_list)
+            qstats = []
+            for mn, mx, cnt in zip(means,maxs, counts):
+                qstats.append(mn)
+                qstats.append(mx)
+                qstats.append(cnt)
+            log.critical('Cassandra Query Time(seconds) Stats per predicate (mean/max/cnt): 1 - %f/%f/%d; 2 - %f/%f/%d; 3 - %f/%f/%d;  4 - %f/%f/%d;  5 - %f/%f/%d;' % tuple(qstats))
+            self.cassandra_stats['query'] = []
 
         defer.returnValue(result)
         
