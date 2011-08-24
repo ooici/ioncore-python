@@ -42,43 +42,92 @@ CONF = ioninit.config(__name__)
 #import binascii
 
 
-def stats(ltuples):
-    len_tuples = len(ltuples)
-    means = None
-    maxs = None
-    for tup in ltuples:
-        if means is None:
-            means = [0] * len(tup)
-        if maxs is None:
-            maxs = [0] * len(tup)
+class SizeStats(object):
+    """
+    It isn't pretty but it works
+    """
 
-        for ind, val in enumerate(tup):
-            means[ind] += val
-            maxs[ind] = max(maxs[ind], val)
-    means = [val/float(len_tuples) for val in means]
-    return (means, maxs)
+    def __init__(self):
+        self.sum_time = 0.0
+        self.sum_tpb = 0.0
+        self.max_time = 0.0
+        self.t_count    = 0
+        self.sum_size = 0
+        self.max_size = 0
+        self.s_count    = 0
 
-def query_stats(ltuples):
-    len_tuples = len(ltuples)
+    def add_stats(self,tic,toc,size=0):
+        etime = toc - tic
+        self.sum_time += etime
+        self.max_time = max(self.max_time, etime)
 
-    # Assume no more than six predicates in one request
-    vals = [0.] * 5
-    counts = [0.] * 5
-    maxs = [0.] * 5
+        self.sum_size += size
+        self.max_size = max(self.max_size, size)
 
-    for tup in ltuples:
+        self.t_count += 1
+
+        if size is not 0:
+            self.sum_tpb  += etime/(size/1000.)
+
+            self.s_count +=1
+
+
+    def put_stats(self):
+        return (self.t_count,
+                self.sum_time/self.t_count,
+                self.sum_tpb/self.s_count,
+                self.max_time,
+                self.sum_size/(self.s_count*1000.),
+                self.max_size/1000.)
+
+    def get_stats(self):
+        return (self.t_count,
+                self.sum_time/self.t_count,
+                self.sum_tpb/self.s_count,
+                self.max_time,
+                self.sum_size/(self.s_count*1000.),
+                self.max_size/1000.,
+                self.t_count - self.s_count)
+
+    def simple_stats(self):
+        return (self.t_count,
+                self.sum_time/self.t_count,
+                self.max_time)
+
+
+class QueryStats(object):
+    """
+    It is better than the size stats...
+    """
+
+    def __init__(self):
+        self.sum_time = [0.0] * 5
+        self.max_time = [0.0] * 5
+        self.count    = [0]   * 5
+        self.sum_results = [0]   * 5
+        self.t_count  = 0
+
+
+    def add_stats(self,tic,toc,npred=0, nresults=0):
+        etime = toc - tic
 
         try:
-            vals[tup[1]-1] += tup[0]
-            counts[tup[1]-1] += 1
-            maxs[tup[1]-1] = max(maxs[tup[1]-1], tup[0])
+            self.sum_results[npred-1] += nresults
+            self.sum_time[npred-1] += etime #/float(npred)
+            self.max_time[npred-1]  = max(self.max_time[npred-1], etime)
+            self.count[npred-1]    += 1
+            self.t_count         += 1
         except IndexError:
             pass
 
-    means = [val/float(max(cnt,1)) for cnt, val in zip(counts,vals)]
 
-    return (means, maxs, counts)
+    def query_stats(self):
 
+        stats = []
+        for mn, mx, nres, cnt in zip(self.sum_time, self.max_time, self.sum_results, self.count):
+            stats.extend([mn/max(cnt,1), mx, nres/max(cnt,1), cnt])
+
+        return tuple(stats)
 
 
 cassandra_timeout = CONF.getValue('CassandraTimeout',10.0)
@@ -108,8 +157,11 @@ class CassandraStore(TCPConnection):
 
     implements(store.IStore)
 
-    cassandra_stats={'get':[],'put':[],'has_key':[]}
-    stats_out = 1000
+    put_stats = SizeStats()
+    get_stats = SizeStats()
+    has_stats = SizeStats()
+
+    stats_out = 10000
 
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
@@ -141,6 +193,8 @@ class CassandraStore(TCPConnection):
         self._cache_name = cache.name
         log.info("leaving __init__")
 
+
+    get_stats_string = 'Cassandra Store Get Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb, Not Found - %d;'
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get(self, key):
@@ -165,14 +219,12 @@ class CassandraStore(TCPConnection):
             value = None
 
         toc = time.time()
-        get_list = self.cassandra_stats['get']
-        get_list.append((toc - tic,lval))
 
-        if len(get_list) >= self.stats_out:
+        self.get_stats.add_stats(tic,toc,lval)
 
-            means, maxs = stats(get_list)
-            log.critical('Cassandra Get Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
-            self.cassandra_stats['get'] = []
+        if self.get_stats.t_count >= self.stats_out:
+            log.critical(self.get_stats_string % self.get_stats.get_stats())
+            self.get_stats.__init__()
 
         defer.returnValue(value)
 
@@ -196,16 +248,13 @@ class CassandraStore(TCPConnection):
 
         toc = time.time()
 
-        put_list = self.cassandra_stats['put']
-        put_list.append((toc - tic,len(value)))
+        self.put_stats.add_stats(tic,toc,len(value))
 
-        if len(put_list) >= self.stats_out:
+        if self.put_stats.t_count >= self.stats_out:
+            log.critical('Cassandra Store Put Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb;' % self.put_stats.put_stats())
+            self.put_stats.__init__()
 
-            means, maxs = stats(put_list)
-            log.critical('Cassandra Put Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
-            self.cassandra_stats['put'] = []
-
-
+    has_key_stats_string = 'Cassandra Store Has_Key Stats(%d ops): time seconds (mean/max) %f/%f;'
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def has_key(self, key):
@@ -223,15 +272,12 @@ class CassandraStore(TCPConnection):
             ret = False
 
         toc = time.time()
-        has_key_list = self.cassandra_stats['has_key']
-        has_key_list.append((toc - tic,))
 
-        if len(has_key_list) >= self.stats_out:
+        self.has_stats.add_stats(tic,toc)
 
-            means, maxs = stats(has_key_list)
-
-            log.critical('Cassandra Has_Key Stats: time (mean/max) %f/%f seconds;' % (means[0], maxs[0]))
-            self.cassandra_stats['has_key'] = []
+        if self.has_stats.t_count >= self.stats_out:
+            log.critical(self.has_key_stats_string % self.has_stats.simple_stats())
+            self.has_stats.__init__()
 
         defer.returnValue(ret)
 
@@ -280,9 +326,18 @@ class CassandraIndexedStore(CassandraStore):
     """
     implements(store.IIndexStore)
 
-    cassandra_stats={'get':[],'put':[],'has_key':[],'query':[],'update_index':[]}
 
-    stats_out = 1000
+    put_stats = SizeStats()
+    get_stats = SizeStats()
+    has_stats = SizeStats()
+    update_stats = SizeStats()
+
+    query_stats = QueryStats()
+
+    has_key_stats_string = 'Cassandra Index Store Has_Key Stats(%d ops): time seconds (mean/max) %f/%f;'
+
+    get_stats_string = 'Cassandra Index Store Get Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb, Not Found - %d;'
+
 
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
@@ -290,8 +345,8 @@ class CassandraIndexedStore(CassandraStore):
         """   
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)  
         self._query_attribute_names = None
-            
-        
+
+
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
@@ -319,16 +374,11 @@ class CassandraIndexedStore(CassandraStore):
 
 
         toc = time.time()
+        self.put_stats.add_stats(tic,toc,len(value))
 
-        put_list = self.cassandra_stats['put']
-        put_list.append((toc - tic,len(value)))
-
-        if len(put_list) >= self.stats_out:
-
-            means, maxs = stats(put_list)
-            log.critical('Cassandra Put Stats: time (mean/max) %f/%f seconds; size (mean/max) %f/%f kb' % (means[0], maxs[0], means[1]/1000., maxs[1]/1000.))
-            self.cassandra_stats['put'] = []
-
+        if self.put_stats.t_count >= self.stats_out:
+            log.critical('Cassandra Index Store Put Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb;' % self.put_stats.put_stats())
+            self.put_stats.__init__()
 
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
@@ -349,14 +399,11 @@ class CassandraIndexedStore(CassandraStore):
 
         toc = time.time()
 
-        update_index_list = self.cassandra_stats['update_index']
-        update_index_list.append((toc - tic,))
+        self.update_stats.add_stats(tic,toc)
 
-        if len(update_index_list) >= self.stats_out:
-
-            means, maxs = stats(update_index_list)
-            log.critical('Cassandra Update_Index Stats: time (mean/max) %f/%f seconds;' % (means[0], maxs[0],))
-            self.cassandra_stats['put'] = []
+        if self.update_stats.t_count >= self.stats_out:
+            log.critical('Cassandra Index Store Update_Index Stats(%d ops): time (mean/max) %f/%f seconds;' % self.update_stats.simple_stats())
+            self.update_stats.__init__()
 
 
 
@@ -437,19 +484,12 @@ class CassandraIndexedStore(CassandraStore):
 
         toc = time.time()
 
-        query_list = self.cassandra_stats['query']
-        query_list.append((toc - tic,len(predicates)))
 
-        if len(query_list) >= self.stats_out:
+        self.query_stats.add_stats(tic,toc,len(predicates), len(rows))
 
-            means, maxs, counts= query_stats(query_list)
-            qstats = []
-            for mn, mx, cnt in zip(means,maxs, counts):
-                qstats.append(mn)
-                qstats.append(mx)
-                qstats.append(cnt)
-            log.critical('Cassandra Query Time(seconds) Stats per predicate (mean/max/cnt): 1 - %f/%f/%d; 2 - %f/%f/%d; 3 - %f/%f/%d;  4 - %f/%f/%d;  5 - %f/%f/%d;' % tuple(qstats))
-            self.cassandra_stats['query'] = []
+        if self.query_stats.t_count >= (self.stats_out/10):
+            log.critical('Cassandra Index Store Query Time(seconds) Stats per predicate (mean/max/mean # of rows/cnt): 1 - %f/%f/%f/%d; 2 - %f/%f/%f/%d; 3 - %f/%f/%f/%d;  4 - %f/%f/%f/%d;  5 - %f/%f/%f/%d;' % self.query_stats.query_stats())
+            self.query_stats.__init__()
 
         defer.returnValue(result)
         
