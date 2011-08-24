@@ -578,6 +578,7 @@ class JavaAgentWrapper(ServiceProcess):
         context['dataset_url'] = datasource.dataset_url
         context['ncml_mask'] = datasource.ncml_mask
         context['max_ingest_millis'] = datasource.max_ingest_millis
+        context['timestep_file_count'] = datasource.timestep_file_count
 
         # Add subranges to the context message
         for i, r in enumerate(datasource.sub_ranges):
