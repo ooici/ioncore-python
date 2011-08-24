@@ -150,6 +150,7 @@ class AISManageDataResourceTest(IonTestCase):
         self.ac    = AssociationClient(proc=proc)
 
 
+        ### Test should now pass with the cache on!
         #prepare to monkey patch so we don't use the cache functions
         child_aiss = yield self.sup.get_child_id('app_integration')
         self.aiss  = self._get_procinstance(child_aiss)
@@ -166,6 +167,7 @@ class AISManageDataResourceTest(IonTestCase):
         #store.IndexStore.kvs.clear()
         #store.IndexStore.indices.clear()
 
+        yield pu.asleep(1)
         yield self._shutdown_processes()
         yield self._stop_container()
         log.info("Successfully tore down test container")
@@ -450,9 +452,7 @@ class AISManageDataResourceTest(IonTestCase):
         delete_req_msg  = ais_req_msg.CreateObject(DELETE_DATA_RESOURCE_REQ_TYPE)
         ais_req_msg.message_parameters_reference = delete_req_msg
 
-        for dsid in data_set_ids:
-            delete_req_msg.data_set_resource_id.append(dsid)
-
+        delete_req_msg.data_set_resource_id.extend(data_set_ids)
 
         result_wrapped = yield self.aisc.deleteDataResource(ais_req_msg, MYOOICI_USER_ID)
 
@@ -474,11 +474,18 @@ class AISManageDataResourceTest(IonTestCase):
                              "Expected %d deletion(s), got %d" % (len(data_set_ids), num_deletions))
 
         #check that it's gone
-        for dsid in data_set_ids:
-            dsrc = yield self.rc.get_instance(dsid)
-            log.info("checking successful deletion of data source with id = '%s'" % dsid)
+        for dsource_id in result.successfully_deleted_id:
+            dsrc = yield self.rc.get_instance(dsource_id)
+            log.info("checking successful deletion of data source with id = '%s'" % dsource_id)
             self.failUnlessEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
-                                 "deleteDataResource apparently didn't mark anything retired")
+                                 "deleteDataResource apparently didn't change the datasource to retired")
+
+        for dset_id in data_set_ids:
+            dsrc = yield self.rc.get_instance(dset_id)
+            log.info("checking successful deletion of data source with id = '%s'" % dset_id)
+            self.failIfEqual(dsrc.ResourceLifeCycleState, dsrc.RETIRED,
+                                 "deleteDataResource changed the state of the dataset")
+
 
         defer.returnValue(None)
 

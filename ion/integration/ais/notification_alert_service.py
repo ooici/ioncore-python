@@ -148,7 +148,6 @@ class NotificationAlertService(ServiceProcess):
         log.debug('NotificationAlertService.handle_offline_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
 
         # build the email from the event content
-        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
         BODY = string.join(("This data resource is currently unavailable.",
                             "",
                             "Explanation: %s" %  msg.additional_data.error_explanation,
@@ -167,6 +166,13 @@ class NotificationAlertService(ServiceProcess):
         # send notification email to each user that is monitoring this dataset
         for key, row in rows.iteritems():
             log.info("NotificationAlertService.handle_offline_event  First row data set id %s", rows[key]['data_src_id'] )
+            if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                InitialIngestion = True
+                SUBJECT = "(SysName " + self.sys_name + ") ION Initial Ingestion Data Alert for data set " +  msg.additional_data.dataset_id
+            else:
+                InitialIngestion = False
+                SUBJECT = "(SysName " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
+            log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
             tempTbl = {}
             # get the user information from the Identity Registry
@@ -199,7 +205,7 @@ class NotificationAlertService(ServiceProcess):
 
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
-                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                if InitialIngestion == True:
                     yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
                     log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
@@ -219,8 +225,6 @@ class NotificationAlertService(ServiceProcess):
         enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
-        SUBJECT = "(ION " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
-        log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
         BODY = string.join((
                         "Additional data have been received.",
@@ -245,6 +249,13 @@ class NotificationAlertService(ServiceProcess):
         # send notification email to each user that is monitoring this dataset
         for key, row in rows.iteritems():
             log.info("NotificationAlertService.handle_update_event  First row data set id %s", rows[key]['data_src_id'] )
+            if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                InitialIngestion = True
+                SUBJECT = "(SysName " + self.sys_name + ") ION Initial Ingestion Data Alert for data set " +  msg.additional_data.dataset_id
+            else:
+                InitialIngestion = False
+                SUBJECT = "(SysName " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
+            log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
             tempTbl = {}
             # get the user information from the Identity Registry
@@ -276,7 +287,7 @@ class NotificationAlertService(ServiceProcess):
 
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
-                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                if InitialIngestion == True:
                     yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
                     log.info('NotificationAlertService.handle_update_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
@@ -330,14 +341,14 @@ class NotificationAlertService(ServiceProcess):
         #   raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
         #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
-        log.info('NotificationAlertService.handle_update_event subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
-        log.info('NotificationAlertService.handle_update_event datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
+        log.info('NotificationAlertService.op_addSubscription subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
+        log.info('NotificationAlertService.op_addSubscription datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
             raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
 
-        log.info("NotificationAlertService subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
+        log.info("NotificationAlertService.op_addSubscription subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
         #add the subscription to the index store
         log.info('NotificationAlertService.op_addSubscription add attributes\n ')
     
