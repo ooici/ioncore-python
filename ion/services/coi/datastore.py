@@ -227,14 +227,32 @@ class DataStoreWorkbench(WorkBench):
                     # only add new items to get if they meet our criteria, meaning they are not in the excluded type list
                     new_links_to_get.update(obj.ChildLinks)
                 else:
-                    def_list.append(self._blob_store.get(key))
+                    def_list.append((self._blob_store.get(key), key))
 
 
-            result_list = yield defer.DeferredList(def_list)
+            result_list = yield defer.DeferredList([x[0] for x in def_list])
+            dl_fails = filter(lambda x: not x[1][0], enumerate(result_list))
+            if len(dl_fails) > 0:
+                msg = "Errors (%s) getting link from blob store\n\n" % len(dl_fails)
+                for idx, d_res in dl_fails:
+                    msg += "Key: %s, Failure: %s\n" % (sha1_to_hex(def_list[idx][1]), str(d_res[1]))
+
+                raise DataStoreWorkBenchError(msg)
+
+            # now, let's check for Nones to get a summary of errors
+            dl_nones = filter(lambda x: x[1][1] is None, enumerate(result_list))
+            if len(dl_nones) > 0:
+                msg = "Blobs not found in blob store (%d)" % len(dl_nones)
+                for idx, d_res in dl_nones:
+                    msg += "Key: %s" % sha1_to_hex(def_list[idx][1])
+
+                raise DataStoreWorkBenchError(msg)
 
             for result, blob in result_list:
+                # these should never happen becuase we check for them above, but leaving them in for now...
                 assert result==True, 'Error getting link from blob store!'
                 assert blob is not None, 'Blob not found in blob store!'
+
                 wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 blobs[wse.key]=wse
 
@@ -483,12 +501,25 @@ class DataStoreWorkbench(WorkBench):
 
                 # @TODO Assumption is that this check is less costly than getting it from the remote service
                 key_list.append(key)
-                def_commit_list.append(self._commit_store.has_key(key))
-                def_blob_list.append(self._blob_store.has_key(key))
+                def_commit_list.append((self._commit_store.has_key(key), key))
+                def_blob_list.append((self._blob_store.has_key(key), key))
 
             if key_list:
-                result_commit_list = yield defer.DeferredList(def_commit_list)
-                result_blob_list = yield defer.DeferredList(def_blob_list)
+                result_commit_list = yield defer.DeferredList([x[0] for x in def_commit_list])
+                result_blob_list = yield defer.DeferredList([x[0] for x in def_blob_list])
+
+                # find issues with either list
+                cl_fails = filter(lambda x: not x[1][0], enumerate(result_commit_list))
+                bl_fails = filter(lambda x: not x[1][0], enumerate(result_blob_list))
+
+                if len(cl_fails) > 0 or len(bl_fails) > 0:
+                    msg = "Push had errors (%d) on blob/commit store has_key:\n\n" % len(cl_fails) + len(bl_fails)
+                    for idx, cfail in cl_fails:
+                        msg += "C Key: %s, Failure %s\n" % (sha1_to_hex(def_commit_list[idx][1]), str(cfail[1]))
+                    for idx, bfail in bl_fails:
+                        msg += "B Key: %s, Failure %s\n" % (sha1_to_hex(def_blob_list[idx][1]), str(cfail[1]))
+
+                    raise DataStoreWorkBenchError(msg)
 
                 # Remove
                 for key, res1, have_blob, res2, have_commit in zip(key_list, result_blob_list, result_commit_list):
@@ -535,9 +566,16 @@ class DataStoreWorkbench(WorkBench):
             element = self._workbench_cache.get(key)
 
             def_list.append(self._blob_store.put(key, element.serialize()))
-        yield defer.DeferredList(def_list)
-        # @TODO - check the results - for what?
 
+        # we need to check problems in the put here
+        dl_res = yield defer.DeferredList(def_list)
+        dl_fails = filter(lambda x: not x[1][0], enumerate(dl_res))
+        if len(dl_fails) > 0:
+            msg = "Errors (%s) putting blob to blob store\n\n" % len(dl_fails)
+            for idx, d_res in dl_fails:
+                msg += "%s\nFailure: %s\n\n" % (str(self._workbench_cache.get(new_blob_keys[idx])), str(d_res[1]))
+
+            raise DataStoreWorkBenchError(msg)
 
         # now put any new commits that are not at the head
         def_list = []
@@ -615,7 +653,7 @@ class DataStoreWorkbench(WorkBench):
                     defd = self._commit_store.put(key = key,
                                        value = wse.serialize(),
                                        index_attributes = attributes)
-                    def_list.append(defd)
+                    def_list.append((defd, key, wse))
 
                 else:
 
@@ -647,23 +685,46 @@ class DataStoreWorkbench(WorkBench):
                     # Any commit which is currently a head will have the correct branch names set.
                     # Just delete the branch names for the ones that are no longer heads.
 
-        yield defer.DeferredList(def_list)
-        #@TODO - check the return vals?
+        dl_res = yield defer.DeferredList([x[0] for x in def_list])
+        dl_fails = filter(lambda x: not x[1][0], enumerate(dl_res))
+        if len(dl_fails) > 0:
+            msg = "Errors (%s) putting commit to store\n\n" % len(dl_fails)
+            for idx, d_res in dl_fails:
+                _, ckey, cwse = def_list[idx]
+                msg += "Key: %s\nElement: %s\nFailure: %s" % (sha1_to_hex(ckey), str(cwse), str(d_res[1]))
+
+            raise DataStoreWorkBenchError(msg)
 
         def_list = []
         for new_head in new_head_list:
 
             def_list.append(self._commit_store.put(**new_head))
 
-        yield defer.DeferredList(def_list)
-        #@TODO - check the return vals?
+        dl_res = yield defer.DeferredList(def_list)
+        dl_fails = filter(lambda x: not x[1][0], enumerate(dl_res))
+        if len(dl_fails) > 0:
+            msg = "Errors (%s) putting new_head_list commit to store\n\n" % len(dl_fails)
+            for idx, d_res in dl_fails:
+                nhlkey = new_head_list[idx]['key']
+                nhlval = new_head_list[idx]['value']
+                msg += "Key: %s\nElement: %s\nFailure: %s" % (sha1_to_hex(nhlkey), str(nhlval), str(d_res[1]))
+
+            raise DataStoreWorkBenchError(msg)
 
         def_list = []
         for key in clear_head_list:
 
-            def_list.append(self._commit_store.update_index(key=key, index_attributes={BRANCH_NAME:''}))
+            def_list.append((self._commit_store.update_index(key=key, index_attributes={BRANCH_NAME:''}), key))
 
-        yield defer.DeferredList(def_list)
+        dl_res = yield defer.DeferredList([x[0] for x in def_list])
+        dl_fails = filter(lambda x: not x[1][0], enumerate(dl_res))
+        if len(dl_fails) > 0:
+            msg = "Errors (%s) updating index to commit store\n\n" % len(dl_fails)
+            for idx, d_res in dl_fails:
+                key = def_list[idx][1]
+                msg += "Key: %s, Failure: %s" % (sha1_to_hex(key), str(d_res[1]))
+
+            raise DataStoreWorkBenchError(msg)
 
         #import pprint
         #print 'After update to heads'
@@ -724,9 +785,15 @@ class DataStoreWorkbench(WorkBench):
 
         def_list = []
         for blob in request.blob_elements:
-            def_list.append(self._blob_store.put(blob.key, blob.SerializeToString() ))
+            def_list.append((self._blob_store.put(blob.key, blob.SerializeToString()), blob.key))
 
-        yield defer.DeferredList(def_list)
+        dl_res = yield defer.DeferredList([x[0] for x in def_list])
+        dl_fails = filter(lambda x: not x[1][0], enumerate(dl_res))     # extract, with indexes, which items in the deferred list have False as first member of result tuple
+        if len(dl_fails) > 0:
+            msg = "Failures (%d) putting to blob store:\n\n" % len(dl_fails)
+            for idx, res in dl_fails:
+                msg += "Key: %s, Failure: %s\n" % (sha1_to_hex(def_list[idx][1]), str(res[1]))
+            raise DataStoreWorkBenchError(msg)
 
         yield self._process.reply_ok(message)
         log.info("op_put_blobs: Complete!")
@@ -758,12 +825,17 @@ class DataStoreWorkbench(WorkBench):
 
                 continue
 
-            def_list.append(self._blob_store.get(key))
+            def_list.append((self._blob_store.get(key), key))
 
-        res_list = yield defer.DeferredList(def_list)
+        res_list = yield defer.DeferredList([x[0] for x in def_list])
+        dl_fails = filter(lambda x: not x[1][0], enumerate(res_list))     # extract, with indexes, which items in the deferred list have False as first member of result tuple
+        if len(dl_fails) > 0:
+            msg = "Failures (%d) fetching blobs from store:\n\n" % len(dl_fails)
+            for idx, res in dl_fails:
+                msg += "Key: %s, Failure: %s\n" % (sha1_to_hex(def_list[idx][1]), str(res[1]))
+            raise DataStoreWorkBenchError(msg)
 
         for result, blob in res_list:
-
             if blob is None:
                 raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
@@ -787,9 +859,21 @@ class DataStoreWorkbench(WorkBench):
         def_list=[]
         for repo in self._repos.itervalues():
 
-            def_list.append(self.flush_repo_to_backend(repo))
+            def_list.append((self.flush_repo_to_backend(repo), repo.repository_key))
 
-        yield defer.DeferredList(def_list)
+        # this is a deferred list of deferred lists
+        odl_res = yield defer.DeferredList([x[0] for x in def_list])
+
+        # odl_res should always return True for each entry - we're more concerned about them underneath having failures
+        for idx, idl_res in enumerate(odl_res):
+            repo_key = def_list[idx][1]
+            # get failures from this
+            # idl_res is: (True, [(True, bla), (True, bla)...])
+            idl_fails = filter(lambda x: not x[0], idl_res[1])
+
+            # we are not concerned with comprehensive errors here, just error out on the first problem we find
+            if len(idl_fails) > 0:
+                raise DataStoreWorkBenchError("flush_initialization_to_backend encountered an error on repository %s" % sha1_to_hex(repo_key))
 
         #import pprint
         #print 'After update to heads'
@@ -895,6 +979,8 @@ class DataStoreWorkbench(WorkBench):
                                    value = wse.serialize(),
                                    index_attributes = attributes)
                 def_list.append(defd)
+
+        # this deferred list will be checked by the flush_initialization_to_backend method
         return defer.DeferredList(def_list)
 
 
