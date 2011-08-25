@@ -719,7 +719,7 @@ class JavaAgentWrapper(ServiceProcess):
         parent_xp_name = self.container.exchange_manager.exchange_space.name
 
         binary = "java"
-        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name]
+        args = ["-Xmx512m", "-jar", jar_pathname, parent_host_name, parent_xp_name]
         log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         return (binary, args)
         
