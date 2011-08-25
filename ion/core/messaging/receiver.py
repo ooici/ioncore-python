@@ -368,6 +368,14 @@ class Receiver(BasicLifecycleObject):
                                 else:
                                     process.context = last_context
 
+
+                            count = workbench.count_persistent()
+                            if count > 0:
+                                    # Print a warning if someone else is using the persistence tricks...
+                                log.warn('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
+
+
+
                         elif performative == 'request':
                             # if it is the end of an rpc request - clean up the context
 
@@ -389,13 +397,15 @@ class Receiver(BasicLifecycleObject):
                                 else:
                                     process.context = last_context
 
+                            count = workbench.count_persistent()
+                            if count > 0:
+                                    # Print a warning if someone else is using the persistence tricks...
+                                log.warn('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
+
+
+
                         else:
                             log.info('No context to clear in Proc: %s ' % (process))
-
-                        count = workbench.count_persistent()
-                        if count > 0:
-                                # Print a warning if someone else is using the persistence tricks...
-                            log.warn('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
 
 
                         log.info(workbench.cache_info())
