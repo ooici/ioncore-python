@@ -203,11 +203,12 @@ class NotificationAlertService(ServiceProcess):
                 except Exception, ex:
                     log.warning('NotificationAlertService.handle_offline_event Error: unable to send email - %s' %str(ex))
 
+                ## Do not delete the initial notification for an unavailable!
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
-                if InitialIngestion == True:
-                    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
-                    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
+                #if InitialIngestion == True:
+                #    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
+                #    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
