@@ -888,7 +888,7 @@ class DataStoreWorkbench(WorkBench):
 
             # we are not concerned with comprehensive errors here, just error out on the first problem we find
             if len(idl_fails) > 0:
-                raise DataStoreWorkBenchError("flush_initialization_to_backend encountered an error on repository %s" % sha1_to_hex(repo_key))
+                raise DataStoreWorkBenchError("flush_initialization_to_backend encountered an error on repository %s" % repo_key)
 
         #import pprint
         #print 'After update to heads'
