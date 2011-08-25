@@ -56,6 +56,27 @@ USER_OOIID_TYPE = object_utils.create_type_identifier(object_id=1403, version=1)
 
 ION_DATA_ALERTS_EMAIL_ADDRESS = 'data_alerts@oceanobservatories.org'
 
+class YieldingDatasetSupplementAddedEventSubscriber(DatasetSupplementAddedEventSubscriber):
+    """
+    Makes sure the ondata method completes (or errors) before acking the message.
+    """
+    @defer.inlineCallbacks
+    def _receive_handler(self, data, msg):
+        try:
+            yield defer.maybeDeferred(self.ondata, data)
+        finally:
+            yield msg.ack()
+
+class YieldingDatasourceUnavailableEventSubscriber(DatasourceUnavailableEventSubscriber):
+    """
+    Makes sure the ondata method completes (or errors) before acking the message.
+    """
+    @defer.inlineCallbacks
+    def _receive_handler(self, data, msg):
+        try:
+            yield defer.maybeDeferred(self.ondata, data)
+        finally:
+            yield msg.ack()
 
 class NotificationAlertError(ApplicationError):
     """
@@ -125,14 +146,14 @@ class NotificationAlertService(ServiceProcess):
 
         # Create the subscribers for the event handlers
 
-        self.sub = DatasetSupplementAddedEventSubscriber(process=self, queue_name=self.update_event_queue_name)
+        self.sub = YieldingDatasetSupplementAddedEventSubscriber(process=self, queue_name=self.update_event_queue_name)
         self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
 
 
-        self.sub = DatasourceUnavailableEventSubscriber(process=self, queue_name=self.offline_event_queue_name)
+        self.sub = YieldingDatasourceUnavailableEventSubscriber(process=self, queue_name=self.offline_event_queue_name)
         self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
