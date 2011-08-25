@@ -398,6 +398,7 @@ class Subscriber(BasicLifecycleObject, PSCRegisterable):
         # @TODO: is this even used anywhere?
         #yield self._pscr_pscc.unsubscribe(self._resource_id)
 
+    @defer.inlineCallbacks
     def _receive_handler(self, data, msg):
         """
         Default handler for messages received by the SubscriberReceiver.
@@ -406,8 +407,11 @@ class Subscriber(BasicLifecycleObject, PSCRegisterable):
         @param msg  Message instance
         @return The return value of ondata.
         """
-        msg.ack()
-        return self.ondata(data)
+        try:
+            ret = yield defer.maybeDeferred(self.ondata, data)
+            defer.returnValue(ret)
+        finally:
+            yield msg.ack()
 
     #noinspection PyUnusedLocal
     def ondata(self, data):
