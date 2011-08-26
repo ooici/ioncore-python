@@ -109,16 +109,6 @@ class UpdateHandler(ScheduleEventSubscriber):
         ScheduleEventSubscriber.__init__(self, *args, **kwargs)
 
     @defer.inlineCallbacks
-    def _receive_handler(self, data, msg):
-        """
-        Custom receive handler - need to wait until ondata completes before acking.
-        """
-        try:
-            yield self.ondata(data)
-        finally:
-            yield msg.ack()
-
-    @defer.inlineCallbacks
     def ondata(self, data):
         """
         @brief callback used to handle incoming notifications of this subscriber.
@@ -719,7 +709,7 @@ class JavaAgentWrapper(ServiceProcess):
         parent_xp_name = self.container.exchange_manager.exchange_space.name
 
         binary = "java"
-        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name]
+        args = ["-Xmx512m", "-jar", jar_pathname, parent_host_name, parent_xp_name]
         log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         return (binary, args)
         
