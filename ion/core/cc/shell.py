@@ -39,11 +39,118 @@ def get_virtualenv():
         return "[env: %s]" % virtual_env
     return "[env: system]"
 
+def real_handle_TAB(self):
+    completer = rlcompleter.Completer(self.namespace)
+    def _no_postfix(val, word):
+        return word
+    completer._callable_postfix = _no_postfix
+    head_line, tail_line = self.currentLineBuffer()
+    search_line = head_line
+    cur_buffer = self.lineBuffer
+    cur_index = self.lineBufferIndex
+
+    def find_term(line):
+        chrs = []
+        attr = False
+        for c in reversed(line):
+            if c == '.':
+                attr = True
+            if not c.isalnum() and c not in ('_', '.'):
+                break
+            chrs.insert(0, c)
+        return ''.join(chrs), attr
+
+    search_term, attrQ = find_term(search_line)
+
+    if not search_term:
+        return manhole.Manhole.handle_TAB(self)
+
+    if attrQ:
+        matches = completer.attr_matches(search_term)
+        matches = list(set(matches))
+        matches.sort()
+    else:
+        matches = completer.global_matches(search_term)
+
+    def same(*args):
+        if len(set(args)) == 1:
+            return args[0]
+        return False
+
+    def progress(rem):
+        letters = []
+        while True:
+            to_compare = []
+            for elm in rem:
+                if not elm:
+                    return letters
+                to_compare.append(elm.pop(0))
+            letter = same(*to_compare)
+            if letter:
+                letters.append(letter)
+            else:
+                return letters
+
+    def group(l):
+        """
+        columns is the width the list has to fit into
+        the longest word length becomes the padded length of every word, plus a
+        uniform space padding. The sum of the product of the number of words
+        and the word length plus padding must be less than or equal to the
+        number of columns.
+        """
+        rows, columns = self.height, self.width
+        l.sort()
+        number_words = len(l)
+        longest_word = len(max(l)) + 2
+        words_per_row = int(columns / (longest_word + 2)) - 1
+        number_rows = int(math.ceil(float(number_words) / words_per_row))
+
+        grouped_words = [list() for i in range(number_rows)]
+        for i, word in enumerate(l):
+            """
+            row, col = divmod(i_word, number_rows)
+            row is the index of element in a print column
+            col is the number of the col list to append to
+            """
+            r, c = divmod(i, number_rows)
+            grouped_words[c].append(pad(word, longest_word))
+        return grouped_words
+
+    def pad(word, full_length):
+        padding = ' ' * (full_length - len(word))
+        return word + padding
+
+    def max(l):
+        last_max = ''
+        for elm in l:
+            if len(elm) > len(last_max):
+                last_max = elm
+        return last_max
+
+    if matches is not None:
+        rem = [list(s.partition(search_term)[2]) for s in matches]
+        more_letters = progress(rem)
+        n = len(more_letters)
+        lineBuffer = list(head_line) + more_letters + list(tail_line)
+        if len(matches) > 1:
+            groups = group(matches)
+            line = self.lineBuffer
+            self.terminal.nextLine()
+            self.terminal.saveCursor()
+            for row in groups:
+                s = '  '.join(map(str, row))
+                self.addOutput(s, True)
+            if tail_line:
+                self.terminal.cursorBackward(len(tail_line))
+                self.lineBufferIndex -= len(tail_line)
+        self._deliverBuffer(more_letters)
+
 class PreprocessedInterpreter(manhole.ManholeInterpreter):
     """
     """
 
-    def __init__(self, handler, locals=None, filename="<console>", preprocess={}):
+    def __init__(self, handler, locals=None, filename="<console>", preprocess=None):
         """
         Initializes a PreprocessedInterpreter.
 
@@ -54,6 +161,7 @@ class PreprocessedInterpreter(manhole.ManholeInterpreter):
                             is assumed to have handled it and it is not sent to the
                             interpreter.
         """
+        preprocess = preprocess or {}
         self._preprocessHandlers = preprocess
         manhole.ManholeInterpreter.__init__(self, handler, locals, filename)
 
@@ -70,9 +178,9 @@ class PreprocessedInterpreter(manhole.ManholeInterpreter):
         newline = line
         for regex, handler in self._preprocessHandlers.items():
             mo = regex.match(line)
-            if mo != None:
+            if mo is not None:
                 retval = handler(line)
-                if retval == None:
+                if retval is None:
                     return False        # handled, all good
                 newline = retval
                 break
@@ -95,6 +203,7 @@ class ConsoleManhole(manhole.ColoredManhole):
 
         @todo Dependency info will be listed in the setup file
         """
+        # self.terminal.reset()
         self.history_append = True      # controls appending of history
         self.historysearch = False
         self.historysearchbuffer = []
@@ -104,7 +213,7 @@ class ConsoleManhole(manhole.ColoredManhole):
         msg = """
     ____                ______                    ____        __  __
    /  _/____  ____     / ____/____  ________     / __ \__  __/ /_/ /_  ____  ____
-   / / / __ \/ __ \   / /    / __ \/ ___/ _ \   / /_/ / / / / __/ __ \/ __ \/ __ \
+   / / / __ \/ __ \   / /    / __ \/ ___/ _ \   / /_/ / / / / __/ __ \/ __ \/ __ \ 
  _/ / / /_/ / / / /  / /___ / /_/ / /  /  __/  / ____/ /_/ / /_/ / / / /_/ / / / /
 /___/ \____/_/ /_/   \____/ \____/_/   \___/  /_/    \__, /\__/_/ /_/\____/_/ /_/
                                                     /____/
@@ -119,71 +228,7 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
 
-    def handle_TAB(self):
-        completer = rlcompleter.Completer(self.namespace)
-        head_line, tail_line = self.currentLineBuffer()
-        search_line = head_line
-        cur_buffer = self.lineBuffer
-        cur_index = self.lineBufferIndex
-
-        completer = rlcompleter.Completer(self.namespace)
-
-        def find_term(line):
-            chrs = []
-            attr = False
-            for c in reversed(line):
-                if c == '.':
-                    attr = True
-                if not c.isalnum() and c not in ('_', '.'):
-                    break
-                chrs.insert(0, c)
-            return ''.join(chrs), attr
-
-        search_term, attrQ = find_term(search_line)
-
-        if not search_term:
-            return manhole.ColoredManhole.handle_TAB(self)
-
-        if attrQ:
-            matches = completer.attr_matches(search_term)
-            matches = list(set(matches))
-            matches.sort()
-        else:
-            matches = completer.global_matches(search_term)
-
-        def same(*args):
-            if len(set(args)) == 1:
-                return args[0]
-            return False
-
-        def progress(rem):
-            letters = []
-            while True:
-                letter = same(*[elm.pop(0) for elm in rem if elm])
-                if letter:
-                    letters.append(letter)
-                else:
-                    return letters
-
-        if matches is not None:
-            rem = [list(s.partition(search_term)[2]) for s in matches]
-            more_letters = progress(rem)
-            n = len(more_letters)
-            lineBuffer = list(head_line) + more_letters + list(tail_line)
-            if len(matches) > 1:
-                match_str = "%s \t\t" * len(matches) % tuple(matches)
-                match_rows = text.greedyWrap(match_str)
-                line = self.lineBuffer
-                self.terminal.nextLine()
-                self.terminal.saveCursor()
-                for row in match_rows:
-                    self.addOutput(row, True)
-                if tail_line:
-                    self.terminal.cursorBackward(len(tail_line))
-                    self.lineBufferIndex -= len(tail_line)
-            self._deliverBuffer(more_letters)
-
-
+    handle_TAB = real_handle_TAB
 
     # def handle_INT(self):
 
@@ -223,7 +268,7 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.printHistorySearch()
 
     def handle_CTRLQ(self):
-        self.history_append = not self.history_append;
+        self.history_append = not self.history_append
         self.ps = PROMPT_HISTORY[self.history_append]
         self.printHistoryAppendStatus()
         self.drawInputLine()
@@ -249,8 +294,10 @@ class ConsoleManhole(manhole.ColoredManhole):
         # from the previous history line. You don't want 10 entries of the same thing.
         if self.lineBuffer:
             curLine = ''.join(self.lineBuffer)
-            if self.history_append and self.historyLines[-1] != curLine:
-                self.historyLines.append(curLine)
+            if self.history_append:
+                if len(self.historyLines) == 0 or self.historyLines[-1] != curLine:
+                    self.historyLines.append(curLine)
+
         self.historyPosition = len(self.historyLines)
         recvline.RecvLine.handle_RETURN(self)
 
@@ -378,146 +425,6 @@ class ConsoleManhole(manhole.ColoredManhole):
             except IOError:
                 pass
 
-class DebugManhole(manhole.Manhole):
-    ps = ('<>< ', '... ')
-
-    def connectionMade(self):
-        manhole.Manhole.connectionMade(self)
-        self.keyHandlers.update({
-            CTRL_A: self.handle_HOME,
-            CTRL_E: self.handle_END,
-            })
-
-    def initializeScreen(self):
-        self.terminal.write('Ion Remote Container Shell\r\n')
-        self.terminal.write('\r\n')
-        self.terminal.write('%s \r\n' % get_virtualenv())
-        self.terminal.write('[host: %s] \r\n' % (os.uname()[1],))
-        self.terminal.write('[cwd: %s] \r\n' % (os.getcwd(),))
-        self.terminal.write('\r\n')
-        self.terminal.write(self.ps[self.pn])
-        self.setInsertMode()
-
-    def terminalSize(self, width, height):
-        self.width = width
-        self.height = height
-
-    def handle_QUIT(self):
-        self.terminal.loseConnection()
-
-    def handle_TAB(self):
-        completer = rlcompleter.Completer(self.namespace)
-        def _no_postfix(val, word):
-            return word
-        completer._callable_postfix = _no_postfix
-        head_line, tail_line = self.currentLineBuffer()
-        search_line = head_line
-        cur_buffer = self.lineBuffer
-        cur_index = self.lineBufferIndex
-
-        def find_term(line):
-            chrs = []
-            attr = False
-            for c in reversed(line):
-                if c == '.':
-                    attr = True
-                if not c.isalnum() and c not in ('_', '.'):
-                    break
-                chrs.insert(0, c)
-            return ''.join(chrs), attr
-
-        search_term, attrQ = find_term(search_line)
-
-        if not search_term:
-            return manhole.Manhole.handle_TAB(self)
-
-        if attrQ:
-            matches = completer.attr_matches(search_term)
-            matches = list(set(matches))
-            matches.sort()
-        else:
-            matches = completer.global_matches(search_term)
-
-        def same(*args):
-            if len(set(args)) == 1:
-                return args[0]
-            return False
-
-        def progress(rem):
-            letters = []
-            while True:
-                to_compare = []
-                for elm in rem:
-                    if not elm:
-                        return letters
-                    to_compare.append(elm.pop(0))
-                letter = same(*to_compare)
-                if letter:
-                    letters.append(letter)
-                else:
-                    return letters
-
-        def group(l):
-            """
-            columns is the width the list has to fit into
-            the longest word length becomes the padded length of every word, plus a
-            uniform space padding. The sum of the product of the number of words
-            and the word length plus padding must be less than or equal to the
-            number of columns.
-            """
-            rows, columns = self.height, self.width
-            l.sort()
-            number_words = len(l)
-            longest_word = len(max(l)) + 2
-            words_per_row = int(columns / (longest_word + 2)) - 1
-            number_rows = int(math.ceil(float(number_words) / words_per_row))
-
-            grouped_words = [list() for i in range(number_rows)]
-            for i, word in enumerate(l):
-                """
-                row, col = divmod(i_word, number_rows)
-                row is the index of element in a print column
-                col is the number of the col list to append to
-                """
-                r, c = divmod(i, number_rows)
-                grouped_words[c].append(pad(word, longest_word))
-            return grouped_words
-
-        def pad(word, full_length):
-            padding = ' ' * (full_length - len(word))
-            return word + padding
-
-        def max(l):
-            last_max = ''
-            for elm in l:
-                if len(elm) > len(last_max):
-                    last_max = elm
-            return last_max
-
-        if matches is not None:
-            rem = [list(s.partition(search_term)[2]) for s in matches]
-            more_letters = progress(rem)
-            n = len(more_letters)
-            lineBuffer = list(head_line) + more_letters + list(tail_line)
-            if len(matches) > 1:
-                groups = group(matches)
-                line = self.lineBuffer
-                self.terminal.nextLine()
-                self.terminal.saveCursor()
-                for row in groups:
-                    s = '  '.join(map(str, row))
-                    self.addOutput(s, True)
-                if tail_line:
-                    self.terminal.cursorBackward(len(tail_line))
-                    self.lineBufferIndex -= len(tail_line)
-            self._deliverBuffer(more_letters)
-
-
-def makeNamespace():
-    #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
-    from ion.core.cc.shell_api import *
-    from ion.core.id import Id
-
     def obj_info(self, item, format='print'):
         """Print useful information about item."""
         # Item is a string with the ? trailing, chop it off.
@@ -565,8 +472,39 @@ def makeNamespace():
             raise ValueError("TODO: no work")
             return info
 
+class DebugManhole(manhole.Manhole):
+    ps = ('<>< ', '... ')
+
+    def connectionMade(self):
+        manhole.Manhole.connectionMade(self)
+        self.keyHandlers.update({
+            CTRL_A: self.handle_HOME,
+            CTRL_E: self.handle_END,
+            })
+
+    def initializeScreen(self):
+        self.terminal.write('Ion Remote Container Shell\r\n')
+        self.terminal.write('\r\n')
+        self.terminal.write('%s \r\n' % get_virtualenv())
+        self.terminal.write('[host: %s] \r\n' % (os.uname()[1],))
+        self.terminal.write('[cwd: %s] \r\n' % (os.getcwd(),))
+        self.terminal.write('\r\n')
+        self.terminal.write(self.ps[self.pn])
+        self.setInsertMode()
+
+    def terminalSize(self, width, height):
+        self.width = width
+        self.height = height
+
+    def handle_QUIT(self):
+        self.terminal.loseConnection()
+
+    handle_TAB = real_handle_TAB
+
 def makeNamespace():
-    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify
+    #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
+    from ion.core.cc.shell_api import info, ps, ms, svc, send, rpc_send, spawn, makeprocess, ping, kill, nodes, identify, get_proc
+    #from ion.core.cc.shell_api import *
     from ion.core.id import Id
 
     namespace = locals()
