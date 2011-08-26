@@ -17,7 +17,8 @@ from ion.core.exception import ReceivedApplicationError, ApplicationError
 from ion.services.coi.resource_registry.association_client import AssociationClient, AssociationClientError
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, \
                                                                     TYPE_OF_ID, \
-                                                                    DISPATCHER_RESOURCE_TYPE_ID
+                                                                    DISPATCHER_RESOURCE_TYPE_ID, \
+                                                                    DATASOURCE_RESOURCE_TYPE_ID
 
 from ion.services.coi.resource_registry.resource_client import ResourceClientError
 
@@ -124,8 +125,12 @@ class ManageDataResourceSubscription(object):
         reqMsg.message_parameters_reference.subscriptions[0].user_ooi_id  = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
 
         #===========================================================
-        # The field is set wrong - fix it to be the correct value!!!!
-        msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        # The field is set wrong - DO NOT FIX IT HERE - IT IS ALREADY FIXED IN THE DELTE AND CREATE METHODS CALLED BELOW!!!
+        #try:
+        #    msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        #except TypeError, te:
+        #    msg.message_parameters_reference.subscriptionInfo.data_src_id = 'Failed to get a data_src_id'
+        #    log.info('Could not get data source id from dataset - this is a hack because the wrong field is set by the UI')
         #===========================================================
 
         reqMsg.message_parameters_reference.subscriptions[0].data_src_id  = msg.message_parameters_reference.subscriptionInfo.data_src_id
@@ -188,7 +193,16 @@ class ManageDataResourceSubscription(object):
 
         #===========================================================
         # The field is set wrong - fix it to be the correct value!!!!
-        msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        try:
+            msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        except TypeError, te:
+            msg.message_parameters_reference.subscriptionInfo.data_src_id = 'Failed to get a data_src_id'
+            log.info('Could not get data source id from dataset - this is a hack because the wrong field is set by the UI')
+
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [data_src_id] can not be looked up by association"
+            defer.returnValue(Response)
         #===========================================================
 
 
@@ -473,7 +487,16 @@ class ManageDataResourceSubscription(object):
                 defer.returnValue(Response)
             #===========================================================
             # The field is set wrong - fix it to be the correct value!!!!
-            Subscription.data_src_id = yield self.getAssociatedSource(Subscription.data_src_id)
+            try:
+                Subscription.data_src_id = yield self.getAssociatedSource(Subscription.data_src_id)
+            except TypeError, te:
+                Subscription.data_src_id = 'Failed to get a data_src_id'
+                log.info('Could not get data source id from dataset - this is a hack because the wrong field is set by the UI')
+
+                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+                Response.error_num = Response.ResponseCodes.BAD_REQUEST
+                Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [data_src_id] can not be looked up by association"
+                defer.returnValue(Response)
             #===========================================================
 
 
