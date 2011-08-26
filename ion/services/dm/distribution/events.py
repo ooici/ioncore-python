@@ -465,20 +465,30 @@ class EventSubscriber(Subscriber):
         
         return "%s.%s" % (str(event_id), str(origin))
 
-    def __init__(self, xp_name=None, binding_key=None, event_id=None, origin=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, event_id=None, origin=None, queue_name=None, *args, **kwargs):
         """
         Initializer.
 
         You may wish to set either event_id or origin. A normal SubscriberFactory, with this class specified
         as the subscriber_type, will pass event_id or origin as kwargs here when specified to the build 
         method.
+
+        If the queue_name is specified here, the sysname is prefixed automatically to it. This is becuase
+        named queues are not namespaces to their exchanges, so two different systems on the same broker
+        can cross-pollute messages if a named queue is used.
         """
         self._event_id = event_id or self.event_id
 
         xp_name = xp_name or get_events_exchange_point()
         binding_key = binding_key or self.topic(origin)
 
-        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, *args, **kwargs)
+        # prefix the queue_name, if specified, with the sysname
+        if queue_name is not None:
+            if not queue_name.startswith(ioninit.sys_name):
+                queue_name = "%s.%s" % (ioninit.sys_name, queue_name)
+                log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
+
+        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, *args, **kwargs)
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
