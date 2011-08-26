@@ -66,9 +66,13 @@ def real_handle_TAB(self):
         return manhole.Manhole.handle_TAB(self)
 
     if attrQ:
-        matches = completer.attr_matches(search_term)
-        matches = list(set(matches))
-        matches.sort()
+        try:
+            # @TODO: this blows up if doing something like from ion.ser<TAB> - needs more smarts.
+            matches = completer.attr_matches(search_term)
+            matches = list(set(matches))
+            matches.sort()
+        except:
+            matches = []
     else:
         matches = completer.global_matches(search_term)
 
