@@ -288,3 +288,15 @@ class TestEventSubscriber(IonTestCase):
         # Pause to make sure we catch the message
         yield pu.asleep(1.0)
         self.assertEqual(testsub.msgs[0]['content'].name, u"TestEvent")
+
+    @defer.inlineCallbacks
+    def test_queue_name_prefix(self):
+        """
+        Test to make sure the sysname ends up in the queue name, if specified, so we don't get pollution between
+        sysnames.
+        """
+        proc = Process(spawnargs={'proc-name': 'subscriber_proc'})
+        yield proc.spawn()
+
+        sub = ResourceLifecycleEventSubscriber(process=proc, queue_name="prefix_me")
+        self.failUnlessEquals(sub._queue_name, "%s.prefix_me" % ioninit.sys_name)
