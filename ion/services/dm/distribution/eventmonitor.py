@@ -15,6 +15,7 @@ from ion.services.dm.distribution.publisher_subscriber import SubscriberFactory
 from ion.services.dm.distribution.events import EventSubscriber
 from uuid import uuid4
 import time
+from ion.core.object.codec import ObjectCodecInterceptor
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -34,19 +35,33 @@ class EventMonitorService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='event_monitor',
                                              version='0.1.0',
                                              dependencies=["pubsub"])
+    class FakeInvocation(object):
+        """
+        This object is solely for manipulating our received event to stuff into the ObjectCodecInterceptor.
+        """
+        def __init__(self, msg):
+            self.message = msg
+            self.content = msg
 
     def slc_init(self, *args, **kwargs):
         self._subs = {}
         self._subfactory = SubscriberFactory(process=self) #, handler=self._handle_msg)
         self._mc = MessageClient(proc=self)
+        self._codec = ObjectCodecInterceptor("fakecodec")
         ServiceProcess.slc_init(self, *args, **kwargs)
 
     def _handle_msg(self, session_id, subid, msg):
         log.debug("message for you sir %s %s %s" % (session_id, subid, str(msg['content'].datetime)))
         assert self._subs.has_key(session_id) and self._subs[session_id]['subscribers'].has_key(subid)
 
-        msg['content'].Repository.persistent = True
-        
+        # save off datetime so we can filter without having to unpack
+        msg['_datetime'] = msg['content'].datetime
+
+        # pack it up as if we were messaging!
+        fo = self.FakeInvocation(msg)
+        self._codec.after(fo)
+        msg = fo.message
+
         self._subs[session_id]['subscribers'][subid]['msgs'].append(msg)
 
     def _bump_timestamp(self, session_id):
@@ -61,6 +76,7 @@ class EventMonitorService(ServiceProcess):
         Requests a new subscription.
         Expects the content to be an EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE with a session_id and information about the subscription.
         """
+        log.info("op_subscribe")
 
         # extract message contents
         session_id      = content.session_id
@@ -145,24 +161,23 @@ class EventMonitorService(ServiceProcess):
             log.debug("get_data(): filtering against timestamp [%s]" % str(timestamp))
 
             for subid, subdata in self._subs[session_id]['subscribers'].iteritems():
-                log.debug("*** Got here 1")
                 # skip if we have a list of sub ids to give back and this subid is not in the list
                 if len(subscriber_ids) > 0 and not subid in subscriber_ids:
                     continue
-                log.debug("*** Got here 2")
                 dataobj = response.data.add()
-                log.debug("***Got here 3")
                 dataobj.subscription_id = subid
-                log.debug("***Got here 4")
                 dataobj.subscription_desc = subdata['subscriber']._binding_key #"none for now"
-                log.debug("*** Got here 5")
-                for event in [ev for ev in subdata['msgs'] if ev['content'].datetime >= timestamp]:
-                    log.debug("*** Got here 6, event: %s", event)
+
+                for idx, event in enumerate([ev for ev in subdata['msgs'] if ev['_datetime'] >= timestamp]):
+
+                    # unpack it up as if we were messaging!
+                    fo = self.FakeInvocation(event.copy())
+                    self._codec.before(fo)
+                    event = fo.content
+                    self.workbench.put_repository(event['content'].Repository)
+
                     link = dataobj.events.add()
-                    log.debug("*** Got here 7")
                     link.SetLink(event['content'].MessageObject)
-                    log.debug("*** Got here 8")
-                log.debug("*** Got here 9")
         yield self.reply_ok(msg, response)
 
 class EventMonitorServiceClient(ServiceClient):
