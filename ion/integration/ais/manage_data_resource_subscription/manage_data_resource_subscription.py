@@ -186,10 +186,10 @@ class ManageDataResourceSubscription(object):
              Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [data_src_id] not found in message"
              defer.returnValue(Response)
 
-             #===========================================================
-             # The field is set wrong - fix it to be the correct value!!!!
-             msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
-             #===========================================================
+        #===========================================================
+        # The field is set wrong - fix it to be the correct value!!!!
+        msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        #===========================================================
 
 
         # check that subscription type enum is present in GPB
