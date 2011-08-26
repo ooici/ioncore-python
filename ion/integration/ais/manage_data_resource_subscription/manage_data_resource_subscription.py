@@ -122,6 +122,12 @@ class ManageDataResourceSubscription(object):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(DELETE_SUBSCRIPTION_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptions.add();
         reqMsg.message_parameters_reference.subscriptions[0].user_ooi_id  = msg.message_parameters_reference.subscriptionInfo.user_ooi_id
+
+        #===========================================================
+        # The field is set wrong - fix it to be the correct value!!!!
+        msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+        #===========================================================
+
         reqMsg.message_parameters_reference.subscriptions[0].data_src_id  = msg.message_parameters_reference.subscriptionInfo.data_src_id
         Response = yield self.delete(reqMsg)
         if Response.MessageType != AIS_RESPONSE_ERROR_TYPE:
@@ -179,6 +185,12 @@ class ManageDataResourceSubscription(object):
              Response.error_num = Response.ResponseCodes.BAD_REQUEST
              Response.error_str = "AIS.ManageDataResourceSubscription.create: Required field [data_src_id] not found in message"
              defer.returnValue(Response)
+
+             #===========================================================
+             # The field is set wrong - fix it to be the correct value!!!!
+             msg.message_parameters_reference.subscriptionInfo.data_src_id = yield self.getAssociatedSource(msg.message_parameters_reference.subscriptionInfo.data_src_id)
+             #===========================================================
+
 
         # check that subscription type enum is present in GPB
         if not msg.message_parameters_reference.subscriptionInfo.IsFieldSet('subscription_type'):
@@ -370,6 +382,51 @@ class ManageDataResourceSubscription(object):
 
 
     @defer.inlineCallbacks
+    def getAssociatedSource(self, dSetID):
+        """
+        Copied from meta data cache - should be factored out to a common class - but worse to import everything everywhere....
+
+        Worker class private method to get the data source that associated
+        with a given data set.
+        """
+
+        if dSetID is None:
+            log.error('getAssociatedSource: dSetID is None')
+            defer.returnValue(None)
+
+        log.debug('getAssociatedSource for dSetID %s' %(dSetID))
+
+        qmsg = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+        pair = qmsg.pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = dSetID
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = HAS_A_ID
+
+        pair = qmsg.pairs.add()
+        pair.object = qmsg.CreateObject(IDREF_TYPE)
+        pair.object.key = DATASOURCE_RESOURCE_TYPE_ID
+        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pair.predicate.key = TYPE_OF_ID
+        try:
+            results = yield self.asc.get_subjects(qmsg)
+        except:
+            log.exception('Error getting associated data source for Dataset: %s' % dSetID)
+            defer.returnValue(None)
+
+        dsrcs = [str(x.key) for x in results.idrefs]
+
+        # we expect one:
+        if len(dsrcs) != 1:
+            log.error('Expected 1 datasource, got %d' % len(dsrcs))
+            defer.returnValue(None)
+
+        log.debug('getAssociatedSource() exit: returning: %s' % dsrcs[0])
+
+        defer.returnValue(dsrcs[0])
+
+
+    @defer.inlineCallbacks
     def delete(self, msg):
         """
         @brief delete the subscription to a data resource 
@@ -405,7 +462,8 @@ class ManageDataResourceSubscription(object):
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
                 Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [user_ooi_id] not found in message"
                 defer.returnValue(Response)
-    
+
+            ##### THE UI SETS THIS FIELD TO BE THE DATASET ID - FOR NOW, AIS SHOULD JUST CHANGE IT TO BE CORRECT!
             # check that data_src_id is present in GPB
             if not Subscription.IsFieldSet('data_src_id'):
                 # build AIS error response
@@ -413,6 +471,11 @@ class ManageDataResourceSubscription(object):
                 Response.error_num = Response.ResponseCodes.BAD_REQUEST
                 Response.error_str = "AIS.ManageDataResourceSubscription.delete: Required field [data_src_id] not found in message"
                 defer.returnValue(Response)
+            #===========================================================
+            # The field is set wrong - fix it to be the correct value!!!!
+            Subscription.data_src_id = yield self.getAssociatedSource(Subscription.data_src_id)
+            #===========================================================
+
 
             reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
             reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
@@ -507,6 +570,7 @@ class ManageDataResourceSubscription(object):
         dispatcherRes = yield self.rc.get_instance(dispatcherID)
         (Association, wkflRes) = yield self.__findWorkflowAssociation(dispatcherRes, SubscriptionInfo)
         if Association == None:
+            ### THIS IS WRONG BUT CONSISTENTLY WRONG  (data_src_id / dataset_id)
             errString = 'Error finding workflow for user ' + SubscriptionInfo.user_ooi_id + \
                         ' and data resource ' + SubscriptionInfo.data_src_id + \
                         ' on dispatcher ' + dispatcherID
@@ -531,6 +595,8 @@ class ManageDataResourceSubscription(object):
         #
         # Create the dispatcher workflow for delete event  #
         dwfRes = yield self.rc.create_instance(DISPATCHER_WORKFLOW_RESOURCE_TYPE, ResourceName = 'Delete DispatcherWorkflow')
+
+        ### THIS IS WRONG BUT CONSISTENTLY WRONG  (data_src_id / dataset_id)
         dwfRes.dataset_id = SubscriptionInfo.data_src_id
         dwfRes.workflow_path = SubscriptionInfo.dispatcher_script_path
         # Publish the delete subscription notification
@@ -570,6 +636,8 @@ class ManageDataResourceSubscription(object):
             if Ref.ResourceObjectType != DISPATCHER_WORKFLOW_RESOURCE_TYPE:
                 continue
             if ((Ref.user_ooi_id == SubscriptionInfo.user_ooi_id) and
+
+                ### THIS IS WRONG BUT CONSISTENTLY WRONG  (data_src_id / dataset_id)
                 (Ref.dataset_id == SubscriptionInfo.data_src_id)):
                 defer.returnValue([Association, Ref])
         defer.returnValue([None, None])
