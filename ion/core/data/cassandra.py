@@ -67,31 +67,31 @@ class SizeStats(object):
         self.t_count += 1
 
         if size is not 0:
-            self.sum_tpb  += etime/(size/1000.)
+            self.sum_tpb  += float(etime)/float(size)
 
             self.s_count +=1
 
 
     def put_stats(self):
         return (self.t_count,
-                self.sum_time/self.t_count,
-                self.sum_tpb/self.s_count,
+                float(self.sum_time)/float(self.t_count),
+                flaot(self.sum_tpb)/float(self.s_count*1000.),
                 self.max_time,
-                self.sum_size/(self.s_count*1000.),
-                self.max_size/1000.)
+                float(self.sum_size)/float(self.s_count*1000.),
+                float(self.max_size)/1000. )
 
     def get_stats(self):
         return (self.t_count,
                 self.sum_time/self.t_count,
-                self.sum_tpb/self.s_count,
+                float(self.sum_tpb)/float(self.s_count*1000.),
                 self.max_time,
-                self.sum_size/(self.s_count*1000.),
+                float(self.sum_size)/float(self.s_count*1000.),
                 self.max_size/1000.,
                 self.t_count - self.s_count)
 
     def simple_stats(self):
         return (self.t_count,
-                self.sum_time/self.t_count,
+                float(self.sum_time)/float(self.t_count),
                 self.max_time)
 
 
@@ -105,6 +105,7 @@ class QueryStats(object):
         self.max_time = [0.0] * 5
         self.count    = [0]   * 5
         self.sum_results = [0]   * 5
+        self.max_results = [0]   * 5
         self.t_count  = 0
 
 
@@ -113,8 +114,11 @@ class QueryStats(object):
 
         try:
             self.sum_results[npred-1] += nresults
-            self.sum_time[npred-1] += etime #/float(npred)
+            self.max_results[npred-1]  = max(self.max_results[npred-1], nresults)
+
+            self.sum_time[npred-1] += etime
             self.max_time[npred-1]  = max(self.max_time[npred-1], etime)
+
             self.count[npred-1]    += 1
             self.t_count         += 1
         except IndexError:
@@ -124,8 +128,8 @@ class QueryStats(object):
     def query_stats(self):
 
         stats = []
-        for mn, mx, nres, cnt in zip(self.sum_time, self.max_time, self.sum_results, self.count):
-            stats.extend([mn/max(cnt,1), mx, nres/max(cnt,1), cnt])
+        for mn, mx, mnres, mxres, cnt in zip(self.sum_time, self.max_time, self.sum_results, self.max_results, self.count):
+            stats.extend([float(mn)/float(max(cnt,1)), mx, float(nres)/float(max(cnt,1)), mxres, cnt])
 
         return tuple(stats)
 
