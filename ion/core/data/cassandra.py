@@ -67,31 +67,31 @@ class SizeStats(object):
         self.t_count += 1
 
         if size is not 0:
-            self.sum_tpb  += etime/(size/1000.)
+            self.sum_tpb  += float(etime)/float(size)
 
             self.s_count +=1
 
 
     def put_stats(self):
         return (self.t_count,
-                self.sum_time/self.t_count,
-                self.sum_tpb/self.s_count,
+                float(self.sum_time)/float(self.t_count),
+                float(self.sum_tpb*1000.)/float(self.s_count),
                 self.max_time,
-                self.sum_size/(self.s_count*1000.),
-                self.max_size/1000.)
+                float(self.sum_size)/float(self.s_count*1000.),
+                float(self.max_size)/1000. )
 
     def get_stats(self):
         return (self.t_count,
-                self.sum_time/self.t_count,
-                self.sum_tpb/self.s_count,
+                float(self.sum_time)/float(self.t_count),
+                float(self.sum_tpb*1000.)/float(self.s_count),
                 self.max_time,
-                self.sum_size/(self.s_count*1000.),
-                self.max_size/1000.,
+                float(self.sum_size)/float(self.s_count*1000.),
+                float(self.max_size)/1000.,
                 self.t_count - self.s_count)
 
     def simple_stats(self):
         return (self.t_count,
-                self.sum_time/self.t_count,
+                float(self.sum_time)/float(self.t_count),
                 self.max_time)
 
 
@@ -101,10 +101,11 @@ class QueryStats(object):
     """
 
     def __init__(self):
-        self.sum_time = [0.0] * 5
-        self.max_time = [0.0] * 5
-        self.count    = [0]   * 5
-        self.sum_results = [0]   * 5
+        self.sum_time = [0.0] * 3
+        self.max_time = [0.0] * 3
+        self.count    = [0]   * 3
+        self.sum_results = [0]   * 3
+        self.max_results = [0]   * 3
         self.t_count  = 0
 
 
@@ -113,8 +114,11 @@ class QueryStats(object):
 
         try:
             self.sum_results[npred-1] += nresults
-            self.sum_time[npred-1] += etime #/float(npred)
+            self.max_results[npred-1]  = max(self.max_results[npred-1], nresults)
+
+            self.sum_time[npred-1] += etime
             self.max_time[npred-1]  = max(self.max_time[npred-1], etime)
+
             self.count[npred-1]    += 1
             self.t_count         += 1
         except IndexError:
@@ -124,8 +128,8 @@ class QueryStats(object):
     def query_stats(self):
 
         stats = []
-        for mn, mx, nres, cnt in zip(self.sum_time, self.max_time, self.sum_results, self.count):
-            stats.extend([mn/max(cnt,1), mx, nres/max(cnt,1), cnt])
+        for mn, mx, mnres, mxres, cnt in zip(self.sum_time, self.max_time, self.sum_results, self.max_results, self.count):
+            stats.extend([float(mn)/float(max(cnt,1)), mx, float(mnres)/float(max(cnt,1)), mxres, cnt])
 
         return tuple(stats)
 
@@ -220,6 +224,10 @@ class CassandraStore(TCPConnection):
 
         toc = time.time()
 
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra get operation elapsed time %f; result size: %s' % (toc - tic, lval))
+
         self.get_stats.add_stats(tic,toc,lval)
 
         if self.get_stats.t_count >= self.stats_out:
@@ -248,6 +256,9 @@ class CassandraStore(TCPConnection):
 
         toc = time.time()
 
+        if toc - tic > 4.0:
+            log.warn('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
+
         self.put_stats.add_stats(tic,toc,len(value))
 
         if self.put_stats.t_count >= self.stats_out:
@@ -272,6 +283,9 @@ class CassandraStore(TCPConnection):
             ret = False
 
         toc = time.time()
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra has_key operation elapsed time %f;' % (toc - tic))
 
         self.has_stats.add_stats(tic,toc)
 
@@ -374,6 +388,10 @@ class CassandraIndexedStore(CassandraStore):
 
 
         toc = time.time()
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
+
         self.put_stats.add_stats(tic,toc,len(value))
 
         if self.put_stats.t_count >= self.stats_out:
@@ -398,6 +416,9 @@ class CassandraIndexedStore(CassandraStore):
 
 
         toc = time.time()
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra update_index operation elapsed time %f;' % (toc - tic))
 
         self.update_stats.add_stats(tic,toc)
 
@@ -484,11 +505,13 @@ class CassandraIndexedStore(CassandraStore):
 
         toc = time.time()
 
+        if toc - tic > 4.0:
+            log.warn('Cassandra Query operation elapsed time %f; # of rows returned: %d, # of predicates in request: %d' % (toc - tic, len(rows), len(predicates)))
 
         self.query_stats.add_stats(tic,toc,len(predicates), len(rows))
 
         if self.query_stats.t_count >= (self.stats_out/10):
-            log.critical('Cassandra Index Store Query Time(seconds) Stats per predicate (mean/max/mean # of rows/cnt): 1 - %f/%f/%f/%d; 2 - %f/%f/%f/%d; 3 - %f/%f/%f/%d;  4 - %f/%f/%f/%d;  5 - %f/%f/%f/%d;' % self.query_stats.query_stats())
+            log.critical('Cassandra Index Store Query Stats per predicate (mean time(seconds)/max time(seconds)/mean # of rows/max # of rows/count): 1 - %f/%f/%f/%d/%d; 2 - %f/%f/%f/%d/%d; 3 - %f/%f/%f/%d/%d;' % self.query_stats.query_stats())
             self.query_stats.__init__()
 
         defer.returnValue(result)
