@@ -157,7 +157,10 @@ class NotificationAlertService(ServiceProcess):
 
         # get the list of subscriptions for this datasource
         query = Query()
-        query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use.
+        #query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        query.add_predicate_eq('data_src_id', msg.additional_data.dataset_id)
+
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_offline_event  Rows returned %s " % (rows,))
 
@@ -241,7 +244,10 @@ class NotificationAlertService(ServiceProcess):
 
         # get the list of subscriptions for this datasource
         query = Query()
-        query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use.
+        #query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        query.add_predicate_eq('data_src_id', msg.additional_data.dataset_id)
+
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
 
@@ -390,7 +396,7 @@ class NotificationAlertService(ServiceProcess):
         # create the AIS response GPBs
         log.info('NotificationAlertService.op_addSubscription construct response message')
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
-        respMsg.result = respMsg.ResponseCodes.OK;
+        respMsg.result = respMsg.ResponseCodes.OK
 
         log.info('NotificationAlertService.op_addSubscription complete')
         yield self.reply_ok(msg, respMsg)
@@ -424,6 +430,7 @@ class NotificationAlertService(ServiceProcess):
 
         log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
 
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
 
@@ -468,6 +475,7 @@ class NotificationAlertService(ServiceProcess):
 
         log.info('NotificationAlertService.op_getSubscription  Returning subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
 
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info("NotificationAlertService.op_getSubscription key: %s ", self.keyval)
 
@@ -476,6 +484,7 @@ class NotificationAlertService(ServiceProcess):
                                              content.ResponseCodes.BAD_REQUEST)
         query = Query()
         query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.subscriptionInfo.user_ooi_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.op_getSubscription rows: %s ", str(rows))
