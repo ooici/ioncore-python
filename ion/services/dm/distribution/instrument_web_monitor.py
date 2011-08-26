@@ -80,11 +80,14 @@ class EventMonitorWebResource(resource.Resource):
 
         @defer.inlineCallbacks
         def _do_action(self, request):
+            log.debug("*** entering data handler!")
             try:
                 timestamp = float("".join(self._timestamp))
             except Exception:
                 timestamp = 0.0
+
             msg = yield self._mc.create_instance(EVENTMONITOR_GETDATA_MESSAGE_TYPE)
+            log.debug("*** created instance")
             msg.session_id  = self._session_id
             msg.timestamp   = str(timestamp)
             # @TODO: subids
@@ -93,6 +96,8 @@ class EventMonitorWebResource(resource.Resource):
             msgdata = yield self._ec.getdata(msg)
 
             data = []
+
+            log.debug("*** pre-sub data handler!")
 
             for sub in msgdata.data:
                 subdata = { 'subscription_id' : sub.subscription_id,
