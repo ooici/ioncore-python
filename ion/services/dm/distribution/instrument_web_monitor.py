@@ -224,7 +224,7 @@ class EventMonitorWebResource(resource.Resource):
         #print request
         requestStr = str(request)
         log.debug('render_GET Request %s' % requestStr)
-        if requestStr.rfind('NMEA'):
+        if requestStr.rfind('NMEA') != -1:
             self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "nmea_instrument_web_monitor.html"))
         else:
             self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "instrument_web_monitor.html"))
