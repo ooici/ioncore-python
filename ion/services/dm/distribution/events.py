@@ -483,7 +483,7 @@ class EventSubscriber(Subscriber):
         binding_key = binding_key or self.topic(origin)
 
         # prefix the queue_name, if specified, with the sysname
-        if queue_name:
+        if queue_name is not None:
             if not queue_name.startswith(ioninit.sys_name):
                 queue_name = "%s.%s" % (ioninit.sys_name, queue_name)
                 log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
