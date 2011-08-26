@@ -476,8 +476,10 @@ class ManageDataResource(object):
             dataset_resource.ResourceLifeCycleState = dataset_resource.NEW
 
             # create subscription to catch the ingestion-complete or failure events
-            yield self._createSubscription(my_datasrc_id, msg.user_id, datasrc_resource.ion_title)
-            
+            #yield self._createSubscription(my_datasrc_id, msg.user_id, datasrc_resource.ion_title)
+            ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use.
+            yield self._createSubscription(my_dataset_id, msg.user_id, datasrc_resource.ion_title)
+
             yield self.rc.put_resource_transaction(resource_transaction)
 
             yield self._createEvent(my_dataset_id, my_datasrc_id)
