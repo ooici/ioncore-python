@@ -1295,6 +1295,7 @@ class DataStoreWorkbench(WorkBench):
             # can we fit the new strip?
             if curlen + cstrip[3] <= CHUNK_FACTOR:
                 curstep.append(csidx)
+                curlen += cstrip[3]
             else:
                 extraction_plan.append(curstep)
                 curstep = [csidx]
