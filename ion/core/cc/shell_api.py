@@ -359,7 +359,6 @@ def ping(servicename):
         servicename = pu.get_scoped_name(servicename, 'system')
 
     def pingok(arg):
-        print 'ARGS',arg
         print "\nPing ok:", servicename, "\n"
 
     d = rpc_send(servicename, "ping")
