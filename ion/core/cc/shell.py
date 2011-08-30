@@ -507,7 +507,7 @@ class DebugManhole(manhole.Manhole):
 
 def makeNamespace():
     #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
-    from ion.core.cc.shell_api import info, ps, ms, svc, send, rpc_send, spawn, makeprocess, ping, kill, nodes, identify, get_proc, mp
+    from ion.core.cc.shell_api import info, ps, ms, svc, send, rpc_send, spawn, makeprocess, ping, kill, nodes, identify, get_proc, mping
     #from ion.core.cc.shell_api import *
     from ion.core.id import Id
 

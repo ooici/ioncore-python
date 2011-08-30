@@ -20,7 +20,7 @@ pinger = None
 namespace = {}
 
 # The objects to import:
-__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc','mp']
+__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc','mping']
 #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
 
 def info():
@@ -36,6 +36,7 @@ def info():
     print "  spawn(module): Spawn a process from a module"
     print "  makeprocess(): Returns a new Process object (spawn is called but may not be done yet)"
     print "  ping(servicename): Pings a named service in this container's sysname. Returns a deferred."
+    print "  mping(timeout): Pings all the service names in R1 repeatedly until the receiver names are known."
     print "  get_proc(full_id): Returns the process instance object"
     print "Variables:"
     print "  control: shell control"
@@ -252,7 +253,7 @@ def makeprocess(name='SimpleProcess'):
     return p
 
 @defer.inlineCallbacks
-def mp(timeout=5):
+def mping(timeout=5):
 
     # Using the list of processes from the dict does not seem to work unless they are imported...
     #from ion.core.process.process import processes
@@ -336,7 +337,7 @@ def _find_services(svcs, timeout):
                 senders[receiver] = 1
 
 
-            print svcname, item[0], senders.items()
+            #print svcname, item[0], senders.items()
 
         else:
             svcstats = svcs[svcname]
