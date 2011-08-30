@@ -15,11 +15,12 @@ from ion.core.id import Id
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessDesc, Process
 
+pinger = None
 # The shell namespace
 namespace = {}
 
 # The objects to import:
-__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc']
+__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc','mp']
 #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
 
 def info():
@@ -130,11 +131,8 @@ def send(to_name, op, content=None, headers=None, **kwargs):
         content = {}
 
     _update()
-    #procs = namespace['procs']
-    #if to_name in procs: recv = procs[to_name]
-
-    sup = yield ioninit.container_instance.proc_manager.create_supervisor()
-    yield sup.send(to_name, op, content, headers, **kwargs)
+    pinger = namespace['pinger']
+    yield pinger.send(to_name, op, content, headers, **kwargs)
 
 @defer.inlineCallbacks
 def rpc_send(to_name, op, content=None, headers=None, **kwargs):
@@ -144,12 +142,12 @@ def rpc_send(to_name, op, content=None, headers=None, **kwargs):
     if content == None:
         content = {}
 
-    _update()
-    #procs = namespace['procs']
-    #if to_name in procs: recv = procs[to_name]
 
-    sup = yield ioninit.container_instance.proc_manager.create_supervisor()
-    yield sup.rpc_send(to_name, op, content, headers, **kwargs)
+    _update()
+    pinger = namespace['pinger']
+    res = yield pinger.rpc_send(to_name, op, content, headers, **kwargs)
+    defer.returnValue(res)
+
 
 def _get_target(name):
     _update()
@@ -239,14 +237,83 @@ def _update():
         namespace['procs'] = process.procRegistry.kvs
         namespace['svcs'] = process.processes
 
+        if namespace.get('pinger') is None:
+
+            pinger = makeprocess('PingerProcess')
+            namespace['pinger'] = pinger
+
     except Exception:
         log.exception("Error updating CC shell namespace")
 
-def makeprocess():
-    p = Process()
+def makeprocess(name='SimpleProcess'):
+    p = Process(spawnargs={'proc-name':name})
     p.spawn()
 
     return p
+
+@defer.inlineCallbacks
+def mp(timeout=5):
+
+    from ion.core.process.process import processes
+
+    dlist = []
+    svcs={}
+
+    for svcname in processes.iterkeys():
+
+        svcs[svcname]={'present':None, 'senders':{} }
+
+
+    results = yield _find_services(svcs, timeout)
+
+    defer.returnValue(results)
+
+@defer.inlineCallbacks
+def _find_services(svcs, timeout):
+
+    def sendping(svcname):
+        servicename = pu.get_scoped_name(svcname, 'system')
+        return rpc_send(servicename, "ping",timeout=timeout)
+
+    dlist = []
+    for svcname, status in svcs.iteritems():
+
+        if status['present'] is False:
+            continue
+
+        for rec, cnt in status['senders'].iteritems():
+
+            if cnt > 4:
+                # Get out of the outter loop
+                break
+
+        else:
+
+            for i in range(5):
+                dlist.append((sendping(svcname), svcname))
+
+
+    res = yield defer.DeferredList([x[0] for x in dlist])
+
+
+    for ind,item in enumerate(res):
+
+        svcname = dlist[ind][1]
+
+        if item[0]:
+            svcstats = svcs[svcname]
+            svcstats['present'] = True
+            senders = svcstats['senders']
+            receiver = item[1][1].get('sender')
+            if receiver in senders:
+                senders[receiver] += 1
+            else:
+                senders[receiver] = 1
+
+
+    defer.returnValue(svcs)
+
+
 
 def ping(servicename):
 
@@ -256,6 +323,7 @@ def ping(servicename):
         servicename = pu.get_scoped_name(servicename, 'system')
 
     def pingok(arg):
+        print 'ARGS',arg
         print "\nPing ok:", servicename, "\n"
 
     d = rpc_send(servicename, "ping")
