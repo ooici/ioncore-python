@@ -15,11 +15,12 @@ from ion.core.id import Id
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessDesc, Process
 
+pinger = None
 # The shell namespace
 namespace = {}
 
 # The objects to import:
-__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc']
+__all__ = ['info', 'ps', 'ms', 'svc', 'send', 'rpc_send', 'spawn', 'makeprocess', 'ping','kill','nodes','identify','get_proc','mping']
 #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
 
 def info():
@@ -35,6 +36,7 @@ def info():
     print "  spawn(module): Spawn a process from a module"
     print "  makeprocess(): Returns a new Process object (spawn is called but may not be done yet)"
     print "  ping(servicename): Pings a named service in this container's sysname. Returns a deferred."
+    print "  mping(timeout): Pings all the service names in R1 repeatedly until the receiver names are known."
     print "  get_proc(full_id): Returns the process instance object"
     print "Variables:"
     print "  control: shell control"
@@ -130,11 +132,8 @@ def send(to_name, op, content=None, headers=None, **kwargs):
         content = {}
 
     _update()
-    #procs = namespace['procs']
-    #if to_name in procs: recv = procs[to_name]
-
-    sup = yield ioninit.container_instance.proc_manager.create_supervisor()
-    yield sup.send(to_name, op, content, headers, **kwargs)
+    pinger = namespace['pinger']
+    yield pinger.send(to_name, op, content, headers, **kwargs)
 
 @defer.inlineCallbacks
 def rpc_send(to_name, op, content=None, headers=None, **kwargs):
@@ -144,12 +143,12 @@ def rpc_send(to_name, op, content=None, headers=None, **kwargs):
     if content == None:
         content = {}
 
-    _update()
-    #procs = namespace['procs']
-    #if to_name in procs: recv = procs[to_name]
 
-    sup = yield ioninit.container_instance.proc_manager.create_supervisor()
-    yield sup.rpc_send(to_name, op, content, headers, **kwargs)
+    _update()
+    pinger = namespace['pinger']
+    res = yield pinger.rpc_send(to_name, op, content, headers, **kwargs)
+    defer.returnValue(res)
+
 
 def _get_target(name):
     _update()
@@ -239,14 +238,118 @@ def _update():
         namespace['procs'] = process.procRegistry.kvs
         namespace['svcs'] = process.processes
 
+        if namespace.get('pinger') is None:
+
+            pinger = makeprocess('PingerProcess')
+            namespace['pinger'] = pinger
+
     except Exception:
         log.exception("Error updating CC shell namespace")
 
-def makeprocess():
-    p = Process()
+def makeprocess(name='SimpleProcess'):
+    p = Process(spawnargs={'proc-name':name})
     p.spawn()
 
     return p
+
+@defer.inlineCallbacks
+def mping(timeout=5):
+
+    # Using the list of processes from the dict does not seem to work unless they are imported...
+    #from ion.core.process.process import processes
+    services=['datastore',
+              'resource_registry',
+              'association_service',
+              'identity_service',
+              #'exchange_management',
+              #'attributestore',
+              #'pubsub',
+              'ingestion',
+              'dataset_controller',
+              #'cassandra_manager_agent',
+              'scheduler',
+              'epu_controller',
+              'instrument_management',
+              'app_integration',
+              'notification_alert',
+              'java_agent_wrapper',
+              'cdm_validation_service']
+
+
+
+    dlist = []
+    svcs={}
+
+    #for svcname in processes.iterkeys():
+    for svcname in services:
+
+        svcs[svcname]={'present':None, 'senders':{} }
+
+
+    results = yield _find_services(svcs, timeout)
+
+    defer.returnValue(results)
+
+@defer.inlineCallbacks
+def _find_services(svcs, timeout):
+
+    def sendping(svcname):
+        servicename = pu.get_scoped_name(svcname, 'system')
+        return rpc_send(servicename, "ping",timeout=timeout)
+
+    dlist = []
+    for svcname, status in svcs.iteritems():
+
+        if status['present'] is False:
+            continue
+
+        for rec, cnt in status['senders'].iteritems():
+
+            if cnt > 3:
+                # Get out of the outter loop
+                break
+
+        else:
+
+            for i in range(3):
+                dlist.append((sendping(svcname), svcname))
+
+    if len(dlist) is 0:
+        defer.returnValue(svcs)
+
+
+    res = yield defer.DeferredList([x[0] for x in dlist])
+
+
+    for ind,item in enumerate(res):
+
+        svcname = dlist[ind][1]
+
+        if item[0]:
+            svcstats = svcs[svcname]
+            svcstats['present'] = True
+            senders = svcstats['senders']
+            receiver = item[1][1].get('sender')
+
+            if receiver in senders:
+                senders[receiver] += 1
+            else:
+                senders[receiver] = 1
+
+
+            #print svcname, item[0], senders.items()
+
+        else:
+            svcstats = svcs[svcname]
+            svcstats['present'] = False
+
+
+    svcs = yield _find_services(svcs, timeout)
+
+
+    defer.returnValue(svcs)
+
+
 
 def ping(servicename):
 
