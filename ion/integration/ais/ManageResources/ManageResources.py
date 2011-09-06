@@ -77,23 +77,24 @@ class ManageResources(object):
                            }
       self.MapGpbTypeToResourceType = {10001 : DATASET_KEY,
                                        1401 : IDENTITY_KEY,
-                                       4503 : DATASOURCE_KEY                                     
+                                       4503 : DATASOURCE_KEY
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
 
       self.mc = ais.mc
       self.asc = AssociationServiceClient(proc=ais)
-      self.rc = ResourceClient(proc=ais)
+      self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
-      self.metadataCache = ais.getMetadataCache()
+
+      self.ais = ais
 
 
    @defer.inlineCallbacks
    def getResourceTypes (self, msg):
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResourceTypes()\n'+str(msg))
-      
+
       # no input for this message, just build AIS response with list of resource types
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourceTypes response')
       Response.message_parameters_reference.add()
@@ -584,12 +585,12 @@ class ManageResources(object):
       LoaderFunc = self.ResourceTypes[ResourceType][4]
       Index = yield LoaderFunc(Response.message_parameters_reference[0], Result)
       if (ResourceType == DATASET_KEY):
-         ResourceID = yield self.metadataCache.getAssociatedSource(Result.ResourceIdentity)
+         ResourceID = yield self.ais.getAssociatedSource(Result.ResourceIdentity)
          Response.message_parameters_reference[0].resource.add()
          Response.message_parameters_reference[0].resource[Index].name = "Data Source ID"
          Response.message_parameters_reference[0].resource[Index].value = ResourceID
       elif (ResourceType == DATASOURCE_KEY):
-         ResourceIDs = yield self.metadataCache.getAssociatedDatasets(Result)
+         ResourceIDs = yield self.ais.getAssociatedDatasets(Result)
          if len(ResourceIDs) == 0:
             ResourceID = 'None'
          else:

@@ -193,17 +193,18 @@ class FindDataResources(object):
     PRIVATE = 0
     PUBLIC = 1
     
-    def __init__(self, ais):
+    def __init__(self, ais, metadataCache):
         log.info('FindDataResources.__init__()')
         self.ais = ais
-        self.rc = ResourceClient(proc=ais)
+        self.rc = ais.rc
         self.mc = ais.mc
         self.asc = AssociationServiceClient(proc=ais)
         self.ac = AssociationClient(proc=ais)
         self.nac = NotificationAlertServiceClient(proc=ais)
 
         self.__subscriptionList = None
-        self.metadataCache = ais.getMetadataCache()
+
+        self.metadataCache = metadataCache
 
     @defer.inlineCallbacks
     def findDataResources(self, msg):
