@@ -201,7 +201,6 @@ class MetadataCacheTest(IonTestCase, AIS_Mixin):
         dsourcelist = self.cache.getDataSources()
         for ds in dsourcelist:
 
-            print 'DKLS KLSD DSKLD LKS DSLNFLSKDNFIOFHLBLJSKDB   KLSNDKLSN'
             dSourceResID = ds['dsource'].ResourceIdentity
 
             dSourceMetadata = yield self.cache.getDSourceMetadata(dSourceResID)

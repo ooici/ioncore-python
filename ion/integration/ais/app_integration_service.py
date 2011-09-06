@@ -77,7 +77,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
             Worker process for the AIS service
             """
 
-        worker = AIS_Worker_Process(**{'prcoc-name':name})
+        worker = AIS_Worker_Process(**{'proc-name':name})
 
         worker.mc = worker.message_client
         worker.rc = ResourceClient(worker)
