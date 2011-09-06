@@ -15,7 +15,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import logging
 from twisted.internet import defer
-import time
 
 from ion.core.object import object_utils
 from ion.core.process.process import ProcessFactory
@@ -26,12 +25,12 @@ from ion.services.dm.inventory.association_service import AssociationServiceClie
 from ion.services.coi.identity_registry import IdentityRegistryClient, get_broadcast_receiver
 from ion.core.intercept.policy import load_roles_from_associations, map_ooi_id_to_role, unmap_ooi_id_from_role
 
-# import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
-                                                       AIS_RESPONSE_ERROR_TYPE
+from ion.core.process.process import Process
 
 # import working classes for AIS
 from ion.integration.ais.common.metadata_cache import  MetadataCache
+from ion.integration.ais.common.ais_utils import AIS_Mixin
+
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources, \
                                                                     DatasetUpdateEventSubscriber, \
                                                                     DatasourceUpdateEventSubscriber
@@ -44,11 +43,7 @@ from ion.integration.ais.validate_data_resource.validate_data_resource import Va
 from ion.integration.ais.manage_data_resource_subscription.manage_data_resource_subscription import ManageDataResourceSubscription
 
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-
-
-class AppIntegrationService(ServiceProcess):
+class AppIntegrationService(ServiceProcess, AIS_Mixin):
     """
     Service to provide clients access to backend data
     """
@@ -57,23 +52,6 @@ class AppIntegrationService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-    # set to None to turn off timing logging, set to anything else to turn on timing logging
-    AnalyzeTiming = None
-    
-    class TimeStampsClass (object):
-        pass
-    
-    TimeStamps = TimeStampsClass()
-    
-    def TimeStamp (self):
-        TimeNow = time.time()
-        TimeStampStr = "(wall time = " + str (TimeNow) + \
-                       ", elapse time = " + str(TimeNow - self.TimeStamps.StartTime) + \
-                       ", delta time = " + str(TimeNow - self.TimeStamps.LastTime) + \
-                       ")"
-        self.TimeStamps.LastTime = TimeNow
-        return TimeStampStr
-    
 
     def __init__(self, *args, **kwargs):
 
@@ -85,31 +63,70 @@ class AppIntegrationService(ServiceProcess):
     
         log.debug('AppIntegrationService.__init__()')
 
+    @defer.inlineCallbacks
+    def spawn_worker(self,name):
+        """
+        For now - keep it simple and use register life cycle object to control the workers.
+
+        Consider changing to use spanw child - but we need to get the actual instance object not just the id...
+
+        """
+
+        class AIS_Worker_Process(Process, AIS_Mixin):
+            """
+            Worker process for the AIS service
+            """
+
+        worker = AIS_Worker_Process(**{'proc-name':name})
+
+        worker.mc = worker.message_client
+        worker.rc = ResourceClient(worker)
+
+        worker.asc = AssociationServiceClient(proc = worker)
+
+        yield worker.spawn()
+
+        yield self.register_life_cycle_object(worker)
+
+        defer.returnValue(worker)
+
 
     @defer.inlineCallbacks
     def slc_init(self):
-        self.metadataCache = MetadataCache(self)
+
+        #== Create a process for the metadata cache and data resource workers
+        data_resource_worker = yield self.spawn_worker('data_resource_worker')
+        self._data_resource_worker = data_resource_worker
+
+        metadataCache = MetadataCache(data_resource_worker)
+        data_resource_worker.metadataCache = metadataCache
         log.debug('Instantiated AIS Metadata Cache Object')
-        yield self.metadataCache.loadDataSets()
-        yield self.metadataCache.loadDataSources()
+        yield data_resource_worker.metadataCache.loadDataSets()
+        yield data_resource_worker.metadataCache.loadDataSources()
 
         log.info('instantiating DatasetUpdateEventSubscriber')
-        self.dataset_subscriber = DatasetUpdateEventSubscriber(process = self)
-        self.register_life_cycle_object(self.dataset_subscriber)
+        data_resource_worker.dataset_subscriber = DatasetUpdateEventSubscriber(process = data_resource_worker)
+        yield data_resource_worker.register_life_cycle_object(data_resource_worker.dataset_subscriber)
         
         log.info('instantiating DatasourceUpdateEventSubscriber')
-        self.datasource_subscriber = DatasourceUpdateEventSubscriber(process = self)
-        self.register_life_cycle_object(self.datasource_subscriber)
-        
-        # create worker instances
-        self.FindDataResourcesWorker = FindDataResources(self)
-        self.GetDataResourceDetailWorker = GetDataResourceDetail(self)       
+        data_resource_worker.datasource_subscriber = DatasourceUpdateEventSubscriber(process = data_resource_worker)
+        yield data_resource_worker.register_life_cycle_object(data_resource_worker.datasource_subscriber)
+
+
+        data_resource_worker.workbench.manage_workbench_cache('Default Context')
+
+        self.FindDataResourcesWorker = FindDataResources(self, metadataCache)
+        self.GetDataResourceDetailWorker = GetDataResourceDetail(self, metadataCache)
+
+        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self, metadataCache)
+
+        self.ManageResourcesWorker = ManageResources(self)
+
+        self.ManageDataResourceWorker = ManageDataResource(self)
+
         self.CreateDownloadURLWorker = CreateDownloadURL(self)
         self.RegisterUserWorker = RegisterUser(self)
-        self.ManageResourcesWorker = ManageResources(self)
-        self.ManageDataResourcWworker = ManageDataResource(self)
         self.ValidateDataResourceWorker = ValidateDataResource(self)
-        self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self)
 
     @defer.inlineCallbacks
     def slc_activate(self):
@@ -118,9 +135,6 @@ class AppIntegrationService(ServiceProcess):
 
         # Load current role associations
         yield load_roles_from_associations(self.asc)
-        
-    def getMetadataCache(self):
-        return self.metadataCache
 
     def op_broadcast(self, content, headers, msg):
         """
@@ -135,6 +149,7 @@ class AppIntegrationService(ServiceProcess):
                 map_ooi_id_to_role(content['user-id'], content['role'])
             elif op == 'unset_user_role':
                 unmap_ooi_id_from_role(content['user-id'], content['role'])
+
 
     @defer.inlineCallbacks
     def op_findDataResources(self, content, headers, msg):
@@ -174,6 +189,7 @@ class AppIntegrationService(ServiceProcess):
         log.info('op_getDataResourceDetail service method')
         returnValue = yield self.GetDataResourceDetailWorker.getDataResourceDetail(content)
         yield self.reply_ok(msg, returnValue)
+
 
     @defer.inlineCallbacks
     def op_createDownloadURL(self, content, headers, msg):
@@ -248,7 +264,7 @@ class AppIntegrationService(ServiceProcess):
         @brief create a new data resource
         """
         log.debug('op_createDataResource: \n'+str(content))
-        response = yield self.ManageDataResourcWworker.create(content);
+        response = yield self.ManageDataResourceWorker.create(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -258,7 +274,7 @@ class AppIntegrationService(ServiceProcess):
         """
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('op_updateDataResource: \n'+str(content))
-        response = yield self.ManageDataResourcWworker.update(content);
+        response = yield self.ManageDataResourceWorker.update(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -268,7 +284,7 @@ class AppIntegrationService(ServiceProcess):
         """
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug('op_deleteDataResource: \n'+str(content))
-        response = yield self.ManageDataResourcWworker.delete(content);
+        response = yield self.ManageDataResourceWorker.delete(content);
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks

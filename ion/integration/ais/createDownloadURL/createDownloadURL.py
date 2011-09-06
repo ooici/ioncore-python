@@ -31,9 +31,9 @@ class CreateDownloadURL(object):
 
     def __init__(self, ais):
         log.info('CreateDownloadURL.__init__()')
-        self.rc = ResourceClient()
+        self.rc = ais.rc
         self.mc = ais.mc
-        self.dscc = DatasetControllerClient()
+        #self.dscc = DatasetControllerClient(ais)
 
     @defer.inlineCallbacks
     def createDownloadURL(self, msg):

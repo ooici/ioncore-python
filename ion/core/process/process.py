@@ -196,7 +196,7 @@ class Process(BasicLifecycleObject):
 
         # Context default dictionary
         self.context = ContextObject()
-        self._last_context = None
+        #self._last_context = None
 
         self.conversation_context = ConversationContext()
 
