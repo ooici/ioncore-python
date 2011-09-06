@@ -14,8 +14,7 @@ from twisted.internet import defer
 from ion.core.object import object_utils
 from ion.core.exception import ReceivedApplicationError
 from ion.services.coi.identity_registry import IdentityRegistryClient
-from ion.services.coi.resource_registry.resource_client import ResourceClient
-from ion.integration.ais.findDataResources.findDataResources import FindDataResources
+
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -29,13 +28,13 @@ RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, ve
 
 class GetDataResourceDetail(object):
     
-    def __init__(self, ais):
+    def __init__(self, ais, metadataCache):
         log.info('GetDataResourceDetail.__init__()')
         self.ais = ais
-        self.rc = ResourceClient(proc=ais)
+        self.rc = ais.rc
         self.mc = ais.mc
         self.irc = IdentityRegistryClient(proc=ais)
-        self.metadataCache = ais.getMetadataCache()
+        self.metadataCache = metadataCache
 
         
     @defer.inlineCallbacks
@@ -80,6 +79,7 @@ class GetDataResourceDetail(object):
         dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
         dSourceResID = dSetMetadata['DSourceID']
         ownerID = dSetMetadata['OwnerID']
+
 
         log.debug('ownerID: ' + ownerID + ' owns dataSetID: ' + dSetResID)
         userProfile = yield self.__getUserProfile(ownerID)
