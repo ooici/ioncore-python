@@ -4,6 +4,7 @@
 @author David Stuebe
 
 """
+import tempfile
 
 import time
 from ion.core import ioninit
@@ -12,6 +13,7 @@ from ion.services.coi.datastore import CDM_BOUNDED_ARRAY_TYPE
 from ion.services.coi.resource_registry.resource_client import ResourceClient as RC
 from ion.core.object import object_utils
 from ion.core.process.process import Process
+import os, os.path
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, MYOOICI_USER_ID, ANONYMOUS_USER_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, HAS_ROLE_ID, HAS_A_ID, IS_A_ID
@@ -19,6 +21,8 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFI
 from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID
 
 import ion.util.ionlog
+from ion.util.os_process import OSProcess
+
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
@@ -57,7 +61,7 @@ __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROL
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all', 'get_dataset_graphviz', '_graphviz'])
 
 
 
@@ -402,3 +406,55 @@ def _checkout_all(arr):
             log.warn("... bad")
             badlist.append(id)
     defer.returnValue((goodlist, badlist))
+
+@defer.inlineCallbacks
+def get_dataset_graphviz(dsetid):
+    dset = yield rc.get_instance(dsetid)
+
+    # build graph output
+    outlines = []
+
+    outlines.append("digraph \"%s\" {" % dsetid)
+
+    visited = set()
+
+    def get_commit_chain(cref):
+        crefkey = sha1_to_hex(cref.MyId)
+        visited.add(crefkey)
+        tm = time.gmtime(cref.date)
+        dat = time.strftime("%m/%d %H:%M:%S",tm)
+        outlines.append("    \"%s\" [label=\"KEY: %s\\nCOMMENT: %s\\nDATE: %s\"] ;" % (crefkey, crefkey, str(cref.comment), dat))
+
+        for idx, x in enumerate(cref.parentrefs):
+            pcref = x.commitref
+            pcrefkey = sha1_to_hex(pcref.MyId)
+            outlines.append("    \"%s\" -> \"%s\" [taillabel=\"%d\"] ;" % (crefkey, pcrefkey, idx))
+            if pcrefkey not in visited:
+                get_commit_chain(x.commitref)
+
+    # call it, fills out commits/edges
+    get_commit_chain(dset.Repository._current_branch.commitrefs[0])
+
+    outlines.append("}")
+
+    defer.returnValue("\n".join(outlines))
+
+@defer.inlineCallbacks
+def _graphviz(dsetid):
+    gvinp = yield get_dataset_graphviz(dsetid)
+
+    (inp, inpfile) = tempfile.mkstemp(suffix='.txt')
+    os.write(inp, gvinp)
+    os.close(inp)
+    gt = time.time()
+
+    outimg = os.path.join(tempfile.gettempdir(), str(gt) + ".svg")
+
+    dot = OSProcess(binary="dot", spawnargs=["-Tsvg", "-o%s" % outimg, inpfile])
+    yield dot.spawn()
+
+    viewit = OSProcess(binary="open", spawnargs=[outimg])
+    yield viewit.spawn()
+
+    print "Input:", inpfile
+    print "Output: ", outimg
