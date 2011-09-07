@@ -15,7 +15,7 @@ from ion.core.object import object_utils
 from ion.core.process.process import Process
 import os, os.path
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, MYOOICI_USER_ID, ANONYMOUS_USER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, MYOOICI_USER_ID, ANONYMOUS_USER_ID, TypeIDMap, PredicateMap
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, HAS_ROLE_ID, HAS_A_ID, IS_A_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, ADMIN_ROLE_ID, DATA_PROVIDER_ROLE_ID, MARINE_OPERATOR_ROLE_ID, EARLY_ADOPTER_ROLE_ID, AUTHENTICATED_ROLE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID
@@ -55,13 +55,16 @@ mc = resource_process.message_client
 
 irc = IdentityRegistryClient(resource_process)
 
+type_id_map = TypeIDMap()
+predicate_map = PredicateMap()
+
 # Set ALL for import *
-__all__= ['resource_process','rc','asc','ac','mc','ROOT_USER_ID', 'MYOOICI_USER_ID', 'ANONYMOUS_USER_ID']
+__all__= ['resource_process','rc','asc','ac','mc','ROOT_USER_ID', 'MYOOICI_USER_ID', 'ANONYMOUS_USER_ID','predicate_map', 'type_id_map']
 __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROLE_ID', 'HAS_A_ID', 'IS_A_ID'])
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all', 'get_dataset_graphviz', '_graphviz'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all', 'get_dataset_graphviz', '_graphviz','association_graphviz'])
 
 
 
@@ -407,6 +410,112 @@ def _checkout_all(arr):
             badlist.append(id)
     defer.returnValue((goodlist, badlist))
 
+
+
+@defer.inlineCallbacks
+def association_graphviz(res_id):
+
+
+    res = yield rc.get_instance(res_id)
+
+    sbj_mngr = yield ac.find_associations(subject=res)
+
+    obj_mngr = yield ac.find_associations(obj=res)
+
+
+    obj_list = []
+    for assoc in sbj_mngr:
+        r = yield rc.get_instance(assoc.ObjectReference.key)
+        obj_list.append(r)
+
+    sub_list=[]
+    for assoc in obj_mngr:
+        r = yield rc.get_instance(assoc.SubjectReference.key)
+        sub_list.append(r)
+
+    rlist = [res,]
+    rlist.extend(sub_list)
+    rlist.extend(obj_list)
+
+
+    # build graph output
+    outlines = []
+
+    outlines.append("digraph \"%s\" {" % res_id)
+
+
+    def sanatize_string(mystring):
+
+        n = 38
+        if len(mystring) > n and "\n" in mystring:
+            mystring = "%s; (Truncated!!)" % (mystring[0:n].split('\n')[0],)
+
+        elif len(mystring) > n:
+            mystring = "%s; (Truncated length)" % (mystring[0:n],)
+
+        elif "\n" in mystring:
+            mystring = "%s; (Truncated newline)" % (mystring.split('\n')[0],)
+
+        return mystring
+
+    for ind, r in enumerate(rlist):
+        resource_lines = []
+
+        ro = r.ResourceObject
+
+        for pname, pvalue in ro._Properties.iteritems():
+
+            value = getattr(ro, pname)
+            if pvalue.field_type == 'TYPE_MESSAGE' and value is not None:
+
+                r1 = value
+                if hasattr(r1,'__iter__'):
+
+                    resource_lines.append("%s (repeated field length): %d" % (pname, len(r1)))
+                else:
+                    resource_lines.append("%s::" % pname)
+                    for pname1, pvalue1 in r1._Properties.iteritems():
+                        if pvalue1.field_type != 'TYPE_MESSAGE':
+                            svalue1 = str(getattr(r1, pname1))
+
+                            resource_lines.append("::%s: '%s'" % (pname1, sanatize_string(svalue1)))
+                        else:
+                            resource_lines.append("::%s - nested field skipped" % (pname1,))
+
+            else:
+                svalue = str(value)
+                resource_lines.append("%s: '%s'" % (pname, sanatize_string(svalue)))
+
+        rid = r.ResourceIdentity
+        if ind == 0:
+            tup = (rid, rid, r.ResourceName, type_id_map[r.ResourceTypeID.key], r.ResourceLifeCycleState, "\\n".join(resource_lines),'Red')
+        else:
+            tup = (rid, rid, r.ResourceName, type_id_map[r.ResourceTypeID.key], r.ResourceLifeCycleState, "\\n".join(resource_lines), 'Black')
+
+        outlines.append("""    \"%s\" [label=\"KEY: %s\\nName: %s\\nType: %s\\nLCState: %s\\nResource Properties:\\n%s \", color=%s] ;""" % tup)
+
+
+    for pred, assoc_set in sbj_mngr.iteritems():
+
+        predicate = predicate_map.get(pred)
+
+        for assoc in assoc_set:
+            outlines.append("""    \"%s\" -> \"%s\" [label=\"Predicate: %s\\nAssociationId: %s\"] ;""" % (res_id, assoc.ObjectReference.key, predicate, assoc.AssociationIdentity))
+
+    for pred, assoc_set in obj_mngr.iteritems():
+        predicate = predicate_map.get(pred)
+
+        for assoc in assoc_set:
+            outlines.append("""    \"%s\" -> \"%s\" [label=\"Predicate: %s\\nAssociationId: %s\"] ;""" % (assoc.SubjectReference.key, res_id, predicate, assoc.AssociationIdentity))
+
+
+
+    outlines.append("}")
+
+    defer.returnValue("\n".join(outlines))
+
+
+
 @defer.inlineCallbacks
 def get_dataset_graphviz(dsetid):
     dset = yield rc.get_instance(dsetid)
@@ -441,7 +550,7 @@ def get_dataset_graphviz(dsetid):
 
 @defer.inlineCallbacks
 def _graphviz(dsetid):
-    gvinp = yield get_dataset_graphviz(dsetid)
+    gvinp = yield association_graphviz(dsetid)
 
     (inp, inpfile) = tempfile.mkstemp(suffix='.txt')
     os.write(inp, gvinp)
