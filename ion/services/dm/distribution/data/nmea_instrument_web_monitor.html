@@ -5,12 +5,12 @@
   <title>OOICI Instrument Monitor</title>
 
 
-  <link rel="stylesheet" type="text/css" href="http://localhost:8080/css/ciux-default.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/cupertino/jquery-ui-1.8.9.custom.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-page.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-table-jui.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/colorbox.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ooici_ux-main.css"/>
+  <link rel="stylesheet" type="text/css" href="http://ion-beta.oceanobservatories.org/css/ciux-default.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/cupertino/jquery-ui-1.8.9.custom.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-page.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-table-jui.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/colorbox.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ooici_ux-main.css"/>
   
   <style type="text/css">
   	html, body { min-height: 100%; }
@@ -98,7 +98,7 @@
                                  var datapoint = datapoints[l];
                                  if (datapoint.NMEA_CD == 'GPGGA') {
                                     lat = datapoint.GPS_LAT;
-                                    lon = datapoint.GPS_LON * -1;
+                                    lon = datapoint.GPS_LON;
                                     time = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
                                  }
                               }
