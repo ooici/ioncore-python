@@ -146,9 +146,10 @@ class OSProcess(protocol.ProcessProtocol):
         def anon_timeout():
             self._close_impl(True)
 
-        # we have to save this so we can cancel the timeout in processEnded
-        self.close_timeout = reactor.callLater(timeout, anon_timeout)
-        self._close_impl(force)
+        if not self.deferred_exited.called:
+            # we have to save this so we can cancel the timeout in processEnded
+            self.close_timeout = reactor.callLater(timeout, anon_timeout)
+            self._close_impl(force)
 
         # with the timeout in place, the processEnded will always be called, so its safe
         # to yield on this deferred now

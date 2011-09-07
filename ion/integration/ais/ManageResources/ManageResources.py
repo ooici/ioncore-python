@@ -34,7 +34,12 @@ from ion.core.intercept.policy import get_current_roles, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
-EPU_CONTROLLER_TYPE_ID = 'type_id_for_epu_controllers'
+EPU_CONTROLLER_TYPE_ID = 'dummy_type_id_for_epu_controllers'
+DATASET_KEY = 'datasets'
+DATASOURCE_KEY = 'datasources'
+IDENTITY_KEY = 'identities'
+EPUCONTROLLER_KEY = 'epucontrollers'
+
 
 class DictObj(object):
     def __getattr__(self, attr):
@@ -65,14 +70,14 @@ class ManageResources(object):
                          self.__PrintEpucontrollerAttributes, \
                          self.__LoadEpucontrollerColumnHeadrers, \
                          self.__LoadEpucontrollerAttributes
-      self.ResourceTypes = {'datasets' : DatasetValues,
-                            'identities' : IdentityValues,
-                            'datasources' : DatasourceValues,
-                            'epucontrollers' : EpucontrollerValues
+      self.ResourceTypes = {DATASET_KEY : DatasetValues,
+                            IDENTITY_KEY : IdentityValues,
+                            DATASOURCE_KEY : DatasourceValues,
+                            EPUCONTROLLER_KEY : EpucontrollerValues
                            }
-      self.MapGpbTypeToResourceType = {10001 : 'datasets',
-                                       1401 : 'identities',
-                                       4503 : 'datasources'                                     
+      self.MapGpbTypeToResourceType = {10001 : DATASET_KEY,
+                                       1401 : IDENTITY_KEY,
+                                       4503 : DATASOURCE_KEY                                     
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
@@ -81,6 +86,7 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ResourceClient(proc=ais)
       self.eclc = EPUControllerListClient(proc=ais)
+      self.metadataCache = ais.getMetadataCache()
 
 
    @defer.inlineCallbacks
@@ -167,10 +173,11 @@ class ManageResources(object):
    def __PrintEpucontrollerAttributes(self, ds):
       log.debug('de_state = '+str(ds['de_state']))
       log.debug('de_conf_report = '+str(ds['de_conf_report']))
-      log.debug('last_queuelen_size = '+str(ds['last_queuelen_size']))
-      log.debug('last_queuelen_time = '+str(ds['last_queuelen_time']))
       for instance in ds['instances']:
          log.debug('Instance Name = '+instance)
+         log.debug('Instance IAAS ID', ds['instances'][instance]['iaas_id'])
+         log.debug('Instance Public IP', ds['instances'][instance]['public_ip'])
+         log.debug('Instance Private IP', ds['instances'][instance]['private_ip'])
          log.debug('iaas_state = '+ds['instances'][instance]['iaas_state'])
          log.debug('iaas_state = '+str(ds['instances'][instance]['iaas_state_time']))
          log.debug('iaas_state = '+str(ds['instances'][instance]['heartbeat_time']))
@@ -375,6 +382,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    @defer.inlineCallbacks
@@ -411,6 +420,9 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
+      
          
          
    @defer.inlineCallbacks
@@ -459,6 +471,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    def __LoadEpucontrollerAttributes(self, To, From):
@@ -468,7 +482,10 @@ class ManageResources(object):
       def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
          To.resource.add()
          To.resource[ns.Index].name = Name
-         To.resource[ns.Index].value = Value
+         if Value == None:
+            To.resource[ns.Index].value = 'None'
+         else:
+            To.resource[ns.Index].value = Value
          ns.Index = ns.Index + 1
          
       ns = namespace()   # create wrapper class for scoping so worker function can set variable
@@ -477,18 +494,27 @@ class ManageResources(object):
       try:
          AddItem('Decision Engine State', From['de_state'])
          AddItem('Decision Engine Configuration Report', From['de_conf_report'])
-         AddItem('Last Queue Length Size', str(From['last_queuelen_size']))
-         AddItem('Last Queue Length Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['last_queuelen_time'])))
          for instance in From['instances']:
             AddItem('Instance Name', instance)
+            AddItem('Instance IAAS ID', From['instances'][instance]['iaas_id'])
+            AddItem('Instance Public IP', From['instances'][instance]['public_ip'])
+            AddItem('Instance Private IP', From['instances'][instance]['private_ip'])
             AddItem('Instance State', From['instances'][instance]['iaas_state'])
-            AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
-            AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
+            if From['instances'][instance]['iaas_state_time'] == None:
+               AddItem('Instance State Time', 'None')
+            else:
+               AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
+            if From['instances'][instance]['heartbeat_time'] == None:
+               AddItem('Heartbeat Time', 'None')
+            else:
+               AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
             AddItem('Heartbeat State', From['instances'][instance]['heartbeat_state'])
     
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      return ns.Index
 
 
    @defer.inlineCallbacks
@@ -529,7 +555,7 @@ class ManageResources(object):
          # debug print for dumping the attributes of the resource
          if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("got back resource \n"+str(Result))
-         ResourceType = 'epucontrollers'
+         ResourceType = EPUCONTROLLER_KEY
       else:
          # get resource from resource registry
          log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
@@ -556,7 +582,21 @@ class ManageResources(object):
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCE_RESPONSE_TYPE)
       LoaderFunc = self.ResourceTypes[ResourceType][4]
-      yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      Index = yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      if (ResourceType == DATASET_KEY):
+         ResourceID = yield self.metadataCache.getAssociatedSource(Result.ResourceIdentity)
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Source ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
+      elif (ResourceType == DATASOURCE_KEY):
+         ResourceIDs = yield self.metadataCache.getAssociatedDatasets(Result)
+         if len(ResourceIDs) == 0:
+            ResourceID = 'None'
+         else:
+            ResourceID = ResourceIDs[0]
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Set ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
       Response.result = Response.ResponseCodes.OK
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResource(): returning\n'+str(Response))

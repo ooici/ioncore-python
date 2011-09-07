@@ -1005,7 +1005,7 @@ class Wrapper(object):
 
         self.recurse_count.count += 1
         local_cnt = self.recurse_count.count
-        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d:\n %s' %
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d, Modified - %s' %
               (local_cnt, type(self), len(self.ChildLinks), len(structure), self.Modified))
 
         if not  self.Modified:
@@ -2083,8 +2083,11 @@ class StructureElement(object):
     def __str__(self):
         msg = ''
         if len(self._element.key) == 20:
-            msg = 'Hexkey: "' + sha1_to_hex(self._element.key) + '"\n'
-        return msg + self._element.__str__()
+            msg =   'Key:    ' + sha1_to_hex(self._element.key) + '\n'
+        msg = msg + 'Type:   ' + str(self._element.type) + '\n'
+        msg = msg + 'IsLeaf: ' + str(self._element.isleaf) + '\n'
+        msg = msg + 'El Len: ' + str(self.__sizeof__())
+        return msg
 
     def serialize(self):
         return self._element.SerializeToString()

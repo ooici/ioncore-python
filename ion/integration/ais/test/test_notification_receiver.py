@@ -29,14 +29,10 @@ class NotificationReceiverTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
+        yield self._start_container(sysname='nas_unit_test')
 
         services = [
-            {
-                'name':'pubsub_service',
-                'module':'ion.services.dm.distribution.pubsub_service',
-                'class':'PubSubService'
-            },
+
             {
                 'name':'ds1',
                 'module':'ion.services.coi.datastore',
@@ -47,32 +43,21 @@ class NotificationReceiverTest(IonTestCase):
                 'name':'resource_registry1',
                 'module':'ion.services.coi.resource_registry.resource_registry',
                 'class':'ResourceRegistryService',
-                    'spawnargs':{'datastore_service':'datastore'}},
-            {
-                'name':'exchange_management',
-                'module':'ion.services.coi.exchange.exchange_management',
-                'class':'ExchangeManagementService',
+                    'spawnargs':{'datastore_service':'datastore'}
             },
+
             {
                 'name':'association_service',
                 'module':'ion.services.dm.inventory.association_service',
                 'class':'AssociationService'
             },
-            {
-                'name':'attributestore',
-                'module':'ion.services.coi.attributestore',
-                'class':'AttributeStoreService'
-            },
+
             {
                 'name':'identity_registry',
                 'module':'ion.services.coi.identity_registry',
                 'class':'IdentityRegistryService'
             },
-            {
-                'name':'store_service',
-                'module':'ion.core.data.store_service',
-                'class':'StoreService'
-            },
+            
             {
                 'name':'app_integration',
                 'module':'ion.integration.ais.app_integration_service',
@@ -80,6 +65,11 @@ class NotificationReceiverTest(IonTestCase):
             },
             {
                 'name':'notification_alert',
+                'module':'ion.integration.ais.notification_alert_service',
+                'class':'NotificationAlertService'
+            },
+            {
+                'name':'notification_alert',                               # add two nas to test for one email from subscriber queue
                 'module':'ion.integration.ais.notification_alert_service',
                 'class':'NotificationAlertService'
             },
@@ -104,8 +94,16 @@ class NotificationReceiverTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
+        # create event publishers
+        pubSupplementAdded = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSupplementAdded.initialize()
+        yield pubSupplementAdded.activate()
 
-        # Add a subscription for this user to this data resource
+        pubSourceOffline = DatasourceUnavailableEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
+        yield pubSourceOffline.initialize()
+        yield pubSourceOffline.activate()
+
+        # Add an initial ingestion subscription for this user to this data resource
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(SUBSCRIBE_DATA_RESOURCE_REQ_TYPE)
         reqMsg.message_parameters_reference.subscriptionInfo.user_ooi_id = MYOOICI_USER_ID
@@ -113,6 +111,9 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference.subscriptionInfo.email_alerts_filter = reqMsg.message_parameters_reference.subscriptionInfo.SubscriptionType.EMAILANDDISPATCHER
         reqMsg.message_parameters_reference.subscriptionInfo.subscription_type = reqMsg.message_parameters_reference.subscriptionInfo.AlertsFilter.UPDATESANDDATASOURCEOFFLINE
         reqMsg.message_parameters_reference.subscriptionInfo.date_registered = IonTime().time_ms
+        # indicate to the NAS that this is an automatically created email subscription that should be deleted after the initial
+        # ingestion event is received
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path = "AutomaticallyCreatedInitialIngestionSubscription"
 
         reqMsg.message_parameters_reference.datasetMetadata.user_ooi_id = MYOOICI_USER_ID
         reqMsg.message_parameters_reference.datasetMetadata.data_resource_id = 'UnitTest_dataresrc123'
@@ -123,26 +124,16 @@ class NotificationReceiverTest(IonTestCase):
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_min = 20.0
         reqMsg.message_parameters_reference.datasetMetadata.ion_geospatial_lon_max = 30.0
 
-        # try to register this user for the first time
+        # register the subscription
         reply = yield self.nac.addSubscription(reqMsg)
 
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('NotificationReceiverTest: response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
-        pubSupplementAdded = DatasetSupplementAddedEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
-        yield pubSupplementAdded.initialize()
-        yield pubSupplementAdded.activate()
-
-        pubSourceOffline = DatasourceUnavailableEventPublisher(process=self.test_sup) # all publishers/subscribers need a process associated
-        yield pubSourceOffline.initialize()
-        yield pubSourceOffline.activate()
-
-        # creates the event notification for us and sends it
-
-
-
+        # create the event notification for successful ingestion and send it,
+        # causes email to be sent and subscription to be deleted
         yield pubSupplementAdded.create_and_publish_event(origin='UnitTest',
-                                                          dataset_id="UnitTest_dataresrc123",
+                                                          dataset_id="UnitTest_dataset123",
                                                           datasource_id="UnitTest_dataresrc123",
                                                           title="Unit Test Datasource",
                                                           url="Some URL",
@@ -150,11 +141,66 @@ class NotificationReceiverTest(IonTestCase):
                                                           end_datetime_millis = 11000,
                                                           number_of_timesteps = 7)
 
+        yield pu.asleep(1.0)
+        
+        # create the event notification for successful ingestion and send it, email should not be sent by NAS
+        yield pubSupplementAdded.create_and_publish_event(origin='UnitTest',
+                                                          dataset_id="UnitTest_dataset123",
+                                                          datasource_id="UnitTest_dataresrc123",
+                                                          title="Unit Test Datasource",
+                                                          url="ION ERROR: THIS EMAIL SHOULD NOT HAVE BEEN SENT",
+                                                          start_datetime_millis = 10000,
+                                                          end_datetime_millis = 11000,
+                                                          number_of_timesteps = 7)
+
+        yield pu.asleep(1.0)
+        
+        # register the subscription again since the earlier event would have deleted it
+        reply = yield self.nac.addSubscription(reqMsg)
+
+        # create the event notification for ingestion failure and send it,
+        # causes email to be sent and subscription to be deleted
         yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
+                                                        dataset_id="UnitTest_dataset123",
                                                         datasource_id="UnitTest_dataresrc123",
                                                         error_explanation="UnitTest_explanation")
-        
 
-        yield pu.asleep(5.0)
+        yield pu.asleep(1.0)
+        
+        # create the event notification for ingestion failure and send it, email should not be sent by NAS
+        yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
+                                                        dataset_id="UnitTest_dataset123",
+                                                        datasource_id="UnitTest_dataresrc123",
+                                                        error_explanation="ION ERROR: THIS EMAIL SHOULD NOT HAVE BEEN SENT")
+
+        yield pu.asleep(1.0)
+
+        # Add another subscription for this user to this data resource that is not for initial ingestion
+        reqMsg.message_parameters_reference.subscriptionInfo.dispatcher_script_path = "SomeScriptPath"
+
+        # register the subscription
+        reply = yield self.nac.addSubscription(reqMsg)
+
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('NotificationReceiverTest: response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        # create the event notification for successful ingestion and send it
+        yield pubSupplementAdded.create_and_publish_event(origin='UnitTest',
+                                                          dataset_id="UnitTest_dataset123",
+                                                          datasource_id="UnitTest_dataresrc123",
+                                                          title="Unit Test Datasource",
+                                                          url="Some URL",
+                                                          start_datetime_millis = 10000,
+                                                          end_datetime_millis = 11000,
+                                                          number_of_timesteps = 7)
+
+        yield pu.asleep(1.0)
+
+        # create the event notification for ingestion failure and send it
+        yield pubSourceOffline.create_and_publish_event(origin='UnitTest',
+                                                        dataset_id="UnitTest_dataset123",
+                                                        datasource_id="UnitTest_dataresrc123",
+                                                        error_explanation="UnitTest_explanation")
+        yield pu.asleep(3.0)
         
         log.info('NotificationReceiverTest:test_publish_receive completed')        

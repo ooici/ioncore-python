@@ -238,12 +238,15 @@ class WorkBenchTest(unittest.TestCase):
         self.assertIn(key, self.wb._repos)
         self.assertNotIn(key, self.wb._repo_cache)
 
+        # Decided to change this behavior - no arguments should clear...
+        """
         # Call manage without context
         self.wb.manage_workbench_cache()
 
         # Still there...
         self.assertIn(key, self.wb._repos)
         self.assertNotIn(key, self.wb._repo_cache)
+        """
 
         # Call manage other context
         self.wb.manage_workbench_cache('Not Mine')
@@ -595,6 +598,8 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.root_object.title = 'Other Title'
         self.repo1.commit('Another updated addressbook')
 
+        self.repo1.persistent=True
+
         # Push the object in proc2 back to proc1 - it will have both divergent states
         log.info('Pushing back to proc1')
         result = yield self.proc2.workbench.push(self.proc1.id.full, repo2)
@@ -644,6 +649,8 @@ class WorkBenchProcessTest(IonTestCase):
         ### SAME CONTENT....
         #self.repo1.root_object.title = 'Other Title'
         #self.repo1.commit('Another updated addressbook')
+
+        self.repo1.persistent = True
 
         # Push the object in proc2 back to proc1 - it will have both divergent states
         log.info('Pushing back to proc1')

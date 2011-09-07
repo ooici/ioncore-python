@@ -91,8 +91,9 @@ class NMEADeviceParam(DriverParameter):
     """
     Add specific NMEA device parameters here.
     """
-    GPGGA = 'GPGGA'       # Global Position Fix Position
+    GPGGA = 'GPGGA'        # Global Position Fix Position
     GPGLL = 'GPGLL'        # Global Position Latitude and Longitude
+    OOIXX = 'OOIXX'        # Custom sentence for demonstrating OOI UI
     GPRMC = 'GPRMC'        # Recommended Minimum Sentence C
     PGRMF = 'PGRMF'        # Garmin GPS Fix Data Sentence
     PGRMC = 'PGRMC'        # Garmin configuration information
@@ -156,6 +157,7 @@ class CfgNMEADevice(object):
     cfgParams = {'GPGGA':        'OFF',
                  'GPGLL':        'OFF',
                  'GPRMC':        'OFF',
+                 'OOIXX':        'OFF',
                  'PGRMF':        'OFF',
                  'PGRMC':        'OFF',
                  'FIX_MODE':     'A',
@@ -1553,25 +1555,29 @@ class NMEADeviceDriver(InstrumentDriver):
             val = params[(chan, param)]
             if (val == None) or (val == ''):
                 continue
-            if self._device_NMEA_config.defParams.get(param):
+            if self._device_NMEA_config.defParams.get(param) is not None:
                 if param in self._device_NMEA_config.validSet:
                     # Do PGRMO stuff here
                     if val in [ON, OFF]:
                         self._device_NMEA_config.SetSentences({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
+                        log.info('NMEA Driver: Set sentence %s to %s.' %(param, val))
                     else:
                         result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
                         set_errors = True
+                        log.info('NMEA Driver: Could not set sentence %s to %s.' %(param, val))
                 else:
                     # Doing PGRMC stuff here
                     if param in self._device_NMEA_config.cfgParams.keys():
                         self._device_NMEA_config.SendConfigToDevice({param: val})
                         self._device_NMEA_config.cfgParams[param] = val
                         result[(chan, param)] = InstErrorCode.OK
+                        log.info('NMEA Driver: Set configuration parameter %s to %s.' %(param, val))
                     else:
                         result[(chan, param)] = InstErrorCode.BAD_DRIVER_COMMAND
                         set_errors = True
+                        log.info('NMEA Driver: Could not set configuration parameter %s to %s.' %(param, val))
             else:
                 result[(chan, param)] = InstErrorCode.INVALID_PARAMETER
                 set_errors = True

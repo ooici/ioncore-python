@@ -12,7 +12,8 @@ import logging.handlers
 import re
 import os, os.path
 
-from ion.util.context import ContextLocal
+
+from ion.util.context import ConversationContext
 from ion.util.path import adjust_dir
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -60,11 +61,6 @@ sys_name = None
 # Global flag determining whether currently running unit test
 testing = True
 
-# Static entry point for "thread local" context storage during request
-# processing, eg. to retaining user-id from request message
-request = ContextLocal()
-
-
 # Optionally use Loggly for logging, just an experiment for now
 loggly_key = ion_config.getValue2(__name__, 'loggly_key', None)
 loggly_key = os.environ.get('LOGGLY_KEY', loggly_key)
@@ -76,7 +72,8 @@ if loggly_key is not None:
     _post_to_endpoint = hoover.utils.post_to_endpoint
     def post_to_endpoint(endpoint, message):
         h = httplib2.Http(disable_ssl_certificate_validation=True)
-        h.request(endpoint, 'POST', message)
+        headers = {'connection': 'close'}
+        h.request(endpoint, 'POST', message, headers=headers)
     async_post_to_endpoint = hoover.utils.async(post_to_endpoint)
     setattr(hoover.utils, 'post_to_endpoint', post_to_endpoint)
     setattr(hoover.utils, 'async_post_to_endpoint', async_post_to_endpoint)
@@ -98,7 +95,7 @@ if loggly_key is not None:
                 self.handleError(record)
 
     loggly_handler = IonLogglyHandler(token=loggly_key)
-    loggly_handler.setLevel(logging.DEBUG)
+    loggly_handler.setLevel(logging.WARNING)
     loggly_formatter = logging.Formatter(
         '%(hostname)s #%(process)s> %(asctime)s.%(msecs)03d [%(levelname)s] {%(module)s:%(lineno)3d} %(message)s')
     loggly_handler.setFormatter(loggly_formatter)

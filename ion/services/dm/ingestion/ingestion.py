@@ -375,12 +375,15 @@ class IngestionService(ServiceProcess):
             ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
         except Exception, ex:
 
+            # clear the repository
+            self.workbench.clear_repository_key(content.dataset_id)
+
             # we have to notify that there is a failure, so get details and setup the dict to pass to notify_ingest.
             data_details = self.get_data_details(content)
             ingest_res={EM_ERROR:'Ingestion Failed: %s' % str(ex.message)}
             ingest_res.update(data_details)
 
-            log.error("Error occured while waiting for ingestion to complete: %s" % str(ex.message))
+            log.exception("Error occured while waiting for ingestion to complete:")
 
             yield self._notify_ingest(ingest_res)
 
@@ -645,7 +648,7 @@ class IngestionService(ServiceProcess):
             raise IngestionError('Calling recv_chunk in an invalid state. No Dataset checked out to ingest.')
 
         if self.dataset.ResourceLifeCycleState is not self.dataset.UPDATE:
-            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch!')
+            raise IngestionError('Calling recv_chunk in an invalid state. Dataset is not on an update branch! (currently: %s)' % str(self.dataset.ResourceLifeCycleState))
 
         # OOIION-191: sanity check field dataset_id disabled as DatasetAgent does not have the information when making these messages.
         #if content.dataset_id != self.dataset.ResourceIdentity:
@@ -793,8 +796,9 @@ class IngestionService(ServiceProcess):
         sup_etime, \
         sup_agg_dim_length, \
         sup_agg_dim_name, \
+        sup_fcst_dim_name, \
         is_new_ds, \
-        result = yield self.__premerge()
+        result = yield self.__premerge(is_fmrc=False)
 
 
         # Calculate offsets and indices for positioning the supplement in the dataset
@@ -802,20 +806,24 @@ class IngestionService(ServiceProcess):
         
         sup_sindex, \
         sup_eindex, \
-        insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
+        insertion_offset, \
+        runtime_offset, \
+        forecast_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length, sup_fcst_dim_name)
         
         log.debug('************* END    __calculate_merge_offsets() *************')
 
         
-        log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
-        log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
-        log.debug('>> insertion_offset   = %i' % insertion_offset)
-        log.debug('>> sup_sindex         = %i' % sup_sindex)
-        log.debug('>> sup_eindex         = %i' % sup_eindex)
+        log.info('>> cur_agg_dim_length           = %i' % cur_agg_dim_length)
+        log.info('>> sup_agg_dim_length           = %i' % sup_agg_dim_length)
+        log.info('>> sup_sindex                   = %i' % sup_sindex)
+        log.info('>> sup_eindex                   = %i' % sup_eindex)
+        log.info('>> insertion_offset             = %i' % insertion_offset)
+        log.info('>> (FMRC) runtime_offset hours  = %i' % runtime_offset)
+        log.info('>> (FMRC) forecast_offset hours = %i' % forecast_offset)
 
 
         # Perform the merge
-        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds)
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_fcst_dim_name, sup_stime, cur_etime, sup_sindex, sup_eindex, insertion_offset, runtime_offset, forecast_offset, is_new_ds)
         result.update(merge_res)
 
 
@@ -827,8 +835,50 @@ class IngestionService(ServiceProcess):
     def _merge_fmrc_supplement(self):
 
         log.debug('_merge_fmrc_supplement - Start')
+        is_overwrite = False
 
-        raise NotImplementedError('FMRC Supplement updates are not yet supported')
+        # Perform necessary premerge operations and unpack the result
+        cur_root, \
+        cur_etime, \
+        cur_agg_dim_length, \
+        sup_root, \
+        sup_stime, \
+        sup_etime, \
+        sup_agg_dim_length, \
+        sup_agg_dim_name, \
+        sup_fcst_dim_name, \
+        is_new_ds, \
+        result = yield self.__premerge(is_fmrc=True)
+
+
+        # Calculate offsets and indices for positioning the supplement in the dataset
+        log.debug('************* START  __calculate_merge_offsets() *************')
+        
+        sup_sindex, \
+        sup_eindex, \
+        insertion_offset, \
+        runtime_offset, \
+        forecast_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length, sup_fcst_dim_name)
+        
+        log.debug('************* END    __calculate_merge_offsets() *************')
+
+        
+        log.info('>> cur_agg_dim_length           = %i' % cur_agg_dim_length)
+        log.info('>> sup_agg_dim_length           = %i' % sup_agg_dim_length)
+        log.info('>> sup_sindex                   = %i' % sup_sindex)
+        log.info('>> sup_eindex                   = %i' % sup_eindex)
+        log.info('>> insertion_offset             = %i' % insertion_offset)
+        log.info('>> (FMRC) runtime_offset hours  = %i' % runtime_offset)
+        log.info('>> (FMRC) forecast_offset hours = %i' % forecast_offset)
+
+
+        # Perform the merge
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_fcst_dim_name, sup_stime, cur_etime, sup_sindex, sup_eindex, insertion_offset, runtime_offset, forecast_offset, is_new_ds)
+        result.update(merge_res)
+
+
+        log.debug('_merge_overlapping_supplement - Complete')
+        defer.returnValue(result)
 
 
 
@@ -847,8 +897,9 @@ class IngestionService(ServiceProcess):
         sup_etime, \
         sup_agg_dim_length, \
         sup_agg_dim_name, \
+        sup_fcst_dim_name, \
         is_new_ds, \
-        result = yield self.__premerge()
+        result = yield self.__premerge(is_fmrc=False)
 
 
         # Calculate offsets and indices for positioning the supplement in the dataset
@@ -856,20 +907,24 @@ class IngestionService(ServiceProcess):
         
         sup_sindex, \
         sup_eindex, \
-        insertion_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length)
+        insertion_offset, \
+        runtime_offset, \
+        forecast_offset = yield self.__calculate_merge_offsets(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length, sup_fcst_dim_name)
         
         log.debug('************* END    __calculate_merge_offsets() *************')
 
         
-        log.debug('>> cur_agg_dim_length = %i' % cur_agg_dim_length)
-        log.debug('>> sup_agg_dim_length = %i' % sup_agg_dim_length)
-        log.debug('>> insertion_offset   = %i' % insertion_offset)
-        log.debug('>> sup_sindex         = %i' % sup_sindex)
-        log.debug('>> sup_eindex         = %i' % sup_eindex)
+        log.info('>> cur_agg_dim_length           = %i' % cur_agg_dim_length)
+        log.info('>> sup_agg_dim_length           = %i' % sup_agg_dim_length)
+        log.info('>> sup_sindex                   = %i' % sup_sindex)
+        log.info('>> sup_eindex                   = %i' % sup_eindex)
+        log.info('>> insertion_offset             = %i' % insertion_offset)
+        log.info('>> (FMRC) runtime_offset hours  = %i' % runtime_offset)
+        log.info('>> (FMRC) forecast_offset hours = %i' % forecast_offset)
 
 
         # Perform the merge
-        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds)
+        merge_res = yield self.__merge(is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_fcst_dim_name, sup_stime, cur_etime, sup_sindex, sup_eindex, insertion_offset, runtime_offset, forecast_offset, is_new_ds)
         result.update(merge_res)
 
 
@@ -878,7 +933,7 @@ class IngestionService(ServiceProcess):
         
 
     @defer.inlineCallbacks
-    def __premerge(self):
+    def __premerge(self, is_fmrc=False):
         """
         Performs the following steps to facilitate common merge operations:
         1) Provides basic sanity checks on the dataset
@@ -894,7 +949,7 @@ class IngestionService(ServiceProcess):
         
         # A little sanity check on entering recv_done...
         if len(self.dataset.Repository.branches) != 2:
-            raise IngestionError('The dataset is in a bad state - there should be two branches in the repository state on entering recv_done.', 500)
+            raise IngestionError('The dataset is in a bad state - there should be two branches (currently %d) in the repository state on entering recv_done.' % len(self.dataset.Repository.branches), 500)
 
 
         # Commit the current state of the supplement - ingest of new content is complete
@@ -916,45 +971,61 @@ class IngestionService(ServiceProcess):
         # Get the cur_root group of the supplement we are merging
         sup_root = self.dataset.Merge[0].root_group
 
-        log.info('Starting Find Dimension Loop')
-
-        time_vars = self._find_time_var(sup_root)
-
-        if len(time_vars) is 0:
-            result={EM_ERROR:'Error during ingestion: No Time variable found!'}
-            defer.returnValue(result)
-
-        # Determine the inner most dimension on which we are aggregating
-        dimension_order = []
-        for merge_var in time_vars:
-
-            # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
-            for merge_dim in reversed(merge_var.shape):
-
-                if merge_dim not in dimension_order:
-                    dimension_order.insert(0, merge_dim)
-
-        #print 'FINAL DIMENSION ORDER:'
-        #print [ dim.name for dim in dimension_order]
-
-        # This is the inner most!
-        merge_agg_dim = dimension_order[0]
-        sup_agg_dim_name = merge_agg_dim.name
+        # Determine which time variable to aggregate on
+        sup_agg_dim       = None
+        sup_agg_dim_name  = None
+        sup_fcst_dim_name = None
+        if is_fmrc:
+            log.info('(FMRC) Determining model time and forecast time dimension names')
+            sup_agg_dim_name  = 'run'
+            sup_fcst_dim_name = 'time'
+            try:
+                sup_agg_dim = sup_root.FindDimensionByName(sup_agg_dim_name)
+            except OOIObjectError, oe:
+                raise IngestionError('FMRC Supplement is missing the dimension "%s"' % sup_agg_dim_name)
+            
+        else:
+            log.info('Starting Find Dimension Loop')
+    
+            time_vars = self._find_time_var(sup_root)
+    
+            if len(time_vars) is 0:
+                result={EM_ERROR:'Error during ingestion: No Time variable found!'}
+                defer.returnValue(result)
+    
+            # Determine the inner most dimension on which we are aggregating
+            dimension_order = []
+            for merge_var in time_vars:
+    
+                # Add each dimension in reverse order so that the inside dimension is always in front... to determine the time aggregation dimension
+                for merge_dim in reversed(merge_var.shape):
+    
+                    if merge_dim not in dimension_order:
+                        dimension_order.insert(0, merge_dim)
+    
+            #print 'FINAL DIMENSION ORDER:'
+            #print [ dim.name for dim in dimension_order]
+    
+            # This is the inner most!
+            sup_agg_dim = dimension_order[0]
+            sup_agg_dim_name = sup_agg_dim.name
+        
         log.info('Merge aggregation dimension name is: %s' % sup_agg_dim_name)
+        log.info('(FMRC) Forecast time dimension name is: %s' % sup_fcst_dim_name)
 
 
-        sup_agg_dim_length = merge_agg_dim.length
-
+        # Retrieve various attributes about the time dimensions
+        sup_agg_dim_length = sup_agg_dim.length
         result = {EM_TIMESTEPS:sup_agg_dim_length}
 
         cur_agg_dim_length = 0
         try:
-            agg_dim = cur_root.FindDimensionByName(merge_agg_dim.name)
+            agg_dim = cur_root.FindDimensionByName(sup_agg_dim_name)
             cur_agg_dim_length = agg_dim.length
             log.info('Aggregation offset from current dataset: %d' % cur_agg_dim_length)
 
         except OOIObjectError, oe:
-            log.debug("Time Dimension of data supplement is not present in current dataset.  Dimension name: '%s'.  Cause: %s" % (merge_agg_dim.name, str(oe)))
+            log.debug("Time Dimension of data supplement is not present in current dataset.  Dimension name: '%s'.  Cause: %s" % (sup_agg_dim_name, str(oe)))
 
 
         # Get the start time of the supplement
@@ -1000,12 +1071,12 @@ class IngestionService(ServiceProcess):
             # ATTENTION: Is there any benefit to determining if there is a gap in the sequence here?
 
 
-        return_value = (cur_root, cur_etime, cur_agg_dim_length, sup_root, sup_stime, sup_etime, sup_agg_dim_length, sup_agg_dim_name, is_new_ds, result)
+        return_value = (cur_root, cur_etime, cur_agg_dim_length, sup_root, sup_stime, sup_etime, sup_agg_dim_length, sup_agg_dim_name, sup_fcst_dim_name, is_new_ds, result)
         defer.returnValue(return_value)
 
 
     @defer.inlineCallbacks
-    def __calculate_merge_offsets(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length):
+    def __calculate_merge_offsets(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length, sup_fcst_dim_name):
         
         sup_sindex       = cur_agg_dim_length
         sup_eindex       = cur_agg_dim_length
@@ -1021,6 +1092,9 @@ class IngestionService(ServiceProcess):
                                                   #          insertion_offset = (length - length = 0
                                                   #    Example 3: (insetion) When 5 values overwrite 4 values:
                                                   #          insertion =_offset = (5 - 4) = 1
+        runtime_offset_seconds   = 0               # @todo: Add notes here
+        forecast_offset_seconds  = 0               # @todo: Add notes here
+        
         # If cur_etime is None then the current dataset does not exist.
         # In this case the cur_agg_dim_length is 0 -- and therefore all our offsets will be as well
         # insertion_offset will be the sup_agg_dim_length, which is equal to the total number of values we are inserting
@@ -1029,6 +1103,63 @@ class IngestionService(ServiceProcess):
             
         else:
             log.info('__calculate_merge_offsets(): Current dataset exists, moving onward...')
+            sup_agg_var = None
+            cur_agg_var = None
+            
+            # First calculate runtime and forecast offsets (these will affect the other offsets)
+            if sup_fcst_dim_name is not None and not len(sup_fcst_dim_name) == 0:
+                log.info('__calculate_merge_offsets(): Calculating runtime and forecast time (normalization) offsets for FMRC dataset...')
+                
+                # Get the runtime and forecast time from dataset and supplement
+                log.debug('__calculate_merge_offsets(): Retrieving time variables from dataset and supplement...')
+                try:
+                    cur_agg_var  = cur_root.FindVariableByName(sup_agg_dim_name)
+                    cur_fcst_var = cur_root.FindVariableByName(sup_fcst_dim_name)
+                except OOIObjectError, ex:
+                    raise IngestionError('__calculate_merge_offsets(): FMRC Dataset must have (model) Run Time and Forecast Time dimension, respectivly named ("%s", "%s").  Inner Exception: %s' % (sup_agg_dim_name.encode('utf-8'), sup_fcst_dim_name.encode('utf-8'), str(ex)))
+                    
+                try:
+                    sup_agg_var  = sup_root.FindVariableByName(sup_agg_dim_name)
+                    sup_fcst_var = sup_root.FindVariableByName(sup_fcst_dim_name)
+                except OOIObjectError, ex:
+                    raise IngestionError('__calculate_merge_offsets(): FMRC Supplement must have (model) Run Time and Forecast Time dimension, respectivly named ("%s", "%s").  Inner Exception: %s' % (sup_agg_dim_name.encode('utf-8'), sup_fcst_dim_name.encode('utf-8'), str(ex)))
+                
+                # Build a list containing a tuple of time variable name, units string, units base time (millis)
+                log.debug('__calculate_merge_offsets(): Building a list of tuples with (time variable name, units string) for each time variable...')
+                units_list = [] 
+                units_list.append((sup_agg_var.name, sup_agg_var.GetUnits()))
+                units_list.append((cur_agg_var.name, cur_agg_var.GetUnits()))
+                units_list.append((sup_fcst_var.name, sup_fcst_var.GetUnits()))
+                units_list.append((cur_fcst_var.name, cur_fcst_var.GetUnits()))
+                
+                
+                log.debug('__calculate_merge_offsets():  Calculating units base time for each time variable...')
+                import re
+                time_units_regex = 'hours since ([\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}Z)'
+                
+                for i in range(len(units_list)):
+                    vname = units_list[i][0]
+                    units = units_list[i][1]
+                    m = re.search(time_units_regex, units)
+                    
+                    if m is None:
+                        raise IngestionError('Units attribute for time variable "%s" must be "hours since yyyy-MM-ddTHH:mm:ssZ" to perform an FMRC aggregation' % units_list[i][0].encode('utf-8'))
+                    
+                    base_time_millis = calendar.timegm(time.strptime(m.group(1), '%Y-%m-%dT%H:%M:%SZ'))
+                    
+                    units_list[i] = (vname, units, base_time_millis)
+                    log.debug('__calculate_merge_offsets(): Adding tuple values to variable units list: %s' % str(units_list[i]))
+                
+                # Determine the difference between the units in the dataset and supplement for runtime and forecast time
+                runtime_offset_seconds  = units_list[0][2] - units_list[1][2]
+                forecast_offset_seconds = units_list[2][2] - units_list[3][2]
+                
+                # If the dataset is an FMRC the units of the dataset and supplement may differ -- adding runtime_offset_seconds here
+                #   accomodates for this case by normalizing the supplements start and end time to be based on the same units as the
+                #   the current dataset.
+                sup_stime += runtime_offset_seconds
+                sup_etime += runtime_offset_seconds    
+                
             if is_overwrite:
                 if cur_etime < sup_stime:
                     log.info('__calculate_merge_offsets(overwrite): Supplement does not overlap.')
@@ -1037,8 +1168,9 @@ class IngestionService(ServiceProcess):
                     log.info('__calculate_merge_offsets(overwrite): Supplement overlaps -- calculating offsets')
                     # Find where the supplement start time and end time should lay in the dataset (supplement_sindex, supplement_eindex)
                     # Find how the origins in the dataset's data should change according to this position (insertion_offset)
-                    agg_var      = cur_root.FindVariableByName(sup_agg_dim_name)
-                    time_indices = yield self._find_time_index(agg_var, [sup_stime, sup_etime])
+                    if cur_agg_var is None:
+                        cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+                    time_indices = yield self._find_time_index(cur_agg_var, [sup_stime, sup_etime])
                     log.debug('time_indices = %s' % str(time_indices))
                     
                     sup_sindex = time_indices[sup_stime]
@@ -1066,9 +1198,10 @@ class IngestionService(ServiceProcess):
     
                 elif cur_etime > sup_stime:
                     log.info('__calculate_merge_offsets(overlap): Supplement overlaps -- calculating number of overlaps')
-                    agg_var      = sup_root.FindVariableByName(sup_agg_dim_name)
-                    time_indices = yield self._find_time_index(agg_var, [cur_etime])
-                    time_index   = time_indices[cur_etime]
+                    if sup_agg_var is None:
+                        sup_agg_var = sup_root.FindVariableByName(sup_agg_dim_name)
+                    time_indices = yield self._find_time_index(sup_agg_var, [cur_etime - runtime_offset_seconds])
+                    time_index   = time_indices[cur_etime - runtime_offset_seconds]
                     
                     # Overlap has some restrictions--
                     if time_index < 0:
@@ -1088,13 +1221,13 @@ class IngestionService(ServiceProcess):
                 insertion_offset -= overlap_count
                 sup_sindex       -= overlap_count
         
-        
-        result = (sup_sindex, sup_eindex, insertion_offset)
+
+        result = (sup_sindex, sup_eindex, insertion_offset, int(runtime_offset_seconds / 3600), int(forecast_offset_seconds / 3600))
         defer.returnValue(result)
 
 
     @defer.inlineCallbacks
-    def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, insertion_offset, sup_stime, cur_etime, sup_sindex, sup_eindex, is_new_ds):
+    def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_fcst_dim_name, sup_stime, cur_etime, sup_sindex, sup_eindex, insertion_offset, runtime_offset, forecast_offset, is_new_ds):
         result = {}
         
         ###
@@ -1125,8 +1258,34 @@ class IngestionService(ServiceProcess):
 
 
         ###
+        ### Adjust the values of the model time and forecast time in the supplement if this is FMRC:
+        ###
+#        log.debug('before FMRC time var normalize')
+#        if runtime_offset is not 0:
+#            runtime_var = sup_root.FindVariableByName(sup_agg_dim_name)
+#            need_keys = [ba.GetLink('ndarray').key for ba in runtime_var.content.bounded_arrays]
+#            yield self._fetch_blobs(cur_root.Repository, need_keys)
+#
+#            # @attention:
+#            # @bug:       The following lines fail because the merge dataset cannot be modified, we have to figure out a way to modify these values before merging
+#            # @attention:
+#            for ba in runtime_var.content.bounded_arrays:
+#                for i in range(len(ba.ndarray.value)):
+#                    ba.ndarray.value[i] += runtime_offset
+                    
+#        if forecast_offset is not 0:
+#            forecast_var = sup_root.FindVariableByName(sup_fcst_dim_name)
+#            need_keys = [ba.GetLink('ndarray').key for ba in forecast_var.content.bounded_arrays]
+#            yield self._fetch_blobs(cur_root.Repository, need_keys)
+#
+#            for ba in forecast_var.content.bounded_arrays:
+#                for i in range(len(ba.ndarray.value)):
+#                    ba.ndarray.value[i] += forecast_offset
+                    
+        
+        ###
         ### Add/merge the variables from the supplement to the current state if they are not already there
-        ### Merge variable if it is dimensioned on the aggregation dimension (merge_agg_dim)
+        ### Merge variable if it is dimensioned on the aggregation dimension (sup_agg_dim)
         ###
         agg_dim_min_offset = 0
         if not is_new_ds:
@@ -1161,7 +1320,7 @@ class IngestionService(ServiceProcess):
                     raise IngestionError('Variable %s does not exist in the dataset.  Supplement is invalid!' % var_name)
 
 
-            # Step 2: Skip merge for variables which are not dimensioned on the merge_agg_dim
+            # Step 2: Skip merge for variables which are not dimensioned on the sup_agg_dim
             # @todo: check to see if supplement shape and dataset shape don't match (like if time dimensions are at different indices)
             merge_agg_dim_idx = -1
             for i in range(len(merge_var.shape)):
@@ -1261,6 +1420,7 @@ class IngestionService(ServiceProcess):
             # Since the supplement is ReadOnly calculate the offset here.. and apply to the dataset afterwards
             merge_var_min_origin = 0
             if not is_new_ds:
+                # Replace with Dim - min_offset?
                 merge_var_min_origin = float('inf')
                 for ba in merge_var.content.bounded_arrays:
                     merge_var_min_origin = min(merge_var_min_origin, ba.bounds[merge_agg_dim_idx].origin)
@@ -1268,12 +1428,41 @@ class IngestionService(ServiceProcess):
             
             
             # Step 3c: Merge the supplement into the dataset
+            new_bas = []
             for merge_ba in merge_var.content.bounded_arrays:
                 ba = var.Repository.copy_object(merge_ba, deep_copy=False)
                 ba.bounds[merge_agg_dim_idx].origin += sup_sindex - merge_var_min_origin
 
                 ba_link = var.content.bounded_arrays.add()
                 ba_link.SetLink(ba)
+
+                # Keep track of these in case we need to adjust the values
+                new_bas.append(ba)
+
+            log.debug('before FMRC time var normalize')
+            if runtime_offset is not 0 and var_name == sup_agg_dim_name:
+
+                need_keys = [ba.GetLink('ndarray').key for ba in merge_var.content.bounded_arrays]
+                yield self._fetch_blobs(cur_root.Repository, need_keys)
+
+                # @attention:
+                # @bug:       The following lines fail because the merge dataset cannot be modified, we have to figure out a way to modify these values before merging
+                # @attention:
+                for ba in new_bas:
+                    for i in range(len(ba.ndarray.value)):
+                        ba.ndarray.value[i] += runtime_offset
+
+
+            if forecast_offset is not 0 and var_name == sup_fcst_dim_name:
+
+                need_keys = [ba.GetLink('ndarray').key for ba in merge_var.content.bounded_arrays]
+                yield self._fetch_blobs(cur_root.Repository, need_keys)
+
+                for ba in new_bas:
+                    for i in range(len(ba.ndarray.value)):
+                        ba.ndarray.value[i] += forecast_offset
+
+
 
             log.info('Merged Variable %s into the dataset!' % var_name)
 
@@ -1473,6 +1662,13 @@ class IngestionService(ServiceProcess):
 
                     time_vars.append(var)
                     break # Don't continue to iterate attributes
+                
+#                elif att.name == '_CoordinateAxisType' and (att.GetValue() == 'Time' or att.GetValue() =='RunTime'):
+#                    log.debug('Found _CoordinateAxisType "%s" in variable name: %s' % (att.GetValue().encode('utf-8'), var.name.encode('utf-8')))
+#                    
+#                    time_vars.append(var)
+#                    break # Don't continue to iterate attributes
+                    
 
             else:
                 log.debug('Variable named "%s" does not appear to be a time variable.' % var.name)

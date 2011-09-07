@@ -147,7 +147,9 @@ class ProcessTest(IonTestCase):
         self.assertEquals(pid1, proc.id)
         log.info('Process 1 spawned and initd correctly')
 
+
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
+
         #self.assertEquals(cont['value'], 'content123')
         self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly')
@@ -532,15 +534,15 @@ class ProcessContextTest(IonTestCase):
         message = yield mc.create_instance(None) # empty message - keep it simple
 
         log.info('Request Message Repo before send: %s' % message.Repository)
-        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+        self.assertEqual(message.Repository.convid_context, 'Default Context')
 
         (response, headers, msg) = yield proc.rpc_send(pid, 'echo', message)
 
         log.info('Request Message Repo after send: %s' % message.Repository)
         log.info('Response Message Repo after send: %s' % response.Repository)
 
-        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
-        self.assertEqual(response.Repository.convid_context, 'Test runner context!')
+        self.assertEqual(message.Repository.convid_context, 'Default Context')
+        self.assertEqual(response.Repository.convid_context, 'Default Context')
 
 
     @defer.inlineCallbacks
@@ -560,7 +562,7 @@ class ProcessContextTest(IonTestCase):
         message = yield mc.create_instance(None) # empty message - keep it simple
 
         log.info('Request Message Repo before send: %s' % message.Repository)
-        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+        self.assertEqual(message.Repository.convid_context, 'Default Context')
 
         try:
             (response, headers, msg) = yield proc.rpc_send(pid, 'echo_apperror', message)
@@ -570,8 +572,8 @@ class ProcessContextTest(IonTestCase):
             log.info('Request Message Repo after send: %s' % message.Repository)
             log.info('Response Message Repo after send: %s' % re.msg_content.Repository)
 
-            self.assertEqual(message.Repository.convid_context, 'Test runner context!')
-            self.assertEqual(re.msg_content.Repository.convid_context, 'Test runner context!')
+            self.assertEqual(message.Repository.convid_context, 'Default Context')
+            self.assertEqual(re.msg_content.Repository.convid_context, 'Default Context')
 
 
     @defer.inlineCallbacks
@@ -591,7 +593,7 @@ class ProcessContextTest(IonTestCase):
         message = yield mc.create_instance(None) # empty message - keep it simple
 
         log.info('Request Message Repo before send: %s' % message.Repository)
-        self.assertEqual(message.Repository.convid_context, 'Test runner context!')
+        self.assertEqual(message.Repository.convid_context, 'Default Context')
 
         try:
             (response, headers, msg) = yield proc.rpc_send(pid, 'echo_exception', message)
@@ -601,5 +603,5 @@ class ProcessContextTest(IonTestCase):
             log.info('Request Message Repo after send: %s' % message.Repository)
             log.info('Response Message Repo after send: %s' % re.msg_content.Repository)
 
-            self.assertEqual(message.Repository.convid_context, 'Test runner context!')
-            self.assertEqual(re.msg_content.Repository.convid_context, 'Test runner context!')
+            self.assertEqual(message.Repository.convid_context, 'Default Context')
+            self.assertEqual(re.msg_content.Repository.convid_context, 'Default Context')

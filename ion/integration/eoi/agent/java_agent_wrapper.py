@@ -18,6 +18,10 @@
 
 # Imports: Builtin
 import os, time, calendar
+try:
+    import json
+except:
+    import simplejson as json
 
 
 # Imports: Twisted
@@ -67,43 +71,11 @@ from ion.util.state_object import BasicStates
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
-
-class OSProcess130Friendly(OSProcess):
+class AgentOSProcess(OSProcess):
     """
-    When a script is terminated in an interactive console by Control-C the fatal signal causes the process
-    to die with a 130 exit code.  This version of OSProcess interprets Control-C termination as a valid
-    termination mechanism; it will not error-out when receiving an error code of 130.
+    The sole purpose of this inherited class is to move debugging log statements into this module.
     """
-    
-    def processEnded(self, reason):
-        """
-        Notice that the process has ended.
-        Will callback the deferred returned by spawn with a dict containing
-        the exit code, the lines produced on stdout, and the lines on stderr.
-        If the exit code is non zero, the errback is raised.
-        """
-        ec = 0
-        if hasattr(reason, 'value') and hasattr(reason.value, 'exitCode') and reason.value.exitCode != None:
-            ec = reason.value.exitCode
 
-        log.debug("OSProcess: process ended (exitcode: %d)" % ec)
-
-        # if this was called as a result of a close() call, we need to cancel the timeout so
-        # it won't try to kill again
-        if self.close_timeout != None and self.close_timeout.active():
-            self.close_timeout.cancel()
-
-        # form a dict of status to be passed as the result
-        cba = { 'exitcode' : ec,
-                'outlines' : self.outlines,
-                'errlines' : self.errlines }
-
-        if ec != 0 and ec != 130:
-            self.deferred_exited.errback(OSProcessError(cba))
-            return
-
-        self.deferred_exited.callback(cba)
-        
     def outReceived(self, data):
         """
         Output on stdout has been received.
@@ -137,16 +109,6 @@ class UpdateHandler(ScheduleEventSubscriber):
         ScheduleEventSubscriber.__init__(self, *args, **kwargs)
 
     @defer.inlineCallbacks
-    def _receive_handler(self, data, msg):
-        """
-        Custom receive handler - need to wait until ondata completes before acking.
-        """
-        try:
-            yield self.ondata(data)
-        finally:
-            yield msg.ack()
-
-    @defer.inlineCallbacks
     def ondata(self, data):
         """
         @brief callback used to handle incoming notifications of this subscriber.
@@ -158,7 +120,12 @@ class UpdateHandler(ScheduleEventSubscriber):
         content = data['content']
         update_msg = content.additional_data.payload
 
-        res = yield self.hook_fn(update_msg.dataset_id, update_msg.datasource_id)
+        try:
+            res = yield self.hook_fn(update_msg.dataset_id, update_msg.datasource_id)
+        except JavaAgentWrapperException, ex:
+            log.error("JAW encountered an error during update: %s" % str(ex))
+            res = False
+
         log.info("JAW (scheduled update event): %s" % str(res))
 
 
@@ -172,7 +139,7 @@ class JavaAgentWrapper(ServiceProcess):
     
     
     declare = ServiceProcess.service_declare(name='java_agent_wrapper',
-                                             version='0.1.0',
+                                             version='0.2.0',
                                              dependencies=[]) # no dependencies
 
         
@@ -186,48 +153,29 @@ class JavaAgentWrapper(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         
         # Step 2: Create class attributes
-        self.__agent_phandle = None
-        self.__agent_binding = None
-        self.__agent_updt_op = None
-        self.__agent_term_op = None
         self.__agent_spawn_args = None
-        self.__binding_key_deferred = None
         self.__ingest_client = None
         self.__ingest_ready_deferred = None
         
         self.queue_name = self.spawn_args.get('queue_name', CONF.getValue('queue_name', default='java_agent_wrapper_updates'))
 
-    @defer.inlineCallbacks
-    def slc_init(self):
-        '''
-        @brief: Initialization upon Service spawning.  This life-cycle process, in-turn, spawns the
-                Dataset Agent for which it is providing governance
-        '''
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered slc_init(); state=%s" % (str(self._get_state())))
-
         # Step 1: Perform Initialization
         self.mc = MessageClient(proc=self)
         self.rc = ResourceClient(proc=self)
-        self._asc = None   # Access using the property self.asc
+        self.asc = AssociationServiceClient(proc=self)
 
-        # Step 2: Spawn the associated external child process (if not already done)
-        yield defer.maybeDeferred(self._spawn_dataset_agent)
+    @defer.inlineCallbacks
+    def slc_init(self):
+        '''
+        Tests the presence and execution of an INIT_TEST context in the eoi-agents jar. If this fails, the service will
+        fall over.
+        '''
+        yield self._spawn_dataset_agent('INIT_TEST')
 
-        # Step 3: Setup schedule event subscriber
-        log.debug('Creating new message receiver for scheduled updates')
-        self.update_handler = UpdateHandler(self._update_request,
-                                queue_name=self.queue_name,
-                                origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
-                                process=self)
-        # Add the receiver as a registered life cycle object
-        yield self.register_life_cycle_object(self.update_handler)
-
-    @timeout.timeout(10.0)
     @defer.inlineCallbacks
     def slc_activate(self):
         '''
-        @brief: Service activation during spawning.  Awaits callback of DAC.
+        @brief: Service activation during spawning
         
         @see:   Dataset Agent Diagram (Activation) - https://docs.google.com/drawings/d/1YVySMhsuzl0PWIW5Xk9BSCz6mYzdmuGXoKXYdzXNvc8/edit?hl=en_US&authkey=CMDan_EN
         
@@ -236,165 +184,43 @@ class JavaAgentWrapper(ServiceProcess):
         if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug(" -[]- Entered slc_activate(); state=%s" % (str(self._get_state())))
 
-        # must change to ACTIVE so we can receive the binding callback
-        self._so_transition()
-
-        self.__binding_key_deferred = defer.Deferred()
-        yield self.__binding_key_deferred
-    
-    @defer.inlineCallbacks
-    def slc_deactivate(self):
+        # Setup schedule event subscriber
+        log.debug('Creating new message receiver for scheduled updates')
+        self.update_handler = UpdateHandler(self._update_request,
+                                queue_name=self.queue_name,
+                                origin=SCHEDULE_TYPE_PERFORM_INGESTION_UPDATE,
+                                process=self)
+        # Add the receiver as a registered life cycle object
+        yield self.register_life_cycle_object(self.update_handler)
+        
+    def _spawn_dataset_agent(self, context_str):
         '''
-        @brief: Service deactivation handler.  If this service's state is S_ACTIVE, slc_deactivate cancels any callbacks associated with
-                agent termination and then terminates the underlying agent process.  The termination callbacks are designd to initiate
-                Service termination.  Cancelling the callbacks first ensures that we don't enter a spin cycle where the wrapper will
-                attempt to cancel the agent and the agent's termination callback then attempts to terminate the wrapper.
-                
-        @see:   Dataset Agent Diagram (Termination) - https://docs.google.com/drawings/d/1zh4d4H_91jF9w9jLVHSJF7Mtm_49MN-zdUKt_TMFLo8/edit?hl=en_US&authkey=CLzOzuQB 
-        '''
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered JavaAgentWrapper.slc_deactivate(); state=%s" % (str(self._get_state())))
-        
-        returncode= None
-        if self._get_state() == BasicStates.S_ACTIVE:
-            
-            # Step 1: Cancel the termination callback of the underlying process
-            cb_list = self.__agent_phandle.deferred_exited.callbacks
-            cb_tuple = (
-                          (self._osp_terminate_callback, (), {}),
-                          (self._osp_terminate_callback, (), {})
-                       )
-            if cb_tuple in cb_list:
-                cb_list.remove(cb_tuple)
-            
-            # Step 2: Terminate the underlying dataset agent
-            result = yield self._terminate_dataset_agent()
-        
-            # Step 3: Log output from the underlying agent
-            returncode = result["exitcode"]
-
-            if log.getEffectiveLevel() <= logging.INFO:
-                msg1 = "External child process terminated.  RETURN CODE == %s" % str(returncode)
-                log.info(msg1)
-
-        else:
-            if log.getEffectiveLevel() <= logging.WARN:
-                log.warning('slc_deactivate():  This Service Process is expected to be in the "%s" state.  Deactivation may have occured prematurely.  state=%s' % (str(BasicStates.S_ACTIVE), str(self._get_state())))
-            
-
-        defer.returnValue(returncode)
-    
-    
-    def slc_terminate(self):
-        '''
-        Termination life cycle process.
-        Nothing to cleanup as of yet.
-        
-        @attention Nothing to yield -- this is NOT an inlineCallback
-        '''
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered slc_terminate(); state=%s" % (str(self._get_state())))
-        
-        # Step 1: Perform necessary cleanup
-        log.info('Cleaning up resources...')
-        
-
-    def on_deactivate(self, *args, **kwargs):
-        """
-        @brief: No implementation: State change ONLY!
-
-                This method definition is required to facilitate a proper deactivation
-                and termination of the java_agent_wrapper's underlying process (agent)
-        """
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered on_deactivate(); state=%s" % (str(self._get_state())))
-        
-        
-    def _spawn_dataset_agent(self):
-        '''
-        @brief: Spawns the Java Dataset Agent while providing appropriate binding information so it can establish
-                messaging channels with this wrapping service (necessary for governance/delegation).
-        @return: True on successful spawn of the dataset agent
+        @brief: Spawns the Java Dataset Agent
+        @return
         @raise RuntimeError: When invalid arguments are provided for spawning the agent, or if there is some other
                              problem with spawning
         '''
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered _spawn_dataset_agent(); state=%s" % (str(self._get_state())))
-        
         # Step 1: Acquire the dataset spawn arguments
-        (binary, args) = self.agent_spawn_args
-        if log.getEffectiveLevel() <= logging.INFO:
-            log.info("Spawning external child process with command: \n\n\t'%s %s'\n" % (binary, " ".join(args)))
+        (binary, args) = self._get_agent_spawn_args()
+
+        log.info("Spawning external child process with command: \n\n\t'%s %s'\n" % (binary, " ".join(args)))
+        log.debug("External child process will have context string: %s" % context_str)
         
         # Step 2: Start the Dataset Agent (java) passing necessary spawn arguments
         try:
-            proc = OSProcess130Friendly(binary, args)
+            proc = AgentOSProcess(binary, args)
             proc.spawn()
-            proc.deferred_exited.addBoth(self._osp_terminate_callback)
         except ValueError, ex:
             raise RuntimeError("JavaAgentWrapper._spawn_agent(): Received invalid spawn arguments form JavaAgentWrapper.agent_spawn_args" + str(ex))
         except OSError, ex:
             raise RuntimeError("JavaAgentWrapper._spawn_agent(): Failed to spawn the external Dataset Agent.  Error: %s" % (str(ex)))
 
-        # Step 3: Maintain a reference to the OSProcess object for later communication
-        self.__agent_phandle = proc
+        # write context json-like to stdin
+        proc.transport.write(context_str)
+        proc.transport.write('\n')
+        proc.transport.closeStdin()
         
-        
-        return True
-        
-        
-    @defer.inlineCallbacks
-    def _terminate_dataset_agent(self):
-        '''
-        @brief: Terminates the underlying dataset agent by sending it a 'terminate' message and waiting for the OSProcess
-                object's exit callback.
-        @return: Whatever the underlying process yields on exit.
-        '''
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
-        result = None
-        if self._get_state() is BasicStates.S_ACTIVE:
-            # Step 1: Send a terminate message to the java dataset agent
-            log.info("@@@--->>> Sending termination request to external child process")
-            yield self.send(self.agent_binding, self.agent_term_op, {})
-            
-            # Step 2: Suspend execution until the agent process exits
-            result = yield self.__agent_phandle.deferred_exited
-            self.__agent_binding = None
-            self.__agent_phandle = None
-        elif self._get_state() is BasicStates.S_READY:
-            errmsg = "External child process has not been spawned, and therefore can not be terminated"
-            log.warning(errmsg)
-
-        defer.returnValue(result)
-
-
-    @property
-    def asc(self):
-        """
-        @brief: Property definition for the AssociationServiceClient
-        """
-        if self._asc is None:
-            self._asc = AssociationServiceClient(proc=self)
-        return self._asc
-
-
-    def _osp_terminate_callback(self, result):
-        """
-        @brief: The OSProcess's terminate callback.  This callback is invoked when the underlying Agent is terminated, and
-                is in place to ensure that if the underlying agent terminates, this service will also shutdown.
-        
-        @param result: The result sent from OSProcess when it is called back.
-        
-        @return: Whatever is passed in as the param 'result' (as a convenience)
-        @see:    Dataset Agent Diagram (Termination) - https://docs.google.com/drawings/d/1zh4d4H_91jF9w9jLVHSJF7Mtm_49MN-zdUKt_TMFLo8/edit?hl=en_US&authkey=CLzOzuQB
-        """
-        log.info('External child process has terminated; Wrapper Service shutting down...')
-        self.deactivate()
-        self.terminate()
-        
-        return result
-
+        return proc
 
     @defer.inlineCallbacks
     def op_pretty_print(self, content, headers, msg):
@@ -407,8 +233,7 @@ class JavaAgentWrapper(ServiceProcess):
                  "\nService State:  " + str(self._get_state())
         res = yield self.reply_ok(msg, {'value':pretty}, {})
         defer.returnValue(res)
-        
-        
+
     @defer.inlineCallbacks
     def op_update_request(self, content, headers, msg):
         """
@@ -494,7 +319,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Step 2: Grab the context for the given dataset ID
         log.debug('Retrieving dataset update context via self._get_dataset_context()')
         try:
-            context = yield self._get_dataset_context(dataset_id, data_source_id)
+            (context, auth_obj, search_pattern_obj) = yield self._get_dataset_context(dataset_id, data_source_id)
         except KeyError, ex:
             err_msg = 'Failed to get dataset context!   %s' % str(ex)
             log.error(err_msg)
@@ -506,7 +331,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 4: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
         reply_to        = self.receiver.name
-        ingest_timeout  = context.max_ingest_millis/1000
+        ingest_timeout  = context['max_ingest_millis']/1000
 
         if log.getEffectiveLevel() <= logging.DEBUG:        
             log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:\t%i' % (dataset_id, reply_to, ingest_timeout))
@@ -551,9 +376,17 @@ class JavaAgentWrapper(ServiceProcess):
             defer.returnValue(False)
         
         log.debug("Ingest is ready to receive data!")
-        context.xp_name = irmsg.xp_name
-        context.ingest_topic = irmsg.publish_topic
+        context['xp_name'] = irmsg.xp_name
+        context['ingest_topic'] = irmsg.publish_topic
 
+        # transform context/auth/search pattern objs into a json-like message
+        context_str = "# EoiDataContextMessage:4501\n" + json.dumps(context, indent="  ")
+
+        if auth_obj:
+            context_str += "\n# ThreddsAuthentication:4504\n" + json.dumps(auth_obj, indent="  ")
+
+        if search_pattern_obj:
+            context_str += "\n# SearchPattern:4505\n" + json.dumps(search_pattern_obj, indent="  ")
 
         log.info('Create subscriber to bump timeouts...')
         self._subscriber = IngestionProcessingEventSubscriber(origin=dataset_id, process=self)
@@ -572,11 +405,16 @@ class JavaAgentWrapper(ServiceProcess):
         if log.getEffectiveLevel() == logging.INFO:
             log.info("@@@--->>> Sending update request to Dataset Agent with context...")
         elif log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug("@@@--->>> Sending update request to Dataset Agent with context...\n %s" % str(context))
+            log.debug("@@@--->>> Sending update request to Dataset Agent with context...\n %s" % str(context_str))
 
-        
-        yield self.send(self.agent_binding, self.agent_update_op, context)
-        
+        # spawn agent, sending it the context json-like str
+        agent_proc = self._spawn_dataset_agent(context_str)
+
+        # chain agent_proc's errback to perform_ingest_deferred's - just in case of a bad startup
+        def _chain_agent_errback(failure):
+            log.error("I DYDE A DEATH %s" % str(failure))
+            perform_ingest_deferred.errback(failure)
+        agent_proc.deferred_exited.addErrback(_chain_agent_errback)
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
 
@@ -586,19 +424,17 @@ class JavaAgentWrapper(ServiceProcess):
             err_msg = 'JAW timed out client side and will tell DAC to cease transmission (while updating dataset "%s")' % dataset_id
             log.error(err_msg)
 
-            # tell dataset agent to stop doing its thing
-            nonemsg = yield self.mc.create_instance(None)
-            yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
-
             raise JavaAgentWrapperException(err_msg)
 
         except ReceivedError, ex:
             err_msg = 'Ingestion raised an error (while updating dataset "%s"): %s' % (dataset_id, str(ex.msg_content.MessageResponseBody))
             log.error(err_msg)
 
-            # tell dataset agent to stop doing its thing
-            nonemsg = yield self.mc.create_instance(None)
-            yield self.send(self.agent_binding, 'op_ingest_error', nonemsg)
+            raise JavaAgentWrapperException(err_msg)
+
+        except OSProcessError, ex:
+            err_msg = 'Agent had a bad startup or exited with non-zero status: %s' % str(ex)
+            log.error(err_msg)
 
             raise JavaAgentWrapperException(err_msg)
 
@@ -608,11 +444,16 @@ class JavaAgentWrapper(ServiceProcess):
             yield self._subscriber.terminate()
             self._subscriber = None
 
+            # tell dataset agent to stop doing its thing - it's likely closed at this point anyway if success
+            # will force after default timeout of 5 sec
+            try:
+                yield agent_proc.close()
+            except OSProcessError:
+                pass
 
         log.debug('Ingestion is complete on the ingestion services side...')
 
         defer.returnValue(True)
-        
 
     @defer.inlineCallbacks
     def op_ingest_ready(self, content, headers, msg):
@@ -629,33 +470,6 @@ class JavaAgentWrapper(ServiceProcess):
         
         yield msg.ack()
 
-    
-    def op_binding_key_callback(self, content, headers, msg):
-        '''
-        @brief: Caches the given binding_key for future communication between the JavaAgentWrapper and its underlying
-                Java Dataset Agent.  This method is invoked remotely from the Dataset Agent during its initialization.
-        
-        @param content: A string containing the Dataset Agent's binding key
-        '''
-        if log.getEffectiveLevel() == logging.INFO:
-            log.info("<<<---@@@ Incoming callback with binding key message")
-        elif log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug("<<<---@@@ Incoming callback with binding key message\n...Content:\t%s" % str(content))
-        
-        # defer.callback will error if called more than once, fix that here...
-        if not self.__binding_key_deferred.called:
-            self.__agent_binding = str(content)
-            self.__binding_key_deferred.callback(self.__agent_binding)
-        else:
-            log.warn('op_binding_key_callback has already been called and will not accept another agent binding key: %s' % str(content))
-            
-            
-        log.info("Current Dataset Agent binding key: '%s'" % (self.__agent_binding))
-            
-            
-        return True
-    
-    
     @defer.inlineCallbacks
     def _get_dataset_context(self, datasetID, dataSourceID):
         '''
@@ -677,10 +491,8 @@ class JavaAgentWrapper(ServiceProcess):
         
         log.debug("  |--->  Retrieving datasource instance")
         datasource = yield self.rc.get_instance(dataSourceID)
-        
-        log.debug("  |--->  Creating EoiDataContext instance")
-        msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
-        
+
+        context = {}
         
         # Create an instance of the EoiDataContext message
         log.debug("Storing data in EoiDataContext fields")
@@ -688,9 +500,9 @@ class JavaAgentWrapper(ServiceProcess):
         
         if str(datasetID).startswith(TESTING_SIGNIFIER):
             testing = True
-        msg.source_type = datasource.source_type
-        msg.dataset_id = datasetID
-        msg.datasource_id = dataSourceID
+        context['source_type'] = datasource.source_type
+        context['dataset_id'] = datasetID
+        context['datasource_id'] = dataSourceID
 
         try:
             # Set the start time of this update to the last time in the dataset (ion_time_coverage_end)
@@ -698,7 +510,7 @@ class JavaAgentWrapper(ServiceProcess):
             string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
             start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
             start_time_seconds -= int(datasource.starttime_offset_millis * 0.001)
-            msg.is_initial = False
+            context['is_initial'] = False
 
         except OOIObjectError, oe:
             # Set the start time of this update to the current time minus the initial start time offset
@@ -709,7 +521,7 @@ class JavaAgentWrapper(ServiceProcess):
             if initial_offset == 0:
                 initial_offset = 86400000 # 1 day in millis
             start_time_seconds = int(time.time() - (initial_offset * 0.001))
-            msg.is_initial = True
+            context['is_initial'] = True
 
         except AttributeError, ae:
             # Set the start time of this update to the current time minus the initial start time offset
@@ -720,7 +532,7 @@ class JavaAgentWrapper(ServiceProcess):
             if initial_offset == 0:
                 initial_offset = 86400000 # 1 day in millis
             start_time_seconds = int(time.time() - (initial_offset * 0.001))
-            msg.is_initial = True
+            context['is_initial'] = True
 
         if testing:
             log.debug('Using Test Delta time....')
@@ -740,41 +552,50 @@ class JavaAgentWrapper(ServiceProcess):
         etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
         log.info('Getting Data End time: %s' % etime)
 
-        msg.start_datetime_millis = start_time_seconds * 1000
+        context['start_datetime_millis'] = start_time_seconds * 1000
 
-        msg.end_datetime_millis = end_time_seconds * 1000
+        context['end_datetime_millis'] = end_time_seconds * 1000
 
-        msg.property.extend(datasource.property)
-        msg.station_id.extend(datasource.station_id)
+        context['property'] = [str(x) for x in datasource.property]
+        context['station_id'] = [str(x) for x in datasource.station_id]
 
-        msg.request_type = datasource.request_type
-        msg.request_bounds_north = datasource.request_bounds_north
-        msg.request_bounds_south = datasource.request_bounds_south
-        msg.request_bounds_west = datasource.request_bounds_west
-        msg.request_bounds_east = datasource.request_bounds_east
-        msg.base_url = datasource.base_url
-        msg.dataset_url = datasource.dataset_url
-        msg.ncml_mask = datasource.ncml_mask
-        msg.max_ingest_millis = datasource.max_ingest_millis
+        context['request_type'] = datasource.request_type
+        context['request_bounds_north'] = datasource.request_bounds_north
+        context['request_bounds_south'] = datasource.request_bounds_south
+        context['request_bounds_west'] = datasource.request_bounds_west
+        context['request_bounds_east'] = datasource.request_bounds_east
+        context['base_url'] = datasource.base_url
+        context['dataset_url'] = datasource.dataset_url
+        context['ncml_mask'] = datasource.ncml_mask
+        context['max_ingest_millis'] = datasource.max_ingest_millis
+        context['timestep_file_count'] = datasource.timestep_file_count
 
         # Add subranges to the context message
         for i, r in enumerate(datasource.sub_ranges):
-            s = msg.sub_ranges.add()
-            s.dim_name    = r.dim_name
-            s.start_index = r.start_index
-            s.end_index   = r.end_index
-        
+            s = { 'dim_name':    r.dim_name,
+                  'start_index': r.start_index,
+                  'end_index':   r.end_index }
+            if not context.has_key('sub_ranges'):
+                context['sub_ranges'] = []
+            context['sub_ranges'].append(s)
+
+        auth_obj = None
         if datasource.IsFieldSet('authentication'):
             log.info('Setting: authentication')
-            msg.authentication = datasource.authentication
+            # object is 4504/1, ThreddsAuthentication
+            auth_obj = {'name':     datasource.authentication.name,
+                        'password': datasource.authentication.password }
 
+        search_pattern_obj = None
         if datasource.IsFieldSet('search_pattern'):
             log.info('Setting: search_patern')
-            msg.search_pattern = datasource.search_pattern
-        
-        
-        defer.returnValue(msg)
+            # object is 4505/1, SearchPattern
+            search_pattern_obj = {'dir_pattern':  datasource.search_pattern.dir_pattern,
+                                  'file_pattern': datasource.search_pattern.file_pattern,
+                                  'join_name':    datasource.search_pattern.join_name}
 
+        # return a tuple of these three dicts
+        defer.returnValue((context, auth_obj, search_pattern_obj))
 
     @defer.inlineCallbacks
     def _get_associated_data_source_id(self, dataset_id):
@@ -873,65 +694,8 @@ class JavaAgentWrapper(ServiceProcess):
 
 
         defer.returnValue(result)
-
-
-    @property
-    def agent_phandle(self):
-        '''
-        @return: an the defered result of the last call to OSProcess.spawn() via self._spawn_dataset_agent() as a
-                 reference to the underlying dataset agent, if self._spawn_dataset_agent has been successfully invoked,
-                 otherwise None
-        '''
-        # Initialization done upon successfull call to self._spawn_agent()
-        return self.__agent_phandle
-
-
-    @property
-    def agent_binding(self):
-        '''
-        @return: a string representing the reply-to binding key used to send messages to the underlying dataset agent
-                 if the dataset agent has responded to spawning through callback self.on_binding_key_callback(),
-                 otherwise None
-        '''
-        # Initialization done by Dataset agent through callback, self.on_binding_key_callback() 
-        return self.__agent_binding
-
-
-    @property
-    def agent_spawn_args(self):
-        '''
-        @return: a list of arguments which can be passed to a spawning mechanism (such as OSProcess) to spawn this
-                 JavaAgentWrapper's underlying Dataset Agent.
-        '''
-        # Lazy-initialize the spawn arguments
-        if (self.__agent_spawn_args == None):
-            self._init_agent_spawn_args()
-        return self.__agent_spawn_args
-
-
-    @property
-    def agent_update_op(self):
-        '''
-        @return: the name of the RPC operation used by the Java Dataset Agent for performing a dataset update.
-        '''
-        # Lazy-initialize the update operation name
-        if (self.__agent_updt_op == None):
-            self._init_agent_update_op()
-        return self.__agent_updt_op
-
     
-    @property
-    def agent_term_op(self):
-        '''
-        @return: the name of the RPC operation used by the Java Dataset Agent for performing self-termination.
-        '''
-        # Lazy-initialize the terminate operation name
-        if (self.__agent_term_op == None):
-            self._init_agent_term_op()
-        return self.__agent_term_op
-
-    
-    def _init_agent_spawn_args(self):
+    def _get_agent_spawn_args(self):
         '''
         @brief: Lazy-initializes self.__agent_spawn_args
         '''
@@ -939,39 +703,15 @@ class JavaAgentWrapper(ServiceProcess):
 
         if jar_pathname is None or not os.path.exists(jar_pathname):
             raise IonError("JAR for dataset agent not found: (%s)" % jar_pathname)
+            #raise JavaAgentWrapperException("JAR for dataset agent not found: (%s)" % jar_pathname)
         
         parent_host_name = self.container.exchange_manager.message_space.hostname
         parent_xp_name = self.container.exchange_manager.exchange_space.name
-        parent_scoped_name = self.receiver.xname
-        parent_callback_op = "binding_key_callback"
 
-
-
-        # Do not return anything.  Store spawn arguments in __agent_spawn_args
         binary = "java"
-        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name, parent_scoped_name, parent_callback_op]
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
-        self.__agent_spawn_args = (binary, args)
-    
-    
-    def _init_agent_update_op(self):
-        '''
-        @brief: Lazy-initializes self.__agent_updt_op
-        '''
-        # @todo: Acquiring the shutdown op may need to be dynamic in the future
-        updt_op= "op_update"
-        log.debug("Acquired Dataset Agent update op: %s" % (updt_op))
-        self.__agent_updt_op = updt_op
-
-    def _init_agent_term_op(self):
-        '''
-        @brief: Lazy-initializes self.__agent_term_op
-        '''
-        # @todo: Acquiring the shutdown op may need to be dynamic in the future
-        term_op= "op_shutdown"
-        log.debug("Acquired external process's terminate op: %s" % (term_op))
-        self.__agent_term_op = term_op
+        args = ["-Xmx512m", "-jar", jar_pathname, parent_host_name, parent_xp_name]
+        log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
+        return (binary, args)
         
 
 class JavaAgentWrapperClient(ServiceClient):

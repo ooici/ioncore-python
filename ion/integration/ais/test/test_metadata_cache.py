@@ -22,7 +22,6 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient, R
 from ion.services.coi.resource_registry.association_client import AssociationClient
 from ion.services.dm.distribution.events import DatasetChangeEventPublisher, \
                                                 DatasourceChangeEventPublisher
-from ion.core.data import store
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ION_AIS_RESOURCES_CFG
 
 from ion.test.iontest import IonTestCase
@@ -83,10 +82,6 @@ class MetadataCacheTest(IonTestCase):
     def setUp(self):
         log.debug('AppIntegrationTest.setUp():')
         yield self._start_container()
-
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
         
         services = [
             {
@@ -124,34 +119,57 @@ class MetadataCacheTest(IonTestCase):
 
         self.sup = sup
 
-        self._proc = Process()
+        self.publisher_proc = Process(**{'proc-name':'Test Publisher Proc'})
 
         #
         # Instantiate the caching object
         #
-        subproc = Process()
+        subproc = Process(**{'proc-name':'Test Metadata Cache Subscriber Proc'})
         yield subproc.spawn()
 
         self.cache = MetadataCache(subproc)
         log.debug('Instantiated AIS Metadata Cache Object')
+        subproc.metadataCache = self.cache
+        subproc.rc = ResourceClient(subproc)
+
         yield self.cache.loadDataSets()
         yield self.cache.loadDataSources()
 
-        self.rc = ResourceClient(subproc)
-        
+        self.subproc = subproc
+
         if self.AnalyzeTiming != None:
             self.TimeStamps.StartTime = time.time()
             self.TimeStamps.LastTime = self.TimeStamps.StartTime
-    
+
+
+        # Setup the publishers
+        datasetPublisher = DatasetChangeEventPublisher(process=self.publisher_proc)
+        yield datasetPublisher.initialize()
+        yield datasetPublisher.activate()
+        self.datasetPublisher = datasetPublisher
+
+        datasrcPublisher = DatasourceChangeEventPublisher(process=self.publisher_proc)
+        yield datasrcPublisher.initialize()
+        yield datasrcPublisher.activate()
+        self.datasrcPublisher = datasrcPublisher
+
+        # Setup the subscribers
+        log.info('instantiating DatasetUpdateEventSubscriber')
+        self.dataset_subscriber = DatasetUpdateEventSubscriber(process = self.subproc)
+        yield self.dataset_subscriber.initialize()
+        yield self.dataset_subscriber.activate()
+
+        log.info('instantiating DatasourceUpdateEventSubscriber')
+        self.datasource_subscriber = DatasourceUpdateEventSubscriber(process = self.subproc)
+        yield self.datasource_subscriber.initialize()
+        yield self.datasource_subscriber.activate()
+
 
 
     @defer.inlineCallbacks
     def tearDown(self):
         log.info('Tearing Down Test Container')
 
-        store.Store.kvs.clear()
-        store.IndexStore.kvs.clear()
-        store.IndexStore.indices.clear()
 
         yield self._shutdown_processes()
         yield self._stop_container()
@@ -202,38 +220,38 @@ class MetadataCacheTest(IonTestCase):
             log.debug('DatasetUpdateEventSubscriber putting new metadata in cache for %s' %(dSetResID))
             yield self.cache.putDSetMetadata(dSetResID)
 
+        dsourcelist = self.cache.getDataSources()
+        for ds in dsourcelist:
+            dSourceResID = ds['dsource'].ResourceIdentity
+
+            dSourceMetadata = yield self.cache.getDSourceMetadata(dSourceResID)
+
+            if dSourceMetadata is None:
+                self.fail("test_metadataCache failed: dSourceMetadata returned None for dsource %s" %(dSourceResID))
+            else:
+                #
+                # Delete the dataset
+                #
+                log.debug('DataSourceUpdatetest deleting %s' \
+                          %(dSourceResID))
+                yield self.cache.deleteDSourceMetadata(dSourceResID)
+
+            #
+            # Now  reload the dataset and datasource metadata
+            #
+            log.debug('DatasetUpdate Test putting new metadata in cache for %s' %(dSourceResID))
+            yield self.cache.putDSourceMetadata(dSourceResID)
+
+        self.assertEqual(numDatasets, self.cache.numDSets)
+        self.assertEqual(numDatasources, self.cache.numDSources)
+
 
     @defer.inlineCallbacks
     def test_updateMetadataCache(self):
         log.debug('Testing updateMetadataCache.')
 
-        #
-        # Setup the sleepTime and totalSleepTime (that we wait for the
-        # metadatacache event handler to complete its work).  Currently
-        # waiting 5 seconds for each set of 2 events (dataset & datasource)
-        #
-        sleepTime = 2
-        totalSleepTime = 0
-        
-        # Setup the publishers
-        datasetPublisher = DatasetChangeEventPublisher(process=self._proc)
-        yield datasetPublisher.initialize()
-        yield datasetPublisher.activate()
- 
-        datasrcPublisher = DatasourceChangeEventPublisher(process=self._proc)
-        yield datasrcPublisher.initialize()
-        yield datasrcPublisher.activate()
- 
-        # Setup the subscribers
-        log.info('instantiating DatasetUpdateEventSubscriber')
-        self.dataset_subscriber = DatasetUpdateEventSubscriber(self, process = self._proc)
-        yield self.dataset_subscriber.initialize()
-        yield self.dataset_subscriber.activate()
-        
-        log.info('instantiating DatasourceUpdateEventSubscriber')
-        self.datasource_subscriber = DatasourceUpdateEventSubscriber(self, process = self._proc)
-        yield self.datasource_subscriber.initialize()
-        yield self.datasource_subscriber.activate()
+        numDatasets = self.cache.getNumDatasets()
+        numDatasources = self.cache.getNumDatasources()
            
         dsList = self.cache.getDatasets()
         log.debug('List of datasets returned from metadataCache:')
@@ -243,7 +261,10 @@ class MetadataCacheTest(IonTestCase):
             
             log.debug('publishing event for dSetID: %s' %(dSetID))
 
-            yield datasetPublisher.create_and_publish_event(
+            source_hook = self.datasource_subscriber._hook_for_testing
+            set_hook = self.dataset_subscriber._hook_for_testing
+
+            yield self.datasetPublisher.create_and_publish_event(
                 name = "TestUpdateDataResourceCache",
                 origin = "SOME DATASET RESOURCE ID",
                 dataset_id = dSetID,
@@ -251,20 +272,24 @@ class MetadataCacheTest(IonTestCase):
             
             log.debug('publishing event for dSrcID: %s' %(dSrcID))
 
-            yield datasrcPublisher.create_and_publish_event(
+            yield self.datasrcPublisher.create_and_publish_event(
                 name = "TestUpdateDataResourceCache",
                 origin = "SOME DATASOURCE RESOURCE ID",
                 datasource_id = dSrcID,
                 )
 
-            #
-            # Increment the sleep time
-            #
-            totalSleepTime = totalSleepTime + sleepTime
+            # Hook will call back when the event is processed in ondata
+            yield source_hook
+            yield set_hook
+
+            # Must reset the deferred Manually
+            self.datasource_subscriber._hook_for_testing = defer.Deferred()
+            self.dataset_subscriber._hook_for_testing = defer.Deferred()
+
+        self.assertEqual(numDatasets, self.cache.numDSets)
+        self.assertEqual(numDatasources, self.cache.numDSources)
     
         # Pause to make sure we catch the message
-        log.debug('TestUpdateDataResourceCache waiting %s seconds to shut down...' %(totalSleepTime))
-        yield pu.asleep(totalSleepTime)
         log.debug('TestUpdateDataResourceCache shutting down...')
             
 
@@ -283,48 +308,23 @@ class MetadataCacheTest(IonTestCase):
         #
 
         #
-        # Setup the sleepTime and totalSleepTime (that we wait for the
-        # metadatacache event handler to complete its work).  Currently
-        # waiting 5 seconds for each set of 2 events (dataset & datasource)
-        #
-        sleepTime = 2
-        
-        # Setup the publishers
-        datasetPublisher = DatasetChangeEventPublisher(process=self._proc)
-        yield datasetPublisher.initialize()
-        yield datasetPublisher.activate()
- 
-        datasrcPublisher = DatasourceChangeEventPublisher(process=self._proc)
-        yield datasrcPublisher.initialize()
-        yield datasrcPublisher.activate()
- 
-        # Setup the subscribers
-        log.info('instantiating DatasetUpdateEventSubscriber')
-        self.dataset_subscriber = DatasetUpdateEventSubscriber(self, process = self._proc)
-        yield self.dataset_subscriber.initialize()
-        yield self.dataset_subscriber.activate()
-        
-        log.info('instantiating DatasourceUpdateEventSubscriber')
-        self.datasource_subscriber = DatasourceUpdateEventSubscriber(self, process = self._proc)
-        yield self.datasource_subscriber.initialize()
-        yield self.datasource_subscriber.activate()
-
-        #
         # Set all ACTIVE datasources to inactive
         #
-        totalSleepTime = 0
-        numActiveSources = 0
         dSourceIDChangedList = []
         dSetIDOrphanList = []
         dsList = self.cache.getDatasets()
         origNumDSets = len(dsList)
         log.debug('List of (%d) datasets returned from metadataCache: %s' %(origNumDSets, dsList))
+
+        # Create a new process and separate resource client to modify the resource
+        rc = ResourceClient()
+
         for ds in dsList:
             #dSetID = ds['ResourceIdentity']
             dSourceID = ds['DSourceID']
             
             try:
-                dSource = yield self.rc.get_instance(dSourceID)
+                dSource = yield rc.get_instance(dSourceID)
             except ResourceClientError:    
                 log.error('get_instance failed for data source ID %s !' %(dSourceID))
             else:
@@ -337,10 +337,9 @@ class MetadataCacheTest(IonTestCase):
                     for newDSetID in newOrphanIDList:
                         dSetIDOrphanList.append(newDSetID)
                     log.debug('dSetIDOrphanList = %s' %(dSetIDOrphanList))
-                    numActiveSources = numActiveSources + 1
                     log.debug("Setting data source %s lifecycle = retired" %(dSourceID))
                     dSource.ResourceLifeCycleState = dSource.RETIRED
-                    yield self.rc.put_instance(dSource)
+                    yield rc.put_instance(dSource)
 
                 log.debug('publishing event for dSourceID: %s' %(dSourceID))
     
@@ -348,21 +347,19 @@ class MetadataCacheTest(IonTestCase):
                 # publish the event so the datasource and dataset cache are
                 # refreshed
                 #
-                yield datasrcPublisher.create_and_publish_event(
+
+                source_hook = self.datasource_subscriber._hook_for_testing
+                yield self.datasrcPublisher.create_and_publish_event(
                     name = "TestUpdateDataResourceCache",
                     origin = "SOME DATASOURCE RESOURCE ID",
                     datasource_id = dSourceID,
                     )
 
-                #
-                # Increment the sleep time
-                #
-                totalSleepTime = totalSleepTime + sleepTime
+                # Hook will call back when the event is processed in ondata
+                yield source_hook
 
-        # Pause to give the events time to be processed
-        log.debug('TestUpdateDataResourceCache waiting %s for events to be processed...' %(totalSleepTime))
-        yield pu.asleep(totalSleepTime)
-        log.debug('TestUpdateDataResourceCache continuing...')
+                # Must reset the deferred Manually
+                self.datasource_subscriber._hook_for_testing = defer.Deferred()
 
         #
         # Check how many datasets are in the list
@@ -375,47 +372,25 @@ class MetadataCacheTest(IonTestCase):
         # (assuming they are in bounds).  At the end of this for loop, there should
         # be no datasets in the count, because their datasources are inactive.
         #
-        i = 0
         for dSetID in dSetIDOrphanList:
             dSet = yield self.cache.getDSetMetadata(dSetID)
             if dSet is None:
-                log.info('dSet for dSetID %s is None' %s(dSetID))
+                log.info('dSet for dSetID %s is None' % (dSetID))
                 continue
             
             dSourceID = dSet['DSourceID']
-            if dSourceID is None:
-                #
-                # There is no associated ID for this dataset; this is a strange
-                # error and it means that there was no datasource returned by
-                # the association service.  Really shouldn't happen, but it
-                # does sometimes.
-                #
-                log.error('dataset %s has no associated dSourceResID.' %(dSetResID))
-                continue
+            self.failIfIdentical(dSourceID, None )
 
             dSource = yield self.cache.getDSourceMetadata(dSourceID)
-            if dSource is None:
-                #
-                # The datasource is not cached; this could be because it was deleted
-                # or because the datasource hasn't been added yet.  In any case,
-                # do not include the corresponding dataset in the list; continue
-                # the loop now (after incrementing index)
-                #
-                log.info('metadata not found for datasourceID: ' + dSourceID)
-                continue
-            
-            i = i + 1
-            
-        if i != 0:
-            self.fail('There should be no datasets returned here!')
+
+            self.failUnlessIdentical(dSource, None, 'There should be no Data Source metadata')
 
         #
         # Now set all datasources that were changed back to ACTIVE
         #
-        totalSleepTime = 0
         for dSourceID in dSourceIDChangedList:
             try:
-                dSource = yield self.rc.get_instance(dSourceID)
+                dSource = yield rc.get_instance(dSourceID)
             except ResourceClientError:    
                 log.error('get_instance failed for data source ID %s !' %(dSourceID))
             else:
@@ -424,7 +399,7 @@ class MetadataCacheTest(IonTestCase):
                 #
                 log.debug("Setting data source %s lifecycle to ACTIVE" %(dSourceID))
                 dSource.ResourceLifeCycleState = dSource.ACTIVE
-                yield self.rc.put_instance(dSource)
+                yield rc.put_instance(dSource)
 
                 log.debug('publishing event for dSourceID: %s' %(dSourceID))
     
@@ -432,23 +407,18 @@ class MetadataCacheTest(IonTestCase):
                 # publish the event so the datasource and dataset cache are
                 # refreshed
                 #
-                yield datasrcPublisher.create_and_publish_event(
+                src_hook = self.datasource_subscriber._hook_for_testing
+
+                yield self.datasrcPublisher.create_and_publish_event(
                     name = "TestUpdateDataResourceCache",
                     origin = "SOME DATASOURCE RESOURCE ID",
                     datasource_id = dSourceID,
                     )
 
-                #
-                # Increment the sleep time
-                #
-                totalSleepTime = totalSleepTime + sleepTime
-            
-        
-        # Pause to give the events time to be processed
-        log.debug('TestUpdateDataResourceCache waiting %s seconds to shut down...' %(totalSleepTime))
-        yield pu.asleep(totalSleepTime)
-        log.debug('TestUpdateDataResourceCache shutting down...')
-
+                yield src_hook
+                # Must reset the deferred Manually
+                self.datasource_subscriber._hook_for_testing = defer.Deferred()
+                
         #
         # There should now be origNumDSets datasets in the list
         #
@@ -458,35 +428,12 @@ class MetadataCacheTest(IonTestCase):
         #
         # Now get the datasets that would show up in the list (assuming they are in bounds)
         #
-        i = 0
         for dSet in dsList:
             dSourceID = dSet['DSourceID']
-            if dSourceID is None:
-                #
-                # There is no associated ID for this dataset; this is a strange
-                # error and it means that there was no datasource returned by
-                # the association service.  Really shouldn't happen, but it
-                # does sometimes.
-                #
-                log.error('dataset %s has no associated dSourceResID.' %(dSetResID))
-                continue
+            self.failIfIdentical(dSourceID, None )
+
 
             dSource = yield self.cache.getDSourceMetadata(dSourceID)
-            if dSource is None:
-                #
-                # The datasource is not cached; this could be because it was deleted
-                # or because the datasource hasn't been added yet.  In any case,
-                # do not include the corresponding dataset in the list; continue
-                # the loop now (after incrementing index)
-                #
-                log.info('metadata not found for datasourceID: ' + dSourceID)
-                continue
-            
-            i = i + 1
-            
-        if i != origNumDSets:
-            self.fail("Incorrect number of datasets; was %d, should be %d." %(i, origNumDSets))
+            self.failIfIdentical(dSource, None, 'There should be Data Source metadata')
 
-        
-        
             

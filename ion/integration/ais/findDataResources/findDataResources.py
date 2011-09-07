@@ -65,10 +65,12 @@ if DNLD_FILE_TYPE is None:
     log.error('DNLD_FILE_TYPE not set in ion.config or ionlocal.config!  Using %s' %(DNLD_FILE_TYPE))
 
 class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
-    def __init__(self, ais, *args, **kwargs):
-        self.msgs = []
-        self.metadataCache = ais.getMetadataCache()
+    def __init__(self, *args, **kwargs):
+        self.ais = kwargs.get('process')
+        self.metadataCache = self.ais.metadataCache
         DatasetChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+        self._hook_for_testing = defer.Deferred()
 
 
     @defer.inlineCallbacks
@@ -82,22 +84,10 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
         #
 
         #
-        # Check the cache to see if there's currently metadata for this
-        # datasetID
+        # Delete the dataset
         #
-        dSetMetadata = yield self.metadataCache.getDSetMetadata(dSetResID)
-
-        #
-        # If dataset does not exist, this must be a new dataset; skip the
-        # delete step.
-        #
-        if dSetMetadata is not None:
-            #
-            # Delete the dataset
-            #
-            log.debug('DatasetUpdateEventSubscriber deleting %s' \
-                      %(dSetResID))
-            yield self.metadataCache.deleteDSetMetadata(dSetResID)
+        log.debug('DatasetUpdateEventSubscriber deleting %s' %(dSetResID))
+        yield self.metadataCache.deleteDSetMetadata(dSetResID)
 
         #
         # Now  reload the dataset and datasource metadata
@@ -107,12 +97,16 @@ class DatasetUpdateEventSubscriber(DatasetChangeEventSubscriber):
 
         log.debug("DatasetUpdateEventSubscriber event for dsetID: %s exit" %(dSetResID))
 
-                
+        if not self._hook_for_testing.called:
+            self._hook_for_testing.callback(True)
+
 class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
-    def __init__(self, ais, *args, **kwargs):
-        self.msgs = []
-        self.metadataCache = ais.getMetadataCache()
+    def __init__(self, *args, **kwargs):
+        self.ais = kwargs.get('process')
+        self.metadataCache = self.ais.metadataCache
         DatasourceChangeEventSubscriber.__init__(self, *args, **kwargs)
+
+        self._hook_for_testing = defer.Deferred()
 
 
     @defer.inlineCallbacks
@@ -126,24 +120,8 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         # datasource.
         #
 
-        #
-        # Check the cache to see if there's currently metadata for this
-        # datasourceID
-        #
-        dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
-        dSource = yield self.metadataCache.getDSource(dSourceResID)
-        
-        #
-        # If datasource does not exist, this must be a new datasource; skip the
-        # delete step.
-        #
-        if dSourceMetadata is not None:
-            #
-            # Delete the datasource
-            #
-            log.debug('DatasourceUpdateEventSubscriber deleting %s' \
-                      %(dSourceResID))
-            yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
+        log.debug('DatasourceUpdateEventSubscriber deleting %s' %(dSourceResID))
+        yield self.metadataCache.deleteDSourceMetadata(dSourceResID)
 
         #
         # Now  reload the datasource metadata
@@ -152,14 +130,10 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         yield self.metadataCache.putDSourceMetadata(dSourceResID)
 
         #
-        # If the dSourceMetadata is None, this was a new datasource; it is
-        # possible the dataset metadatacache was populated before this datasource
-        # was populated, so get the dSourceMetadata so that we can get the dataset
-        # and check to see if has an associated dataSource.
+        # Get the latest datasource metadata
         #
-        if dSourceMetadata is None:
-            dSourceMetadata = yield self.metadataCache.getDSourceMetadata(dSourceResID)
-            dSource = yield self.metadataCache.getDSource(dSourceResID)
+
+        dSource = yield self.ais.rc.get_instance(dSourceResID)
             
         #
         # Get the assoicated dataset(s) and refresh them (they might not be loaded
@@ -168,31 +142,39 @@ class DatasourceUpdateEventSubscriber(DatasourceChangeEventSubscriber):
         datasetList = yield self.metadataCache.getAssociatedDatasets(dSource)
         log.debug('getAssociatedDatasets returned %s' %(datasetList))
         for dSetResID in datasetList:
+            # Should be only one in the list!!!
             dSet = yield self.metadataCache.getDSetMetadata(dSetResID)
             #
             # if the DSOURCE_ID is None, the datasource wasn't active or
             # didn't show up in the association service when the event for
             # the dataset was received, so refresh the dataset.
             #
+            
+            if dSet is None:
+                log.info('DataSet Metadata not found %s; refreshing dataset' %(dSetResID))
 
-            tempDSourceResID = None
-            if dSet is not None:
-                tempDSourceResID = dSet.get('DSOURCE_ID',None)
-                
-            if (tempDSourceResID is None) or (tempDSourceResID != dSourceResID):
-                log.error('DSOURCE_ID was none or changed for dSetID %s; refreshing dataset' %(dSetResID))
+                #
+                # Now  load the dataset metadata
+                #
+                log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
+                yield self.metadataCache.putDSetMetadata(dSetResID)
+
+            elif dSet.get('DSOURCE_ID') != dSourceResID:
+                log.info('DataSet Metadata DSOURCE_ID was none or did not match for dSetID %s; refreshing dataset' %(dSetResID))
                 #
                 # Delete the dataset
                 #
-                log.debug('DatasourceUpdateEventSubscriber deleting dataset %s' \
-                          %(dSetResID))
+                log.debug('DatasourceUpdateEventSubscriber deleting dataset %s' %(dSetResID))
                 yield self.metadataCache.deleteDSetMetadata(dSetResID)
-            
+
                 #
                 # Now  reload the dataset and datasource metadata
                 #
                 log.debug('DatasourceUpdateEventSubscriber loading dataset %s metadata into cache' %(dSetResID))
                 yield self.metadataCache.putDSetMetadata(dSetResID)
+
+        if not self._hook_for_testing.called:
+            self._hook_for_testing.callback(True)
 
         log.debug("<----<<<  DatasourceUpdateEventSubscriber event for dsourceID: %s exit" %(dSourceResID))
 
@@ -405,56 +387,6 @@ class FindDataResources(object):
 
 
     @defer.inlineCallbacks
-    def getAssociatedOwner(self, dsID):
-        """
-        Worker class method to find the owner associated with a data set.
-        This is a public method because it can be called from the
-        findDataResourceDetail worker class.
-        """
-        log.debug('getAssociatedOwner() entry')
-
-        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
-
-        #
-        # Set up an owned_by_id search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(subject)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = dsID
-        
-        pair.subject = type_ref
-
-        log.info('Calling get_objects with dsID: ' + dsID)
-
-        try:
-            result = yield self.asc.get_objects(request)
-        
-        except AssociationServiceError:
-            log.error('getAssociatedOwner: association error!')
-            defer.returnValue(None)
-
-        if len(result.idrefs) == 0:
-            log.error('Owner not found!')
-            defer.returnValue('OWNER NOT FOUND!')
-        elif len(result.idrefs) == 1:
-            log.debug('getAssociatedOwner() exit')
-            defer.returnValue(result.idrefs[0].key)
-        else:
-            log.error('More than 1 owner found!')
-            defer.returnValue('MULTIPLE OWNERS!')
-
-
-    @defer.inlineCallbacks
     def __getDataResources(self, msg, dSetList, rspMsg, typeFlag = ALL):
         """
         Given the list of datasetIDs, determine in the data represented by
@@ -531,7 +463,6 @@ class FindDataResources(object):
                 #
                 # Added this for Tim and Tom; not sure we need it yet...
                 #
-                #ownerID = yield self.getAssociatedOwner(dSetResID)
                 ownerID = 'Is this used?'
 
                 if typeFlag is self.ALL:
@@ -564,244 +495,6 @@ class FindDataResources(object):
 
         defer.returnValue(rspMsg)        
         log.debug('__getDataResources exit')
-
-
-    @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType):
-
-        log.debug('__findResourcesOfType() entry')
-        
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        #
-        # Set up a search term using:
-        # - TYPE_OF_ID as predicate
-        # - object of type: resourceType parameter as object
-        #
-        pair = request.pairs.add()
-    
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = resourceType
-        pair.object = type_ref
-
-        # 
-        # Set up a search term using:
-        # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = HAS_LIFE_CYCLE_STATE_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
-        pair.object = state_ref
-
-        log.debug('Getting resources of type: %s' % (resourceType))
-
-        try:
-            result = yield self.asc.get_subjects(request)
-
-        except AssociationServiceError:
-            log.error('__findResourcesOfType: association error!')
-            defer.returnValue(None)
-
-        log.debug('__findResourcesOfType() exit: found %d resources' % len(result.idrefs))
-        
-        defer.returnValue(result)
-
-        
-    @defer.inlineCallbacks
-    def __findResourcesOfTypeAndOwner(self, resourceType, owner):
-
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        #
-        # Set up a search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = owner
-        
-        pair.object = type_ref
-
-        #
-        # Set up a search term using:
-        # - TYPE_OF_ID as predicate
-        # - object of type: resourceType parameter as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = resourceType
-        pair.object = type_ref
-        
-        # 
-        # Set up a search term using:
-        # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = HAS_LIFE_CYCLE_STATE_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
-        pair.object = state_ref
-
-        log.info('Getting resources of type %s with owner: %s' % (resourceType, owner))
-
-        try:
-            result = yield self.asc.get_subjects(request)
-        
-        except AssociationServiceError:
-            log.error('__findResourcesOfTypeAndOwner: association error!')
-            defer.returnValue(None)
-        
-        defer.returnValue(result)
-
-
-    @defer.inlineCallbacks
-    def __findDatasetResourcesByOwner(self, owner):
-
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        #
-        # Set up a search term using:
-        # - TYPE_OF_ID as predicate
-        # - object of type: resourceType parameter as object
-        #
-        pair = request.pairs.add()
-    
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = DATASET_RESOURCE_TYPE_ID
-        pair.object = type_ref
-
-        #
-        # Set up a search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = owner
-        
-        pair.object = type_ref
-
-        # 
-        # Set up a search term using:
-        # - HAS_LIFE_CYCLE_STATE_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE (private) as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = HAS_LIFE_CYCLE_STATE_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
-        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
-        pair.object = state_ref
-
-        log.info('Getting private datasets with owner: ' + owner)
-
-        try:
-            result = yield self.asc.get_subjects(request)
-        
-        except AssociationServiceError:
-            log.error('__findPrivateResourcesByOwner: association error!')
-            defer.returnValue(None)
-
-        log.debug('__findPrivateResourcesByOwner() exit: found %d resources' % len(result.idrefs))
-       
-        defer.returnValue(result)
-
-
-    def __loadMinMetaData(self, dSet, dSetMetadata):
-        for attrib in dSet.root_group.attributes:
-            #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
-            if attrib.name == 'title':
-                dSetMetadata['title'] = attrib.GetValue()
-            elif attrib.name == 'institution':                
-                dSetMetadata['institution'] = attrib.GetValue()
-            elif attrib.name == 'source':                
-                dSetMetadata['source'] = attrib.GetValue()
-            elif attrib.name == 'references':                
-                dSetMetadata['references'] = attrib.GetValue()
-            elif attrib.name == 'ion_time_coverage_start':                
-                dSetMetadata['ion_time_coverage_start'] = attrib.GetValue()
-            elif attrib.name == 'ion_time_coverage_end':                
-                dSetMetadata['ion_time_coverage_end'] = attrib.GetValue()
-            elif attrib.name == 'summary':                
-                dSetMetadata['summary'] = attrib.GetValue()
-            elif attrib.name == 'comment':                
-                dSetMetadata['comment'] = attrib.GetValue()
-            elif attrib.name == 'ion_geospatial_lat_min':                
-                dSetMetadata['ion_geospatial_lat_min'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_lat_max':                
-                dSetMetadata['ion_geospatial_lat_max'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_lon_min':                
-                dSetMetadata['ion_geospatial_lon_min'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_lon_max':                
-                dSetMetadata['ion_geospatial_lon_max'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_vertical_min':                
-                dSetMetadata['ion_geospatial_vertical_min'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_vertical_max':                
-                dSetMetadata['ion_geospatial_vertical_max'] = Decimal(str(attrib.GetValue()))
-            elif attrib.name == 'ion_geospatial_vertical_positive':                
-                dSetMetadata['ion_geospatial_vertical_positive'] = attrib.GetValue()
 
 
     def __printDownloadURL(self):
