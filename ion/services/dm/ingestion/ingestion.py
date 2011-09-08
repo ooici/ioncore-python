@@ -1022,11 +1022,11 @@ class IngestionService(ServiceProcess):
         try:
             agg_dim = cur_root.FindDimensionByName(sup_agg_dim_name)
             cur_agg_dim_length = agg_dim.length
-            log.info('Aggregation offset from current dataset: %d' % cur_agg_dim_length)
+            log.info('Aggregation dimension length in current dataset: %d' % cur_agg_dim_length)
 
         except OOIObjectError, oe:
             log.debug("Time Dimension of data supplement is not present in current dataset.  Dimension name: '%s'.  Cause: %s" % (sup_agg_dim_name, str(oe)))
-
+            # Do not raise - this happens on every new dataset - first ingestion!
 
         # Get the start time of the supplement
         try:
@@ -1169,7 +1169,26 @@ class IngestionService(ServiceProcess):
                     # Find where the supplement start time and end time should lay in the dataset (supplement_sindex, supplement_eindex)
                     # Find how the origins in the dataset's data should change according to this position (insertion_offset)
                     if cur_agg_var is None:
-                        cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+                        try:
+                            cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+                        except OOIObjectError, oe:
+                            log.info('Time Variable name does not match its dimension name')
+
+                    if cur_agg_var is None:
+                        try:
+                            time_vars = self._find_time_var(cur_root)
+                            cur_agg_var = time_vars[0]
+                            if len(time_vars) >1:
+                                log.warn('Uncertain resolution of time variable in dataset id: %s' % cur_root._repository.repository_key)
+
+                        except IndexError, ie:
+                            raise IngestionError('No Time Var found in the current dataset.')
+
+                    log.critical(cur_agg_var.PPrint())
+
+                    log.critical('Supplement Times: %s' [sup_stime, sup_etime])
+
+
                     time_indices = yield self._find_time_index(cur_agg_var, [sup_stime, sup_etime])
                     log.debug('time_indices = %s' % str(time_indices))
                     
