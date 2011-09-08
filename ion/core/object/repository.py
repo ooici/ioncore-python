@@ -764,7 +764,7 @@ class Repository(ObjectContainer):
         self._process = None
 
         if self.merge is not None:
-            for mr in self.merge:
+            for mr in self.merge.merge_repos:
                 mr.clear()
 
 
