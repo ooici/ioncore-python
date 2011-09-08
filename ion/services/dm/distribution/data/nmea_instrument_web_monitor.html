@@ -4,7 +4,8 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <title>OOICI Instrument Monitor</title>
 
- <link rel="stylesheet" type="text/css" href="http://ion-beta.oceanobservatories.org/css/ciux-default.css"/>
+
+  <link rel="stylesheet" type="text/css" href="http://ion-beta.oceanobservatories.org/css/ciux-default.css"/>
   <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/cupertino/jquery-ui-1.8.9.custom.css"/>
   <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-page.css"/>
   <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-table-jui.css"/>
@@ -97,7 +98,7 @@
                                  var datapoint = datapoints[l];
                                  if (datapoint.NMEA_CD == 'GPGGA') {
                                     lat = datapoint.GPS_LAT;
-                                    lon = datapoint.GPS_LON * -1;
+                                    lon = datapoint.GPS_LON;
                                     time = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
                                  }
                               }
@@ -122,6 +123,13 @@
 
         });
     </script>
+    
+    <script type="text/javascript">
+      window.onbeforeunload = function() {
+	$.getJSON('/ctl/unsub', function(data) {});
+      }
+    </script>
+    
 </head>
 <body id="body" onload="initialize()">
 <div id="loading_message"><span class="msg">Loading...</span></div>

@@ -53,6 +53,7 @@ class EventMonitorWebResource(resource.Resource):
                 request.write(res)
                 request.finish()
 
+            log.debug('AsyncResource.render_GET request: %s' %request)
             def_action = self._do_action(request)
             def_action.addCallback(finish_req, request)
 
@@ -76,21 +77,28 @@ class EventMonitorWebResource(resource.Resource):
             self._session_id = session_id
             self._timestamp = timestamp
             self._subscription_ids = subscription_ids or []
+            log.debug("Created DataRequest with session id: %s", session_id)
 
         @defer.inlineCallbacks
         def _do_action(self, request):
+            log.debug("*** entering data handler!")
             try:
                 timestamp = float("".join(self._timestamp))
             except Exception:
                 timestamp = 0.0
 
             msg = yield self._mc.create_instance(EVENTMONITOR_GETDATA_MESSAGE_TYPE)
+            log.debug("*** created instance")
             msg.session_id  = self._session_id
             msg.timestamp   = str(timestamp)
             # @TODO: subids
+            log.debug("setup timestamp and session id")
 
             msgdata = yield self._ec.getdata(msg)
+
             data = []
+
+            log.debug("*** pre-sub data handler!")
 
             for sub in msgdata.data:
                 subdata = { 'subscription_id' : sub.subscription_id,
@@ -116,13 +124,12 @@ class EventMonitorWebResource(resource.Resource):
 
                 data.append(subdata)
 
-            # build json response
             response = { 'data': data,
                         'lasttime': time.time() }
-
             defer.returnValue(json.dumps(response))
 
     class ControlRequest(AsyncResource):
+        subscriptionID = None
         isLeaf = True
         def __init__(self, mc, ec, session_id):
             resource.Resource.__init__(self)
@@ -137,37 +144,48 @@ class EventMonitorWebResource(resource.Resource):
             log.debug('ControlRequest _do_action Request %s' % requestStr)
 
             command = request.postpath.pop(0)
+            log.debug('_do_action: %s' %command)
+            log.debug('subscriptionID: %s' %EventMonitorWebResource.ControlRequest.subscriptionID)
+            log.debug('session id %s' % str(self._session_id))
 
             if command == "sub":
 
-                event_id = request.postpath.pop(0)
-                origin = None
-                if len(request.postpath) > 0:
-                    origin = request.postpath.pop(0)
+                if EventMonitorWebResource.ControlRequest.subscriptionID is not None:
+                    log.debug('Already subscribed, not responding to subscribe request.')
+                    response = {'status':'ok',
+                                'subscription_id': EventMonitorWebResource.ControlRequest.subscriptionID }
 
-                msg = yield self._mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
+                else:
+                    event_id = request.postpath.pop(0)
+                    origin = None
+                    if len(request.postpath) > 0:
+                        origin = request.postpath.pop(0)
 
-                msg.session_id = self._session_id
-                msg.event_id = int(event_id)
-                if origin:
-                    msg.origin = origin
-                log.debug('session id %s' % str(msg.session_id))
-                log.debug('event_id %s' % str(msg.event_id))
-                log.debug('origin %s' % str(msg.origin))
+                    msg = yield self._mc.create_instance(EVENTMONITOR_SUBSCRIBE_MESSAGE_TYPE)
 
-                log.debug('before subscribe')
-                resp = yield self._ec.subscribe(msg)
+                    msg.session_id = self._session_id
+                    msg.event_id = int(event_id)
+                    if origin:
+                        msg.origin = origin
+                    log.debug('event_id %s' % str(msg.event_id))
+                    log.debug('origin %s' % str(msg.origin))
 
-                log.debug('subscribe response %s' % str(resp))
-                response = {'status':'ok',
-                                'subscription_id': resp.subscription_id }
+                    log.debug('before subscribe')
+                    resp = yield self._ec.subscribe(msg)
 
-                log.debug('Returning OK from subscribe')
+                    log.debug('subscribe response %s' % str(resp))
+                    response = {'status':'ok',
+                                    'subscription_id': resp.subscription_id }
+                    EventMonitorWebResource.ControlRequest.subscriptionID = resp.subscription_id
+                    log.debug('Storing subscriptionID: %s' %EventMonitorWebResource.ControlRequest.subscriptionID)
+                    log.debug('Returning OK from subscribe')
+
                 defer.returnValue(json.dumps(response))
 
             elif command == "unsub":
 
                 sub_id = None
+                EventMonitorWebResource.ControlRequest.subscriptionID = None
                 if len(request.postpath) > 0:
                     sub_id = request.postpath.pop(0)
 
@@ -176,6 +194,7 @@ class EventMonitorWebResource(resource.Resource):
                 if sub_id:
                     msg.subscription_id = sub_id
 
+                log.debug('unsubscribing with session id %s' % str(msg.session_id))
                 yield self._ec.unsubscribe(msg)
 
                 response = {'status':'ok'}
@@ -223,7 +242,8 @@ class EventMonitorWebResource(resource.Resource):
         #print '############# Request'
         #print request
         requestStr = str(request)
-        log.debug('render_GET Request %s' % requestStr)
+
+        log.debug('render_GET Request ----> %s <----' % requestStr)
         if requestStr.rfind('NMEA') != -1:
             self._mainpage = static.File(os.path.join(os.path.dirname(__file__), "data", "nmea_instrument_web_monitor.html"))
         else:
