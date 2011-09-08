@@ -375,6 +375,8 @@ class IngestionService(ServiceProcess):
             ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
         except Exception, ex:
 
+            log.exception("Error occured while waiting for ingestion to complete:")
+
             # clear the repository
             self.workbench.clear_repository_key(content.dataset_id)
 
@@ -383,7 +385,6 @@ class IngestionService(ServiceProcess):
             ingest_res={EM_ERROR:'Ingestion Failed: %s' % str(ex.message)}
             ingest_res.update(data_details)
 
-            log.exception("Error occured while waiting for ingestion to complete:")
 
             yield self._notify_ingest(ingest_res)
 
@@ -1159,7 +1160,25 @@ class IngestionService(ServiceProcess):
                 #   the current dataset.
                 sup_stime += runtime_offset_seconds
                 sup_etime += runtime_offset_seconds    
-                
+
+            # Get the agg vars - if this is not an FMRC...
+            if cur_agg_var is None:
+                try:
+                    cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+                except OOIObjectError, oe:
+                    log.exception('Time Variable name does not match its dimension name')
+                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+
+            if sup_agg_var is None:
+
+                try:
+                    sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
+                except OOIObjectError, oe:
+                    log.exception('Time Variable name does not match its dimension name')
+                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+
+
+
             if is_overwrite:
                 if cur_etime < sup_stime:
                     log.info('__calculate_merge_offsets(overwrite): Supplement does not overlap.')
@@ -1168,28 +1187,51 @@ class IngestionService(ServiceProcess):
                     log.info('__calculate_merge_offsets(overwrite): Supplement overlaps -- calculating offsets')
                     # Find where the supplement start time and end time should lay in the dataset (supplement_sindex, supplement_eindex)
                     # Find how the origins in the dataset's data should change according to this position (insertion_offset)
-                    if cur_agg_var is None:
-                        try:
-                            cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
-                        except OOIObjectError, oe:
-                            log.info('Time Variable name does not match its dimension name')
 
-                    if cur_agg_var is None:
-                        try:
-                            time_vars = self._find_time_var(cur_root)
-                            cur_agg_var = time_vars[0]
-                            if len(time_vars) >1:
-                                log.warn('Uncertain resolution of time variable in dataset id: %s' % cur_root._repository.repository_key)
-
-                        except IndexError, ie:
-                            raise IngestionError('No Time Var found in the current dataset.')
-
-                    log.critical(cur_agg_var.PPrint())
-
-                    log.critical('Supplement Times: %s' [sup_stime, sup_etime])
+                    log.debug('Gathering a list of keys for blobs which need to be fetched for the sup_agg_var...')
 
 
-                    time_indices = yield self._find_time_index(cur_agg_var, [sup_stime, sup_etime])
+                    if sup_agg_var.GetUnits() != cur_agg_var.GetUnits():
+                        raise IngestionError('Aggregation variable units do not match in the latest supplement. Time Variable: "%s", in dataset: %s' % (sup_agg_var.name, self.dataset.repository_key))
+
+
+                    repo = self.dataset.Repository
+
+
+                    need_keys = IngestionService._get_ndarray_keys(sup_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
+
+                    # Step 1b: Fetch all blobs for the ndarrays in the match_var
+                    log.debug('Fetching all blobs for the ndarrays in the supplement...')
+                    yield self._fetch_blobs(repo, need_keys)
+
+                    # Step 1c: Now, grab all the array values from the ndarrays..
+                    log.debug('Grabbing all the array values from the ndarrays...')
+                    values = IngestionService._get_ndarray_vals(sup_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  ndarray values = %s' % str(values))
+
+                    # need to compare in the same units - to hard to convert the variable using the units string...
+                    search_times = [values[0][1], values[-1][1]]
+
+                    log.debug('Gathering a list of keys for blobs which need to be fetched for the cur_agg_var (time)...')
+                    need_keys = IngestionService._get_ndarray_keys(cur_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
+
+                    # Step 1b: Fetch all blobs for the ndarrays in the time_var
+                    log.debug('Fetching all blobs for the ndarrays in the current dataset...')
+                    yield self._fetch_blobs(repo, need_keys)
+
+                    # Step 1c: Now, grab all the array values from the ndarrays..
+                    log.debug('Grabbing all the array values from the ndarrays...')
+                    values = IngestionService._get_ndarray_vals(cur_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  ndarray values = %s' % str(values))
+
+
+                    time_indices = yield self._find_time_index(values, search_times)
                     log.debug('time_indices = %s' % str(time_indices))
                     
                     sup_sindex = time_indices[sup_stime]
@@ -1786,30 +1828,16 @@ class IngestionService(ServiceProcess):
                 repo.index_hash[element.key] = element
 
 
+
+
+
     @defer.inlineCallbacks
-    def _find_time_index(self, time_var, search_times, THRESHOLD = 0.001):
+    def _find_time_index(self, values, search_times, THRESHOLD = 0.001):
         """
         @todo: Add documentation about what negative value returns mean
         """
-        search_times_cpy = search_times[:]  # copy the search_times list so we can remove values
-        # Step 1: Get a handle to an array of values from the given time variable
-        # Step 1a: Gather a list of keys for blobs which need to be fetched             
-        
-        log.debug('Gathering a list of keys for blobs which need to be fetched...')
-        need_keys = IngestionService._get_ndarray_keys(time_var)
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
-        
-        # Step 1b: Fetch all blobs for the ndarrays in the time_var
-        log.debug('Fetching all blobs for the ndarrays in the supplement...')
-        repo = self.dataset.Repository
-        yield self._fetch_blobs(repo, need_keys)
 
-        # Step 1c: Now, grab all the array values from the ndarrays..
-        log.debug('Grabbing all the array values from the ndarrays...')
-        values = IngestionService._get_ndarray_vals(time_var)
-        if log.getEffectiveLevel() <= logging.DEBUG:
-            log.debug('>>  ndarray values = %s' % str(values))
+        search_times_cpy = search_times[:]  # copy the search_times list so we can remove values
 
 
         # Step 2: Perform a linear search in the values array for each time in search_times
@@ -1821,10 +1849,12 @@ class IngestionService(ServiceProcess):
         
         
         # Step 2a: Perform the linear search to see where in the set of values our search_times lay
-        log.debug('Searching for values "%s" in ndarray list' % str(search_times_cpy))
+        log.debug('Searching for values "%s"' % str(search_times_cpy))
+        log.debug('Got Time values "%s" in ndarray list' % str(values))
         results_dict = {}
-        for i in range(len(values)):
-            idx, val = values[i]
+        for i, tup in enumerate(values):
+            log.debug('i - %s,tup - %s' % (i,tup))
+            idx, val = tup
             # @note: this is a good place to check if two entries in the time variables bounded_arrays
             #        contain mismatched values for the same index -- this shouldn't happen however
             for search_time in search_times_cpy:
@@ -1837,7 +1867,10 @@ class IngestionService(ServiceProcess):
                 # else search_time > val: continue
             if len(search_times_cpy) == 0:
                 break; 
-                
+
+        log.debug('HEJENJWN')
+
+        # Don't get it - what is the error? ValueError: need more than 2 values to unpack
         if len(search_times_cpy) > 0:
             not_in_list_val = -(len(values) + 1)
             for search_time in search_times_cpy:
