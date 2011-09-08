@@ -4,12 +4,13 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <title>OOICI Instrument Monitor</title>
 
- <link rel="stylesheet" type="text/css" href="http://localhost:8080/css/ciux-default.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/cupertino/jquery-ui-1.8.9.custom.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-page.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ciux-datatable-table-jui.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/colorbox.css"/>
-  <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:8080/css/ooici_ux-main.css"/>
+
+  <link rel="stylesheet" type="text/css" href="http://ion-beta.oceanobservatories.org/css/ciux-default.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/cupertino/jquery-ui-1.8.9.custom.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-page.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ciux-datatable-table-jui.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/colorbox.css"/>
+  <link rel="stylesheet" type="text/css" media="screen" href="http://ion-beta.oceanobservatories.org/css/ooici_ux-main.css"/>
   
   <style type="text/css">
   	html, body { min-height: 100%; }
@@ -22,11 +23,11 @@
   	
   </style>
 
-  <script src="http://localhost:8080/js/jquery-1.6.2.min.js" type="text/javascript"></script>
-  <script src="http://localhost:8080/js/jquery.layout.min.js" type="text/javascript"></script>
-  <script src="http://localhost:8080/js/jquery.colorbox.min.js" type="text/javascript"></script>
-  <script src="http://localhost:8080/js/jquery.tmpl.min.js" type="text/javascript"></script>
-  <script src="http://localhost:8080/js/json2.js" type="text/javascript"></script>
+  <script src="http://ion-beta.oceanobservatories.org/js/jquery-1.6.2.min.js" type="text/javascript"></script>
+  <script src="http://ion-beta.oceanobservatories.org/js/jquery.layout.min.js" type="text/javascript"></script>
+  <script src="http://ion-beta.oceanobservatories.org/js/jquery.colorbox.min.js" type="text/javascript"></script>
+  <script src="http://ion-beta.oceanobservatories.org/js/jquery.tmpl.min.js" type="text/javascript"></script>
+  <script src="http://ion-beta.oceanobservatories.org/js/json2.js" type="text/javascript"></script>
   <script type="text/javascript">
      $(function() {
 	    var selector = '#layoutContainer', $el = $(selector);
@@ -97,7 +98,7 @@
                                  var datapoint = datapoints[l];
                                  if (datapoint.NMEA_CD == 'GPGGA') {
                                     lat = datapoint.GPS_LAT;
-                                    lon = datapoint.GPS_LON * -1;
+                                    lon = datapoint.GPS_LON;
                                     time = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
                                  }
                               }
@@ -122,6 +123,13 @@
 
         });
     </script>
+    
+    <script type="text/javascript">
+      window.onbeforeunload = function() {
+	$.getJSON('/ctl/unsub', function(data) {});
+      }
+    </script>
+    
 </head>
 <body id="body" onload="initialize()">
 <div id="loading_message"><span class="msg">Loading...</span></div>
