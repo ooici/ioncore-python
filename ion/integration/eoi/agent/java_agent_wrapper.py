@@ -412,8 +412,9 @@ class JavaAgentWrapper(ServiceProcess):
 
         # chain agent_proc's errback to perform_ingest_deferred's - just in case of a bad startup
         def _chain_agent_errback(failure):
-            log.error("I DYDE A DEATH %s" % str(failure))
-            perform_ingest_deferred.errback(failure)
+            if not perform_ingest_deferred.called:
+                log.error("I DYDE A DEATH %s" % str(failure))
+                perform_ingest_deferred.errback(failure)
         agent_proc.deferred_exited.addErrback(_chain_agent_errback)
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
