@@ -192,14 +192,14 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                msg = MIMEText(BODY)
-                msg['Subject'] = SUBJECT
-                msg['From'] = FROM
-                msg['To'] = ', '.join([TO])
+                emsg = MIMEText(BODY)
+                emsg['Subject'] = SUBJECT
+                emsg['From'] = FROM
+                emsg['To'] = ', '.join([TO])
                     
                 try:
                     log.debug("NotificationAlertService.handle_offline_event sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], emsg)
                     log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
@@ -278,14 +278,14 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                msg = MIMEText(BODY)
-                msg['Subject'] = SUBJECT
-                msg['From'] = FROM
-                msg['To'] = ', '.join([TO])
+                emsg = MIMEText(BODY)
+                emsg['Subject'] = SUBJECT
+                emsg['From'] = FROM
+                emsg['To'] = ', '.join([TO])
 
                 try:
                     log.debug("NotificationAlertService.handle_update_event: sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], emsg)
                     log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_update_event Error: unable to send email')
