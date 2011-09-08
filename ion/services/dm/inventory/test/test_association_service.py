@@ -5,6 +5,7 @@
 @author David Stuebe
 @author Matt Rodriguez
 """
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -24,6 +25,7 @@ from ion.core.exception import ReceivedApplicationError
 
 
 from ion.services.coi.resource_registry import resource_client
+from ion.util import procutils as pu
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
@@ -755,3 +757,178 @@ class AssociationServiceTest(IonTestCase):
 
         self.assertEquals(len(stars.idrefs), 1)
         self.assertEquals(stars.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
+
+    @defer.inlineCallbacks
+    def test_get_divergent_objects(self):
+
+        # setup for this test:
+        # grab the SAMPLE_PROFILE_DATASET_ID twice from two processes, make a different change in each, push back to get divergence
+        p1 = Process()
+        yield p1.spawn()
+        rc1 = ResourceClient(proc=p1)
+
+        p2 = Process()
+        yield p2.spawn()
+        rc2 = ResourceClient(proc=p2)
+
+        ds1 = yield rc1.get_instance(SAMPLE_PROFILE_DATASET_ID)
+        ds2 = yield rc2.get_instance(SAMPLE_PROFILE_DATASET_ID)
+
+        # sanity check - we're not a merge yet, amirite?
+        self.failUnless(len(ds1.Repository._current_branch.commitrefs[0].parentrefs) != 2)
+
+        ds1.ResourceLifeCycleState = ds1.INACTIVE
+        yield rc1.put_instance(ds1)
+
+        yield pu.asleep(1)
+
+        ds2.ResourceLifeCycleState = ds2.DECOMMISSIONED
+        yield rc2.put_instance(ds2)
+
+        # we should have divergence at this point (make sure)
+        p3 = Process()
+        yield p3.spawn()
+        rc3 = ResourceClient(proc=p3)
+
+        ds3 = yield rc3.get_instance(SAMPLE_PROFILE_DATASET_ID)
+        self.failUnlessEquals(len(ds3.Repository._current_branch.commitrefs[0].parentrefs), 2)
+
+        # also make sure the right one stuck
+        self.failUnlessEquals(ds3.ResourceLifeCycleState, ds3.DECOMMISSIONED)
+
+        # it's resolved only in the p3 process now. don't push it back so we can grab it below
+
+        # OKAY. now we can test divergence resolutions in get_object
+
+        request = yield self.proc.message_client.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_A_ID
+        pair.predicate = pref
+
+        # Set the subject search term
+        subject_ref = request.CreateObject(IDREF_TYPE)
+        subject_ref.key = SAMPLE_PROFILE_DATA_SOURCE_ID
+
+        pair.subject = subject_ref
+
+        # make the request
+        result = yield self.asc.get_objects(request)
+
+        self.failUnlessEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.failUnlessIn(SAMPLE_PROFILE_DATASET_ID, key_list)
+
+        # we should be able to pull here without resolving anything - it's already been resolved and pushed
+        p4 = Process()
+        yield p4.spawn()
+        rc4 = ResourceClient(proc=p4)
+
+        ds4 = yield rc4.get_instance(SAMPLE_PROFILE_DATASET_ID)
+        self.failUnlessEqual(ds4.ResourceLifeCycleState, ds4.DECOMMISSIONED)
+
+        # grab the datastore process
+        datastore_id = yield self.sup.get_child_id('ds1')
+        datastore  = self._get_procinstance(datastore_id)
+
+        # grab this repo
+        repo = datastore.workbench.get_repository(SAMPLE_PROFILE_DATASET_ID)
+        repo.checkout('master')
+
+        self.failUnlessEquals(repo._current_branch.commitrefs[0].MyId, ds4.Repository._current_branch.commitrefs[0].MyId)
+
+
+
+    @defer.inlineCallbacks
+    def test_get_divergent_subjects(self):
+
+        # setup for this test:
+        # grab the SAMPLE_PROFILE_DATA_SOURCE_ID twice from two processes, make a different change in each, push back to get divergence
+        p1 = Process()
+        yield p1.spawn()
+        rc1 = ResourceClient(proc=p1)
+
+        p2 = Process()
+        yield p2.spawn()
+        rc2 = ResourceClient(proc=p2)
+
+        dsrc1 = yield rc1.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        dsrc2 = yield rc2.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+
+        # sanity check - we're not a merge yet, amirite?
+        self.failUnless(len(dsrc1.Repository._current_branch.commitrefs[0].parentrefs) != 2)
+
+        dsrc1.ResourceLifeCycleState = dsrc1.INACTIVE
+        yield rc1.put_instance(dsrc1)
+
+        yield pu.asleep(1)
+
+        dsrc2.ResourceLifeCycleState = dsrc2.DECOMMISSIONED
+        yield rc2.put_instance(dsrc2)
+
+        # we should have divergence at this point (make sure)
+        p3 = Process()
+        yield p3.spawn()
+        rc3 = ResourceClient(proc=p3)
+
+        dsrc3 = yield rc3.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        self.failUnlessEquals(len(dsrc3.Repository._current_branch.commitrefs[0].parentrefs), 2)
+
+        # also make sure the right one stuck
+        self.failUnlessEquals(dsrc3.ResourceLifeCycleState, dsrc3.DECOMMISSIONED)
+
+        # it's resolved only in the p3 process now. don't push it back so we can grab it below
+
+        # OKAY. now we can test divergence resolutions in get_object
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_A_ID
+        pair.predicate = pref
+
+        # Set the object search term
+        object_ref = request.CreateObject(IDREF_TYPE)
+        object_ref.key = SAMPLE_PROFILE_DATASET_ID
+
+        pair.object = object_ref
+
+        # make the request
+        result = yield self.asc.get_subjects(request)
+
+        self.failUnlessEqual(len(result.idrefs)>=1,True)
+
+        key_list = []
+        for idref in result.idrefs:
+            key_list.append(idref.key)
+
+        self.failUnlessIn(SAMPLE_PROFILE_DATA_SOURCE_ID, key_list)
+
+        # we should be able to pull here without resolving anything - it's already been resolved and pushed
+        p4 = Process()
+        yield p4.spawn()
+        rc4 = ResourceClient(proc=p4)
+
+        dset4 = yield rc4.get_instance(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        self.failUnlessEqual(dset4.ResourceLifeCycleState, dset4.DECOMMISSIONED)
+
+        # grab the datastore process
+        datastore_id = yield self.sup.get_child_id('ds1')
+        datastore  = self._get_procinstance(datastore_id)
+
+        # grab this repo
+        repo = datastore.workbench.get_repository(SAMPLE_PROFILE_DATA_SOURCE_ID)
+        repo.checkout('master')
+
+        self.failUnlessEquals(repo._current_branch.commitrefs[0].MyId, dset4.Repository._current_branch.commitrefs[0].MyId)
+

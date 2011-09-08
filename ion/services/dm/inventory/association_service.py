@@ -6,6 +6,7 @@
 @author Matt Rodriguez
 @brief A service to provide indexing and search capability of objects in the datastore
 """
+from ion.services.coi.resource_registry.resource_client import ResourceClient
 
 import ion.util.ionlog
 from net.ooici.core.message.ion_message_pb2 import BAD_REQUEST
@@ -85,6 +86,7 @@ class AssociationService(ServiceProcess):
 
         # Get the configuration for cassandra - may or may not be used depending on the backend class
         self._storage_conf = get_cassandra_configuration()
+        self._rc = ResourceClient(proc=self)
 
 
 
@@ -180,26 +182,44 @@ class AssociationService(ServiceProcess):
                 subject_query.add_predicate_eq(REPOSITORY_KEY,row[SUBJECT_KEY])
                 subject_heads = yield self.index_store.query(subject_query)
 
-                branches = []
+                subj_candidates = {}     # map branch -> object_key
+                resolve_objs = []       # list of object keys we need to resolve due to multiple branches
+
                 for commit_key, commit_row in subject_heads.items():
 
-                    if commit_row[BRANCH_NAME] in branches:
-                        raise NotImplementedError('Dealing with divergence in an associated Subject is not yet supported')
-
-                    else:
-                        branches.append(commit_row[BRANCH_NAME])
-
-                    if commit_row[BRANCH_NAME] == row[SUBJECT_BRANCH]:
-                        # We do not need to determine ancestry - the branch name is the same!
-
-                        # return the pointer to this commit - this is the latest version of the associated subject!
-                        totalkey = (row[SUBJECT_KEY] , row[SUBJECT_BRANCH])
-
-                        # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
-                        subjects_pointers.add(totalkey)
-                    else:
+                    if commit_row[BRANCH_NAME] != row[SUBJECT_BRANCH]:
                         raise NotImplementedError('Dealing with associations to a subject with multiple branches is not yet supported')
 
+                    # have we already seen this branch name? if so, we have divergence, add it to list of things to resolve
+                    if commit_row[BRANCH_NAME] in subj_candidates:
+                        # remove it
+                        del subj_candidates[commit_row[BRANCH_NAME]]
+
+                        # push it to resolve objs
+                        resolve_objs.append(row[SUBJECT_KEY])
+
+                        log.warn("_get_subjects found a divergent subject: %s" % str(row[SUBJECT_KEY]))
+                    else:
+                        subj_candidates[commit_row[BRANCH_NAME]] = row[SUBJECT_KEY]
+
+                # do we have to resolve anything
+                for rkey in resolve_objs:
+                    r = yield self._rc.get_instance(rkey)
+
+                    # make sure we are a merge commit
+                    if len(r.Repository._current_branch.commitrefs[0].parentrefs) != 2:
+                        raise AssociationServiceError("_get_subjects attempted to resolve a divergent associated subjects but rc did not give us a merge commit")
+
+                    # put it back
+                    yield self._rc.put_instance(r)
+
+                    # add our key/branch pair to the candidates
+                    subj_candidates[r.Repository._current_branch.branchkey] = rkey
+
+                # candidates are now final, add them to objects_pointers
+                for branch, key in subj_candidates.iteritems():
+                    total_key = (key, branch)
+                    subjects_pointers.add(total_key)
 
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
@@ -355,26 +375,44 @@ class AssociationService(ServiceProcess):
                 object_query.add_predicate_eq(REPOSITORY_KEY,row[OBJECT_KEY])
                 object_heads = yield self.index_store.query(object_query)
 
-                branches = []
+                obj_candidates = {}     # map branch -> object_key
+                resolve_objs = []       # list of object keys we need to resolve due to multiple branches
+
                 for commit_key, commit_row in object_heads.items():
 
-                    if commit_row[BRANCH_NAME] in branches:
-                        raise NotImplementedError('Dealing with divergence in an associated Object is not yet supported')
-
-                    else:
-                        branches.append(commit_row[BRANCH_NAME])
-
-                    if commit_row[BRANCH_NAME] == row[OBJECT_BRANCH]:
-                        # We do not need to determine ancestry - the branch name is the same!
-
-                        # return the pointer to this commit - this is the latest version of the associated subject!
-                        totalkey = (row[OBJECT_KEY] , row[OBJECT_BRANCH])
-
-                        # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
-                        objects_pointers.add(totalkey)
-                    else:
+                    if commit_row[BRANCH_NAME] != row[OBJECT_BRANCH]:
                         raise NotImplementedError('Dealing with associations to a Object with multiple branches is not yet supported')
 
+                    # have we already seen this branch name? if so, we have divergence, add it to list of things to resolve
+                    if commit_row[BRANCH_NAME] in obj_candidates:
+                        # remove it
+                        del obj_candidates[commit_row[BRANCH_NAME]]
+
+                        # push it to resolve objs
+                        resolve_objs.append(row[OBJECT_KEY])
+
+                        log.warn("_get_objects found a divergent object: %s" % str(row[OBJECT_KEY]))
+                    else:
+                        obj_candidates[commit_row[BRANCH_NAME]] = row[OBJECT_KEY]
+
+                # do we have to resolve anything
+                for rkey in resolve_objs:
+                    r = yield self._rc.get_instance(rkey)
+
+                    # make sure we are a merge commit
+                    if len(r.Repository._current_branch.commitrefs[0].parentrefs) != 2:
+                        raise AssociationServiceError("_get_objects attempted to resolve a divergent associated object but rc did not give us a merge commit")
+
+                    # put it back
+                    yield self._rc.put_instance(r)
+
+                    # add our key/branch pair to the candidates
+                    obj_candidates[r.Repository._current_branch.branchkey] = rkey
+
+                # candidates are now final, add them to objects_pointers
+                for branch, key in obj_candidates.iteritems():
+                    total_key = (key, branch)
+                    objects_pointers.add(total_key)
 
             # Now - at the end of the loop over the pairs - take the intersection with the current search results!
             if first_pair:
