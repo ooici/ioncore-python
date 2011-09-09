@@ -64,8 +64,10 @@ __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROL
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all', 'get_dataset_graphviz', '_graphviz','association_graphviz'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all'])
 
+# graphviz related
+__all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations'])
 
 
 
@@ -198,7 +200,10 @@ def pprint_datasets(dataset_dict=None):
     # Iterate over each dataset in the list..
     for key, dataset in dataset_dict.items():
         # Get some info
-        title = dataset.root_group.FindAttributeByName('title').GetValue()
+        try:
+            title = dataset.root_group.FindAttributeByName('title').GetValue()
+        except:
+            title = "(no title found)"
         state = dataset.ResourceLifeCycleState
         vrbls = [(var.name, [(dim.name, dim.length) for dim in var.shape]) for var in dataset.root_group.variables]
         
@@ -411,17 +416,102 @@ def _checkout_all(arr):
     defer.returnValue((goodlist, badlist))
 
 
+class GraphvizEntry(object):
+    """
+    A graphviz graph entry.
+
+    Can represent edges and nodes. Will truncate values if max_value_len is specified.
+    Attributes on the nodes can be set via accessors, aka:
+
+        ge = GraphvisEntry("source_name")
+        ge['label'] = "This is the source"
+        ge['color'] = "blue"
+
+    Use str() to automatically transform this entry into a graphviz language line (without any indent).
+    Note that it will quote everything, so you cannot use it to set defaults on things like node - use
+    the GraphvizGraph's preamble parameter for that.
+    """
+    def __init__(self, src=None, dest=None, attrs=None, max_value_len=0):
+        self._attrs = attrs or {}
+        self.src = src
+        self.dest = dest
+        self._max_value_len = max_value_len
+
+    def __getitem__(self, item):
+        return self._attrs[item]
+
+    def __setitem__(self, key, value):
+        self._attrs[key] = value
+
+    def __str__(self):
+        out = "\"%s\"" % self.src
+        if self.dest:
+            out += " -> \"%s\"" % self.dest
+
+        attrs = map(lambda x: "%s=\"%s\"" % (x[0], self._sanitize(x[1])), self._attrs.iteritems())
+        if len(attrs):
+            out += " [%s]" % ",".join(attrs)
+            
+        out += ";"
+        return out
+
+    def _sanitize(self, mystring):
+        if self._max_value_len > 0 and len(mystring) > self._max_value_len:
+            mystring = "%s... (trunc)" % mystring[0:self._max_value_len]
+        return mystring
+
+class GraphvizGraph(list):
+    """
+    Represents a Graphviz graph.
+
+    This is a simple inheritance from list, and expects to contain GraphvizEntry objects. When turning
+    this object into a string, it builds a full graphviz input of itself and any contained objects.
+    It also sets some defaults for nodes via the DEFAULT_PREAMBLE - you can override this in the
+    initializer.
+    """
+    DEFAULT_PREAMBLE = '\tnode [shape="box", style="filled, rounded", fillcolor="#E7E9E8"];'
+
+    def __init__(self, name, entries=None, preamble=None):
+        self._name = name
+        # default - shape like boxes please
+        self._preamble = preamble or self.DEFAULT_PREAMBLE
+        entries = entries or ()
+        list.__init__(self, entries)
+
+    def __str__(self):
+        outlines = []
+        outlines.append("digraph \"%s\" {" % self._name)
+        outlines.append(self._preamble)
+        outlines.extend(map(lambda x: "\t%s" % str(x), self))
+        outlines.append("}")
+        return "\n".join(outlines)
 
 @defer.inlineCallbacks
-def association_graphviz(res_id):
+def _graph(callable, ident, mode="svg"):
+    ident = str(ident)
+    gvinp = yield defer.maybeDeferred(callable, ident)
 
+    (inp, inpfile) = tempfile.mkstemp(suffix='.txt', prefix="%s-" % ident)
+    os.write(inp, gvinp)
+    os.close(inp)
+    gt = time.time()
 
+    outimg = os.path.join(tempfile.gettempdir(), "%s-%s.%s" % (ident, str(gt), mode))
+
+    dot = OSProcess(binary="dot", spawnargs=["-T%s" % mode, "-o%s" % outimg, inpfile])
+    yield dot.spawn()
+
+    viewit = OSProcess(binary="open", spawnargs=[outimg])
+    yield viewit.spawn()
+
+    print "Input:", inpfile
+    print "Output: ", outimg
+
+@defer.inlineCallbacks
+def _gv_resource_associations(res_id, show_assoc_ids=False):
     res = yield rc.get_instance(res_id)
-
     sbj_mngr = yield ac.find_associations(subject=res)
-
     obj_mngr = yield ac.find_associations(obj=res)
-
 
     obj_list = []
     for assoc in sbj_mngr:
@@ -437,26 +527,17 @@ def association_graphviz(res_id):
     rlist.extend(sub_list)
     rlist.extend(obj_list)
 
+    g=GraphvizGraph("associations-%s" % res_id)
 
-    # build graph output
-    outlines = []
+    def sanatize_string(mystring, maxlen=38):
+        if len(mystring) > maxlen and "\n" in mystring:
+            mystring = "%s; (Truncated!!)" % (mystring[0:maxlen].split('\n')[0],)
 
-    outlines.append("digraph \"%s\" {" % res_id)
-
-
-    def sanatize_string(mystring):
-
-        n = 38
-        if len(mystring) > n and "\n" in mystring:
-            mystring = "%s; (Truncated!!)" % (mystring[0:n].split('\n')[0],)
-
-        elif len(mystring) > n:
-            mystring = "%s; (Truncated length)" % (mystring[0:n],)
+        elif len(mystring) > maxlen:
+            mystring = "%s; (Truncated length)" % (mystring[0:maxlen],)
 
         elif "\n" in mystring:
             mystring = "%s; (Truncated newline)" % (mystring.split('\n')[0],)
-
-        return mystring
 
     for ind, r in enumerate(rlist):
         resource_lines = []
@@ -470,7 +551,6 @@ def association_graphviz(res_id):
 
                 r1 = value
                 if hasattr(r1,'__iter__'):
-
                     resource_lines.append("%s (repeated field length): %d" % (pname, len(r1)))
                 else:
                     resource_lines.append("%s::" % pname)
@@ -487,43 +567,49 @@ def association_graphviz(res_id):
                 resource_lines.append("%s: '%s'" % (pname, sanatize_string(svalue)))
 
         rid = r.ResourceIdentity
+        lbl = "KEY: %s\\nName: %s\\nType: %s\\nLCState: %s\\nResource Properties:\\n%s" % (rid, r.ResourceName, type_id_map[r.ResourceTypeID.key], r.ResourceLifeCycleState, "\\n".join(resource_lines))
+        attrs = {'label':lbl}
         if ind == 0:
-            tup = (rid, rid, r.ResourceName, type_id_map[r.ResourceTypeID.key], r.ResourceLifeCycleState, "\\n".join(resource_lines),'Red')
-        else:
-            tup = (rid, rid, r.ResourceName, type_id_map[r.ResourceTypeID.key], r.ResourceLifeCycleState, "\\n".join(resource_lines), 'Black')
+            attrs['fillcolor'] = '#ffaaaa'
 
-        outlines.append("""    \"%s\" [label=\"KEY: %s\\nName: %s\\nType: %s\\nLCState: %s\\nResource Properties:\\n%s \", color=%s] ;""" % tup)
+        g.append(GraphvizEntry(rid, None, attrs))
 
+    edgestyle = {'style':'bold', 'color':'#a40000', 'fontcolor':'#a40000'}
 
     for pred, assoc_set in sbj_mngr.iteritems():
 
         predicate = predicate_map.get(pred)
 
         for assoc in assoc_set:
-            outlines.append("""    \"%s\" -> \"%s\" [label=\"Predicate: %s\\nAssociationId: %s\"] ;""" % (res_id, assoc.ObjectReference.key, predicate, assoc.AssociationIdentity))
+            lbl = str(predicate)
+            if show_assoc_ids:
+                lbl += "\\n%s" % assoc.AssociationIdentity
+            attrs = {'label':lbl }
+            attrs.update(edgestyle)
+            g.append(GraphvizEntry(res_id, assoc.ObjectReference.key, attrs))
 
     for pred, assoc_set in obj_mngr.iteritems():
         predicate = predicate_map.get(pred)
 
         for assoc in assoc_set:
-            outlines.append("""    \"%s\" -> \"%s\" [label=\"Predicate: %s\\nAssociationId: %s\"] ;""" % (assoc.SubjectReference.key, res_id, predicate, assoc.AssociationIdentity))
+            lbl = str(predicate)
+            if show_assoc_ids:
+                lbl += "\\n%s" % assoc.AssociationIdentity
+            attrs = {'label':lbl }
+            attrs.update(edgestyle)
+            g.append(GraphvizEntry(assoc.SubjectReference.key, res_id, attrs))
 
-
-
-    outlines.append("}")
-
-    defer.returnValue("\n".join(outlines))
-
-
+    defer.returnValue(str(g))
 
 @defer.inlineCallbacks
-def get_dataset_graphviz(dsetid):
-    dset = yield rc.get_instance(dsetid)
+def graph_resource_associations(res_id, show_assoc_ids=False, mode="svg"):
+    yield _graph(lambda x: _gv_resource_associations(x, show_assoc_ids), res_id, mode)
 
-    # build graph output
-    outlines = []
+@defer.inlineCallbacks
+def _gv_resource_commits(rid):
+    res = yield rc.get_instance(rid)
 
-    outlines.append("digraph \"%s\" {" % dsetid)
+    g = GraphvizGraph("commits-%s" % rid)
 
     visited = set()
 
@@ -532,38 +618,24 @@ def get_dataset_graphviz(dsetid):
         visited.add(crefkey)
         tm = time.gmtime(cref.date)
         dat = time.strftime("%m/%d %H:%M:%S",tm)
-        outlines.append("    \"%s\" [label=\"KEY: %s\\nCOMMENT: %s\\nDATE: %s\"] ;" % (crefkey, crefkey, str(cref.comment), dat))
+        lbl = "KEY: %s\\nCOMMENT: %s\\nDATE: %s" % (crefkey, str(cref.comment), dat)
+        fc = '#dddddd'
+        if not len(g):
+            fc = '#ffaaaa'
+
+        g.append(GraphvizEntry(crefkey, None, {"label":lbl, 'fillcolor': fc}))
 
         for idx, x in enumerate(cref.parentrefs):
             pcref = x.commitref
             pcrefkey = sha1_to_hex(pcref.MyId)
-            outlines.append("    \"%s\" -> \"%s\" [taillabel=\"%d\"] ;" % (crefkey, pcrefkey, idx))
+            g.append(GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)}))
             if pcrefkey not in visited:
                 get_commit_chain(x.commitref)
 
-    # call it, fills out commits/edges
-    get_commit_chain(dset.Repository._current_branch.commitrefs[0])
+    get_commit_chain(res.Repository._current_branch.commitrefs[0])
 
-    outlines.append("}")
-
-    defer.returnValue("\n".join(outlines))
+    defer.returnValue(str(g))
 
 @defer.inlineCallbacks
-def _graphviz(dsetid):
-    gvinp = yield association_graphviz(dsetid)
-
-    (inp, inpfile) = tempfile.mkstemp(suffix='.txt')
-    os.write(inp, gvinp)
-    os.close(inp)
-    gt = time.time()
-
-    outimg = os.path.join(tempfile.gettempdir(), str(gt) + ".svg")
-
-    dot = OSProcess(binary="dot", spawnargs=["-Tsvg", "-o%s" % outimg, inpfile])
-    yield dot.spawn()
-
-    viewit = OSProcess(binary="open", spawnargs=[outimg])
-    yield viewit.spawn()
-
-    print "Input:", inpfile
-    print "Output: ", outimg
+def graph_resource_commits(rid, mode="svg"):
+    yield _graph(_gv_resource_commits, rid, mode)
