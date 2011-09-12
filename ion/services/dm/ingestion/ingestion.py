@@ -1106,7 +1106,25 @@ class IngestionService(ServiceProcess):
             log.info('__calculate_merge_offsets(): Current dataset exists, moving onward...')
             sup_agg_var = None
             cur_agg_var = None
-            
+
+
+            # Get the agg vars - if this is not an FMRC...
+            if cur_agg_var is None:
+                try:
+                    cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+                except OOIObjectError, oe:
+                    log.exception('Time Variable name does not match its dimension name')
+                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+
+            if sup_agg_var is None:
+
+                try:
+                    sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
+                except OOIObjectError, oe:
+                    log.exception('Time Variable name does not match its dimension name')
+                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+
+
             # First calculate runtime and forecast offsets (these will affect the other offsets)
             if sup_fcst_dim_name is not None and not len(sup_fcst_dim_name) == 0:
                 log.info('__calculate_merge_offsets(): Calculating runtime and forecast time (normalization) offsets for FMRC dataset...')
@@ -1114,13 +1132,11 @@ class IngestionService(ServiceProcess):
                 # Get the runtime and forecast time from dataset and supplement
                 log.debug('__calculate_merge_offsets(): Retrieving time variables from dataset and supplement...')
                 try:
-                    cur_agg_var  = cur_root.FindVariableByName(sup_agg_dim_name)
                     cur_fcst_var = cur_root.FindVariableByName(sup_fcst_dim_name)
                 except OOIObjectError, ex:
                     raise IngestionError('__calculate_merge_offsets(): FMRC Dataset must have (model) Run Time and Forecast Time dimension, respectivly named ("%s", "%s").  Inner Exception: %s' % (sup_agg_dim_name.encode('utf-8'), sup_fcst_dim_name.encode('utf-8'), str(ex)))
                     
                 try:
-                    sup_agg_var  = sup_root.FindVariableByName(sup_agg_dim_name)
                     sup_fcst_var = sup_root.FindVariableByName(sup_fcst_dim_name)
                 except OOIObjectError, ex:
                     raise IngestionError('__calculate_merge_offsets(): FMRC Supplement must have (model) Run Time and Forecast Time dimension, respectivly named ("%s", "%s").  Inner Exception: %s' % (sup_agg_dim_name.encode('utf-8'), sup_fcst_dim_name.encode('utf-8'), str(ex)))
@@ -1159,24 +1175,7 @@ class IngestionService(ServiceProcess):
                 #   accomodates for this case by normalizing the supplements start and end time to be based on the same units as the
                 #   the current dataset.
                 sup_stime += runtime_offset_seconds
-                sup_etime += runtime_offset_seconds    
-
-            # Get the agg vars - if this is not an FMRC...
-            if cur_agg_var is None:
-                try:
-                    cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
-                except OOIObjectError, oe:
-                    log.exception('Time Variable name does not match its dimension name')
-                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
-
-            if sup_agg_var is None:
-
-                try:
-                    sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
-                except OOIObjectError, oe:
-                    log.exception('Time Variable name does not match its dimension name')
-                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
-
+                sup_etime += runtime_offset_seconds
 
 
             if is_overwrite:
@@ -1204,6 +1203,7 @@ class IngestionService(ServiceProcess):
 
                     # Step 1b: Fetch all blobs for the ndarrays in the match_var
                     log.debug('Fetching all blobs for the ndarrays in the supplement...')
+                    ### Should we use the repo or the merge repo here?
                     yield self._fetch_blobs(repo, need_keys)
 
                     # Step 1c: Now, grab all the array values from the ndarrays..
@@ -1213,7 +1213,9 @@ class IngestionService(ServiceProcess):
                         log.debug('>>  ndarray values = %s' % str(values))
 
                     # need to compare in the same units - to hard to convert the variable using the units string...
-                    search_times = [values[0][1], values[-1][1]]
+                    sup_var_start = values[0][1]
+                    sup_var_end = values[-1][1]
+                    search_times = [sup_var_start,sup_var_end]
 
                     log.debug('Gathering a list of keys for blobs which need to be fetched for the cur_agg_var (time)...')
                     need_keys = IngestionService._get_ndarray_keys(cur_agg_var)
@@ -1231,11 +1233,11 @@ class IngestionService(ServiceProcess):
                         log.debug('>>  ndarray values = %s' % str(values))
 
 
-                    time_indices = yield self._find_time_index(values, search_times)
+                    time_indices = self._find_time_index(values, search_times)
                     log.debug('time_indices = %s' % str(time_indices))
                     
-                    sup_sindex = time_indices[sup_stime]
-                    sup_eindex = time_indices[sup_etime]
+                    sup_sindex = time_indices[sup_var_start]
+                    sup_eindex = time_indices[sup_var_end]
                     
                     # Adjust indices when the supplement times lay between indices in the current dataset
                     if sup_sindex < 0:
@@ -1831,7 +1833,6 @@ class IngestionService(ServiceProcess):
 
 
 
-    @defer.inlineCallbacks
     def _find_time_index(self, values, search_times, THRESHOLD = 0.001):
         """
         @todo: Add documentation about what negative value returns mean
@@ -1868,22 +1869,20 @@ class IngestionService(ServiceProcess):
             if len(search_times_cpy) == 0:
                 break; 
 
-        log.debug('HEJENJWN')
 
         # Don't get it - what is the error? ValueError: need more than 2 values to unpack
         if len(search_times_cpy) > 0:
             not_in_list_val = -(len(values) + 1)
+
             for search_time in search_times_cpy:
                 results_dict[search_time] = not_in_list_val
         # don't use the copy of the list after this point -- structure is indeterminant
         search_times_cpy = None
-                
-            
+
         # Step 2b: @todo: Make sure that we aren't experiencing a roundoff issue by checking how close
         #           our search_start is to the values before and after it in the list (floats only)
          
-
-        defer.returnValue(results_dict)
+        return(results_dict)
 
 
     @defer.inlineCallbacks
