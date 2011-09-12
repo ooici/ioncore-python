@@ -28,6 +28,7 @@
   <script src="http://ion-beta.oceanobservatories.org/js/jquery.colorbox.min.js" type="text/javascript"></script>
   <script src="http://ion-beta.oceanobservatories.org/js/jquery.tmpl.min.js" type="text/javascript"></script>
   <script src="http://ion-beta.oceanobservatories.org/js/json2.js" type="text/javascript"></script>
+
   <script type="text/javascript">
     $(function() {
         var selector = '#layoutContainer', $el = $(selector);
@@ -44,6 +45,7 @@
   </script>
   <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
   <script type="text/javascript">
+
     function initialize() {
         var centerLatlng = new google.maps.LatLng(32.8581028, -117.2567035);
         var myOptions = {
@@ -65,75 +67,80 @@
   <script type="text/javascript">
     var intervalID;
     var gllasttime = '0';
-    $(document).ready(function() { 
-    
-        function dowork(lasttime, callback) {
-            req = "/data/" + lasttime;
-      
-            $.getJSON(req, function(data) {
-                gllasttime = data.lasttime;
-                intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
-                callback(data);
-            });
+
+
+    function dowork(lasttime, callback) {
+        req = "/data/" + lasttime;
+
+        $.getJSON(req, function (data) {
+            gllasttime = data.lasttime;
+            intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
+            callback(data);
+        });
+    }
+
+    //pull out lat, lng, and time from data.
+    function parsedata(curdata) {
+
+        var subscription_desc = curdata.subscription_desc;
+
+        // Determine if data block event subscription
+        if (!(subscription_desc == "4001.#" && curdata.events.length > 0)) {
+            return null;
         }
-      
-        //pull out lat, lng, and time from data.
-        function parsedata(curdata) {
 
-            var subscription_desc = curdata.subscription_desc;
-
-            // Determine if data block event subscription
-            if (!(subscription_desc == "4001.#" && curdata.events.length > 0)) return null;
-
-            var alat;
-            var alon;
-            var atime;
-            for (var j = 0; j < curdata.events.length; j++) {
-                for (var k = 0; k < curdata.events[j].length; k++) {
-                    var cchild = curdata.events[j][k];
-                    if (cchild.id == "data_block") {
-                        var datapoints = JSON.parse(cchild.content);
-                        for (var l = 0; l < datapoints.length; l++) {
-                            var datapoint = datapoints[l];
-                            if (datapoint.NMEA_CD == 'GPGGA') {
-                                alat = datapoint.GPS_LAT;
-                                alon = datapoint.GPS_LON;
-                                atime = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
-                            }
+        var alat, alon, atime;
+        var j, k, l;
+        for (j = 0; j < curdata.events.length; j++) {
+            for (k = 0; k < curdata.events[j].length; k++) {
+                var cchild = curdata.events[j][k];
+                if (cchild.id == "data_block") {
+                    var datapoints = JSON.parse(cchild.content);
+                    for (l = 0; l < datapoints.length; l++) {
+                        var datapoint = datapoints[l];
+                        if (datapoint.NMEA_CD == 'GPGGA') {
+                            alat = datapoint.GPS_LAT;
+                            alon = datapoint.GPS_LON;
+                            atime = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC;
                         }
                     }
                 }
             }
-            return {lat: alat, lon: alon, time: atime};
         }
+        return {lat: alat, lon: alon, time: atime};
+    }
 
-        function handledata(data) {
-            for (var i = 0; i < data.data.length; i++) {
-                var curdata = data.data[i]; 
-                var parsed = parsedata(curdata);
+    function handledata(data) {
+        for (var i = 0; i < data.data.length; i++) {
+            var curdata = data.data[i]; 
+            var parsed = parsedata(curdata);
 
-                if (null != parsed) {
-                    var newLatlng = new google.maps.LatLng(parsed.lat, parsed.lon);
-                    var marker = new google.maps.Marker({
-                        position: newLatlng,
-                        title:parsed.time
-                    });
+            if (null != parsed) {
+                var newLatlng = new google.maps.LatLng(parsed.lat, parsed.lon);
+                var marker = new google.maps.Marker({
+                    position: newLatlng,
+                    title:parsed.time
+                });
 
-                    marker.setMap(this.map);
-                }
+                marker.setMap(this.map);
             }
         }
-    });
+    }
 
-    $.getJSON('/ctl/sub/4001', function(data) {
-        dowork(gllasttime, handledata);
+
+
+    // set up data handling loop
+    $(function () { 
+        $.getJSON('/ctl/sub/4001', function (data) {
+            dowork(gllasttime, handledata);
+        });
     });
 
     </script>
     
     <script type="text/javascript">
-      window.onbeforeunload = function() {
-	$.getJSON('/ctl/unsub', function(data) {});
+      window.onbeforeunload = function () {
+	$.getJSON('/ctl/unsub', function (data) {});
       }
     </script>
     
