@@ -29,99 +29,106 @@
   <script src="http://ion-beta.oceanobservatories.org/js/jquery.tmpl.min.js" type="text/javascript"></script>
   <script src="http://ion-beta.oceanobservatories.org/js/json2.js" type="text/javascript"></script>
   <script type="text/javascript">
-     $(function() {
-	    var selector = '#layoutContainer', $el = $(selector);
+    $(function() {
+        var selector = '#layoutContainer', $el = $(selector);
         var layout_main = $el.layout({
-           resizerClass: 'ui-state-default',
-           north__resizable: false,
-           north__closable: false,
-           north__size: 60,
-           //west__size: 350,
-           //east__size: 350
-        });
-        $el.css('position', 'static');
-     });
+            resizerClass: 'ui-state-default',
+            north__resizable: false,
+            north__closable: false,
+            north__size: 60,
+            //west__size: 350,
+            //east__size: 350
+         });
+       $el.css('position', 'static');
+    });
   </script>
   <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
   <script type="text/javascript">
     function initialize() {
-      var centerLatlng = new google.maps.LatLng(32.8581028, -117.2567035);
-      var myOptions = {
-        zoom: 15,
-        center: centerLatlng,
-        mapTypeId: google.maps.MapTypeId.SATELLITE
-      }
-      this.map = new google.maps.Map(document.getElementById("map_div"), myOptions);
+        var centerLatlng = new google.maps.LatLng(32.8581028, -117.2567035);
+        var myOptions = {
+            zoom: 15,
+            center: centerLatlng,
+            mapTypeId: google.maps.MapTypeId.SATELLITE
+        }
+        this.map = new google.maps.Map(document.getElementById("map_div"), myOptions);
+
+        //history of points for the map
+        this.pointHistory = [];
+        for (var i = 0; i < 5; ++i) {
+            this.pointHistory[i] = null;
+        }
+        this.pointHistoryIndex = null;
     }
   </script>
 
-    <script type="text/javascript">
-        var intervalID;
-        var gllasttime = '0';
-        $(document).ready(function() { 
-
-            function dowork(lasttime, callback)
-            {
-                req = "/data/" + lasttime;
-
-                $.getJSON(req, function(data) {
-                    gllasttime = data.lasttime;
-                    intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
-                    callback(data);
-                });
-            }
-
-            function handledata(data)
-            {
-               for (var i = 0; i < data.data.length; i++)
-               {
-                  var curdata = data.data[i]; 
-                    
-                  var subscription_desc = curdata.subscription_desc;
-                    
-                  // Determine if data block event subscription
-                  if ((subscription_desc == "4001.#") && (curdata.events.length > 0))
-                  {
-                     var lat;
-                     var lon;
-                     var time;
-                     for (var j = 0; j < curdata.events.length; j++)
-                     {
-                        for (var k = 0; k < curdata.events[j].length; k++)
-                        {
-                           var cchild = curdata.events[j][k];
-                           if (cchild.id == "data_block")
-                           {
-                              var datapoints = JSON.parse(cchild.content);
-                              for (var l = 0; l < datapoints.length; l++)
-                              {
-                                 var datapoint = datapoints[l];
-                                 if (datapoint.NMEA_CD == 'GPGGA') {
-                                    lat = datapoint.GPS_LAT;
-                                    lon = datapoint.GPS_LON;
-                                    time = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
-                                 }
-                              }
-                           }
-                        }
-                     }
-
-                     var newLatlng = new google.maps.LatLng(lat,lon);
-                     var marker = new google.maps.Marker({
-                         position: newLatlng,
-                         title:time
-                     });
-
-                     marker.setMap(this.map);
-                  }
-               }
-            }
-
-            $.getJSON('/ctl/sub/4001', function(data) {
-                dowork(gllasttime, handledata);
+  <script type="text/javascript">
+    var intervalID;
+    var gllasttime = '0';
+    $(document).ready(function() { 
+    
+        function dowork(lasttime, callback) {
+            req = "/data/" + lasttime;
+      
+            $.getJSON(req, function(data) {
+                gllasttime = data.lasttime;
+                intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
+                callback(data);
             });
+        }
+      
+        //pull out lat, lng, and time from data.
+        function parsedata(curdata) {
 
-        });
+            var subscription_desc = curdata.subscription_desc;
+
+            // Determine if data block event subscription
+            if (!(subscription_desc == "4001.#" && curdata.events.length > 0)) return null;
+
+            var alat;
+            var alon;
+            var atime;
+            for (var j = 0; j < curdata.events.length; j++) {
+                for (var k = 0; k < curdata.events[j].length; k++) {
+                    var cchild = curdata.events[j][k];
+                    if (cchild.id == "data_block") {
+                        var datapoints = JSON.parse(cchild.content);
+                        for (var l = 0; l < datapoints.length; l++) {
+                            var datapoint = datapoints[l];
+                            if (datapoint.NMEA_CD == 'GPGGA') {
+                                alat = datapoint.GPS_LAT;
+                                alon = datapoint.GPS_LON;
+                                atime = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
+                            }
+                        }
+                    }
+                }
+            }
+            return {lat: alat, lon: alon, time: atime};
+        }
+
+        function handledata(data) {
+            for (var i = 0; i < data.data.length; i++) {
+                var curdata = data.data[i]; 
+                var parsed = parsedata(curdata);
+
+                if (null != parsed) {
+                    var newLatlng = new google.maps.LatLng(parsed.lat, parsed.lon);
+                    var marker = new google.maps.Marker({
+                        position: newLatlng,
+                        title:parsed.time
+                    });
+
+                    marker.setMap(this.map);
+                }
+            }
+        }
+    });
+
+    $.getJSON('/ctl/sub/4001', function(data) {
+        dowork(gllasttime, handledata);
+    });
+
     </script>
     
     <script type="text/javascript">
