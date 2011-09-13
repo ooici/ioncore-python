@@ -64,7 +64,7 @@
             this.pointHistory[i] = null;
             this.markerHistory[i] = null;
         }
-        for (var i = 0; i < 100; ++i) {
+        for (var i = 0; i < 200; ++i) {
             this.lineHistory[i] = null;
         }
         this.historyCount = 0;
@@ -118,54 +118,42 @@
         return {lat: alat, lon: alon, time: atime};
     }
 
+    function printDebugRaw(text, delim) {
+        $('#ikdebug').html($('#ikdebug').html() + delim + text);
+    }
+
     function printDebug(text) {
-        $('#ikdebug').html($('#ikdebug').html() + "<br />" + text);
+        printDebugRaw(text, "<br />");
     }
 
-    function fadeOpacityFn(i, total_length)
-    {
-        return i/total_length;
+    function fadeOpacityFn(i, total_length) {
+        return 0.1 + (0.9 * i / total_length);
     }
 
-    function fadeWidthFn(i, head_length)
-    {
-        var ret = head_length - i;
-        return max(ret, 1);
+    function fadeWidthFn(i, total_length, head_length) {
+        //var ret = i + head_length - total_length;
+        var mult = total_length - i + 1;
+        var ret = Math.pow(0.9, mult) * head_length;
+        if (1 > ret) {
+            return 1;
+        } else {
+            return ret;
+        }
     }
 
     function onNewData(dpoint) {
-        var idx = this.historyCount % this.pointHistory.length;
-        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.pointHistory.length);
-         
-        //remove oldest marker
-        if (this.pointHistory.length <= this.historyCount)
-        {
-            if (this.markerHistory[idx])
-            {
-                this.markerHistory[idx].setMap(null);
-            }
-        }
+        //make latlng point
+        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+
+        var idx = this.lineHistoryCount % this.lineHistory.length;
+        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.lineHistory.length);
 
         //remove oldest line segment
-        if (this.lineHistory.length <= this.lineHistoryCount)
-        {
-            if (this.lineHistory[idx])
-            {
+        if (this.lineHistory.length <= this.lineHistoryCount) {
+            if (this.lineHistory[idx]) {
                 this.lineHistory[idx].setMap(null);
             }
         }
-
-        //make latlng point
-        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
-        this.pointHistory[idx] = newLatlng;
-
-        //make marker
-        var marker = new google.maps.Marker({
-            position: newLatlng,
-            title: dpoint.time
-        });
-        marker.setMap(this.map);
-        this.markerHistory[idx] = marker;        
 
         //make new line segment.  google supports dynamically editing the 
         //   line by editing the path array, but we want it to fade... so
@@ -173,35 +161,36 @@
         // FIXME: maybe subdivide into segments of 10.
         if (this.lastPoint)
         {
-            var segment = new google.maps.Polyline({
-                clickable   : false,
-                geodesic    : true,
-                strokeColor : "yellow",
-                path        : [this.lastPoint, newLatlng]
-            });
+            var segment = new google.maps.Polyline({path: [this.lastPoint, newLatlng]});
             segment.setMap(this.map);
             this.lineHistory[idx] = segment;
 
             //descend through history and fade out as we go
             var startidx = this.lineHistoryCount % this.lineHistory.length;
             var i;
-            for (i = startidx + this.lineHistory.length;
-                 this.lineHistory[i] && i > startidx;
-                 i--)
-            {
-                var opts = this.lineHistory[i].getOptions();
+            //printDebug("Added segment " + idx + " iterating " + (startidx + this.lineHistory.length) + " to " + startidx);
+            //printDebug("");
+            for (i = startidx + this.lineHistory.length; i > startidx; i--) {
+                var ii = i % this.lineHistory.length;
+                //break out if we encounter a null
+                if (null == this.lineHistory[ii]) {
+                    break;
+                }
 
-                //set all widths
-                opts.strokeWeight = fadeWidthFn(i, 15);
-            
-                //set all opacities
-                opts.strokeOpacity = fadeOpacityFn(i, this.lineHistory.length);
-
-                this.lineHistory[i].setOptions(opts);
+                var opts = {
+                    clickable   : false,
+                    geodesic    : true,
+                    strokeColor : "yellow"
+                };
+                //printDebugRaw((i - startidx) + ", ", "");
+                //get options and set the widths (aka weight) and opacities
+                opts.path = this.lineHistory[ii].getPath();
+                opts.strokeWeight = fadeWidthFn(i - startidx, this.lineHistory.length, 15);
+                opts.strokeOpacity = fadeOpacityFn(i - startidx, this.lineHistory.length);
+                this.lineHistory[ii].setOptions(opts);
             }
 
             this.lineHistoryCount++;
-            printDebug("got here");
         }
 
         this.lastPoint = newLatlng;
