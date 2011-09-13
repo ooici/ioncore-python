@@ -57,10 +57,12 @@
 
         //history of points for the map
         this.pointHistory = [];
-        for (var i = 0; i < 5; ++i) {
+        this.markerHistory = []
+        for (var i = 0; i < 15; ++i) {
             this.pointHistory[i] = null;
+            this.markerHistory[i] = null;
         }
-        this.pointHistoryIndex = null;
+        this.historyCount = 0;
     }
   </script>
 
@@ -74,7 +76,7 @@
 
         $.getJSON(req, function (data) {
             gllasttime = data.lasttime;
-            intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
+            intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
             callback(data);
         });
     }
@@ -110,27 +112,51 @@
         return {lat: alat, lon: alon, time: atime};
     }
 
+    function printDebug(text) {
+        $('#ikdebug').html($('#ikdebug').html() + "<br />" + text);
+    }
+
+    function onNewData(dpoint) {
+        var idx = this.historyCount % this.pointHistory.length;
+        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.pointHistory.length);
+         
+        //remove oldest marker
+        if (this.pointHistory.length <= this.historyCount)
+        {
+            this.markerHistory[idx].setMap(null);
+        }
+
+        this.pointHistory[idx] = dpoint;
+
+        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+        var marker = new google.maps.Marker({
+            position: newLatlng,
+            title: dpoint.time
+        });
+
+        marker.setMap(this.map);
+
+        this.markerHistory[idx] = marker;        
+
+        this.historyCount++;
+
+    }
+
     function handledata(data) {
         for (var i = 0; i < data.data.length; i++) {
             var curdata = data.data[i]; 
-            var parsed = parsedata(curdata);
+            var parsed = parsedata(data.data[i]);
 
             if (null != parsed) {
-                var newLatlng = new google.maps.LatLng(parsed.lat, parsed.lon);
-                var marker = new google.maps.Marker({
-                    position: newLatlng,
-                    title:parsed.time
-                });
-
-                marker.setMap(this.map);
+                onNewData(parsed);
             }
         }
     }
 
 
-
     // set up data handling loop
     $(function () { 
+        printDebug("init");
         $.getJSON('/ctl/sub/4001', function (data) {
             dowork(gllasttime, handledata);
         });
@@ -155,7 +181,9 @@
     </div>
   </div><!-- end .ui-layout-north -->
 
+
   <div class="ui-layout-center">
+    <div id="ikdebug" style="float:right; width:250px; height:750px; overflow:auto; background-color:#eee; padding:1px;"></div>
     <div id="map_div" style="width: 1000px; height: 750px"></div>
   </div><!-- end .ui-layout-center -->
 
