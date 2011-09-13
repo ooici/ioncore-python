@@ -60,11 +60,11 @@
         this.pointHistory   = [];
         this.markerHistory  = [];
         this.lineHistory    = [];
-        for (var i = 0; i < 2; ++i) {
+        for (var i = 0; i < 1; ++i) {
             this.pointHistory[i] = null;
             this.markerHistory[i] = null;
         }
-        for (var i = 0; i < 200; ++i) {
+        for (var i = 0; i < 25; ++i) {
             this.lineHistory[i] = null;
         }
         this.historyCount = 0;
@@ -141,7 +141,50 @@
         }
     }
 
+    function fadeColorFn(i, total_length) {
+        if (i == total_length) {
+            return "red";
+        } else {
+            return "white";
+        }
+    }
+
     function onNewData(dpoint) {
+        updateLineSegments(dpoint);
+        //updateMarkers(dpoint);
+    }
+
+    function updateMarkers(dpoint) {
+        var idx = this.historyCount % this.pointHistory.length;
+        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.lineHistory.length);
+         
+        //remove oldest marker
+        if (this.pointHistory.length <= this.historyCount)
+        {
+            if (this.markerHistory[idx])
+            {
+                this.markerHistory[idx].setMap(null);
+            }
+        }
+
+        //make latlng point
+        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+        this.pointHistory[idx] = newLatlng;
+
+        //make marker
+        var marker = new google.maps.Marker({
+            title     : dpoint.time,
+            position  : newLatlng,
+            draggable : false,
+            clickable : false,
+            icon      : "http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png"
+        });
+        marker.setMap(this.map);
+        this.markerHistory[idx] = marker;
+    }
+
+    function updateLineSegments(dpoint)
+    {
         //make latlng point
         var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
 
@@ -180,13 +223,13 @@
                 var opts = {
                     clickable   : false,
                     geodesic    : true,
-                    strokeColor : "yellow"
                 };
                 //printDebugRaw((i - startidx) + ", ", "");
                 //get options and set the widths (aka weight) and opacities
                 opts.path = this.lineHistory[ii].getPath();
-                opts.strokeWeight = fadeWidthFn(i - startidx, this.lineHistory.length, 15);
+                opts.strokeWeight  = fadeWidthFn(i - startidx, this.lineHistory.length, 15);
                 opts.strokeOpacity = fadeOpacityFn(i - startidx, this.lineHistory.length);
+                opts.strokeColor   = fadeColorFn(i - startidx, this.lineHistory.length);
                 this.lineHistory[ii].setOptions(opts);
             }
 
@@ -238,7 +281,7 @@
 
 
   <div class="ui-layout-center">
-    <div id="ikdebug" style="float:right; width:250px; height:750px; overflow:auto; background-color:#eee; padding:1px;"></div>
+    <div id="ikdebug" style="display:none;float:right; width:250px; height:750px; overflow:auto; background-color:#eee; padding:1px;"></div>
     <div id="map_div" style="width: 1000px; height: 750px"></div>
   </div><!-- end .ui-layout-center -->
 
