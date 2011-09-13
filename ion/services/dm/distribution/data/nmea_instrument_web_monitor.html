@@ -56,13 +56,19 @@
         this.map = new google.maps.Map(document.getElementById("map_div"), myOptions);
 
         //history of points for the map
-        this.pointHistory = [];
-        this.markerHistory = []
-        for (var i = 0; i < 15; ++i) {
+        this.lastPoint      = null;
+        this.pointHistory   = [];
+        this.markerHistory  = [];
+        this.lineHistory    = [];
+        for (var i = 0; i < 2; ++i) {
             this.pointHistory[i] = null;
             this.markerHistory[i] = null;
         }
+        for (var i = 0; i < 100; ++i) {
+            this.lineHistory[i] = null;
+        }
         this.historyCount = 0;
+        this.lineHistoryCount = 0;
     }
   </script>
 
@@ -116,6 +122,17 @@
         $('#ikdebug').html($('#ikdebug').html() + "<br />" + text);
     }
 
+    function fadeOpacityFn(i, total_length)
+    {
+        return i/total_length;
+    }
+
+    function fadeWidthFn(i, head_length)
+    {
+        var ret = head_length - i;
+        return max(ret, 1);
+    }
+
     function onNewData(dpoint) {
         var idx = this.historyCount % this.pointHistory.length;
         printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.pointHistory.length);
@@ -123,23 +140,72 @@
         //remove oldest marker
         if (this.pointHistory.length <= this.historyCount)
         {
-            this.markerHistory[idx].setMap(null);
+            if (this.markerHistory[idx])
+            {
+                this.markerHistory[idx].setMap(null);
+            }
         }
 
-        this.pointHistory[idx] = dpoint;
+        //remove oldest line segment
+        if (this.lineHistory.length <= this.lineHistoryCount)
+        {
+            if (this.lineHistory[idx])
+            {
+                this.lineHistory[idx].setMap(null);
+            }
+        }
 
+        //make latlng point
         var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+        this.pointHistory[idx] = newLatlng;
+
+        //make marker
         var marker = new google.maps.Marker({
             position: newLatlng,
             title: dpoint.time
         });
-
         marker.setMap(this.map);
-
         this.markerHistory[idx] = marker;        
 
-        this.historyCount++;
+        //make new line segment.  google supports dynamically editing the 
+        //   line by editing the path array, but we want it to fade... so
+        //   make separate segments.  
+        // FIXME: maybe subdivide into segments of 10.
+        if (this.lastPoint)
+        {
+            var segment = new google.maps.Polyline({
+                clickable   : false,
+                geodesic    : true,
+                strokeColor : "yellow",
+                path        : [this.lastPoint, newLatlng]
+            });
+            segment.setMap(this.map);
+            this.lineHistory[idx] = segment;
 
+            //descend through history and fade out as we go
+            var startidx = this.lineHistoryCount % this.lineHistory.length;
+            var i;
+            for (i = startidx + this.lineHistory.length;
+                 this.lineHistory[i] && i > startidx;
+                 i--)
+            {
+                var opts = this.lineHistory[i].getOptions();
+
+                //set all widths
+                opts.strokeWeight = fadeWidthFn(i, 15);
+            
+                //set all opacities
+                opts.strokeOpacity = fadeOpacityFn(i, this.lineHistory.length);
+
+                this.lineHistory[i].setOptions(opts);
+            }
+
+            this.lineHistoryCount++;
+            printDebug("got here");
+        }
+
+        this.lastPoint = newLatlng;
+        this.historyCount++;
     }
 
     function handledata(data) {
