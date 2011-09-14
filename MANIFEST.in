@@ -2,3 +2,5 @@ recursive-include ion *
 recursive-include res *
 include README.txt requirements.txt LICENSE.txt Doxyfile
 include ion/core/messaging/amqp0-8.xml
+exclude res/config/ionlocal.config
+exclude res/logging/loglevelslocal.cfg
