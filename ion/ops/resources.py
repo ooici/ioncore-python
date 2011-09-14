@@ -8,6 +8,7 @@ import tempfile
 
 import time
 from ion.core import ioninit
+from ion.core.object.gpb_wrapper import WrappedMessageProperty, WrappedRepeatedCompositeProperty, WrappedRepeatedScalarProperty
 from ion.core.object.object_utils import sha1_to_hex
 from ion.services.coi.datastore import CDM_BOUNDED_ARRAY_TYPE
 from ion.services.coi.resource_registry.resource_client import ResourceClient as RC
@@ -67,7 +68,7 @@ __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYP
 __all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all'])
 
 # graphviz related
-__all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations'])
+__all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations', '_gv_resource', 'graph_resource'])
 
 
 
@@ -639,3 +640,100 @@ def _gv_resource_commits(rid):
 @defer.inlineCallbacks
 def graph_resource_commits(rid, mode="svg"):
     yield _graph(_gv_resource_commits, rid, mode)
+
+@defer.inlineCallbacks
+def _gv_resource(rid):
+    res = yield rc.get_instance(rid)
+    g = GraphvizGraph("resource-%s" % rid)
+
+    rwo = res.ResourceObject
+    g.append(GraphvizEntry(rid, None, {'label':'ID: %s\\nType: %s' % (rid, rwo.ObjectClass)}))
+
+    def pprint(wo, parentnode=None):
+        try:
+            for name, field in wo._Properties.iteritems():
+                try:
+                    field_val = field.__get__(wo)
+                except KeyError, ke:
+                    g.append(GraphvizEntry(name, None, {'label':'Error during get field (%s)' % name}))
+                    continue
+
+                # fullname is the new parent node we pass into things - fully qualified
+                if parentnode:
+                    fullname = "%s/%s" % (parentnode, name)
+                else:
+                    fullname = "%s/%s" % (rid, name)
+
+                if isinstance(field, WrappedMessageProperty):
+                    try:
+                        pprint(field_val, fullname)
+                        lbl = "WrappedMessageProperty: %s" % name
+
+                    except AttributeError, ae:
+                        log.debug("Unset CasRef Field Name: %s: catching attribute error: %s" % (name, ae))
+                    except Exception, ex:
+                        log.exception("unexpected state in a wrapped message property")
+                        continue
+
+                elif isinstance(field, WrappedRepeatedCompositeProperty):
+                    try:
+                        length = len(field_val)
+                        lbl = "%s (length: %d)" % (name, length)
+                        for i in range(length):
+                            try:
+                                # make a new node for this item
+                                nodename = "%s/comp-%d" % (fullname, i)
+                                nodelbl = "[%d] Name: %s" % (i, field_val[i].name)
+                                g.append(GraphvizEntry(nodename, None, {'label':nodelbl}))
+                                g.append(GraphvizEntry(fullname, nodename))
+
+                                pprint(field_val[i], nodename)
+
+                            except AttributeError, ex:
+                                log.exception("Attribute Error in RepeatedComposite")
+                            except KeyError, ex:
+                                log.exception("Key Error in RepeatedComposite")
+                            except Exception, ex:
+                                log.exception("Unknown excpetion in RepeatedComposite")
+
+                    except Exception, ex:
+                        log.exception('Unexpected state in a WrappedRepeatedCompositeProperty.')
+                        continue
+
+                elif isinstance(field, WrappedRepeatedScalarProperty):
+                    scalars = field_val
+                    lbl = "Scalars (length: %d)" % len(scalars)
+                    for i, scalval in enumerate(scalars[0:20]):
+                        nodename = "%s/scalar-%d" % (fullname, i)
+                        scallbl = str(scalval).replace('\n', '\\n')
+                        g.append(GraphvizEntry(nodename, None, {'label':scallbl}))
+                        g.append(GraphvizEntry(fullname, nodename))
+                    if len(scalars) > 20:
+                        lbl += " (truncated)"
+
+                else:
+                    item = field_val
+                    if field.field_type == 'TYPE_ENUM':
+                        item = field.field_enum.lookup.get(item, 'Invalid Enum Value!')
+
+                    lbl = "Name: %s\\nValue: '%s'" % (name, str(item))
+
+                # make node/connection
+                g.append(GraphvizEntry(fullname, None, {'label':lbl}))
+
+                if parentnode:
+                    g.append(GraphvizEntry(parentnode, fullname))
+                else:
+                    g.append(GraphvizEntry(rid, fullname))
+
+        except Exception, ex:
+            log.exception("well, something went wrong here (wo type %s)" % str(wo.__class__))
+            pass
+
+    pprint(rwo)
+
+    defer.returnValue(str(g))
+
+@defer.inlineCallbacks
+def graph_resource(rid, mode="svg"):
+    yield _graph(_gv_resource, rid, mode)
