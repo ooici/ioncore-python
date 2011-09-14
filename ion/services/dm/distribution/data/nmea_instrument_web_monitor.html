@@ -28,105 +28,243 @@
   <script src="http://ion-beta.oceanobservatories.org/js/jquery.colorbox.min.js" type="text/javascript"></script>
   <script src="http://ion-beta.oceanobservatories.org/js/jquery.tmpl.min.js" type="text/javascript"></script>
   <script src="http://ion-beta.oceanobservatories.org/js/json2.js" type="text/javascript"></script>
+
   <script type="text/javascript">
-     $(function() {
-	    var selector = '#layoutContainer', $el = $(selector);
+    $(function() {
+        var selector = '#layoutContainer', $el = $(selector);
         var layout_main = $el.layout({
-           resizerClass: 'ui-state-default',
-           north__resizable: false,
-           north__closable: false,
-           north__size: 60,
-           //west__size: 350,
-           //east__size: 350
-        });
-        $el.css('position', 'static');
-     });
+            resizerClass: 'ui-state-default',
+            north__resizable: false,
+            north__closable: false,
+            north__size: 60,
+            //west__size: 350,
+            //east__size: 350
+         });
+       $el.css('position', 'static');
+    });
   </script>
   <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
   <script type="text/javascript">
+
     function initialize() {
-      var centerLatlng = new google.maps.LatLng(32.8581028, -117.2567035);
-      var myOptions = {
-        zoom: 15,
-        center: centerLatlng,
-        mapTypeId: google.maps.MapTypeId.SATELLITE
-      }
-      this.map = new google.maps.Map(document.getElementById("map_div"), myOptions);
+        var centerLatlng = new google.maps.LatLng(32.8581028, -117.2567035);
+        var myOptions = {
+            zoom: 15,
+            center: centerLatlng,
+            mapTypeId: google.maps.MapTypeId.SATELLITE
+        }
+        this.map = new google.maps.Map(document.getElementById("map_div"), myOptions);
+
+        //history of points for the map
+        this.lastPoint      = null;
+        this.pointHistory   = [];
+        this.markerHistory  = [];
+        this.lineHistory    = [];
+        for (var i = 0; i < 1; ++i) {
+            this.pointHistory[i] = null;
+            this.markerHistory[i] = null;
+        }
+        for (var i = 0; i < 25; ++i) {
+            this.lineHistory[i] = null;
+        }
+        this.historyCount = 0;
+        this.lineHistoryCount = 0;
     }
   </script>
 
-    <script type="text/javascript">
-        var intervalID;
-        var gllasttime = '0';
-        $(document).ready(function() { 
+  <script type="text/javascript">
+    var intervalID;
+    var gllasttime = '0';
 
-            function dowork(lasttime, callback)
-            {
-                req = "/data/" + lasttime;
 
-                $.getJSON(req, function(data) {
-                    gllasttime = data.lasttime;
-                    intervalID = window.setTimeout(dowork, 5000, data.lasttime, callback);           
-                    callback(data);
-                });
-            }
+    function dowork(lasttime, callback) {
+        req = "/data/" + lasttime;
 
-            function handledata(data)
-            {
-               for (var i = 0; i < data.data.length; i++)
-               {
-                  var curdata = data.data[i]; 
-                    
-                  var subscription_desc = curdata.subscription_desc;
-                    
-                  // Determine if data block event subscription
-                  if ((subscription_desc == "4001.#") && (curdata.events.length > 0))
-                  {
-                     var lat;
-                     var lon;
-                     var time;
-                     for (var j = 0; j < curdata.events.length; j++)
-                     {
-                        for (var k = 0; k < curdata.events[j].length; k++)
-                        {
-                           var cchild = curdata.events[j][k];
-                           if (cchild.id == "data_block")
-                           {
-                              var datapoints = JSON.parse(cchild.content);
-                              for (var l = 0; l < datapoints.length; l++)
-                              {
-                                 var datapoint = datapoints[l];
-                                 if (datapoint.NMEA_CD == 'GPGGA') {
-                                    lat = datapoint.GPS_LAT;
-                                    lon = datapoint.GPS_LON;
-                                    time = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC
-                                 }
-                              }
-                           }
-                        }
-                     }
-
-                     var newLatlng = new google.maps.LatLng(lat,lon);
-                     var marker = new google.maps.Marker({
-                         position: newLatlng,
-                         title:time
-                     });
-
-                     marker.setMap(this.map);
-                  }
-               }
-            }
-
-            $.getJSON('/ctl/sub/4001', function(data) {
-                dowork(gllasttime, handledata);
-            });
-
+        $.getJSON(req, function (data) {
+            gllasttime = data.lasttime;
+            intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
+            callback(data);
         });
+    }
+
+    //pull out lat, lng, and time from data.
+    function parsedata(curdata) {
+
+        var subscription_desc = curdata.subscription_desc;
+
+        // Determine if data block event subscription
+        if (!(subscription_desc == "4001.#" && curdata.events.length > 0)) {
+            return null;
+        }
+
+        var alat, alon, atime;
+        var j, k, l;
+        for (j = 0; j < curdata.events.length; j++) {
+            for (k = 0; k < curdata.events[j].length; k++) {
+                var cchild = curdata.events[j][k];
+                if (cchild.id == "data_block") {
+                    var datapoints = JSON.parse(cchild.content);
+                    for (l = 0; l < datapoints.length; l++) {
+                        var datapoint = datapoints[l];
+                        if (datapoint.NMEA_CD == 'GPGGA') {
+                            alat = datapoint.GPS_LAT;
+                            alon = datapoint.GPS_LON;
+                            atime = datapoint.HOUR + ":" + datapoint.MIN + ":" + datapoint.SEC;
+                        }
+                    }
+                }
+            }
+        }
+        return {lat: alat, lon: alon, time: atime};
+    }
+
+    function printDebugRaw(text, delim) {
+        $('#ikdebug').html($('#ikdebug').html() + delim + text);
+    }
+
+    function printDebug(text) {
+        printDebugRaw(text, "<br />");
+    }
+
+    function fadeOpacityFn(i, total_length) {
+        return 0.1 + (0.9 * i / total_length);
+    }
+
+    function fadeWidthFn(i, total_length, head_length) {
+        //var ret = i + head_length - total_length;
+        var mult = total_length - i + 1;
+        var ret = Math.pow(0.9, mult) * head_length;
+        if (1 > ret) {
+            return 1;
+        } else {
+            return ret;
+        }
+    }
+
+    function fadeColorFn(i, total_length) {
+        if (i == total_length) {
+            return "red";
+        } else {
+            return "white";
+        }
+    }
+
+    function onNewData(dpoint) {
+        updateLineSegments(dpoint);
+        //updateMarkers(dpoint);
+    }
+
+    function updateMarkers(dpoint) {
+        var idx = this.historyCount % this.pointHistory.length;
+        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.lineHistory.length);
+         
+        //remove oldest marker
+        if (this.pointHistory.length <= this.historyCount)
+        {
+            if (this.markerHistory[idx])
+            {
+                this.markerHistory[idx].setMap(null);
+            }
+        }
+
+        //make latlng point
+        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+        this.pointHistory[idx] = newLatlng;
+
+        //make marker
+        var marker = new google.maps.Marker({
+            title     : dpoint.time,
+            position  : newLatlng,
+            draggable : false,
+            clickable : false,
+            icon      : "http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png"
+        });
+        marker.setMap(this.map);
+        this.markerHistory[idx] = marker;
+    }
+
+    function updateLineSegments(dpoint)
+    {
+        //make latlng point
+        var newLatlng = new google.maps.LatLng(dpoint.lat, dpoint.lon);
+
+        var idx = this.lineHistoryCount % this.lineHistory.length;
+        printDebug("new data! idx=" + idx + " hc=" + this.historyCount + " ph.l=" + this.lineHistory.length);
+
+        //remove oldest line segment
+        if (this.lineHistory.length <= this.lineHistoryCount) {
+            if (this.lineHistory[idx]) {
+                this.lineHistory[idx].setMap(null);
+            }
+        }
+
+        //make new line segment.  google supports dynamically editing the 
+        //   line by editing the path array, but we want it to fade... so
+        //   make separate segments.  
+        // FIXME: maybe subdivide into segments of 10.
+        if (this.lastPoint)
+        {
+            var segment = new google.maps.Polyline({path: [this.lastPoint, newLatlng]});
+            segment.setMap(this.map);
+            this.lineHistory[idx] = segment;
+
+            //descend through history and fade out as we go
+            var startidx = this.lineHistoryCount % this.lineHistory.length;
+            var i;
+            //printDebug("Added segment " + idx + " iterating " + (startidx + this.lineHistory.length) + " to " + startidx);
+            //printDebug("");
+            for (i = startidx + this.lineHistory.length; i > startidx; i--) {
+                var ii = i % this.lineHistory.length;
+                //break out if we encounter a null
+                if (null == this.lineHistory[ii]) {
+                    break;
+                }
+
+                var opts = {
+                    clickable   : false,
+                    geodesic    : true,
+                };
+                //printDebugRaw((i - startidx) + ", ", "");
+                //get options and set the widths (aka weight) and opacities
+                opts.path = this.lineHistory[ii].getPath();
+                opts.strokeWeight  = fadeWidthFn(i - startidx, this.lineHistory.length, 15);
+                opts.strokeOpacity = fadeOpacityFn(i - startidx, this.lineHistory.length);
+                opts.strokeColor   = fadeColorFn(i - startidx, this.lineHistory.length);
+                this.lineHistory[ii].setOptions(opts);
+            }
+
+            this.lineHistoryCount++;
+        }
+
+        this.lastPoint = newLatlng;
+        this.historyCount++;
+    }
+
+    function handledata(data) {
+        for (var i = 0; i < data.data.length; i++) {
+            var curdata = data.data[i]; 
+            var parsed = parsedata(data.data[i]);
+
+            if (null != parsed) {
+                onNewData(parsed);
+            }
+        }
+    }
+
+
+    // set up data handling loop
+    $(function () { 
+        printDebug("init");
+        $.getJSON('/ctl/sub/4001', function (data) {
+            dowork(gllasttime, handledata);
+        });
+    });
+
     </script>
     
     <script type="text/javascript">
-      window.onbeforeunload = function() {
-	$.getJSON('/ctl/unsub', function(data) {});
+      window.onbeforeunload = function () {
+	$.getJSON('/ctl/unsub', function (data) {});
       }
     </script>
     
@@ -141,7 +279,9 @@
     </div>
   </div><!-- end .ui-layout-north -->
 
+
   <div class="ui-layout-center">
+    <div id="ikdebug" style="display:none;float:right; width:250px; height:750px; overflow:auto; background-color:#eee; padding:1px;"></div>
     <div id="map_div" style="width: 1000px; height: 750px"></div>
   </div><!-- end .ui-layout-center -->
 
