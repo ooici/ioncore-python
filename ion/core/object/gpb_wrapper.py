@@ -768,7 +768,7 @@ class Wrapper(object):
 
         elif self.IsRoot:
             # If this is a straight invalidation - clear the derived wrappers if root
-            for item in self.DerivedWrappers.values():
+            for item in self.DerivedWrappers.itervalues():
                 item.Invalidate()
 
         # Source must always be set to self or another gpb_wrapper object!
@@ -1606,8 +1606,8 @@ class ContainerWrapper(object):
 
     def Invalidate(self, source=None):
         self._gpbcontainer = None
-        if source is not None:
-            self._source = source
+        self._source = source
+        self.Repository = None
 
     @GPBSourceCW
     def __setitem__(self, key, value):
@@ -1858,8 +1858,9 @@ class ScalarContainerWrapper(object):
 
     def Invalidate(self, source=None):
         self._gpbcontainer = None
-        if source is not None:
-            self._source = source
+        self._source = source
+        self.Repository = None
+
 
     @GPBSourceSCW
     def append(self, value):

@@ -666,6 +666,9 @@ class Repository(ObjectContainer):
         #print self._dotgit
         #print other._dotgit
 
+        if self._dotgit is None:
+            return False
+
         if self._dotgit == other._dotgit:
 
             return True
@@ -681,6 +684,8 @@ class Repository(ObjectContainer):
 
     @property
     def repository_key(self):
+        if self._dotgit is None:
+            raise RepositoryError('DotGit object in repository is None - this repo has been cleared!')
         return self._dotgit.repositorykey
 
     def _set_persistent(self, value):
@@ -753,6 +758,7 @@ class Repository(ObjectContainer):
 
 
         self._dotgit.Invalidate()
+        self._dotgit = None
 
         self._workspace.clear()
         self.index_hash.clear()
@@ -792,6 +798,8 @@ class Repository(ObjectContainer):
         """
         Convience method to access the branches from the mutable head (dotgit object)
         """
+        if self._dotgit is None:
+            raise RepositoryError('DotGit object in repository is None - this repo has been cleared!')
         return self._dotgit.branches
 
 
