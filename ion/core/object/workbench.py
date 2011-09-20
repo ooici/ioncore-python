@@ -1053,19 +1053,34 @@ class WorkBench(object):
                 self._load_commits(link,loaded=loaded)
 
         if repo._dotgit == head:
-            return
 
-        if len(repo.branches) == 0:
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+        elif len(repo.branches) == 0:
             # if we are doing a clone - pulling a new repository
+
+            # no need to delete the branches - there are not any!
+            repo._dotgit.Invalidate()
+
             repo._dotgit = head
             if len(repo.branches)>1:
                 log.warn('Do not assume branch order is unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
-            return
-        
-        # The current repository state must be merged with the new head.
-        self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
 
+        else:
+            # The current repository state must be merged with the new head.
+            self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
+
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+            
+        return
 
 
     def _merge_repo_heads(self, existing_head, new_head, existing_commits=None):
