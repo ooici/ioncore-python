@@ -1721,6 +1721,8 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
 
+        self._old_workbench = self.workbench
+        self.workbench.clear()
         # Create a specialized workbench for the datastore which has a persistent back end.
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
