@@ -714,7 +714,7 @@ class DataStoreTest(IonTestCase):
 
         yield self.failUnlessFailure(lcsdef, ReceivedApplicationError)
 
-    """
+
 
 
     @defer.inlineCallbacks
@@ -734,7 +734,7 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+            self.wb1.workbench.manage_workbench_cache('Default Context')
 
             log.info(pu.print_memory_usage())
             log.info("WB1: %s" % self.wb1.workbench_memory())
@@ -781,6 +781,8 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
+            self.wb1.workbench.manage_workbench_cache('Default Context')
+
             log.info("WB1: %s" % self.wb1.workbench_memory())
             log.info("DS1: %s" % self.ds1.workbench_memory())
             log.info("Expect memory to grow unless you are using cassandra backend and the cache is full")
@@ -788,7 +790,6 @@ class DataStoreTest(IonTestCase):
             mem = yield pu.print_memory_usage()
             log.info(mem)
 
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
 
 
 
@@ -799,7 +800,7 @@ class DataStoreTest(IonTestCase):
 
         for i in range(self.repetitions):
             yield self.test_checkout_defaults()
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+            self.wb1.workbench.manage_workbench_cache('Default Context')
 
             for key, repo in self.wb1.workbench._repo_cache.iteritems():
                 log.info('Repo Name - %s, size - %d, # of blobs - %d' % (key, repo.__sizeof__(), len(repo.index_hash)))
@@ -810,7 +811,7 @@ class DataStoreTest(IonTestCase):
             mem = yield pu.print_memory_usage()
             log.info(mem)
 
-    """
+
 
 class MulitDataStoreTest(IonTestCase):
     """

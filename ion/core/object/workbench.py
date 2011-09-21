@@ -95,6 +95,11 @@ class WorkBench(object):
         self._repo_cache = LRUDict(cache_size, use_size=True)
 
 
+        # Set a default value for Purging Previous States
+        # It must be possible to turn this off for certain workbench tests.
+        self._purge_previous = True
+
+
         """
         A cache - shared between repositories for hashed objects
         """  
@@ -318,9 +323,14 @@ class WorkBench(object):
         # Delete it from the deterministically held repo dictionary
         del self._repos[key]
 
+        # Can only do this if we are not testing the work bench class without persistence
+        if self._purge_previous is True:
+            repo.purge_previous_states()
+
         repo.purge_workspace()
 
         repo.purge_associations()
+
 
         # Move it to the cached repositories
         self._repo_cache[key] = repo
@@ -524,7 +534,16 @@ class WorkBench(object):
         else:
             cloning = False
             # If we have a current version - get the list of commits
-            commit_list = self.list_repository_commits(repo)
+            #commit_list = self.list_repository_commits(repo)
+
+            if get_head_content:
+                # Add all blobs to the commit list - not just the commits...
+                commit_list = self.list_repository_blobs(repo)
+            else:
+                # We are only concerned with the commits...
+                commit_list = self.list_repository_commits(repo)
+
+
 
         # set excluded types on this repository
         if excluded_types is not None:
@@ -673,10 +692,12 @@ class WorkBench(object):
             blobs = self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.itervalues():
-                link = response.blob_elements.add()
-                obj = response.Repository._wrap_message_object(element._element)
 
-                link.SetLink(obj)
+                if element.key not in puller_has:
+                    link = response.blob_elements.add()
+                    obj = response.Repository._wrap_message_object(element._element)
+
+                    link.SetLink(obj)
 
             log.debug('Added blobs to the response')
 
@@ -996,7 +1017,8 @@ class WorkBench(object):
             comment='Commiting to send message with wrapper object'
             repo.commit(comment=comment)
         '''
-        
+
+        '''
         cref_set = set()
         for branch in repo.branches:
 
@@ -1022,6 +1044,11 @@ class WorkBench(object):
 
         key_list = []
         key_list.extend(key_set)
+        '''
+
+        # Just use the commit index dictionary...
+        key_list = repo._commit_index.keys()
+
         return key_list
 
     def list_repository_blobs(self, repo):
@@ -1053,19 +1080,34 @@ class WorkBench(object):
                 self._load_commits(link,loaded=loaded)
 
         if repo._dotgit == head:
-            return
 
-        if len(repo.branches) == 0:
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+        elif len(repo.branches) == 0:
             # if we are doing a clone - pulling a new repository
+
+            # no need to delete the branches - there are not any!
+            repo._dotgit.Invalidate()
+
             repo._dotgit = head
             if len(repo.branches)>1:
                 log.warn('Do not assume branch order is unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
-            return
-        
-        # The current repository state must be merged with the new head.
-        self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
 
+        else:
+            # The current repository state must be merged with the new head.
+            self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
+
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+            
+        return
 
 
     def _merge_repo_heads(self, existing_head, new_head, existing_commits=None):

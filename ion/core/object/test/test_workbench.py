@@ -283,7 +283,8 @@ class WorkBenchProcess(Process):
 
         Process.__init__(self, *args, **kwargs)
 
-
+        # Over ride purge previous for local testing...
+        self.workbench._purge_previous = False
 
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
