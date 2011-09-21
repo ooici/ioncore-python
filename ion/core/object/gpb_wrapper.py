@@ -1304,7 +1304,7 @@ class Wrapper(object):
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
         # This is dangerous - this can result in an exception loop!
-        if hasattr(self._repository, '_dotgit') and not self._repository._dotgit.Invalid:
+        if hasattr(self._repository, '_dotgit') and self._repository._dotgit is not None and not self._repository._dotgit.Invalid:
             output += 'Repository: %s \n' % str(self._repository.repository_key)
         else:
             output += 'Repository: %s \n' % str(self._repository)
