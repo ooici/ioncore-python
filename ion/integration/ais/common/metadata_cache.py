@@ -464,6 +464,10 @@ class MetadataCache(AIS_Mixin):
 
         try:
             dSet = yield self.rc.get_instance(dSetID)
+
+            # Since the Resource is persistent, this must be done manually!
+            dSet.Repository.purge_previous_states()
+
             yield self.__loadDSetMetadata(dSet)
         except ResourceClientError:    
             log.error('get_instance failed for data set ID %s !' %(dSetID))
@@ -481,6 +485,10 @@ class MetadataCache(AIS_Mixin):
 
         try:
             dSource = yield self.rc.get_instance(dSourceID)
+
+            # Since the Resource is persistent, this must be done manually!
+            dSource.Repository.purge_previous_states()
+
             self.__loadDSourceMetadata(dSource)
         except ResourceClientError:    
             log.error('get_instance failed for data source ID %s !' %(dSourceID))
