@@ -434,10 +434,10 @@ class DataStoreWorkbench(WorkBench):
 
             for element in blobs.itervalues():
 
-
-                link = response.blob_elements.add()
-                obj = response.Repository._wrap_message_object(element._element)
-                link.SetLink(obj)
+                if element.key not in puller_has:
+                    link = response.blob_elements.add()
+                    obj = response.Repository._wrap_message_object(element._element)
+                    link.SetLink(obj)
 
                 #def log_wrapper():
                 #    log.critical("CALLING INVALIDATE!!!\n%s" % obj.Debug())
@@ -1721,6 +1721,8 @@ class DataStoreService(ServiceProcess):
         
         log.info("Created stores")
 
+        self._old_workbench = self.workbench
+        self.workbench.clear()
         # Create a specialized workbench for the datastore which has a persistent back end.
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store, cache_size=self._cache_size)
 
