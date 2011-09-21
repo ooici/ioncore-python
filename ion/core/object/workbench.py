@@ -81,7 +81,7 @@ class WorkBenchError(ApplicationError):
 
 class WorkBench(object):
     
-    def __init__(self, process, cache_size=10**7, purge_previous=True):
+    def __init__(self, process, cache_size=10**7):
     
         self._process = process
 
@@ -95,7 +95,9 @@ class WorkBench(object):
         self._repo_cache = LRUDict(cache_size, use_size=True)
 
 
-        self._purge_previous = purge_previous
+        # Set a default value for Purging Previous States
+        # It must be possible to turn this off for certain workbench tests.
+        self._purge_previous = True
 
 
         """
