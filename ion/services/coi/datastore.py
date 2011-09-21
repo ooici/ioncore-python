@@ -434,10 +434,10 @@ class DataStoreWorkbench(WorkBench):
 
             for element in blobs.itervalues():
 
-
-                link = response.blob_elements.add()
-                obj = response.Repository._wrap_message_object(element._element)
-                link.SetLink(obj)
+                if element.key not in puller_has:
+                    link = response.blob_elements.add()
+                    obj = response.Repository._wrap_message_object(element._element)
+                    link.SetLink(obj)
 
                 #def log_wrapper():
                 #    log.critical("CALLING INVALIDATE!!!\n%s" % obj.Debug())

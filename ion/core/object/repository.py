@@ -1249,6 +1249,28 @@ class Repository(ObjectContainer):
         self._workspace_root = None
 
 
+    def purge_previous_states(self):
+
+
+        if self.status == self.MODIFIED:
+
+            #@TODO consider changing this to a warning rather than an exception
+            log.warn('Can not call purge previous states on a repository in a modified state!')
+            return
+
+        data_blobs = set(self.index_hash.keys()).difference(set(self._commit_index.keys()))
+
+        old_data_blobs = data_blobs.difference(set(self._workspace.keys()))
+
+        for key in old_data_blobs:
+            del self.index_hash[key]
+
+
+        return
+
+
+
+
     def purge_associations(self):
 
         self.associations_as_object.predicate_sorted_associations.clear()

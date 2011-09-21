@@ -81,7 +81,7 @@ class WorkBenchError(ApplicationError):
 
 class WorkBench(object):
     
-    def __init__(self, process, cache_size=10**7):
+    def __init__(self, process, cache_size=10**7, purge_previous=True):
     
         self._process = process
 
@@ -93,6 +93,9 @@ class WorkBench(object):
 
         # A Cache of repositories that holds upto a certain size between op message calls.
         self._repo_cache = LRUDict(cache_size, use_size=True)
+
+
+        self._purge_previous = purge_previous
 
 
         """
@@ -318,9 +321,14 @@ class WorkBench(object):
         # Delete it from the deterministically held repo dictionary
         del self._repos[key]
 
+        # Can only do this if we are not testing the work bench class without persistence
+        if self._purge_previous is True:
+            repo.purge_previous_states()
+
         repo.purge_workspace()
 
         repo.purge_associations()
+
 
         # Move it to the cached repositories
         self._repo_cache[key] = repo
@@ -524,7 +532,16 @@ class WorkBench(object):
         else:
             cloning = False
             # If we have a current version - get the list of commits
-            commit_list = self.list_repository_commits(repo)
+            #commit_list = self.list_repository_commits(repo)
+
+            if get_head_content:
+                # Add all blobs to the commit list - not just the commits...
+                commit_list = self.list_repository_blobs(repo)
+            else:
+                # We are only concerned with the commits...
+                commit_list = self.list_repository_commits(repo)
+
+
 
         # set excluded types on this repository
         if excluded_types is not None:
@@ -673,10 +690,12 @@ class WorkBench(object):
             blobs = self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.itervalues():
-                link = response.blob_elements.add()
-                obj = response.Repository._wrap_message_object(element._element)
 
-                link.SetLink(obj)
+                if element.key not in puller_has:
+                    link = response.blob_elements.add()
+                    obj = response.Repository._wrap_message_object(element._element)
+
+                    link.SetLink(obj)
 
             log.debug('Added blobs to the response')
 
@@ -996,7 +1015,8 @@ class WorkBench(object):
             comment='Commiting to send message with wrapper object'
             repo.commit(comment=comment)
         '''
-        
+
+        '''
         cref_set = set()
         for branch in repo.branches:
 
@@ -1022,6 +1042,11 @@ class WorkBench(object):
 
         key_list = []
         key_list.extend(key_set)
+        '''
+
+        # Just use the commit index dictionary...
+        key_list = repo._commit_index.keys()
+
         return key_list
 
     def list_repository_blobs(self, repo):
