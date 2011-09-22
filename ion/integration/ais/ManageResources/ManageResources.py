@@ -48,7 +48,7 @@ class DictObj(object):
 
 class ManageResources(object):
     
-   def __init__(self, ais):
+   def __init__(self, ais, metadataCache):
       log.debug('ManageResources.__init__()')
       DatasetValues = DATASET_RESOURCE_TYPE_ID, \
                       self.__LoadDatasetColumnData, \
@@ -86,6 +86,9 @@ class ManageResources(object):
       self.asc = AssociationServiceClient(proc=ais)
       self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
+
+      self.metadataCache = metadataCache
+
 
       self.ais = ais
 
@@ -325,28 +328,48 @@ class ManageResources(object):
       HeaderFunc(Response.message_parameters_reference[0])
 
       # load the attributes for each resource that was found into response
-      i = 0
-      while i < len(Result.idrefs):
-         # load the attributes of the resource into response
-         Response.message_parameters_reference[0].resources.add()
-         if ResourceType == EPU_CONTROLLER_TYPE_ID:
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
-         else:
-            # need to get the actual resource from it's ooi_id
-            ResID = Result.idrefs[i].key
-            log.debug('Working on ResID: ' + ResID)        
-            try:
-                Resource = yield self.rc.get_instance(ResID)
-            except ApplicationError, ex:
-                # build AIS error response
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
-                Response.error_num = Response.ResponseCodes.NOT_FOUND
-                Response.error_str = 'AIS.getResourcesOfType: Error calling get_instance: '+str(ex)
-                defer.returnValue(Response)
-            # debug print for dumping the attributes of the resource
-            PrintFunc(Resource)           
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
-         i = i + 1
+
+      if ResourceType == EPU_CONTROLLER_TYPE_ID:
+
+          for i, idref in enumerate(Result.idrefs):
+             # load the attributes of the resource into response
+             Response.message_parameters_reference[0].resources.add()
+
+             LoaderFunc(Response.message_parameters_reference[0].resources[i], idref)
+
+
+      else:
+
+          for i, idref in enumerate(Result.idrefs):
+              # need to get the actual resource from it's ooi_id
+              ResID = idref.key
+              log.debug('Working on ResID: ' + ResID)
+
+              Resource = None
+
+              # If it is a data set or a data source - try to get it from the metadata cache
+              if ResourceType == DATASET_RESOURCE_TYPE_ID:
+                  Resource = yield self.metadataCache.getDSet(ResID)
+              elif ResourceType == DATASOURCE_RESOURCE_TYPE_ID:
+                  Resource = yield self.metadataCache.getDSource(ResID)
+
+              # If it is an identity or not found in the metadata cache - get it from the datastore!
+              if Resource is None:
+                  try:
+                      Resource = yield self.rc.get_instance(ResID)
+                  except ApplicationError, ex:
+                      # build AIS error response
+                      Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
+                      Response.error_num = Response.ResponseCodes.NOT_FOUND
+                      Response.error_str = 'AIS.getResourcesOfType: Error calling get_instance: '+str(ex)
+                      defer.returnValue(Response)
+
+              # debug print for dumping the attributes of the resource
+              Response.message_parameters_reference[0].resources.add()
+
+              PrintFunc(Resource)
+              LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
+
 
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
@@ -443,8 +466,12 @@ class ManageResources(object):
 
       try:
          AddItem('source_type', self.SourceTypes[From.source_type])
-         AddItem('property', From.property[0])
-         AddItem('station_id', From.station_id[0])
+
+         if len(From.property) > 0:
+             AddItem('property', From.property[0])
+
+         if len(From.station_id) >0:
+             AddItem('station_id', From.station_id[0])
          AddItem('request_type', self.RequestTypes[From.request_type])
          AddItem('request_bounds_north', str(From.request_bounds_north))
          AddItem('request_bounds_south', str(From.request_bounds_south))
