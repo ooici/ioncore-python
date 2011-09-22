@@ -1011,40 +1011,6 @@ class WorkBench(object):
         The return value is a list of binary SHA1 keys
         """
 
-        '''
-        if repo.status == repo.MODIFIED:
-            log.warn('Automatic commit called during pull. Commit should be called first!')
-            comment='Commiting to send message with wrapper object'
-            repo.commit(comment=comment)
-        '''
-
-        '''
-        cref_set = set()
-        for branch in repo.branches:
-
-            for cref in branch.commitrefs:
-                cref_set.add(cref)
-
-        key_set = set()
-
-        while len(cref_set)>0:
-            new_set = set()
-
-            for cref in cref_set:
-
-                if cref.MyId not in key_set:
-                    key_set.add(cref.MyId)
-
-                    for prefs in cref.parentrefs:
-                        new_set.add(prefs.commitref)
-
-
-            # Now recurse on the ancestors
-            cref_set = new_set
-
-        key_list = []
-        key_list.extend(key_set)
-        '''
 
         # Just use the commit index dictionary...
         key_list = repo._commit_index.keys()
@@ -1058,12 +1024,7 @@ class WorkBench(object):
 
         The method is a bit trivial - candidate for removal!
         """
-        '''
-        if repo.status == repo.MODIFIED:
-            log.warn('Automatic commit called during push. Commit should be called first!')
-            comment='Commiting to push repo.'
-            repo.commit(comment=comment)
-        '''
+
 
         return repo.index_hash.keys()
 
