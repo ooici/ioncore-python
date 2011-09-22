@@ -77,7 +77,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
             Worker process for the AIS service
             """
 
-        worker = AIS_Worker_Process(**{'proc-name':name})
+        worker = AIS_Worker_Process(spawnargs={'proc-name':name})
 
         worker.mc = worker.message_client
         worker.rc = ResourceClient(worker)
@@ -95,7 +95,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
     def slc_init(self):
 
         #== Create a process for the metadata cache and data resource workers
-        data_resource_worker = yield self.spawn_worker('data_resource_worker')
+        data_resource_worker = yield self.spawn_worker('resource_cache_worker')
         self._data_resource_worker = data_resource_worker
 
         metadataCache = MetadataCache(data_resource_worker)
@@ -120,7 +120,7 @@ class AppIntegrationService(ServiceProcess, AIS_Mixin):
 
         self.ManageDataResourceSubscriptionWorker = ManageDataResourceSubscription(self, metadataCache)
 
-        self.ManageResourcesWorker = ManageResources(self)
+        self.ManageResourcesWorker = ManageResources(self,metadataCache)
 
         self.ManageDataResourceWorker = ManageDataResource(self)
 
