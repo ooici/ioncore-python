@@ -58,7 +58,7 @@ setup( name = 'ioncore',
            'pyserial==2.5',
            'hoover==0.5.2',
            'setproctitle==1.1.2',
-           'ionproto>=0.3.39',
+           'ionproto==1.1.0',
                           ],
        entry_points = {
                         'console_scripts': [
