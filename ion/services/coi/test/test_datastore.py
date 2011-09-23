@@ -813,6 +813,35 @@ class DataStoreTest(IonTestCase):
 
 
 
+    def create_many_commits(self,repo, number):
+
+        for n in range(number):
+            repo.root_object.title = 'WB Title Commit: %s' % str(n)
+            repo.commit('repo %s commit' % str(n))
+
+        return
+
+
+    @defer.inlineCallbacks
+    def test_truncate_commits(self):
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        self.create_many_commits(repo,30)
+
+        result = yield self.wb1.workbench.push('datastore',repo)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        self.create_many_commits(repo,30)
+
+        result = yield self.wb1.workbench.push('datastore',repo)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+
+
 class MulitDataStoreTest(IonTestCase):
     """
     Testing Datastore service.

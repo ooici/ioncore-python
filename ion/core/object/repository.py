@@ -1244,9 +1244,8 @@ class Repository(ObjectContainer):
 
                         old_commit_keys.remove(parent.MyId)
 
-
             commits_front = new_front
-            new_front = new_front.clear()
+            new_front = set()
 
         for key in old_commit_keys:
 
