@@ -1067,6 +1067,8 @@ class WorkBench(object):
 
             head.Invalidate()
 
+        repo.truncate_commits()
+
             
         return
 

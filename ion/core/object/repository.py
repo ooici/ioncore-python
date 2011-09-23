@@ -1210,6 +1210,53 @@ class Repository(ObjectContainer):
 
         return ancestor
 
+    def truncate_commits(self, ncom=50):
+
+        # the set of all commits - from which we will remove the newest 50
+        old_commit_keys = set(self._commit_index.keys())
+
+        # bail early if there are less than 50 commits
+        if len(old_commit_keys) <= ncom:
+            return
+
+        # the front wave of commits - starting with head
+        commits_front = self.current_heads()
+
+        if len(commits_front) > 10:
+            raise RepositoryError('Unexpectedly high number of branches - something is wrong with this repo! \n%s' % str(self))
+
+        keep_commit_keys = set([cref.MyId for cref in commits_front])
+
+        new_front = set()
+        while len(keep_commit_keys) < ncom:
+
+            for cref in commits_front:
+
+                for pref in cref.parentrefs:
+
+                    parent = pref.commitref
+
+                    if parent.MyId not in keep_commit_keys:
+
+                        keep_commit_keys.add(parent.MyId)
+
+                        new_front.add(parent)
+
+                        old_commit_keys.remove(parent.MyId)
+
+
+            commits_front = new_front
+            new_front = new_front.clear()
+
+        for key in old_commit_keys:
+
+            del self._commit_index[key]
+            del self.index_hash[key]
+
+        return
+
+
+
     def reset(self):
         
         if self.status != self.MODIFIED:
