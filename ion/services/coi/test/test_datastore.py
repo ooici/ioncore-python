@@ -12,6 +12,8 @@ from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
 from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
 
+from ion.core.object.test.test_workbench import WorkBenchProcess
+
 import ion.util.ionlog
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -810,6 +812,72 @@ class DataStoreTest(IonTestCase):
 
             mem = yield pu.print_memory_usage()
             log.info(mem)
+
+
+
+    def create_many_commits(self,repo, number):
+
+        for n in range(number):
+            repo.root_object.title = 'WB Title Commit: %s' % str(n)
+            repo.commit('repo %s commit' % str(n))
+
+        return
+
+
+    @defer.inlineCallbacks
+    def test_truncate_commits(self):
+
+        log.info('Create 30 commits and push to datastore')
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.create_many_commits(repo,30)
+        result = yield self.wb1.workbench.push('datastore',repo)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        log.info('Create 30 more commits and push to datastore')
+        self.create_many_commits(repo,30)
+        result = yield self.wb1.workbench.push('datastore',repo)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        log.info('Create a new workbench process and pull from datastore')
+        wb2 = WorkBenchProcess()
+        yield wb2.spawn()
+
+        result = yield wb2.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo2 = wb2.workbench.get_repository(self.repo_key)
+        yield repo2.checkout('master')
+
+        log.info('Create 61 commits and push to datastore from workbench 2')
+        self.create_many_commits(repo2,61)
+        # Test pushing more than the default number to truncate...
+        result = yield wb2.workbench.push('datastore',repo2)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        self.assertEqual(len(repo2._commit_index),111)
+
+
+
+        log.info('Pull it back to wb2 again - to clear the number of commits')
+        result = yield wb2.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo2 = wb2.workbench.get_repository(self.repo_key)
+        yield repo2.checkout('master')
+
+
+
+        log.info('Pull it all back to workbench 1...')
+        # Now pull it back to the original...
+        result = yield self.wb1.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        yield repo.checkout('master')
+
 
 
 
