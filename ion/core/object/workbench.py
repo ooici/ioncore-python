@@ -1172,6 +1172,8 @@ class WorkBench(object):
                             log.debug('Commit history is truncated... found oldest commit')
                             break
 
+                    log.warn('REPO (%s) Branch Syncing: newest existing commit date - %s, oldest new commit date - %s, new commit ref count - %d ' % (repo.repository_key, existing_cref.date, pref.date, cref_count))
+
                     if pref.date > existing_cref.date and cref_count > 10:
                         # If all these new commits - and there better be at least 10 of them... are newer than the newest
                         # existing commit - assume that it is not a merge but just a gap in the history!
