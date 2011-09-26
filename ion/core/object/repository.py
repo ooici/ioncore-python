@@ -1259,6 +1259,8 @@ class Repository(ObjectContainer):
 
         for key in old_commit_keys:
 
+            cref = self._commit_index[key]
+            cref.Invalidate()
             del self._commit_index[key]
             del self.index_hash[key]
 
