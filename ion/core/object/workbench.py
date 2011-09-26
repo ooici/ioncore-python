@@ -1029,7 +1029,7 @@ class WorkBench(object):
         return repo.index_hash.keys()
 
 
-    def _update_repo_to_head(self, repo, head):
+    def _update_repo_to_head(self, repo, head, truncate_commits=True):
         log.debug('_update_repo_to_head: Loading a repository!')
 
         existing_commits = repo._commit_index.copy()
@@ -1067,7 +1067,8 @@ class WorkBench(object):
 
             head.Invalidate()
 
-        repo.truncate_commits()
+        if truncate_commits:
+            repo.truncate_commits()
 
             
         return
@@ -1154,6 +1155,31 @@ class WorkBench(object):
                         found = True
                         existing_link.key = new_link.key # Cheat and just copy the key!
 
+                        continue
+
+
+                    #### Check to see if the history has been truncated since the last time we pulled.
+
+                    # Get the oldest of the new commits
+                    pref = new_cref
+                    cref_count = 0
+                    while pref.parentrefs:
+                        cref_count +=1
+                        pref_obj = pref.parentrefs[0]
+                        try:
+                            pref = pref_obj.commitref
+                        except KeyError:
+                            log.debug('Commit history is truncated... found oldest commit')
+                            break
+
+                    if pref.date > existing_cref.date and cref_count > 10:
+                        # If all these new commits - and there better be at least 10 of them... are newer than the newest
+                        # existing commit - assume that it is not a merge but just a gap in the history!
+                        found = True
+                        existing_link.key = new_link.key
+
+
+
                     # Anything state that is not caught by these three options is
                     # resolved in the else of the for loop by adding this divergent
                     # state to the existing (local) repositories branch
@@ -1203,11 +1229,11 @@ class WorkBench(object):
 
         try:
             cref = repo.get_linked_object(link)
-        except repository.RepositoryError, ex:
-            log.exception(str(repo))
-            raise WorkBenchError('Commit id not found while loading commits: \n %s' % link.key)
+        except KeyError:
+            log.info('Commit history has been truncated!')
             # This commit ref was not actually sent!
-
+            return
+        
         if cref.ObjectType != COMMIT_TYPE:
             raise WorkBenchError('This method should only load commits!')
 
@@ -1215,8 +1241,14 @@ class WorkBench(object):
 
         for parent in cref.parentrefs:
             link = parent.GetLink('commitref')
+
             # load the linked object no matter what to realize parent child relationships
-            obj = repo.get_linked_object(link)
+            try:
+                obj = repo.get_linked_object(link)
+            except KeyError:
+                log.info('Commit history has been truncated!')
+                return
+
 
             # Call this method recursively for each link
             if link.key not in loaded:
