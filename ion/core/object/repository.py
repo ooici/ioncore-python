@@ -243,8 +243,9 @@ class ObjectContainer(object):
         """
         output  = '============== %s  ==============\n' % self.__class__.__name__
 
-        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
-        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of commit objects: %d \n' % len(self._commit_index)
         output += 'Excluded types:\n'
 
         try:
@@ -614,8 +615,9 @@ class Repository(ObjectContainer):
 
         output  = '============== Repository (status: %s) ==============\n' % self.status
 
-        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
-        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of commit objects: %d \n' % len(self._commit_index)
         output += 'Current context identifier for repository: %s \n' % self.convid_context
         output += 'Cached (%s) and Persistent (%s) settings \n' % (str(self.cached), str(self.persistent))
         if self._current_branch is not None:
@@ -1209,6 +1211,65 @@ class Repository(ObjectContainer):
                 raise RepositoryError('No common ancestor found for commit ref.')
 
         return ancestor
+
+    def truncate_commits(self, ncom=50):
+
+        log.info('Truncating Commits in repository -  %s' % self.repository_key)
+
+        # the set of all commits - from which we will remove the newest 50
+        old_commit_keys = set(self._commit_index.keys())
+
+        # bail early if there are less than 50 commits
+        if len(old_commit_keys) <= ncom:
+            return
+
+        # the front wave of commits - starting with head
+        commits_front = self.current_heads()
+
+        if len(commits_front) > 10:
+            raise RepositoryError('Unexpectedly high number of branches - something is wrong with this repo! \n%s' % str(self))
+
+        # Set the head
+        keep_commit_keys = set([cref.MyId for cref in commits_front])
+
+        # and remove them from the old list
+        for key in keep_commit_keys:
+            old_commit_keys.remove(key)
+
+        # Now iterate their parents keeping the newest generations...
+        new_front = set()
+        while len(keep_commit_keys) < ncom:
+
+            for cref in commits_front:
+
+                for pref in cref.parentrefs:
+
+                    parent = pref.commitref
+
+                    if parent.MyId not in keep_commit_keys:
+
+                        keep_commit_keys.add(parent.MyId)
+
+                        new_front.add(parent)
+
+                        old_commit_keys.remove(parent.MyId)
+
+            commits_front = new_front
+            new_front = set()
+
+        for key in old_commit_keys:
+
+            cref = self._commit_index[key]
+            cref.Invalidate()
+            del self._commit_index[key]
+            del self.index_hash[key]
+
+        log.info('Truncate Commits - Complete!')
+
+
+        return
+
+
 
     def reset(self):
         
