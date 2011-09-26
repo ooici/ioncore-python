@@ -560,7 +560,7 @@ class DataStoreWorkbench(WorkBench):
             new_head.MyId = repo.new_id()
 
             # Now merge the state!
-            self._update_repo_to_head(repo,new_head)
+            self._update_repo_to_head(repo,new_head, truncate_commits=False)
 
         # Put any new blobs
         def_list = []
