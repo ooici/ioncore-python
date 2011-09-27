@@ -1029,10 +1029,13 @@ class WorkBench(object):
         return repo.index_hash.keys()
 
 
-    def _update_repo_to_head(self, repo, head, truncate_commits=True):
+    def _update_repo_to_head(self, repo, head, truncate_commits=True, loaded_commits=None):
         log.debug('_update_repo_to_head: Loading a repository!')
 
         existing_commits = repo._commit_index.copy()
+
+        if loaded_commits is not None:
+            repo._commit_index.update(loaded_commits)
 
         log.info('Running load commits...')
         loaded={}
