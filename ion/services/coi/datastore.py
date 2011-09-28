@@ -278,7 +278,7 @@ class DataStoreWorkbench(WorkBench):
         #return blobs
 
     @defer.inlineCallbacks
-    def _resolve_repo_state(self, repository_key, fail_if_not_found=True):
+    def _resolve_repo_state(self, repository_key, fail_if_not_found=True, ncom=60):
         """
         @returns Repo.
         """
@@ -296,38 +296,45 @@ class DataStoreWorkbench(WorkBench):
             log.debug('Repository is loaded - merge it with the state in the persistent store')
 
 
-        # Must reconstitute the head and merge with existing
-        mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
-        new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
-        new_head.repositorykey = repository_key
-
         q = Query()
         q.add_predicate_eq(REPOSITORY_KEY, repository_key)
 
         rows = yield self._commit_store.query(q)
 
-        if fail_if_not_found and len(rows) == 0:
-            self.clear_repository(repo)
-            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
+        if len(rows) == 0:
+
+            if fail_if_not_found:
+                self.clear_repository(repo)
+                raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % repository_key, 404)   # @TODO: constant
+
+            else:
+                # return early with the empty repository
+                log.info('_resolve_repo_state: complete - early!!!')
+
+                defer.returnValue(repo)
+
+
+        # Must reconstitute the head and merge with existing
+        mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
+        new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
+        new_head.repositorykey = repository_key
+
 
         log.debug('Found %d commits in the store' % len(rows))
 
+        # Make a copy of the commit_index to keep track of the cref objects that are already loaded.
+        all_crefs = repo._commit_index.copy()
+
+        # Keep track of the current heads...
+        commits_front = set()
+
         for key, columns in rows.items():
-
-            if key not in repo.index_hash:
-                blob = columns[VALUE]
-                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                repo.index_hash[key] = wse
-            else:
-                wse = repo.index_hash.get(key)
-
 
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
 
-                # Deal with the possiblity that more than one branch points to the same commit
+                # Deal with the possibility that more than one branch points to the same commit
                 branch_names = columns[BRANCH_NAME].split(',')
-
 
                 for name in branch_names:
 
@@ -343,22 +350,82 @@ class DataStoreWorkbench(WorkBench):
                         link = branch.commitrefs.add()
 
                     if key not in repo._commit_index:
+
+                        if key not in repo.index_hash:
+                            blob = columns[VALUE]
+                            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                            repo.index_hash[key] = wse
+                        else:
+                            wse = repo.index_hash.get(key)
+
                         cref = repo._load_element(wse)
 
                         ### DO NOT ADD IT TO THE COMMIT INDEX - THE STATE OF THE COMMIT INDEX IS USED IN UPDATING TO THE HEAD!
                         #repo._commit_index[cref.MyId]=cref
+                        ### Add it to a separate dicationary of cref objects that we know about...
+                        all_crefs[key] = cref
                         cref.ReadOnly = True
+
                     else:
                         cref = repo._commit_index.get(key)
-                        
+
+                    # Add all the commitrefs to the list to load from - makes the edge cases simpler...
+                    commits_front.add(cref)
+
+
                     link.SetLink(cref)
                     link.isleaf=False
 
-                # Check to make sure the mutable is upto date with the commits...
+        if len(commits_front) is 0:
+            raise DataStoreWorkBenchError('Found no head commits in datastore query for repository: %s' % repo.repository_key, 404)
+
+
+        # The set of new keys we know about...
+        keep_commit_keys = set([cref.MyId for cref in commits_front])
+
+        # The front wave of the crefs...
+        new_front = set()
+
+        early_exit = False
+        while len(keep_commit_keys) < ncom and early_exit is False:
+
+            early_exit = True
+
+            for cref in commits_front:
+
+                for pref in cref.parentrefs:
+
+                    key = pref.GetLink('commitref').key
+
+                    if key in all_crefs:
+                        # This crefs parent are already loaded we are done...
+                        continue
+
+                    # Any time we found a new parent - we have to keep looking for its parents...
+                    early_exit = False
+
+                    if key not in repo.index_hash:
+                        columns = rows[key]
+                        blob = columns[VALUE]
+                        wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                        repo.index_hash[key] = wse
+                    else:
+                        wse = repo.index_hash.get(key)
+
+                    parent = repo._load_element(wse)
+
+                    ### Add it to the dictionary of cref objects that we know about...
+                    all_crefs[key] = parent
+
+                    parent.ReadOnly = True
+
+                    new_front.add(parent)
+
+            commits_front = new_front
+            new_front = set()
 
         # Do the update!
-        self._update_repo_to_head(repo, new_head)
-
+        self._update_repo_to_head(repo, new_head, loaded_commits=all_crefs)
 
         log.info('_resolve_repo_state: complete')
 
@@ -434,6 +501,9 @@ class DataStoreWorkbench(WorkBench):
 
             for element in blobs.itervalues():
 
+                # Keep all these keys after the operation completes...
+                repo.keys_to_keep.add(element.key)
+
                 if element.key not in puller_has:
                     link = response.blob_elements.add()
                     obj = response.Repository._wrap_message_object(element._element)
@@ -479,6 +549,10 @@ class DataStoreWorkbench(WorkBench):
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
+
+
+            # Hold onto any keys that the remote is trying to push...
+            repo.keys_to_keep = set(repostate.blob_keys)
 
             # Get the set of keys in repostate that are not in repo_keys
             need_keys = set(repostate.blob_keys).difference(repo_keys)
