@@ -1328,7 +1328,7 @@ class Repository(ObjectContainer):
         throw_away_blobs = old_data_blobs.difference(self.keys_to_keep)
 
         # Clear the set of keys to keep
-        keys_to_keep = set()
+        self.keys_to_keep = set()
 
         for key in throw_away_blobs:
             del self.index_hash[key]
