@@ -501,6 +501,9 @@ class DataStoreWorkbench(WorkBench):
 
             for element in blobs.itervalues():
 
+                # Keep all these keys after the operation completes...
+                repo.keys_to_keep.add(element.key)
+
                 if element.key not in puller_has:
                     link = response.blob_elements.add()
                     obj = response.Repository._wrap_message_object(element._element)
@@ -546,6 +549,10 @@ class DataStoreWorkbench(WorkBench):
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
+
+
+            # Hold onto any keys that the remote is trying to push...
+            repo.keys_to_keep = set(repostate.blob_keys)
 
             # Get the set of keys in repostate that are not in repo_keys
             need_keys = set(repostate.blob_keys).difference(repo_keys)

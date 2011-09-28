@@ -586,6 +586,8 @@ class Repository(ObjectContainer):
         to level 2 LRU caching in the workbench.
         """
 
+        # Only used by the datastore to track blobs worth holding onto...
+        self.keys_to_keep = set()
 
 
         ### Structures for managing associations to a repository:
@@ -1323,7 +1325,12 @@ class Repository(ObjectContainer):
 
         old_data_blobs = data_blobs.difference(set(self._workspace.keys()))
 
-        for key in old_data_blobs:
+        throw_away_blobs = old_data_blobs.difference(self.keys_to_keep)
+
+        # Clear the set of keys to keep
+        keys_to_keep = set()
+
+        for key in throw_away_blobs:
             del self.index_hash[key]
 
 

@@ -74,6 +74,14 @@ def create_large_object(wb):
     defer.returnValue(repo)
 
 
+def create_many_commits(repo, number):
+
+    for n in range(number):
+        repo.root_object.title = 'WB Title Commit: %s' % str(n)
+        repo.commit('repo %s commit' % str(n))
+
+    return
+
 
 
 class DataStoreTest(IonTestCase):
@@ -815,27 +823,18 @@ class DataStoreTest(IonTestCase):
 
 
 
-    def create_many_commits(self,repo, number):
-
-        for n in range(number):
-            repo.root_object.title = 'WB Title Commit: %s' % str(n)
-            repo.commit('repo %s commit' % str(n))
-
-        return
-
-
     @defer.inlineCallbacks
     def test_truncate_commits(self):
 
         log.info('Create 30 commits and push to datastore')
         repo = self.wb1.workbench.get_repository(self.repo_key)
-        self.create_many_commits(repo,30)
+        create_many_commits(repo,30)
         result = yield self.wb1.workbench.push('datastore',repo)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
 
         log.info('Create 30 more commits and push to datastore')
-        self.create_many_commits(repo,30)
+        create_many_commits(repo,30)
         result = yield self.wb1.workbench.push('datastore',repo)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
@@ -851,7 +850,7 @@ class DataStoreTest(IonTestCase):
         yield repo2.checkout('master')
 
         log.info('Create 61 commits and push to datastore from workbench 2')
-        self.create_many_commits(repo2,61)
+        create_many_commits(repo2,61)
         # Test pushing more than the default number to truncate...
         result = yield wb2.workbench.push('datastore',repo2)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
