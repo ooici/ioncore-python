@@ -14,7 +14,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet.task import deferLater
-from ion.util import timeout
+from ion.util import timeout as tout
 
 
 class TimeoutTest(unittest.TestCase):
@@ -22,7 +22,7 @@ class TimeoutTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_timeout(self):
 
-        @timeout.timeout(1.0)
+        @tout.timeout(1.0)
         def my_sleep(secs):
             def f():
                 pass
@@ -33,13 +33,13 @@ class TimeoutTest(unittest.TestCase):
         yield my_sleep(0.5)
 
 
-        yield self.failUnlessFailure(my_sleep(2.0),timeout.TimeoutError)
+        yield self.failUnlessFailure(my_sleep(2.0),tout.TimeoutError)
 
 
     @defer.inlineCallbacks
     def test_timeout_excpetion(self):
 
-        @timeout.timeout(1.0)
+        @tout.timeout(1.0)
         def my_sleep(secs):
             def f():
                 raise RuntimeError('Shit happens!')
@@ -48,5 +48,5 @@ class TimeoutTest(unittest.TestCase):
 
         yield self.failUnlessFailure(my_sleep(0.5),RuntimeError)
 
-        yield self.failUnlessFailure(my_sleep(2.0),timeout.TimeoutError)
+        yield self.failUnlessFailure(my_sleep(2.0),tout.TimeoutError)
 
