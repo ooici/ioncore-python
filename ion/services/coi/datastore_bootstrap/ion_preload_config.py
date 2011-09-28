@@ -896,6 +896,26 @@ class TypeMap(dict):
         return dict.get(self,key, DEFAULT_RESOURCE_TYPE_ID)
 
 
+class TypeIDMap(dict):
+
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+        type_map = {}
+        for type_name, description in ION_RESOURCE_TYPES.items():
+            type_map[description.get(ID_CFG)] = type_name
+
+        self.update(type_map)
+
+
+    def get(self, key):
+        '''
+        Get the resource type given an object type id #
+        '''
+
+        return dict.get(self,key, DEFAULT_RESOURCE_TYPE_ID)
+
+
 
 class PredicateMap(dict):
 
@@ -904,8 +924,7 @@ class PredicateMap(dict):
 
         predicate_map = {}
         for predicate_name, description in ION_PREDICATES.items():
-            preidcate_cfg = description.get(CONTENT_CFG)
-            predicate_map[description.get(ID_CFG)] =  preidcate_cfg
+            predicate_map[description.get(ID_CFG)] =  predicate_name
 
         self.update(predicate_map)
 
