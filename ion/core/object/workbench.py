@@ -693,6 +693,9 @@ class WorkBench(object):
 
             for element in blobs.itervalues():
 
+                # Hold onto any keys that we just loaded for a pull request...
+                repo.keys_to_keep.add(element.key)
+
                 if element.key not in puller_has:
                     link = response.blob_elements.add()
                     obj = response.Repository._wrap_message_object(element._element)
@@ -879,6 +882,9 @@ class WorkBench(object):
                     raise WorkBenchError('Requested push to a repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
+            # Hold onto any keys that the remote is trying to push...
+            repo.keys_to_keep = set(repostate.blob_keys)
+
             # Get the set of keys in repostate that are not in repo_keys
             need_keys = set(repostate.blob_keys).difference(repo_keys)
 
@@ -1029,10 +1035,13 @@ class WorkBench(object):
         return repo.index_hash.keys()
 
 
-    def _update_repo_to_head(self, repo, head, truncate_commits=True):
+    def _update_repo_to_head(self, repo, head, truncate_commits=True, loaded_commits=None):
         log.debug('_update_repo_to_head: Loading a repository!')
 
         existing_commits = repo._commit_index.copy()
+
+        if loaded_commits is not None:
+            repo._commit_index.update(loaded_commits)
 
         log.info('Running load commits...')
         loaded={}
