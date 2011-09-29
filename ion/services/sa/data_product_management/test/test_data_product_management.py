@@ -58,7 +58,7 @@ class DataProductManagementTest(IonTestCase):
 
         result = yield self.dpmc.define_data_product(owner='Instrument1Owner', source='Instrument1', description='SeaBird')
 
-        log.info("define_data_product Finished testing: Create instrument from UI")
+        log.info("define_data_product Finished testing: Create sample data product")
 
 
 
