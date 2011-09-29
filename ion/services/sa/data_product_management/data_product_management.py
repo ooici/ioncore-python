@@ -32,20 +32,13 @@ class DataProductManagementService(ServiceProcess):
 
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        #self.rc = ResourceClient(proc = self)
-        #self.mc = MessageClient(proc = self)
-        #self.asc = AssociationServiceClient(proc = self)
-
         log.debug('DataProductManagementService.__init__()')
 
 
     @defer.inlineCallbacks
     def op_define_data_product(self, request, headers, msg):
-        log.info("INSIDE op_define_data_product msg" )
-        #log.info( **msg.content )
 
         assert(isinstance(request, dict))
-
         response = self.define_data_product(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
 
@@ -55,9 +48,7 @@ class DataProductManagementService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
-
     def define_data_product(self, owner='default', source='default', description='default desc'):
-        log.info("INSIDE Define_data_product msg  owner: %s", owner )
 
         # DefineDataProduct will validate and register a new data product within the system
 
