@@ -46,7 +46,7 @@ class DataAcquisitionManagementService(ServiceProcess):
 
     def define_data_agent(self, agent='default'):
 
-        # Register the data agent; create resource and associations
+        # Register the data agent; create resource with metadata and associations
 
 
 
@@ -60,7 +60,7 @@ class DataAcquisitionManagementService(ServiceProcess):
         # Coordinate creation of the stream channel; call PubsubMgmtSvc with characterization of data stream to define the topic and the producer
         
 
-        # Return the XP information
+        # Return the XP information to the data agent
 
         return
 
