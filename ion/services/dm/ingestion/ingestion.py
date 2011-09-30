@@ -1078,7 +1078,10 @@ class IngestionService(ServiceProcess):
 
     @defer.inlineCallbacks
     def __calculate_merge_offsets(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_stime, sup_etime, cur_etime, cur_agg_dim_length, sup_agg_dim_length, sup_fcst_dim_name):
-        
+
+
+        log.info('__calculate_merge_offsets: Start')
+
         sup_sindex       = cur_agg_dim_length
         sup_eindex       = cur_agg_dim_length
         insertion_offset = sup_agg_dim_length     #- Net change to the dataset along the aggregation dimension (how the length of the dim changes)
@@ -1092,7 +1095,7 @@ class IngestionService(ServiceProcess):
                                                   #    Example 2: When overwriting identical data:
                                                   #          insertion_offset = (length - length = 0
                                                   #    Example 3: (insetion) When 5 values overwrite 4 values:
-                                                  #          insertion =_offset = (5 - 4) = 1
+                                                  #          insertion_offset = (5 - 4) = 1
         runtime_offset_seconds   = 0               # @todo: Add notes here
         forecast_offset_seconds  = 0               # @todo: Add notes here
         
@@ -1232,24 +1235,36 @@ class IngestionService(ServiceProcess):
                     if log.getEffectiveLevel() <= logging.DEBUG:
                         log.debug('>>  ndarray values = %s' % str(values))
 
+                    #cur_var_end = values[-1][1]
+                    cur_eindex = values[-1][0]
 
                     time_indices = self._find_time_index(values, search_times)
                     log.debug('time_indices = %s' % str(time_indices))
                     
                     sup_sindex = time_indices[sup_var_start]
                     sup_eindex = time_indices[sup_var_end]
-                    
+
                     # Adjust indices when the supplement times lay between indices in the current dataset
                     if sup_sindex < 0:
                         sup_sindex = -sup_sindex - 1
-                    if sup_eindex < 0:
-                        sup_eindex = -sup_eindex - 2
-                        
+                    #if sup_eindex < 0:
+                    #    sup_eindex = -sup_eindex - 2
+
+
+                    if sup_eindex is None:
+                        sup_eindex = sup_sindex + sup_agg_dim_length - 1
+
                         
                     # Calculate the insertion offset -- how bounded_arrays ordered after the overwritten section must be offset
-                    supplement_impact = (sup_eindex + 1) - sup_sindex  #(number of values displaced by inserting this supplement into the dataset)
-                    insertion_offset  = sup_agg_dim_length - supplement_impact
-            
+                    #supplement_impact = (sup_eindex + 1) - sup_sindex  #(number of values displaced by inserting this supplement into the dataset)
+                    #insertion_offset  = sup_agg_dim_length - supplement_impact
+
+                    if sup_eindex >= cur_eindex:
+                        insertion_offset  = sup_eindex - cur_eindex
+
+                    else:
+                        insertion_offset  = 0
+
             else:
     
                 # For overlap - determine how many indices overlap to determine our offsets
@@ -1261,20 +1276,44 @@ class IngestionService(ServiceProcess):
     
                 elif cur_etime > sup_stime:
                     log.info('__calculate_merge_offsets(overlap): Supplement overlaps -- calculating number of overlaps')
-                    if sup_agg_var is None:
-                        sup_agg_var = sup_root.FindVariableByName(sup_agg_dim_name)
-                    time_indices = yield self._find_time_index(sup_agg_var, [cur_etime - runtime_offset_seconds])
+
+
+                    log.debug('Gathering a list of keys for blobs which need to be fetched...')
+                    need_keys = IngestionService._get_ndarray_keys(sup_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  (ndarray) need_keys = %s' % str(need_keys))
+
+                    # Step 1b: Fetch all blobs for the ndarrays in the time_var
+                    log.debug('Fetching all blobs for the ndarrays in the supplement...')
+                    repo = self.dataset.Repository
+                    yield self._fetch_blobs(repo, need_keys)
+
+                    # Step 1c: Now, grab all the array values from the ndarrays..
+                    log.debug('Grabbing all the array values from the ndarrays...')
+                    values = IngestionService._get_ndarray_vals(sup_agg_var)
+                    if log.getEffectiveLevel() <= logging.DEBUG:
+                        log.debug('>>  ndarray values = %s' % str(values))
+
+
+                    time_indices = yield self._find_time_index(values, [cur_etime - runtime_offset_seconds])
                     time_index   = time_indices[cur_etime - runtime_offset_seconds]
-                    
+
+                    log.debug('Time Indicies: %s, %s' % (str(time_indices), time_index))
+
                     # Overlap has some restrictions--
-                    if time_index < 0:
-                        if time_index == -(sup_agg_dim_length + 1):
-                            raise IngestionError('Current data overlaps the supplement entirely and must be overwritten!  Supplement will NOT be merged!  index:%i' % time_index)
-                        elif time_index == -1:
+
+                    if time_index is None:
+
+                        raise IngestionError('Current data overlaps the supplement entirely and must be overwritten!  Supplement will NOT be merged!')
+
+                    elif time_index < 0:
+
+                        if time_index == -1:
                             raise IngestionError('Supplement data does not actualy overlap the current data!  Supplement will NOT be merged!  index:%i' % time_index)
                         else:
                             raise IngestionError('Overlapping supplement data does not match current data!  Supplement will NOT be merged!  index:%i' % time_index)
-                    
+
+
                     overlap_count = time_index + 1
                     
                 else:
@@ -1286,11 +1325,18 @@ class IngestionService(ServiceProcess):
         
 
         result = (sup_sindex, sup_eindex, insertion_offset, int(runtime_offset_seconds / 3600), int(forecast_offset_seconds / 3600))
+
+        log.info('__calculate_merge_offsets: end')
+
         defer.returnValue(result)
 
 
     @defer.inlineCallbacks
     def __merge(self, is_overwrite, cur_root, sup_root, sup_agg_dim_name, sup_fcst_dim_name, sup_stime, cur_etime, sup_sindex, sup_eindex, insertion_offset, runtime_offset, forecast_offset, is_new_ds):
+
+        log.info('__merge: Start')
+
+
         result = {}
         
         ###
@@ -1350,6 +1396,7 @@ class IngestionService(ServiceProcess):
         ### Add/merge the variables from the supplement to the current state if they are not already there
         ### Merge variable if it is dimensioned on the aggregation dimension (sup_agg_dim)
         ###
+        '''
         agg_dim_min_offset = 0
         if not is_new_ds:
             agg_dim_min_offset = dims[sup_agg_dim_name].min_offset
@@ -1359,7 +1406,11 @@ class IngestionService(ServiceProcess):
         log.debug('>> sup     min_offset    = %i' % merge_dims[sup_agg_dim_name].min_offset)
         log.debug('>> sup_sindex (adjusted) = %i' % sup_sindex)
         log.debug('>> sup_eindex (adjusted) = %i' % sup_eindex)
+        '''
+
+
         for merge_var in sup_root.variables:
+            yield pu.asleep(0.001)
             var_name = merge_var.name
 
             log.info('Merge Var Name: %s' % merge_var.name)
@@ -1700,6 +1751,7 @@ class IngestionService(ServiceProcess):
                 
                 log.exception('Attribute merger failed for global attribute "%s".  Cause: %s' % (att_name, str(ex)))
 
+        log.info('__merge: End')
 
         defer.returnValue(result)
             
@@ -1854,7 +1906,7 @@ class IngestionService(ServiceProcess):
         log.debug('Got Time values "%s" in ndarray list' % str(values))
         results_dict = {}
         for i, tup in enumerate(values):
-            log.debug('i - %s,tup - %s' % (i,tup))
+            #log.debug('i - %s,tup - %s' % (i,tup))
             idx, val = tup
             # @note: this is a good place to check if two entries in the time variables bounded_arrays
             #        contain mismatched values for the same index -- this shouldn't happen however
@@ -1863,7 +1915,7 @@ class IngestionService(ServiceProcess):
                     results_dict[search_time] = idx
                     search_times_cpy.remove(search_time)
                 elif search_time < val:
-                    results_dict[search_time] = -(i + 1)
+                    results_dict[search_time] = -(idx + 1)  # used to be -(i + 1) ????
                     search_times_cpy.remove(search_time)
                 # else search_time > val: continue
             if len(search_times_cpy) == 0:
@@ -1872,7 +1924,7 @@ class IngestionService(ServiceProcess):
 
         # Don't get it - what is the error? ValueError: need more than 2 values to unpack
         if len(search_times_cpy) > 0:
-            not_in_list_val = -(len(values) + 1)
+            not_in_list_val = None
 
             for search_time in search_times_cpy:
                 results_dict[search_time] = not_in_list_val
@@ -1915,9 +1967,15 @@ class IngestionService(ServiceProcess):
         # Step 1: Fetch blobs for this bounded_array
         need_keys = [old_ba.GetLink('ndarray').key]
         yield self._fetch_blobs(repo, need_keys)
-        
+
+        if idx is not 0:
+            raise IngestionError('Unexpected Subset Condition - Can only subset the 0 dimension for now...')
+
         # Step 1: Create the bounds
         old_shape = []
+
+        min_ind = 1
+        new_size = 1
         for i in range(len(old_ba.bounds)):
             old_bound = old_ba.bounds[i]
             new_bound = new_ba.bounds.add()
@@ -1927,35 +1985,66 @@ class IngestionService(ServiceProcess):
             if i == idx:
                 new_bound.size = max - min
                 new_bound.origin = min
+
+                min_ind *= min - old_bound.origin
+                new_size *= new_bound.size
             else:
+
+                min_ind *= old_bound.size
+                new_size *= old_bound.size
+
+
                 new_bound.size = old_bound.size
                 new_bound.origin = old_bound.origin
             new_bound.stride = old_bound.stride # not used here, but must transpose
-        
-        
+
+            log.debug('Old Dim - %d, size - %d, origin - %d' % (i, old_bound.size, old_bound.origin))
+            log.debug('New Dim - %d, size - %d, origin - %d' % (i, new_bound.size, new_bound.origin))
+
         # Step 2: Create the ndarray
         old_nd = old_ba.ndarray
         new_nd = repo.create_object(old_nd.ObjectType)
         
         offset_min = min - old_ba.bounds[idx].origin
         offset_max = max - old_ba.bounds[idx].origin
+
+        '''
+        THIS IS UNBELIEVABLY INEFFICIENT!!!!
         for i in range(len(old_nd.value)):  # (.value is a list)
             shape = variables._unflatten_index(i, old_shape)
             
             # If this value is in our subset range (for the dimension indexed by idx)
             if (shape[idx] >= offset_min and shape[idx] < offset_max):
                 new_nd.value.append(old_nd.value[i])
-        
-        
+        '''
+
+        expect_len = reduce(lambda x,y: x+y, [bound.size for bound in new_ba.bounds])
+
+        log.info('Unpacking values array...')
+        old_vals = old_nd.value
+        log.info('Finished unpacking')
+
+
+        new_vals = old_vals[min_ind:(min_ind+new_size)]
+
+        log.info('Setting Values')
+        new_nd.value.extend(new_vals)
+        log.info('Set Values')
+
+
         # Make sure the actual length of the new ndarray matches the length indicated by
         # the cumulative sizes of the arrays bounds
-        expect_len = reduce(lambda x,y: x+y, [bound.size for bound in new_ba.bounds])
+
         actual_len = len(new_nd.value)
         assert(expect_len == actual_len, 'Actual length of ndarray != expected length: %i != %i' % (actual_len, expect_len))
 
-
+        log.info('Alomst DOne!!!')
         
         new_ba.ndarray = new_nd
+
+        log.info('Now I am DOne!!!')
+
+
         defer.returnValue(new_ba)
         
         
