@@ -1410,7 +1410,6 @@ class IngestionService(ServiceProcess):
 
 
         for merge_var in sup_root.variables:
-            yield pu.asleep(0.001)
             var_name = merge_var.name
 
             log.info('Merge Var Name: %s' % merge_var.name)
