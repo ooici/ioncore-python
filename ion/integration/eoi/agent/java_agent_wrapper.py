@@ -522,6 +522,10 @@ class JavaAgentWrapper(ServiceProcess):
             if initial_offset == 0:
                 initial_offset = 86400000 # 1 day in millis
             start_time_seconds = int(time.time() - (initial_offset * 0.001))
+
+            # TESTING-HACK:  Force the start time to reference from the 2nd timestep of the test datasets, 2011 Sep 02 03:00:00
+            # ==> must use the second timestep to trigger the erroneous index calculation as a "0" based initial dataset SEEMS to work properly (rivers)!!!
+            #start_time_seconds = int(1315018800.0 - (initial_offset * 0.001))
             context['is_initial'] = True
 
         except AttributeError, ae:
