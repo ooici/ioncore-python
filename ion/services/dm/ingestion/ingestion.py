@@ -2020,17 +2020,10 @@ class IngestionService(ServiceProcess):
 
         expect_len = reduce(lambda x,y: x+y, [bound.size for bound in new_ba.bounds])
 
-        log.info('Unpacking values array...')
         old_vals = old_nd.value
-        log.info('Finished unpacking')
-
 
         new_vals = old_vals[min_ind:(min_ind+new_size)]
-
-        log.info('Setting Values')
         new_nd.value.extend(new_vals)
-        log.info('Set Values')
-
 
         # Make sure the actual length of the new ndarray matches the length indicated by
         # the cumulative sizes of the arrays bounds
@@ -2038,12 +2031,7 @@ class IngestionService(ServiceProcess):
         actual_len = len(new_nd.value)
         assert(expect_len == actual_len, 'Actual length of ndarray != expected length: %i != %i' % (actual_len, expect_len))
 
-        log.info('Alomst DOne!!!')
-        
         new_ba.ndarray = new_nd
-
-        log.info('Now I am DOne!!!')
-
 
         defer.returnValue(new_ba)
         
