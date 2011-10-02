@@ -12,7 +12,7 @@ from ion.core.object.gpb_wrapper import WrappedMessageProperty, WrappedRepeatedC
 from ion.core.object.object_utils import sha1_to_hex
 from ion.services.coi.datastore import CDM_BOUNDED_ARRAY_TYPE
 from ion.services.coi.resource_registry.resource_client import ResourceClient as RC
-from ion.core.object import object_utils
+from ion.core.object import object_utils, workbench, repository, gpb_wrapper
 from ion.core.process.process import Process
 import os, os.path
 
@@ -20,6 +20,10 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, HAS_ROLE_ID, HAS_A_ID, IS_A_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, ADMIN_ROLE_ID, DATA_PROVIDER_ROLE_ID, MARINE_OPERATOR_ROLE_ID, EARLY_ADOPTER_ROLE_ID, AUTHENTICATED_ROLE_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID
+
+from ion.services.coi.datastore import DataStoreService, DataStoreWorkbench, DataStoreWorkBenchError, BLOB_CACHE, COMMIT_CACHE, Query, REPOSITORY_KEY, MUTABLE_TYPE, BRANCH_NAME, VALUE
+from ion.core.data.cassandra_bootstrap import CassandraIndexedStoreBootstrap, CassandraStoreBootstrap
+
 
 import ion.util.ionlog
 from ion.util.os_process import OSProcess
@@ -71,6 +75,8 @@ __all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint
 __all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations', '_gv_resource', 'graph_resource'])
 
 
+# Data Store Repair
+__all__.extend(['cassandra_repair_shop',])
 
 
 @defer.inlineCallbacks
@@ -171,8 +177,11 @@ def find_datasets(lifecycle_state=None):
     
     if len(idrefs) > 0:
         for idref in idrefs:
-            dataset = yield rc.get_instance(idref)
-            result[idref.key] = dataset
+            try:
+                dataset = yield rc.get_instance(idref)
+            except Exception, ex:
+                result[idref.key] = ex
+
                 
                 
     defer.returnValue(result)
@@ -748,3 +757,226 @@ def _gv_resource(rid):
 @defer.inlineCallbacks
 def graph_resource(rid, mode="svg"):
     yield _graph(_gv_resource, rid, mode)
+
+
+class RepairBench(DataStoreWorkbench):
+
+
+
+    def __init__(self, blob_store, commit_store, cache_size=10**8):
+
+        DataStoreWorkbench.__init__(self, None, blob_store, commit_store, cache_size)
+
+
+    @defer.inlineCallbacks
+    def read_repo_state(self, repository_key):
+        """
+        @returns Repo.
+        """
+
+        log.info('read_repo_state: start')
+
+        repo = self.get_repository(repository_key)
+        if repo is None:
+            #if it does not exist make a new one
+            log.debug('Repository is not loaded - get it from the persistent store')
+
+            repo = repository.Repository(repository_key=repository_key)
+            self.put_repository(repo)
+        else:
+            raise RuntimeError('read_repo_state should only be run once on a repo that is not yet loaded. Clear it from the repair bench first...')
+
+        q = Query()
+        q.add_predicate_eq(REPOSITORY_KEY, repository_key)
+
+        rows = yield self._commit_store.query(q)
+        log.warn('Found %d commits in the store' % len(rows))
+
+        # This method does not sync with existing it loads it!
+        new_head = repo._dotgit
+
+        # Keep track of the current heads...
+        commits_front = set()
+
+
+        for key, columns in rows.iteritems():
+
+
+            blob = columns[VALUE]
+            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+            repo.index_hash[key] = wse
+
+            cref = repo._load_element(wse)
+
+            repo._commit_index[key] = cref
+            cref.ReadOnly = True
+
+
+            if columns[BRANCH_NAME]:
+                # If this appears to be a head commit
+
+                # Deal with the possibility that more than one branch points to the same commit
+                branch_names = columns[BRANCH_NAME].split(',')
+
+                for name in branch_names:
+
+                    for branch in new_head.branches:
+                        # if the branch already exists in the new_head just add a commitref
+                        if branch.branchkey == name:
+                            link = branch.commitrefs.add()
+                            break
+                    else:
+                        # If not add a new branch
+                        branch = new_head.branches.add()
+                        branch.branchkey = name
+                        link = branch.commitrefs.add()
+
+                    # Add all the commitrefs to the list to load from - makes the edge cases simpler...
+                    commits_front.add(cref)
+
+
+                    link.SetLink(cref)
+                    link.isleaf=False
+
+        if len(commits_front) is 0:
+            log.warn('No heads found in this repository!')
+
+        repo.broken_children = {}
+
+        repo.broken_parents = {}
+
+        for key, cref in repo._commit_index.iteritems():
+
+            for parent in cref.parentrefs:
+                link = parent.GetLink('commitref')
+
+                # load the linked object no matter what to realize parent child relationships
+                try:
+                    obj = repo.get_linked_object(link)
+                except KeyError:
+                    repo.broken_children[key] = cref
+
+
+        for key, cref in repo._commit_index.iteritems():
+
+            if len(cref.ParentLinks) == 0:
+
+                repo.broken_parents[key] = cref
+
+            if len(cref.parentrefs) == 0:
+
+                repo.root_commit = cref
+
+
+        ### Can't do this - max recursion depth exceeded!
+        #for cref in repo.broken_parents.itervalues():
+
+            #if not repo.root_commit.InParents(cref):
+            #    log.warn('The commit chain is broken in multiple places - your screwed!')
+
+        repo.orphaned_crefs = repo.broken_children.copy()
+
+        for cref in repo.broken_children.itervalues():
+
+            prefs = [ref.Root for ref in cref.ParentLinks]
+
+            new_refs = []
+            while len(prefs) > 0:
+
+                for ref in prefs:
+
+                    if ref.MyId not in repo.orphaned_crefs:
+                        repo.orphaned_crefs[ref.MyId] = ref
+
+                        new_refs.extend([_ref.Root for _ref in ref.ParentLinks])
+
+                prefs = new_refs
+                new_refs = []
+                    
+
+        log.info('read_repo_state: complete')
+
+        # return repository
+        defer.returnValue(repo)
+
+    @defer.inlineCallbacks
+    def checkout(self, repo, cref):
+
+        def filtermethod(x):
+                """
+                Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
+                """
+                return (x.type not in repo.excluded_types)
+
+
+        yield self._get_blobs(repo, [cref.GetLink('objectroot').key, ], filtermethod)
+
+        defer.returnValue(cref.objectroot)
+
+    @defer.inlineCallbacks
+    def resolve_broken_repository(self,repo, cref):
+
+
+        # Must reconstitute the head
+        mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
+        new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
+        new_head.repositorykey = repo.repository_key
+
+        # keep the first branch name...
+        bname = repo.branches[0].branchkey
+
+        branch = new_head.branches.add()
+        branch.branchkey = bname
+        link = branch.commitrefs.add()
+
+        link.SetLink(cref)
+        link.isleaf=False
+
+        repo._dotgit.Invalidate()
+        repo._dotgit = new_head
+
+
+        for key in repo.orphaned_crefs.iterkeys():
+
+            res = yield self._commit_store.remove(key)
+
+            if res is not None:
+                log.warn('Could not delete commit - that is bad!')
+
+            del repo._commit_index[key]
+
+
+        self._commit_store.update_index(key=cref.MyId, index_attributes={BRANCH_NAME:bname})
+
+
+        log.critical('I think it worked - try checking out your resource!')
+
+#del RepairBench.op_checkout
+#del RepairBench.op_fetch_blobs
+#del RepairBench.op_pull
+#del RepairBench.op_pull
+#del RepairBench.op_push
+
+
+@defer.inlineCallbacks
+def cassandra_repair_shop(host='', keyspace='', uname=None, pword=None ):
+
+    storage_provider = {'host':host,'port':9160}
+    if host is '':
+        raise RuntimeError('No host name provided!')
+
+    if keyspace is '':
+        raise RuntimeError('No keyspace name provided!')
+
+    c_store = CassandraIndexedStoreBootstrap(uname,pword,storage_provider, keyspace, COMMIT_CACHE)
+    yield c_store.initialize()
+    yield c_store.activate()
+
+    b_store = CassandraStoreBootstrap(uname,pword,storage_provider, keyspace, BLOB_CACHE)
+    yield b_store.initialize()
+    yield b_store.activate()
+
+    rb = RepairBench(blob_store=b_store, commit_store=c_store, cache_size=10**9)
+    # Make the cache big - so you don't have to worry about it...
+
+    defer.returnValue(rb)
