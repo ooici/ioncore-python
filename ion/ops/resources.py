@@ -69,7 +69,7 @@ __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROL
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
 __all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all','print_dataset_time'])
+__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','find_broken_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all','print_dataset_time'])
 
 # graphviz related
 __all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations', '_gv_resource', 'graph_resource'])
@@ -179,12 +179,40 @@ def find_datasets(lifecycle_state=None):
         for idref in idrefs:
             try:
                 dataset = yield rc.get_instance(idref)
+                result[idref.key] = dataset
             except Exception, ex:
-                result[idref.key] = ex
+                log.exception('The dataset %s could not be retrieved!' % str(idref))
+                #result[idref.key] = ex
 
-                
-                
     defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def find_broken_datasets(lifecycle_state=None):
+        """
+        Uses the associations framework to grab the ID reference keys of all available datasets with
+        the given lifecycle_state and then uses a resource_client to obtain the resource objects for
+        those keys.
+        @param lifecycle_state: the int value of a lifecycle state as from the LifeCycleState enum
+                                embedded in MessageInstance_Wrapper objects.  If lifecycle_state is
+                                None it will not be used in the query.
+
+        @return: A dictionary mapping dataset resource keys (ids) to their dataset resource objects.
+                 If nothing is found, an empty dictionary is returned
+        """
+        result = {}
+        idrefs = yield find_resource_keys(DATASET_RESOURCE_TYPE_ID, lifecycle_state)
+
+        if len(idrefs) > 0:
+            for idref in idrefs:
+                try:
+                    dataset = yield rc.get_instance(idref)
+                    #result[idref.key] = dataset
+                except Exception, ex:
+                    result[idref.key] = ex
+
+        defer.returnValue(result)
+
+
 
 
 @defer.inlineCallbacks
