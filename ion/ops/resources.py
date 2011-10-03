@@ -867,6 +867,13 @@ class RepairBench(DataStoreWorkbench):
 
                 repo.root_commit = cref
 
+        min_date = 99999999999999999
+        for cref in repo.broken_parents.values():
+          if cref.date < min_date:
+            my_ref = cref
+            min_date = cref.date
+
+        repo.oldest_valid = my_ref
 
         ### Can't do this - max recursion depth exceeded!
         #for cref in repo.broken_parents.itervalues():
@@ -892,7 +899,11 @@ class RepairBench(DataStoreWorkbench):
 
                 prefs = new_refs
                 new_refs = []
-                    
+
+        broken_parents = repo.broken_parents.copy()
+        del broken_parents[my_ref.MyId]
+
+        repo.orphaned_crefs.update(broken_parents)
 
         log.info('read_repo_state: complete')
 
@@ -943,10 +954,10 @@ class RepairBench(DataStoreWorkbench):
             if res is not None:
                 log.warn('Could not delete commit - that is bad!')
 
-            del repo._commit_index[key]
+            #del repo._commit_index[key]
 
 
-        self._commit_store.update_index(key=cref.MyId, index_attributes={BRANCH_NAME:bname})
+        yield self._commit_store.update_index(key=cref.MyId, index_attributes={BRANCH_NAME:bname})
 
 
         log.critical('I think it worked - try checking out your resource!')
