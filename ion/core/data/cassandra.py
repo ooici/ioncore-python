@@ -412,8 +412,6 @@ class CassandraIndexedStore(CassandraStore):
         yield self._check_index(index_attributes)
         #log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
-        defer.succeed(None)
-
 
         toc = time.time()
 
@@ -426,6 +424,7 @@ class CassandraIndexedStore(CassandraStore):
             log.critical('Cassandra Index Store Update_Index Stats(%d ops): time (mean/max) %f/%f seconds;' % self.update_stats.simple_stats())
             self.update_stats.__init__()
 
+        defer.succeed(None)
 
 
     @timeout(cassandra_timeout)
