@@ -53,6 +53,10 @@ class DataProcessManagementService(ServiceProcess):
 
         # Connect the process to the input and output streams
 
+        # Call DM:DataTransformMgmtSvc:DefineTransform to configure
+
+        # Call DM:DataTransformMgmtSvc:BindTransform to connect transform and execute
+
 
 
         return
@@ -60,6 +64,10 @@ class DataProcessManagementService(ServiceProcess):
     def define_data_process(self, process='default'):
 
         # Register the data process; create and store the resource and associations
+
+        # Coordinate orchestration with CEI:ProcessMgmtSvc to define a process
+
+        #
 
 
 
