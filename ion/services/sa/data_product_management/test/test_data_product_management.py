@@ -56,7 +56,7 @@ class DataProductManagementTest(IonTestCase):
 
         log.info("test_define_data_product Now testing: Create sample data product")
 
-        result = yield self.dpmc.define_data_product(owner='Instrument1Owner', source='Instrument1', description='SeaBird')
+        result = yield self.dpmc.define_data_product(title='CTD data', summary='Data from Seabird instrument', keywords='salinity, temperature')
 
         log.info("define_data_product Finished testing: Create sample data product")
 
