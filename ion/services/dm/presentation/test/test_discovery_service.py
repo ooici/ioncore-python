@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/sa/test/test_data_product_management.py
-@test ion.services.sa.data_product_management
+@file ion/services/dm/presentation/test/test_discovery.py
+@test ion.services.sdm.presentation.discovery
 @author
 """
 
@@ -11,13 +11,13 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import Process
-from ion.services.sa.data_product_management.data_product_management import DataProductManagementServiceClient
+from ion.services.dm.presentation.discovery_service import DiscoveryServiceClient
 from ion.test.iontest import IonTestCase
 
 
-class DataProductManagementTest(IonTestCase):
+class DiscoveryTest(IonTestCase):
     """
-    Testing data product management service
+    Testing discovery service
     """
 
     @defer.inlineCallbacks
@@ -26,9 +26,9 @@ class DataProductManagementTest(IonTestCase):
 
         services = [
             {
-                'name':'dataprodmgmt',
-                'module':'ion.services.sa.data_product_management.data_product_management',
-                'class':'DataProductManagementServiceClient'
+                'name':'discovery',
+                'module':'ion.services.dm.presentation.discovery_service',
+                'class':'DiscoveryServiceClient'
             }
         ]
 
@@ -37,7 +37,7 @@ class DataProductManagementTest(IonTestCase):
         log.debug('AppIntegrationTest.setUp(): spawned processes')
         self.sup = sup
 
-        self.dpmc = DataProductManagementServiceClient(proc=sup)
+        self.ds = DiscoveryServiceClient(proc=sup)
         self._proc = Process()
 
 
@@ -48,20 +48,15 @@ class DataProductManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_define_data_product(self):
+    def test_find_by_metadata(self):
         """
         Accepts a dictionary containing metadata about a data product.
         Updates are made to the registries.
         """
 
-        log.info("test_define_data_product Now testing: Create sample data product")
+        log.info("test_find_by_metadata Now testing: search for a resource")
 
-        result = yield self.dpmc.define_data_product(title='CTD data', summary='Data from Seabird instrument', keywords='salinity, temperature')
+        result = yield self.ds.find_by_metadata(resourceTypes='IdentityResource', keyValueFilters='key=value')
 
-        log.info("define_data_product Finished testing: Create sample data product")
-
-
-
-
-  
+        log.info("test_find_by_metadata Finished testing")
   
