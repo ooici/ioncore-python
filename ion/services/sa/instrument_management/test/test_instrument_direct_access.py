@@ -26,7 +26,7 @@ class InstrumentDirectAccessTest(IonTestCase):
 
         services = [
             {
-                'name':'instrumentdirectaccess',
+                'name':'instrument_direct_access',
                 'module':'ion.services.sa.instrument_management.instrument_direct_access',
                 'class':'InstrumentDirectAccessServiceClient'
             }
