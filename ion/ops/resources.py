@@ -8,6 +8,7 @@ import tempfile
 
 import time
 from ion.core import ioninit
+from ion.core.data.storage_configuration_utility import RESOURCE_OBJECT_TYPE
 from ion.core.object.gpb_wrapper import WrappedMessageProperty, WrappedRepeatedCompositeProperty, WrappedRepeatedScalarProperty
 from ion.core.object.object_utils import sha1_to_hex
 from ion.services.coi.datastore import CDM_BOUNDED_ARRAY_TYPE
@@ -186,31 +187,31 @@ def find_datasets(lifecycle_state=None):
 
     defer.returnValue(result)
 
-    @defer.inlineCallbacks
-    def find_broken_datasets(lifecycle_state=None):
-        """
-        Uses the associations framework to grab the ID reference keys of all available datasets with
-        the given lifecycle_state and then uses a resource_client to obtain the resource objects for
-        those keys.
-        @param lifecycle_state: the int value of a lifecycle state as from the LifeCycleState enum
-                                embedded in MessageInstance_Wrapper objects.  If lifecycle_state is
-                                None it will not be used in the query.
+@defer.inlineCallbacks
+def find_broken_datasets(lifecycle_state=None):
+    """
+    Uses the associations framework to grab the ID reference keys of all available datasets with
+    the given lifecycle_state and then uses a resource_client to obtain the resource objects for
+    those keys.
+    @param lifecycle_state: the int value of a lifecycle state as from the LifeCycleState enum
+                            embedded in MessageInstance_Wrapper objects.  If lifecycle_state is
+                            None it will not be used in the query.
 
-        @return: A dictionary mapping dataset resource keys (ids) to their dataset resource objects.
-                 If nothing is found, an empty dictionary is returned
-        """
-        result = {}
-        idrefs = yield find_resource_keys(DATASET_RESOURCE_TYPE_ID, lifecycle_state)
+    @return: A dictionary mapping dataset resource keys (ids) to their dataset resource objects.
+             If nothing is found, an empty dictionary is returned
+    """
+    result = {}
+    idrefs = yield find_resource_keys(DATASET_RESOURCE_TYPE_ID, lifecycle_state)
 
-        if len(idrefs) > 0:
-            for idref in idrefs:
-                try:
-                    dataset = yield rc.get_instance(idref)
-                    #result[idref.key] = dataset
-                except Exception, ex:
-                    result[idref.key] = ex
+    if len(idrefs) > 0:
+        for idref in idrefs:
+            try:
+                dataset = yield rc.get_instance(idref)
+                #result[idref.key] = dataset
+            except Exception, ex:
+                result[idref.key] = ex
 
-        defer.returnValue(result)
+    defer.returnValue(result)
 
 
 
@@ -536,9 +537,13 @@ class GraphvizGraph(list):
         return "\n".join(outlines)
 
 @defer.inlineCallbacks
-def _graph(callable, ident, mode="svg"):
+def _graph(callable, ident, kwargs):
+
+    call_args = kwargs.copy()
+    mode = call_args.pop('mode','svg')
+
     ident = str(ident)
-    gvinp = yield defer.maybeDeferred(callable, ident)
+    gvinp = yield defer.maybeDeferred(callable, ident, **call_args)
 
     (inp, inpfile) = tempfile.mkstemp(suffix='.txt', prefix="%s-" % ident)
     os.write(inp, gvinp)
@@ -651,12 +656,14 @@ def _gv_resource_associations(res_id, show_assoc_ids=False):
     defer.returnValue(str(g))
 
 @defer.inlineCallbacks
-def graph_resource_associations(res_id, show_assoc_ids=False, mode="svg"):
-    yield _graph(lambda x: _gv_resource_associations(x, show_assoc_ids), res_id, mode)
+def graph_resource_associations(res_id, mode="svg", show_assoc_ids=False):
+    yield _graph(_gv_resource_associations, res_id, {'mode':mode,'show_assoc_ids':show_assoc_ids} )
 
 @defer.inlineCallbacks
-def _gv_resource_commits(rid):
-    res = yield rc.get_instance(rid)
+def _gv_resource_commits(rid, get_instance_callable=None, cref=None):
+
+    get_instance_callable = get_instance_callable or rc.get_instance
+    res = yield defer.maybeDeferred(get_instance_callable, rid)
 
     g = GraphvizGraph("commits-%s" % rid)
 
@@ -675,23 +682,31 @@ def _gv_resource_commits(rid):
         g.append(GraphvizEntry(crefkey, None, {"label":lbl, 'fillcolor': fc}))
 
         for idx, x in enumerate(cref.parentrefs):
-            pcref = x.commitref
+            try:
+                pcref = x.commitref
+            except KeyError, ke:
+                log.warn('Commit not found or truncated')
+                continue
             pcrefkey = sha1_to_hex(pcref.MyId)
             g.append(GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)}))
             if pcrefkey not in visited:
                 get_commit_chain(x.commitref)
 
-    get_commit_chain(res.Repository._current_branch.commitrefs[0])
+    cref = cref or res.Repository._current_branch.commitrefs[0]
+    get_commit_chain(cref)
 
     defer.returnValue(str(g))
 
 @defer.inlineCallbacks
-def graph_resource_commits(rid, mode="svg"):
-    yield _graph(_gv_resource_commits, rid, mode)
+def graph_resource_commits(rid, mode="svg", get_instance_callable=None):
+    yield _graph(_gv_resource_commits, rid, {'mode':mode,'get_instance_callable':get_instance_callable})
 
 @defer.inlineCallbacks
-def _gv_resource(rid):
-    res = yield rc.get_instance(rid)
+def _gv_resource(rid, get_instance_callable=None):
+
+    get_instance_callable = get_instance_callable or rc.get_instance
+    res = yield defer.maybeDeferred(get_instance_callable, rid)
+    #res = yield rc.get_instance(rid)
     g = GraphvizGraph("resource-%s" % rid)
 
     rwo = res.ResourceObject
@@ -783,8 +798,8 @@ def _gv_resource(rid):
     defer.returnValue(str(g))
 
 @defer.inlineCallbacks
-def graph_resource(rid, mode="svg"):
-    yield _graph(_gv_resource, rid, mode)
+def graph_resource(rid, mode="svg", get_instance_callable=None):
+    yield _graph(_gv_resource, rid, {'mode':mode,'get_instance_callable':get_instance_callable})
 
 
 class RepairBench(DataStoreWorkbench):
@@ -794,6 +809,62 @@ class RepairBench(DataStoreWorkbench):
     def __init__(self, blob_store, commit_store, cache_size=10**8):
 
         DataStoreWorkbench.__init__(self, None, blob_store, commit_store, cache_size)
+
+    @defer.inlineCallbacks
+    def find_resource_keys(self):
+
+        resource_types=[RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID]
+        resource_type_names=['RESOURCE_TYPE', 'DATASET_RESOURCE_TYPE', 'TOPIC_RESOURCE_TYPE', 'EXCHANGE_POINT_RES_TYPE', 'EXCHANGE_SPACE_RES_TYPE', 'PUBLISHER_RES_TYPE', 'SUBSCRIBER_RES_TYPE', 'SUBSCRIPTION_RES_TYPE', 'DATASOURCE_RESOURCE_TYPE', 'DISPATCHER_RESOURCE_TYPE', 'DATARESOURCE_SCHEDULE_TYPE', 'IDENTITY_RESOURCE_TYPE']
+
+        keys_by_type={}
+
+        for type,type_name in zip(resource_types, resource_type_names):
+
+            q = Query()
+            q.add_predicate_eq(RESOURCE_OBJECT_TYPE,type)
+            q.add_predicate_gt(BRANCH_NAME, '')
+
+            rows = yield self._commit_store.query(q)
+
+            keys=set()
+            for row in rows.itervalues():
+                keys.add(row[REPOSITORY_KEY])
+
+            keys_by_type[type_name] = keys
+
+        defer.returnValue(keys_by_type)
+
+
+
+    @defer.inlineCallbacks
+    def graph_commits(self,repo,cref=None):
+
+        yield _graph(_gv_resource_commits, repo.repository_key, {'mode':'svg','get_instance_callable':self.get_repository,'cref':cref})
+
+
+
+    @defer.inlineCallbacks
+    def find_broken_repos(self, keys_by_type):
+
+        broken_by_type={}
+        for type_name, keyset in keys_by_type.iteritems():
+
+            for key in keyset:
+                repo = yield self.read_repo_state(key)
+
+
+                if len(repo.orphaned_crefs) is 0:
+                    log.warn('Repository %s appears to be okay!' % repo.repository_key)
+                    self.clear_repository(repo)
+
+                else:
+
+                    log.warn('Repository %s appears to be broken!' % repo.repository_key)
+                    broken_by_type[type_name] = repo
+
+        defer.returnValue(broken_by_type)
+
+
 
 
     @defer.inlineCallbacks
@@ -896,6 +967,7 @@ class RepairBench(DataStoreWorkbench):
                 repo.root_commit = cref
 
         min_date = 99999999999999999
+        my_ref = None
         for cref in repo.broken_parents.values():
           if cref.date < min_date:
             my_ref = cref
@@ -929,7 +1001,8 @@ class RepairBench(DataStoreWorkbench):
                 new_refs = []
 
         broken_parents = repo.broken_parents.copy()
-        del broken_parents[my_ref.MyId]
+        if my_ref is not None:
+            del broken_parents[my_ref.MyId]
 
         repo.orphaned_crefs.update(broken_parents)
 
@@ -945,7 +1018,7 @@ class RepairBench(DataStoreWorkbench):
                 """
                 Returns true if the passed in link's type is not in the excluded_types list of the passed in message.
                 """
-                return (x.type not in repo.excluded_types)
+                return (x.type.GPBMessage not in repo.excluded_types)
 
 
         yield self._get_blobs(repo, [cref.GetLink('objectroot').key, ], filtermethod)
