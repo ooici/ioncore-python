@@ -19,7 +19,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 class InstrumentDirectAccessService(ServiceProcess):
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='instrument_mgmt',
+    declare = ServiceProcess.service_declare(name='instrument_direct_access',
                                              version='0.1.0',
                                              dependencies=[])
 
@@ -97,7 +97,7 @@ class InstrumentDirectAccessServiceClient(ServiceClient):
 
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "instrument_mgmt"
+            kwargs['targetname'] = "instrument_direct_access"
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
