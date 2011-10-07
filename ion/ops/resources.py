@@ -849,6 +849,7 @@ class RepairBench(DataStoreWorkbench):
         broken_by_type={}
         for type_name, keyset in keys_by_type.iteritems():
 
+            repos = set()
             for key in keyset:
                 repo = yield self.read_repo_state(key)
 
@@ -860,7 +861,10 @@ class RepairBench(DataStoreWorkbench):
                 else:
 
                     log.warn('Repository %s appears to be broken!' % repo.repository_key)
-                    broken_by_type[type_name] = repo
+                    repos.add(repo)
+
+            if repos:
+                broken_by_type[type_name] = repos
 
         defer.returnValue(broken_by_type)
 
