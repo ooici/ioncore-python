@@ -75,6 +75,8 @@ __all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','find_b
 # graphviz related
 __all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations', '_gv_resource', 'graph_resource'])
 
+# these are handy...
+__all__.extend(['time','sha1_to_hex'])
 
 # Data Store Repair
 __all__.extend(['cassandra_repair_shop',])
@@ -558,8 +560,8 @@ def _graph(callable, ident, kwargs):
     viewit = OSProcess(binary="open", spawnargs=[outimg])
     yield viewit.spawn()
 
-    print "Input:", inpfile
-    print "Output: ", outimg
+    log.warn("Graph Input: %s" % inpfile)
+    log.warn("graph Output: %s" % outimg)
 
 @defer.inlineCallbacks
 def _gv_resource_associations(res_id, show_assoc_ids=False):
@@ -660,40 +662,45 @@ def graph_resource_associations(res_id, mode="svg", show_assoc_ids=False):
     yield _graph(_gv_resource_associations, res_id, {'mode':mode,'show_assoc_ids':show_assoc_ids} )
 
 @defer.inlineCallbacks
-def _gv_resource_commits(rid, get_instance_callable=None, cref=None):
+def _gv_resource_commits(rid, get_instance_callable=None):
 
     get_instance_callable = get_instance_callable or rc.get_instance
     res = yield defer.maybeDeferred(get_instance_callable, rid)
 
     g = GraphvizGraph("commits-%s" % rid)
 
-    visited = set()
 
-    def get_commit_chain(cref):
-        crefkey = sha1_to_hex(cref.MyId)
-        visited.add(crefkey)
-        tm = time.gmtime(cref.date)
-        dat = time.strftime("%m/%d %H:%M:%S",tm)
-        lbl = "KEY: %s\\nCOMMENT: %s\\nDATE: %s" % (crefkey, str(cref.comment), dat)
-        fc = '#dddddd'
-        if not len(g):
-            fc = '#ffaaaa'
+    def get_commit_chain(repo):
 
-        g.append(GraphvizEntry(crefkey, None, {"label":lbl, 'fillcolor': fc}))
+        for cref in repo._commit_index.values():
+            crefkey = sha1_to_hex(cref.MyId)
+            tm = time.gmtime(cref.date)
+            dat = time.strftime("%m/%d %H:%M:%S",tm)
+            lbl = "KEY: %s\\nCOMMENT: %s\\nDATE: %s" % (crefkey, str(cref.comment), dat)
 
-        for idx, x in enumerate(cref.parentrefs):
-            try:
-                pcref = x.commitref
-            except KeyError, ke:
-                log.warn('Commit not found or truncated')
-                continue
-            pcrefkey = sha1_to_hex(pcref.MyId)
-            g.append(GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)}))
-            if pcrefkey not in visited:
-                get_commit_chain(x.commitref)
 
-    cref = cref or res.Repository._current_branch.commitrefs[0]
-    get_commit_chain(cref)
+            fc = '#ffaaaa' # Default is head color
+            for link in cref.ParentLinks:
+                fc = '#dddddd' # If there are any parent links it is not a head... unless
+
+                if link.Root.ObjectType != cref.ObjectType:
+                    fc = '#ffaaaa' # it has a ref from the .git object
+                    break
+
+            g.append(GraphvizEntry(crefkey, None, {"label":lbl, 'fillcolor': fc}))
+
+            for idx, x in enumerate(cref.parentrefs):
+                try:
+                    pcref = x.commitref
+                except KeyError, ke:
+                    log.warn('Commit not found or truncated')
+                    continue
+                pcrefkey = sha1_to_hex(pcref.MyId)
+                g.append(GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)}))
+                
+
+    repo = res.Repository # this works for a repository or a resource
+    get_commit_chain(repo)
 
     defer.returnValue(str(g))
 
@@ -837,9 +844,9 @@ class RepairBench(DataStoreWorkbench):
 
 
     @defer.inlineCallbacks
-    def graph_commits(self,repo,cref=None):
+    def graph_commits(self,repo):
 
-        yield _graph(_gv_resource_commits, repo.repository_key, {'mode':'svg','get_instance_callable':self.get_repository,'cref':cref})
+        yield _graph(_gv_resource_commits, repo.repository_key, {'mode':'svg','get_instance_callable':self.get_repository})
 
 
 
@@ -970,45 +977,66 @@ class RepairBench(DataStoreWorkbench):
 
                 repo.root_commit = cref
 
-        min_date = 99999999999999999
-        my_ref = None
-        for cref in repo.broken_parents.values():
-          if cref.date < min_date:
-            my_ref = cref
-            min_date = cref.date
 
-        repo.oldest_valid = my_ref
+        repo.oldest_valid = None
+        repo.orphaned_crefs = {}
+        if repo.broken_children:
 
-        ### Can't do this - max recursion depth exceeded!
-        #for cref in repo.broken_parents.itervalues():
+            min_date = 99999999999999999
+            my_ref = None
+            for cref in repo.broken_parents.values():
+              if cref.date < min_date:
+                my_ref = cref
+                min_date = cref.date
 
-            #if not repo.root_commit.InParents(cref):
-            #    log.warn('The commit chain is broken in multiple places - your screwed!')
+            repo.oldest_valid = my_ref
 
-        repo.orphaned_crefs = repo.broken_children.copy()
+            repo.orphaned_crefs = repo.broken_children.copy()
 
-        for cref in repo.broken_children.itervalues():
+            for cref in repo.broken_children.itervalues():
 
-            prefs = [ref.Root for ref in cref.ParentLinks]
+                prefs = [ref.Root for ref in cref.ParentLinks]
 
-            new_refs = []
-            while len(prefs) > 0:
-
-                for ref in prefs:
-
-                    if ref.MyId not in repo.orphaned_crefs:
-                        repo.orphaned_crefs[ref.MyId] = ref
-
-                        new_refs.extend([_ref.Root for _ref in ref.ParentLinks])
-
-                prefs = new_refs
                 new_refs = []
+                while len(prefs) > 0:
 
-        broken_parents = repo.broken_parents.copy()
-        if my_ref is not None:
-            del broken_parents[my_ref.MyId]
+                    for ref in prefs:
 
-        repo.orphaned_crefs.update(broken_parents)
+                        if ref.MyId not in repo.orphaned_crefs:
+                            repo.orphaned_crefs[ref.MyId] = ref
+
+                            new_refs.extend([_ref.Root for _ref in ref.ParentLinks])
+
+                    prefs = new_refs
+                    new_refs = []
+
+            broken_parents = repo.broken_parents.copy()
+            if repo.oldest_valid is not None:
+                del broken_parents[repo.oldest_valid.MyId]
+
+            repo.orphaned_crefs.update(broken_parents)
+
+        elif repo.broken_parents:
+            # if there are only broken parents...
+
+            repo.orphaned_crefs.update(repo.broken_parents)
+
+            broken_refs = repo.broken_parents.values()
+
+
+            while broken_refs:
+                for cref in broken_refs:
+
+                    crefs = [pref.commitref for pref in cref.parentrefs]
+
+                    for new_ref in crefs:
+
+                        if len(new_ref.ParentLinks) < 2:
+                            repo.orphaned_crefs[new_ref.MyId] = new_ref
+                            new_broken.append(new_ref)
+
+                broken_refs = new_broken
+                
 
         log.info('read_repo_state: complete')
 
