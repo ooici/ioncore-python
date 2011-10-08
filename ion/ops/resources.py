@@ -692,11 +692,17 @@ def _gv_resource_commits(rid, get_instance_callable=None):
             for idx, x in enumerate(cref.parentrefs):
                 try:
                     pcref = x.commitref
+                    pcrefkey = sha1_to_hex(pcref.MyId)
+                    ge = GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)})
                 except KeyError, ke:
                     log.warn('Commit not found or truncated')
-                    continue
-                pcrefkey = sha1_to_hex(pcref.MyId)
-                g.append(GraphvizEntry(crefkey, pcrefkey, {'taillabel':str(idx)}))
+                    link = x.GetLink('commitref')
+                    key = sha1_to_hex(link.key)
+                    ge = GraphvizEntry(crefkey, key, {'taillabel':str(idx),'fillcolor':'#ffaaaa'})
+
+                g.append(ge)
+
+
                 
 
     repo = res.Repository # this works for a repository or a resource
