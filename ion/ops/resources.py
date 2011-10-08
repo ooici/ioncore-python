@@ -679,7 +679,7 @@ def _gv_resource_commits(rid, get_instance_callable=None):
             lbl = "KEY: %s\\nCOMMENT: %s\\nDATE: %s" % (crefkey, str(cref.comment), dat)
 
 
-            fc = '#ffaaaa' # Default is head color
+            fc = '#FFFFAA' # Default is No Parent - that is bad
             for link in cref.ParentLinks:
                 fc = '#dddddd' # If there are any parent links it is not a head... unless
 
@@ -1024,6 +1024,26 @@ class RepairBench(DataStoreWorkbench):
             broken_refs = repo.broken_parents.values()
 
 
+            reachable_heads = repo.current_heads()
+
+            reachable_keys = set([cref.MyId for cref in reachable_heads])
+            while reachable_heads:
+
+                new_reachables = []
+                for cref in reachable_heads:
+
+                    prefs = [pref.commitref for pref in cref.parentrefs]
+
+                    for new_ref in prefs:
+
+                        if new_ref.MyId not in reachable_keys:
+                            reachable_keys.add(new_ref.MyId)
+
+                            new_reachables.append(new_ref)
+
+                reachable_heads = new_reachables
+
+
             while broken_refs:
                 new_broken = []
                 for cref in broken_refs:
@@ -1032,7 +1052,7 @@ class RepairBench(DataStoreWorkbench):
 
                     for new_ref in crefs:
 
-                        if len(new_ref.ParentLinks) < 2:
+                        if new_ref.MyId not in reachable_keys:
                             repo.orphaned_crefs[new_ref.MyId] = new_ref
                             new_broken.append(new_ref)
 
