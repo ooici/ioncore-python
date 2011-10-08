@@ -1025,6 +1025,7 @@ class RepairBench(DataStoreWorkbench):
 
 
             while broken_refs:
+                new_broken = []
                 for cref in broken_refs:
 
                     crefs = [pref.commitref for pref in cref.parentrefs]
