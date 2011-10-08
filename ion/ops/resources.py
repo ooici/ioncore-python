@@ -1052,7 +1052,7 @@ class RepairBench(DataStoreWorkbench):
 
                     for new_ref in crefs:
 
-                        if new_ref.MyId not in reachable_keys:
+                        if new_ref.MyId not in reachable_keys and new_ref.MyId not in repo.orphaned_crefs:
                             repo.orphaned_crefs[new_ref.MyId] = new_ref
                             new_broken.append(new_ref)
 
