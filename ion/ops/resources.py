@@ -315,15 +315,25 @@ def print_dataset_history(dsid):
         commits.append(cref)
 
         if cref.parentrefs:
-            cref = cref.parentrefs[0].commitref
+            try:
+                cref = cref.parentrefs[0].commitref
+            except KeyError:
+                log.info('Commit history was truncated!')
+                cref = None
         else:
             cref = None
+
+    try:
+        title = commits[0].objectroot.resource_object.root_group.FindAttributeByName('title').GetValue()
+    except:
+        title = "(no title found)"
 
     # parent -> child ordering
     commits.reverse()
 
     outlines.append('========= Dataset History: ==========')
     outlines.append('= Dataset ID: %s' % repo.repository_key)
+    outlines.append('= Dataset Title: %s' % title)
     outlines.append('= Dataset Branch: %s' % repo.current_branch_key())
 
     for i, c in enumerate(commits):

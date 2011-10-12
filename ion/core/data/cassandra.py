@@ -134,7 +134,8 @@ class QueryStats(object):
         return tuple(stats)
 
 
-cassandra_timeout = CONF.getValue('CassandraTimeout',10.0)
+# Don't let cassandra timeout cause failure
+cassandra_timeout = CONF.getValue('CassandraTimeout',60.0)
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
