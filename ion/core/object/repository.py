@@ -1259,12 +1259,21 @@ class Repository(ObjectContainer):
             commits_front = new_front
             new_front = set()
 
+        # Remove the old keys - truncating the local history
         for key in old_commit_keys:
 
             cref = self._commit_index[key]
             cref.Invalidate()
             del self._commit_index[key]
             del self.index_hash[key]
+
+        # Clean up any parent refs left behind Bug OOIION-510
+        for cref in self._commit_index.itervalues():
+
+            for plink in cref.ParentLinks.copy():
+
+                if plink.Invalid:
+                    cref.ParentLinks.discard(plink)
 
         log.info('Truncate Commits - Complete!')
 
