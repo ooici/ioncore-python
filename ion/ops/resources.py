@@ -315,7 +315,11 @@ def print_dataset_history(dsid):
         commits.append(cref)
 
         if cref.parentrefs:
-            cref = cref.parentrefs[0].commitref
+            try:
+                cref = cref.parentrefs[0].commitref
+            except KeyError:
+                log.info('Commit history was truncated!')
+                cref = None
         else:
             cref = None
 
