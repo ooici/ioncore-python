@@ -595,6 +595,8 @@ def _gv_resource_associations(res_id, show_assoc_ids=False):
         elif "\n" in mystring:
             mystring = "%s; (Truncated newline)" % (mystring.split('\n')[0],)
 
+        return mystring
+
     for ind, r in enumerate(rlist):
         resource_lines = []
 
