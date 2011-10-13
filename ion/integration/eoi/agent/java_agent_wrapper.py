@@ -81,7 +81,7 @@ class AgentOSProcess(OSProcess):
         Output on stdout has been received.
         Stores the output in a list.
         """
-        log.debug("SO: %s" % str(data).strip())
+        log.info("JAVA-SO: %s" % str(data).strip())
         self.outlines.append(data)
 
     def errReceived(self, data):
@@ -89,7 +89,7 @@ class AgentOSProcess(OSProcess):
         Output on stderr has been received.
         Stores the output in a list.
         """
-        log.debug("SE: %s" % data)
+        log.error("JAVA-SE: %s" % data)
         self.errlines.append(data)
 
 class JavaAgentWrapperException(ApplicationError):
