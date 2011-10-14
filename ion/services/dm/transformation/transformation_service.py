@@ -25,6 +25,55 @@ class TransformationService(ServiceProcess):
         """Service operation: TBD
         """
 
+
+
+    @defer.inlineCallbacks
+    def op_bind_transform(self, request, headers, msg):
+
+        assert(isinstance(request, dict))
+        response = self.bind_transform(**request)  # Unpack dict to kwargs
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_define_transform(self, request, headers, msg):
+        response = self.define_transform(**request)  # Unpack dict to kwargs
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_schedule_transform(self, request, headers, msg):
+        response = self.schedule_transform(**request)  # Unpack dict to kwargs
+        yield self.reply_ok(msg, response)
+
+
+    def bind_transform(self, process='default'):
+
+        # Connect the process to the input and output streams
+
+
+        return
+
+    def define_transform(self, resourceRef='processResource'):
+
+        # Create and register the transform process, create  associations
+
+        # Coordinate orchestration with CEI:ProcessMgmtSvc to configure the supporting process
+
+        # Return resource reference
+
+        return
+
+
+    def schedule_transform(self, process='default'):
+
+        # Initiate process execution
+
+        return
+
+
+
+
+
+
 # Spawn of the process using the module name
 factory = ProcessFactory(TransformationService)
 
@@ -39,3 +88,18 @@ class TransformationClient(ServiceClient):
         @brief transform an object to a different type
         @param what?
         '''
+
+    @defer.inlineCallbacks
+    def bind_transform(self, process='default'):
+        (content, headers, msg) = yield self.rpc_send('bind_transform', {'process':process})
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def define_transform(self, process='default'):
+        (content, headers, msg) = yield self.rpc_send('define_transform', {'process':process})
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def schedule_transform(self, process='default'):
+        (content, headers, msg) = yield self.rpc_send('schedule_transform', {'process':process})
+        defer.returnValue(content)
