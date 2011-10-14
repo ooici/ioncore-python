@@ -77,6 +77,22 @@
                                             },
         },
 
+        #
+        # New R2 DM services
+        #
+
+        {'name':'catalog_mgmt',    'version':'0.1',
+                                      'processapp':('catalog_mgmt','ion.services.dm.presentation.catalog_management','CatalogManagementService'),
+        },
+
+        {'name':'discovery_service',    'version':'0.1',
+                                      'processapp':('discovery_service','ion.services.dm.presentation.discovery_service','DiscoveryService'),
+        },
+
+        {'name':'transformation_service',    'version':'0.1',
+                                      'processapp':('transformation_service','ion.services.dm.transformation.transformation_service','TransformationService'),
+        },
+
 #-------------#
 # Bootlevel 9 #
 #-------------#
@@ -118,6 +134,26 @@
 
         {'name':'instrument_web_monitor',       'version':'0.1',
                                       'processapp':('instrument_web_monitor','ion.services.dm.distribution.instrument_web_monitor','InstrumentWebMonitorService')
+        },
+
+
+        #
+        # New R2 SA services
+        #
+                {'name':'data_acquisition_management',       'version':'0.1',
+                                      'processapp':('data_acquisition_management','ion.services.sa.data_acquisition_management.data_acquisition_management','DataAcquisitionManagementService')
+        },
+                {'name':'data_process_management',       'version':'0.1',
+                                      'processapp':('data_process_management','ion.services.sa.data_process_management.data_process_management','DataProcessManagementService')
+        },
+                {'name':'data_product_management',       'version':'0.1',
+                                      'processapp':('data_product_management','ion.services.sa.data_product_management.data_product_management','DataProductManagementService')
+        },
+                {'name':'instrument_management',       'version':'0.1',
+                                      'processapp':('instrument_management','ion.services.sa.instrument_management.instrument_management','InstrumentManagementService')
+        },
+                {'name':'instrument_direct_access',       'version':'0.1',
+                                      'processapp':('instrument_direct_access','ion.services.sa.instrument_management.instrument_direct_access','InstrumentDirectAccessService')
         },
 
     ]
