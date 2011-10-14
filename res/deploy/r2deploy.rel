@@ -1,0 +1,124 @@
+{
+    "type":"release",
+    "name":"Release2Configuration",
+    "version": "0.1",
+    "description": "Release 1 deployment configuration. Core and AIS services",
+    "ioncore" : "1.1.0",
+    "apps":[
+        # CC Agent
+        {'name':'ccagent',              'version':'0.1',
+        },
+
+        # Bootlevels less than 4 are not represented in this rel file...
+
+#-------------#
+# Bootlevel 4 #
+#-------------#
+        {'name':'datastore',            'version':'0.1',
+                                        'config':{
+                                            'ion.services.coi.datastore':{
+                                                'blobs':'ion.core.data.store.Store',
+                                                'commits':'ion.core.data.store.IndexStore',
+                                                'preload':{'ion_datasets':True}
+                                            }
+                                        }
+        },
+
+        {'name':'association_service',  'version':'0.1',
+                                        'processapp':('association_service','ion.services.dm.inventory.association_service','AssociationService'),
+                                        'config':{
+                                            'ion.services.dm.inventory.association_service':{
+                                                'index_store_class':'ion.core.data.store.IndexStore',
+                                            },
+                                        },
+        },
+
+#-------------#
+# Bootlevel 5 #
+#-------------#
+        {'name':'resource_registry',    'version':'0.1',
+                                        'processapp':('resource_registry','ion.services.coi.resource_registry.resource_registry','ResourceRegistryService'),
+                                        'config':{
+                                            'ion.services.coi.resource_registry.resource_registry':{
+                                                'datastore_service':'datastore'
+                                            }
+                                        },
+        },
+
+#-------------#
+# Bootlevel 6 #
+#-------------#
+         # Add scheduler service
+        {'name':'scheduler', 'version':'0.1',
+                                        'processapp':('scheduler','ion.services.dm.scheduler.scheduler_service', 'SchedulerService'),
+        },
+                       
+#-------------#
+# Bootlevel 7 #
+#-------------#
+        # Add Agent Management Service
+        # Add Logger Service
+        # Add Policy Decision Service
+
+        {'name':'identity_registry',    'version':'0.1',
+                                        'processapp':('identity_registry','ion.services.coi.identity_registry','IdentityRegistryService'),
+        },
+
+#-------------#
+# Bootlevel 8 #
+#-------------#
+
+        # Add Dataset Controller Service
+        {'name':'dataset_controller',   'version':'0.1',
+                                        'processapp':('dataset_controller','ion.services.dm.inventory.dataset_controller','DatasetController'),
+                                        'config': {
+                                            'ion.services.dm.inventory.dataset_controller':{
+                                                'do-init': True}
+                                            },
+        },
+
+#-------------#
+# Bootlevel 9 #
+#-------------#
+
+        {'name':'notification_alert', 'version':'0.1',
+                                      'processapp':('notification_alert_service', 'ion.integration.ais.notification_alert_service', 'NotificationAlertService'),
+        },
+
+        {'name':'cdm_validation_service', 'version':'0.1',
+                                      'processapp':('cdm_validation_service', 'ion.integration.eoi.validation.cdm_validation_service', 'CdmValidationService'),
+        },
+        
+        {'name':'app_integration',    'version':'0.1',
+                                      'processapp':('app_integration','ion.integration.ais.app_integration_service','AppIntegrationService'),
+        },
+
+#--------------#
+# Bootlevel 10 #
+#--------------#
+
+        {'name':'ingestion',    'version':'0.1',
+
+        },
+
+        # Add Dataset Agent
+        # NOTE: THIS IS NOT IN IONCORE-PYTHON, ION-INTEGRATION ONLY
+
+#--------------#
+# Bootlevel 11 #
+#--------------#
+
+        {'name':'instrument_integration_service', 'version':'0.1',
+                                     'processapp':('instrument_integration_service', 'ion.integration.sa.instrument_integration_service', 'InstrumentIntegrationService')
+        },
+ 
+        {'name':'eventmonitor',       'version':'0.1',
+                                      'processapp':('eventmonitor','ion.services.dm.distribution.eventmonitor','EventMonitorService'),
+        },
+
+        {'name':'instrument_web_monitor',       'version':'0.1',
+                                      'processapp':('instrument_web_monitor','ion.services.dm.distribution.instrument_web_monitor','InstrumentWebMonitorService')
+        },
+
+    ]
+}
