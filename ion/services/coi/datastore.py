@@ -1219,8 +1219,18 @@ class DataStoreWorkbench(WorkBench):
         # @TODO: Bug OOIION-159 is preventing us from setting a proper chunk limit of 5mb.
         #                       The overflow point appears to be 16482 -> 16483, which in bytes, looks suspiciously
         #                       like an arithmetic overflow somewhere.
+        #
+        # the CHUNK_FACTOR must respect the data type - limits appear to be:   8 byte type -> 8162 maximum items
+        #                                                                      4 byte type -> 16324 maximum items
+        #
+        # without the msgpack bug, we should be using this line:
+        # CHUNK_FACTOR = LRU_DICT_LIMIT / ITEM_SIZE
 
-        CHUNK_FACTOR = 15000 #LRU_DICT_LIMIT / ITEM_SIZE       # chunk factor is expressed in # of items, not bytes
+        # chunk factor is expressed in # of items, not bytes
+        CHUNK_FACTOR = 8000
+        if ITEM_SIZE < 8:
+            CHUNK_FACTOR = 16000
+
         log.debug("LRU Cache Limit set at %d bytes, CHUNK_FACTOR is %d elements" % (LRU_DICT_LIMIT, CHUNK_FACTOR))
 
         # ===================================================================
@@ -1246,7 +1256,50 @@ class DataStoreWorkbench(WorkBench):
                 ba_shape = [x.size for x in ba.bounds]
 
                 for targetslice, srcslice, laststridelen in self._get_slices(targetshape, ba_shape, targetranges, srcranges, strides):
-                    striplist.append((ba, targetslice, srcslice, targetslice[1]-targetslice[0], laststridelen))
+                    # make sure we do not exceed the CHUNK_FACTOR in a single strip here
+                    targetslicelen = targetslice[1] - targetslice[0]
+                    srcslicelen = srcslice[1] - srcslice[0]
+                    if targetslicelen > CHUNK_FACTOR:
+                        log.debug("target slice len (%d) exceeds CHUNK_FACTOR, splitting" % targetslicelen)
+
+                        upperbound = targetslicelen / CHUNK_FACTOR      # this is int division, we want to know about whole chunks only here, we'll catch leftovers below
+
+                        # figure out our chunk factor for the source as we may have striding applied
+                        src_chunk_factor = (srcslicelen * CHUNK_FACTOR) / targetslicelen
+
+                        log.debug("upperbound: %d, src chunk factor: %d" % (upperbound, src_chunk_factor))
+
+                        for i in xrange(upperbound):
+                            offset = i * CHUNK_FACTOR
+                            thislen = min(targetslicelen - offset, CHUNK_FACTOR)
+
+                            src_offset = i * src_chunk_factor
+                            src_len = min(srcslicelen - src_offset, src_chunk_factor)
+
+                            log.debug("Taking: # %d, offset %d, len %d (src: %d+%d)" % (i, offset, thislen, src_offset, src_len))
+
+                            # compute new src and target slices
+                            newtslice = (targetslice[0] + offset, targetslice[0] + offset + thislen)
+                            newsslice = (srcslice[0] + src_offset, srcslice[0] + src_offset + src_len)
+                            #log.debug("OLDTARSLICE: %s, SRCSLICE %s" % (str(targetslice), str(srcslice)))
+                            #log.debug("TARGETFLICE: %s, SRCSLICE %s" % (str(newtslice), str(newsslice)))
+                            striplist.append((ba, newtslice, newsslice, thislen, laststridelen))
+
+                        # get any remnants
+                        left = targetslicelen % CHUNK_FACTOR
+                        if left > 0:
+                            log.debug("Adding remainder of %d items" % left)
+
+                            src_left = srcslicelen % src_chunk_factor
+                            newtslice = (targetslice[1] - left, targetslice[1])
+                            newsslice = (srcslice[1] - src_left, srcslice[1])
+
+                            #log.debug("OLDTARSLICE: %s, SRCSLICE %s" % (str(targetslice), str(srcslice)))
+                            #log.debug("TARGETSLICE: %s, SRCSLICE %s" % (str(newtslice), str(newsslice)))
+                            striplist.append((ba, newtslice, newsslice, left, laststridelen))
+
+                    else:
+                        striplist.append((ba, targetslice, srcslice, targetslicelen, laststridelen))
 
         log.debug("Number of uncompressed strips: %d" % len(striplist))
 
