@@ -1235,34 +1235,45 @@ class WorkBench(object):
             loaded = {}
 
 
-        log.debug('_load_commits - Key: %s' % sha1_to_hex(link.key))
+        log.info('_load_commits - Key: %s' % sha1_to_hex(link.key))
         repo = link.Repository
 
-        try:
-            cref = repo.get_linked_object(link)
-        except KeyError:
-            log.info('Commit history has been truncated!')
-            # This commit ref was not actually sent!
-            return
-        
-        if cref.ObjectType != COMMIT_TYPE:
-            raise WorkBenchError('This method should only load commits!')
+        links_to_get = set()
+        links_to_get.add(link)
 
-        loaded[cref.MyId] = cref
+        while len(links_to_get):
 
-        for parent in cref.parentrefs:
-            link = parent.GetLink('commitref')
+            # grab an item from the set
+            curlink = links_to_get.pop()
 
-            # load the linked object no matter what to realize parent child relationships
+            log.debug('_load_commits - Key: %s, links_to_get size: %d' % (sha1_to_hex(curlink.key), len(links_to_get)))
+
             try:
-                obj = repo.get_linked_object(link)
+                cref = repo.get_linked_object(curlink)
             except KeyError:
                 log.info('Commit history has been truncated!')
-                return
+                # This commit ref was not actually sent!
+                continue
+
+            if cref.ObjectType != COMMIT_TYPE:
+                raise WorkBenchError('This method should only load commits!')
+
+            loaded[cref.MyId] = cref
+
+            for parent in cref.parentrefs:
+                parentlink = parent.GetLink('commitref')
+
+                # load the linked object no matter what to realize parent child relationships
+                try:
+                    obj = repo.get_linked_object(parentlink)
+                except KeyError:
+                    log.info('Commit history has been truncated!')
+                    continue
 
 
-            # Call this method recursively for each link
-            if link.key not in loaded:
-                self._load_commits(link, loaded=loaded)
-        
+                # Call this method recursively for each link
+                if parentlink.key not in loaded:
+                    links_to_get.add(parentlink)
+                    #self._load_commits(link, loaded=loaded)
+
 
