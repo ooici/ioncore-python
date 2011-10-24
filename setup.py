@@ -55,6 +55,7 @@ setup( name = 'ioncore',
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ply==3.4',
            'pysnmp==4.1.16a',
+           'pycrypto==2.3',
            'pyserial==2.5',
            'hoover==0.5.2',
            'setproctitle==1.1.2',
