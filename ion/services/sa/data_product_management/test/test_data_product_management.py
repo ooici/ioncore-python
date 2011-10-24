@@ -28,16 +28,16 @@ class DataProductManagementTest(IonTestCase):
             {
                 'name':'dataprodmgmt',
                 'module':'ion.services.sa.data_product_management.data_product_management',
-                'class':'DataProductManagementServiceClient'
+                'class':'DataProductManagementService'
             }
         ]
 
-        log.debug('AppIntegrationTest.setUp(): spawning processes')
+        log.debug('DataProductManagementTest.setUp(): spawning processes')
         sup = yield self._spawn_processes(services)
-        log.debug('AppIntegrationTest.setUp(): spawned processes')
+        log.debug('DataProductManagementTest.setUp(): spawned processes')
         self.sup = sup
 
-        self.dpmc = DataProductManagementServiceClient(proc=sup)
+        self.dpmsc = DataProductManagementServiceClient(proc=sup)
         self._proc = Process()
 
 
@@ -56,7 +56,10 @@ class DataProductManagementTest(IonTestCase):
 
         log.info("test_define_data_product Now testing: Create sample data product")
 
-        result = yield self.dpmc.define_data_product(title='CTD data', summary='Data from Seabird instrument', keywords='salinity, temperature')
+        result = yield self.dpmsc.define_data_product(title='CTD data', summary='Data from Seabird instrument', keywords='salinity, temperature')
+        if isinstance(result, dict) != True:
+            self.fail("response is not a dictionary")
+        log.debug("define_data_product returned " + str(result))
 
         log.info("define_data_product Finished testing: Create sample data product")
 

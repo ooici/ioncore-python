@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 
 """
@@ -6,14 +7,19 @@
 @brief Services related to the activation and registry of data products
 """
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
+import ion.util.procutils as pu
 
 from ion.core.messaging import message_client
 from ion.core.exception import ReceivedError, ApplicationError
 
+from ion.core.data import cassandra_bootstrap
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry.resource_client import ResourceClient
@@ -30,27 +36,45 @@ class DataProductManagementService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
 
-        ServiceProcess.__init__(self, *args, **kwargs)
-
         log.debug('DataProductManagementService.__init__()')
+        ServiceProcess.__init__(self, *args, **kwargs)
+        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
+        self.index_store_class = pu.get_class(index_store_class_name)
+        
 
+    def slc_init(self):
+
+        log.debug('DataProductManagementService.slc_init()')
+        #initialize index store for data product information
+        DATA_PRODUCT_INDEXED_COLUMNS = ['data_product_ooi_id', 'data_producer_ooi_id', 'data_stream_ooi_id']
+        
+        if issubclass(self.index_store_class , cassandra_bootstrap.CassandraIndexedStoreBootstrap):
+            log.info("CassandraStore not yet supported")
+        else: 
+            log.info("Instantiating Memory Store")
+            self.index_store = self.index_store_class(self, indices=DATA_PRODUCT_INDEXED_COLUMNS )
+ 
 
     @defer.inlineCallbacks
     def op_define_data_product(self, request, headers, msg):
 
         assert(isinstance(request, dict))
-        response = self.define_data_product(**request)  # Unpack dict to kwargs
+        response = yield self.define_data_product(**request)  # Unpack dict to kwargs
+        log.info('DataProductManagementService.op_define_data_product response: %s', str(response))
         yield self.reply_ok(msg, response)
+
 
     @defer.inlineCallbacks
     def op_find_data_product(self, request, headers, msg):
         response = self.find_data_product(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
 
+
     @defer.inlineCallbacks
     def op_get_data_product_detail(self, request, headers, msg):
         response = self.get_data_product_detail(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
+
 
     @defer.inlineCallbacks
     def op_set_data_product_detail(self, request, headers, msg):
@@ -58,6 +82,7 @@ class DataProductManagementService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
+    @defer.inlineCallbacks
     def define_data_product(self, title='title', summary='summary', keywords='keywords'):
 
         # DefineDataProduct will validate and register a new data product within the system
@@ -91,8 +116,16 @@ class DataProductManagementService(ServiceProcess):
         # Call Data Aquisition Mgmt Svc:define_data_producer to coordinate creation of topic and connection to source
 
         # Return a resource ref
+        
+        DataProductID = 'A7B44115-34BC-4553-B51E-1D87617F12E1'
 
-        return
+        self.attributes = {'data_product_ooi_id' : DataProductID,
+                           'data_producer_ooi_id' : '',
+                           'data_stream_ooi_id' : ''}
+        self.keyval = DataProductID
+        log.info('DataProductManagementService.define_data_product keyval id: %s', self.keyval)
+        yield self.index_store.put(self.keyval, self.keyval, self.attributes)
+        defer.returnValue({'Response':'OK', 'Resource_ID':'A7B44115-34BC-4553-B51E-1D87617F12E1'})
 
     def find_data_product(self, filter='default'):
 
