@@ -10,6 +10,9 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
+import ion.agents.instrumentagents.instrument_agent as instrument_agent
+from ion.core.process.process import Process
+from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 
 
 from ion.core.process.process import ProcessFactory
@@ -31,8 +34,30 @@ class InstrumentDirectAccessService(ServiceProcess):
     @defer.inlineCallbacks
     def op_start_session(self, request, headers, msg):
         """ """
+
+        response = None
         assert(isinstance(request, dict))
-        response = self.start_session(**request)  # Unpack dict to kwargs
+        log.debug ("start_session()")
+        ia_name = request['instrumentAgent']
+        self.ia_client = instrument_agent.InstrumentAgentClient (targetname = ia_name)
+        self._proc = Process()
+        log.debug ("self.ia_client= " + str (self.ia_client.proc.id))
+        log.debug ("self.ia_client.target= " + str (self.ia_client.target))
+
+        if self.ia_client.proc.container
+        #response = self.start_session(**request)  # Unpack dict to kwargs
+
+        # Begin an explicit transaction.
+        log.debug ('----- Begin an explicit transaction.')
+        reply = yield self.ia_client.start_transaction()
+        success = reply['success']
+        tid = reply['transaction_id']
+        if InstErrorCode.is_error (success):
+            response['success'] = success
+            yield self.reply_ok(msg, response)
+            return
+        #todo: self.assertEqual(type (tid), str)
+        #todo: self.assertEqual(len (tid), 36)
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -48,11 +73,17 @@ class InstrumentDirectAccessService(ServiceProcess):
         yield self.reply_ok(msg, response)
 
 
-
-    def start_session(self, instrumentAgent='resourceRef' ):
+    @defer.inlineCallbacks
+    def start_session(self, instrumentAgent='resourceRef'):
         """ """
         # Validate the input filter and augment context as required
+        log.debug ("start_session()")
+        self.ia_client = instrument_agent.InstrumentAgentClient (target = instrumentAgent)
+        log.debug ("Before Process()")
+        self._proc = Process()
+        log.debug("ia_client: " + str (ia_client))
 
+        
         # Snapshot and persist instrument state
 
         # Request DA channel from instrument
@@ -60,7 +91,7 @@ class InstrumentDirectAccessService(ServiceProcess):
 
         # Return a channel ref
 
-        return
+        yield self.reply_ok (msg, response)
 
     def stop_session(self, instrumentAgent='resourceRef', restoreState='false'):
         """ """
@@ -107,7 +138,7 @@ class InstrumentDirectAccessServiceClient(ServiceClient):
         log.debug ("rpc_send content:\n" + str (content))
         log.debug ("rpc_send headers:\n" + str (headers))
         log.debug ("rpc_send msg:\n" + str (msg))
-        defer.returnValue(content)
+        defer.returnValue (content)
 
     @defer.inlineCallbacks
     def stop_session(self, instrumentAgent='resourceRef', restoreState='false'):

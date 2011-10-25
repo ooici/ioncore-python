@@ -9,23 +9,12 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-import ion.agents.instrumentagents.instrument_agent as instrument_agent
 import ion.services.sa.instrument_management.instrument_direct_access as direct_access
 from ion.agents.instrumentagents.instrument_constants import AgentCommand
-from ion.agents.instrumentagents.instrument_constants import AgentParameter
 from ion.agents.instrumentagents.instrument_constants import AgentEvent
 from ion.agents.instrumentagents.instrument_constants import AgentStatus
 from ion.agents.instrumentagents.instrument_constants import AgentState
-from ion.agents.instrumentagents.instrument_constants import DriverChannel
-from ion.agents.instrumentagents.instrument_constants import DriverParameter
 from ion.agents.instrumentagents.instrument_constants import InstErrorCode
-from ion.agents.instrumentagents.instrument_constants import InstrumentCapability
-from ion.agents.instrumentagents.instrument_constants import MetadataParameter
-from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceChannel
-from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceCommand
-from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceParam
-from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceMetadataParameter
-from ion.agents.instrumentagents.driver_NMEA0183 import NMEADeviceStatus
 from ion.core.process.process import Process
 #from ion.services.sa.instrument_management.instrument_direct_access import InstrumentDirectAccessServiceClient
 from ion.test.iontest import IonTestCase
@@ -33,8 +22,11 @@ import ion.agents.instrumentagents.instrument_agent as instrument_agent
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
 from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
-    import SERPORTSLAVE, OFF, ON
+    import SERPORTSLAVE
 
+import ion.util.procutils as pu
+
+INST_NAME = "gpssim"
 
 class InstrumentDirectAccessTest(IonTestCase):
     """
@@ -60,23 +52,28 @@ class InstrumentDirectAccessTest(IonTestCase):
 
         # Prepare arguments for launching the instrument agent and direct access services
         IA_spawnargs = self.PrepareInstrumentAgentSpawnArgs()
-        IA_args = {'name':      'instrument_direct_access',
+        DA_args = {'name':      'instrument_direct_access',
                    'module':    'ion.services.sa.instrument_management.instrument_direct_access',
                    'class':     'InstrumentDirectAccessServiceClient'}
-        DA_args = {'name':      'instrument_agent',
+        IA_args = {'name':      INST_NAME,
                    'module':    'ion.agents.instrumentagents.instrument_agent',
                    'class':     'InstrumentAgent',
                    'spawnargs': IA_spawnargs }
         services = [IA_args, DA_args]
 
+        self._proc = Process()
         log.debug ('----- Spawning services')
         self.sup = yield self._spawn_processes (services)
         log.debug ('----- Spawning service clients')
-        self.ia_id = yield self.sup.get_child_id ('instrument_agent')
+        self.ia_id = yield self.sup.get_child_id (INST_NAME)
         self.ia_client = instrument_agent.InstrumentAgentClient (proc = self.sup, target = self.ia_id)
         self.da_id = yield self.sup.get_child_id ('instrument_direct_access')
         self.da_client = direct_access.InstrumentDirectAccessServiceClient (proc = self.sup, target = self.da_id)
-        self._proc = Process()
+        log.debug ("test case id: " + str (self._proc.id))
+        log.debug ("ia_id:        " + str (self.ia_id))
+        log.debug ("ia_client id: " + str (self.ia_client.proc.id))
+        log.debug ("da_id:        " + str (self.da_id))
+        log.debug ("da_client id: " + str (self.da_client.proc.id))
 
         log.info("FINISH: InstrumentDirectAccessTest.setUp()")
 
@@ -133,7 +130,7 @@ class InstrumentDirectAccessTest(IonTestCase):
         """
         log.info("TEST START: test_Set_Direct_State()")
 
-        # Begin an explicit transaciton.
+        # Begin an explicit transaction.
         log.debug ('----- Begin an explicit transaction.')
         reply = yield self.ia_client.start_transaction()
         success = reply['success']
@@ -151,7 +148,7 @@ class InstrumentDirectAccessTest(IonTestCase):
         self.assert_(InstErrorCode.is_ok (success))
 
         # Get IA into an active running state
-        log.debug ('----- Get IA into an active runningstate.')
+        log.debug ('----- Get IA into an active running state.')
         cmd = [AgentCommand.TRANSITION, AgentEvent.GO_ACTIVE]
         reply = yield self.ia_client.execute_observatory (cmd, tid)
         success = reply['success']
@@ -174,31 +171,13 @@ class InstrumentDirectAccessTest(IonTestCase):
         log.debug ('           ... agent state now: ' + str (agent_state))
         self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
 
-        # Get IA into Direct Access state
-        log.debug ('----- Get IA into Direct Access state.')
-        cmd = [AgentCommand.TRANSITION, AgentEvent.GO_DIRECT_ACCESS_MODE]
-        reply = yield self.ia_client.execute_observatory (cmd, tid)
-        success = reply['success']
-        result = reply['result']
-        self.assert_(InstErrorCode.is_ok (success))
-
-        # Verify that the agent is in Diret Access mode.
-        log.debug ('----- Verify that the agent is in Diret Access mode...')
-        params = [AgentStatus.AGENT_STATE]
-        reply = yield self.ia_client.get_observatory_status (params, tid)
-        success = reply['success']
-        result = reply['result']
-        agent_state = result[AgentStatus.AGENT_STATE][1]
-        self.assert_(InstErrorCode.is_ok (success))
-        log.debug ('           ... agent state now: ' + str (agent_state))
-        self.assert_(agent_state == AgentState.DIRECT_ACCESS_MODE)
-
         # End the transaction.
         log.debug ('----- End the explicit transaction.')
         reply = yield self.ia_client.end_transaction (tid)
         success = reply['success']
-        self.assert_(InstErrorCode.is_ok (success))
+        self.assert_ (InstErrorCode.is_ok (success))
 
-        result = yield self.da_client.start_session(instrumentAgent=self.ia_id)
+        yield pu.asleep(3)
+        result = yield self.da_client.start_session (instrumentAgent=INST_NAME)
 
-        log.info("TEST FINISH: test_Set_Direct_State()")
+        log.info ("TEST FINISH: test_Set_Direct_State()")
