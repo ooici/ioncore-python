@@ -30,11 +30,11 @@ class InstrumentDirectAccessService(ServiceProcess):
         """ """
         log.debug ("__init__(): Instrument Direct Access Service")
         ServiceProcess.__init__(self, *args, **kwargs)
+        log.debug ("A")
         self.instrumentName = self.spawn_args.get ("instrumentAgent")
-        if not self._proc:
-            self._proc = Process()
-            self._proc.spawn()
-        self.ia_client = instrument_agent.InstrumentAgentClient (self, name=self.instrumentName)
+        log.debug ("B "+ self.instrumentName)
+        self.ia_client = instrument_agent.InstrumentAgentClient (proc=self, targetname=self.instrumentName)
+        log.debug ("C")
 
     @defer.inlineCallbacks
     def op_start_session(self, request, headers, msg):

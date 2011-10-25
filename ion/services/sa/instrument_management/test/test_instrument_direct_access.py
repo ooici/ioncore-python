@@ -55,7 +55,7 @@ class InstrumentDirectAccessTest(IonTestCase):
         DA_args = {'name':      'instrument_direct_access',
                    'module':    'ion.services.sa.instrument_management.instrument_direct_access',
                    'class':     'InstrumentDirectAccessServiceClient',
-                   'spawnargs': {'InstrumentAgent': INST_NAME }}
+                   'spawnargs': {'instrumentAgent': INST_NAME }}
         IA_args = {'name':      INST_NAME,
                    'module':    'ion.agents.instrumentagents.instrument_agent',
                    'class':     'InstrumentAgent',
