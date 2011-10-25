@@ -18,6 +18,7 @@ import ion.util.procutils as pu
 
 from ion.core.messaging import message_client
 from ion.core.exception import ReceivedError, ApplicationError
+from ion.core.data.store import Query
 
 from ion.core.data import cassandra_bootstrap
 from ion.core.process.process import ProcessFactory
@@ -46,7 +47,12 @@ class DataProductManagementService(ServiceProcess):
 
         log.debug('DataProductManagementService.slc_init()')
         #initialize index store for data product information
-        DATA_PRODUCT_INDEXED_COLUMNS = ['data_product_ooi_id', 'data_producer_ooi_id', 'data_stream_ooi_id']
+        DATA_PRODUCT_INDEXED_COLUMNS = ['data_product_ooi_id',
+                                        'data_producer_ooi_id',
+                                        'data_stream_ooi_id',
+                                        'title',
+                                        'summary',
+                                        'keywords']
         
         if issubclass(self.index_store_class , cassandra_bootstrap.CassandraIndexedStoreBootstrap):
             log.info("CassandraStore not yet supported")
@@ -65,25 +71,25 @@ class DataProductManagementService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_find_data_product(self, request, headers, msg):
-        response = self.find_data_product(**request)  # Unpack dict to kwargs
+    def op_find_data_products(self, request, headers, msg):
+        response = yield self.find_data_products(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
     def op_get_data_product_detail(self, request, headers, msg):
-        response = self.get_data_product_detail(**request)  # Unpack dict to kwargs
+        response = yield self.get_data_product_detail(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
     def op_set_data_product_detail(self, request, headers, msg):
-        response = self.set_data_product_detail(**request)  # Unpack dict to kwargs
+        response = yield self.set_data_product_detail(**request)  # Unpack dict to kwargs
         yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
-    def define_data_product(self, title='title', summary='summary', keywords='keywords'):
+    def define_data_product(self, title='title', summary='summary', keywords='keywords', data_producer='none'):
 
         # DefineDataProduct will validate and register a new data product within the system
 
@@ -117,17 +123,28 @@ class DataProductManagementService(ServiceProcess):
 
         # Return a resource ref
         
-        DataProductID = 'A7B44115-34BC-4553-B51E-1D87617F12E1'
+        DataProductId = pu.create_guid()
+        if data_producer == 'none':
+            DataProducerId = ''
+            DataStreamId = ''            
+        else:
+            DataProducerId = pu.create_guid()
+            DataStreamId = pu.create_guid()
 
-        self.attributes = {'data_product_ooi_id' : DataProductID,
-                           'data_producer_ooi_id' : '',
-                           'data_stream_ooi_id' : ''}
-        self.keyval = DataProductID
+        self.attributes = {'data_product_ooi_id' : DataProductId,
+                           'data_producer_ooi_id' : DataProducerId,
+                           'data_stream_ooi_id' : DataStreamId,
+                           'title' : title,
+                           'summary' : summary,
+                           'keywords' : keywords}
+        self.keyval = DataProductId
         log.info('DataProductManagementService.define_data_product keyval id: %s', self.keyval)
         yield self.index_store.put(self.keyval, self.keyval, self.attributes)
-        defer.returnValue({'Response':'OK', 'Resource_ID':'A7B44115-34BC-4553-B51E-1D87617F12E1'})
+        defer.returnValue({'Response':'OK', 'productId':DataProductId})
 
-    def find_data_product(self, filter='default'):
+
+    @defer.inlineCallbacks
+    def find_data_products(self, filter={}):
 
         # Validate the input filter and augment context as required
 
@@ -137,21 +154,53 @@ class DataProductManagementService(ServiceProcess):
         # Call DM DiscoveryService to query the catalog for matches
 
         # Organize and return the list of matches with summary metadata (title, summary, keywords)
+        log.info("DataProductManagementService.find_data_products filter: %s ", str(filter))
+        #find the item in the store
+        query = Query()
+        for item in filter:
+            log.debug("item = " + str(item) + "   value = " + str(filter[item]))
+            query.add_predicate_eq(item, filter[item])
+        rows = yield self.index_store.query(query)
+        log.info("DataProductManagementService.find_data_products  query returned %s " % (rows))
+        DataProducts = []
+        for key, row in rows.iteritems () :
+            DataProduct = []
+            DataProduct.append(rows[key]['title'])
+            DataProduct.append(rows[key]['title'])
+            DataProduct.append(rows[key]['data_product_ooi_id'])
+            DataProduct.append(rows[key]['data_producer_ooi_id'])
+            DataProduct.append(rows[key]['data_stream_ooi_id'])
+            DataProduct.append(rows[key]['summary'])
+            DataProducts.append(DataProduct)
+        defer.returnValue({'Response':'OK', 'products':DataProducts})
 
-        return
 
+    @defer.inlineCallbacks
     def get_data_product_detail(self, productId='default'):
 
         # Retrieve all metadata for a specific data product
-
         # Return data product resource
 
-        return
+        query = Query()
+        query.add_predicate_eq('data_product_ooi_id', productId)
+        rows = yield self.index_store.query(query)
+        log.debug("DataProductManagementService.get_data_product_detail rows: %s ", str(rows))
+        if rows.has_key(productId):
+            title = rows[productId]['title']
+            productId = rows[productId]['data_product_ooi_id']
+            producerId = rows[productId]['data_producer_ooi_id']
+            streamId = rows[productId]['data_stream_ooi_id']
+            summary = rows[productId]['summary']
+            keywords = rows[productId]['keywords']
+            defer.returnValue({'Response':'OK', 'productId':productId, 'title':title, 'producerId':producerId, 'streamId':streamId, 'summary':summary, 'keywords':keywords})
+        else:
+            defer.returnValue({'Response':'FAILURE'})
 
+
+    @defer.inlineCallbacks
     def set_data_product_detail(self, productId='default', title='title', summary='summary', keywords='keywords'):
 
-        # Update  metadata for a specific data product
-
+        # Update metadata for a specific data product
         # Return updated data product resource
 
         return
@@ -169,13 +218,13 @@ class DataProductManagementServiceClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def define_data_product(self, title='title', summary='summary', keywords='keywords'):
-        (content, headers, msg) = yield self.rpc_send('define_data_product', {'title':title, 'summary':summary, 'keywords':keywords})
+    def define_data_product(self, title='title', summary='summary', keywords='keywords', data_producer='none'):
+        (content, headers, msg) = yield self.rpc_send('define_data_product', {'title':title, 'summary':summary, 'keywords':keywords, 'data_producer':data_producer})
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def find_data_product(self, filter='default'):
-        (content, headers, msg) = yield self.rpc_send('find_data_product', {'filter':filter})
+    def find_data_products(self, filter={}):
+        (content, headers, msg) = yield self.rpc_send('find_data_products', {'filter':filter})
         defer.returnValue(content)
 
     @defer.inlineCallbacks
