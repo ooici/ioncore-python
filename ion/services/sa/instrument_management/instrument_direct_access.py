@@ -18,7 +18,7 @@ from ion.agents.instrumentagents.instrument_constants import InstErrorCode
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-
+"""TODO: Change ServiceProcess to Process (use Instrument Agent as reference"""
 class InstrumentDirectAccessService(ServiceProcess):
     """ """
     # Declaration of service
@@ -30,21 +30,19 @@ class InstrumentDirectAccessService(ServiceProcess):
         """ """
         log.debug ("__init__(): Instrument Direct Access Service")
         ServiceProcess.__init__(self, *args, **kwargs)
-        self._proc = None
-        self.ia_client = None
+        self.instrumentName = self.spawn_args.get ("instrumentAgent")
+        if not self._proc:
+            self._proc = Process()
+            self._proc.spawn()
+        self.ia_client = instrument_agent.InstrumentAgentClient (self, name=self.instrumentName)
 
     @defer.inlineCallbacks
     def op_start_session(self, request, headers, msg):
         """ """
-
         response = None
         assert(isinstance(request, dict))
         log.debug ("start_session()")
         ia_name = request['instrumentAgent']
-        if not self._proc:
-            self._proc = Process()
-            self._proc.spawn()
-        self.ia_client = instrument_agent.InstrumentAgentClient (proc=self._proc, targetname=ia_name)
         log.debug ("self.ia_client= " + str (self.ia_client.proc.id))
         log.debug ("self.ia_client.target= " + str (self.ia_client.target))
 
