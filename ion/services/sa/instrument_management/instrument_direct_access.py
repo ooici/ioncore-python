@@ -30,6 +30,8 @@ class InstrumentDirectAccessService(ServiceProcess):
         """ """
         log.debug ("__init__(): Instrument Direct Access Service")
         ServiceProcess.__init__(self, *args, **kwargs)
+        self._proc = None
+        self.ia_client = None
 
     @defer.inlineCallbacks
     def op_start_session(self, request, headers, msg):
@@ -39,12 +41,14 @@ class InstrumentDirectAccessService(ServiceProcess):
         assert(isinstance(request, dict))
         log.debug ("start_session()")
         ia_name = request['instrumentAgent']
-        self.ia_client = instrument_agent.InstrumentAgentClient (targetname = ia_name)
-        self._proc = Process()
+        if not self._proc:
+            self._proc = Process()
+            self._proc.spawn()
+        self.ia_client = instrument_agent.InstrumentAgentClient (proc=self._proc, targetname=ia_name)
         log.debug ("self.ia_client= " + str (self.ia_client.proc.id))
         log.debug ("self.ia_client.target= " + str (self.ia_client.target))
 
-        if self.ia_client.proc.container
+
         #response = self.start_session(**request)  # Unpack dict to kwargs
 
         # Begin an explicit transaction.

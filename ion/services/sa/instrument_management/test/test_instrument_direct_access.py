@@ -62,13 +62,14 @@ class InstrumentDirectAccessTest(IonTestCase):
         services = [IA_args, DA_args]
 
         self._proc = Process()
+        self._proc.spawn()
         log.debug ('----- Spawning services')
         self.sup = yield self._spawn_processes (services)
         log.debug ('----- Spawning service clients')
         self.ia_id = yield self.sup.get_child_id (INST_NAME)
-        self.ia_client = instrument_agent.InstrumentAgentClient (proc = self.sup, target = self.ia_id)
+        self.ia_client = instrument_agent.InstrumentAgentClient (proc = self._proc, target = self.ia_id)
         self.da_id = yield self.sup.get_child_id ('instrument_direct_access')
-        self.da_client = direct_access.InstrumentDirectAccessServiceClient (proc = self.sup, target = self.da_id)
+        self.da_client = direct_access.InstrumentDirectAccessServiceClient (proc = self._proc, target = self.da_id)
         log.debug ("test case id: " + str (self._proc.id))
         log.debug ("ia_id:        " + str (self.ia_id))
         log.debug ("ia_client id: " + str (self.ia_client.proc.id))
@@ -177,7 +178,6 @@ class InstrumentDirectAccessTest(IonTestCase):
         success = reply['success']
         self.assert_ (InstErrorCode.is_ok (success))
 
-        yield pu.asleep(3)
         result = yield self.da_client.start_session (instrumentAgent=INST_NAME)
 
         log.info ("TEST FINISH: test_Set_Direct_State()")
