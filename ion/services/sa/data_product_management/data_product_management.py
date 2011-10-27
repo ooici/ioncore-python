@@ -27,12 +27,15 @@ from ion.services.coi.resource_registry.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 
+from ion.services.sa.data_acquisition_management.data_acquisition_management import DataAcquisitionManagementServiceClient
+
 class DataProductManagementService(ServiceProcess):
 
     # Declaration of service
     declare = ServiceProcess.service_declare(name='data_product_mgmt',
                                              version='0.1.0',
                                              dependencies=[])
+    
     DATA_PRODUCT_OOI_ID = 'data_product_ooi_id'
     DATA_PRODUCER_OOI_ID = 'data_producer_ooi_id'
     DATA_STREAM_OOI_ID = 'data_stream_ooi_id'
@@ -40,6 +43,7 @@ class DataProductManagementService(ServiceProcess):
     SUMMARY = 'summary'
     KEYWORDS = 'keywords'
     DATA_PRODUCER = 'data_producer'
+    DATA_PRODUCER_NAME = 'data_producer_name'
 
     def __init__(self, *args, **kwargs):
 
@@ -47,6 +51,7 @@ class DataProductManagementService(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         self.index_store_class = pu.get_class(index_store_class_name)
+        self.damc = DataAcquisitionManagementServiceClient(proc = self)
         
 
     def slc_init(self):
@@ -133,8 +138,10 @@ class DataProductManagementService(ServiceProcess):
         DataProductId = pu.create_guid()
 
         if self.DATA_PRODUCER in ParameterDictionary:
-            DataProducerId = pu.create_guid()
-            DataStreamId = pu.create_guid()
+            result = yield self.damc.define_data_producer(producer=ParameterDictionary[self.DATA_PRODUCER])
+            log.info("DataProductManagementService.define_data_product result: %s ", str(result))
+            DataProducerId = result[self.DATA_PRODUCER_OOI_ID]
+            DataStreamId = result[self.DATA_STREAM_OOI_ID]
         else:
             DataProducerId = ''
             DataStreamId = ''            
@@ -204,16 +211,7 @@ class DataProductManagementService(ServiceProcess):
         query.add_predicate_eq(self.DATA_PRODUCT_OOI_ID, data_product_ooi_id)
         rows = yield self.index_store.query(query)
         log.debug("DataProductManagementService.get_data_product_detail rows: %s ", str(rows))
-        #product = {}
         if data_product_ooi_id in rows:
-            """
-            product[self.TITLE] = rows[productId][self.TITLE]
-            product[self.DATA_PRODUCT_OOI_ID] = rows[productId][self.DATA_PRODUCT_OOI_ID]
-            producerId = rows[productId]['data_producer_ooi_id']
-            streamId = rows[productId]['data_stream_ooi_id']
-            summary = rows[productId]['summary']
-            keywords = rows[productId]['keywords']
-            """
             rows[data_product_ooi_id].pop('value', None)   # get rid of some stupid key that the index store adds
             defer.returnValue({'Response':'OK', 'product':rows[data_product_ooi_id]})
         else:
@@ -239,8 +237,18 @@ class DataProductManagementService(ServiceProcess):
             defer.returnValue({'Response':'FAILURE'})
         product = rows[productId]
         product.pop('value', None)    # get rid of some stupid key that the index store adds
+        if product[self.DATA_PRODUCER_OOI_ID] == '':
+            if self.DATA_PRODUCER in ParameterDictionary:
+                result = yield self.damc.define_data_producer(producer=ParameterDictionary[self.DATA_PRODUCER])
+                log.info("DataProductManagementService.set_data_product_detail result: %s ", str(result))
+                product[self.DATA_PRODUCER_OOI_ID] = result[self.DATA_PRODUCER_OOI_ID]
+                product[self.DATA_STREAM_OOI_ID] = result[self.DATA_STREAM_OOI_ID]
         if self.TITLE in ParameterDictionary:
             product[self.TITLE] = ParameterDictionary[self.TITLE]
+        if self.SUMMARY in ParameterDictionary:
+            product[self.SUMMARY] = ParameterDictionary[self.SUMMARY]
+        if self.KEYWORDS in ParameterDictionary:
+            product[self.KEYWORDS] = ParameterDictionary[self.KEYWORDS]
         yield self.index_store.put(productId, productId, product)
         defer.returnValue({'Response':'OK', 'product':product})
 

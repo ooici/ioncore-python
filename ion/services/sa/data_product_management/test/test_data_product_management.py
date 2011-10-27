@@ -29,6 +29,11 @@ class DataProductManagementTest(IonTestCase):
                 'name':'dataprodmgmt',
                 'module':'ion.services.sa.data_product_management.data_product_management',
                 'class':'DataProductManagementService'
+            },
+            {
+                'name':'dataacqmgmt',
+                'module':'ion.services.sa.data_acquisition_management.data_acquisition_management',
+                'class':'DataAcquisitionManagementService'
             }
         ]
 
@@ -67,7 +72,7 @@ class DataProductManagementTest(IonTestCase):
         result = yield self.dpmsc.define_data_product(ParameterDictionary={'title':'ADCP data',
                                                                            'summary':'Data from Workhorse instrument',
                                                                            'keywords':'current',
-                                                                           'data_producer':'InstrumentAgent_123'})
+                                                                           'data_producer':{'data_producer_name':'InstrumentAgent_123'}})
         if isinstance(result, dict) != True:
             self.fail("response is not a dictionary")
         log.debug("define_data_product returned " + str(result))
@@ -100,7 +105,7 @@ class DataProductManagementTest(IonTestCase):
         result = yield self.dpmsc.define_data_product(ParameterDictionary={'title':'ADCP data',
                                                                            'summary':'Data from Workhorse instrument',
                                                                            'keywords':'current',
-                                                                           'data_producer':'InstrumentAgent_123'})
+                                                                           'data_producer':{'data_producer_name':'InstrumentAgent_123'}})
         if isinstance(result, dict) != True:
             self.fail("response is not a dictionary")
         log.debug("define_data_product returned " + str(result))
@@ -137,7 +142,7 @@ class DataProductManagementTest(IonTestCase):
         result = yield self.dpmsc.define_data_product(ParameterDictionary={'title':'ADCP data',
                                                                            'summary':'Data from Workhorse instrument',
                                                                            'keywords':'current',
-                                                                           'data_producer':'InstrumentAgent_123'})
+                                                                           'data_producer':{'data_producer_name':'InstrumentAgent_123'}})
         result = yield self.dpmsc.find_data_products(filter={'summary':'Data from Seabird instrument'})
         log.debug("find_product returned " + str(result))
 
@@ -156,17 +161,28 @@ class DataProductManagementTest(IonTestCase):
         # create a data product with a data producer
         define_result = yield self.dpmsc.define_data_product(ParameterDictionary={'title':'CTD data',
                                                                                   'summary':'Data from Seabird instrument',
-                                                                                  'keywords':'salinity, temperature',
-                                                                                  'data_producer':'InstrumentAgent_456'})
+                                                                                  'keywords':'salinity, temperature'})
         if isinstance(define_result, dict) != True:
             self.fail("response is not a dictionary")
         log.debug("define_data_product returned " + str(define_result))
+        
+        # get the data product back from the service
         result = yield self.dpmsc.get_data_product_detail(data_product_ooi_id=define_result['data_product_ooi_id'])
         if isinstance(result, dict) != True:
             self.fail("response is not a dictionary")
         log.debug("get_data_product_detail returned " + str(result))
+        
+        # change some of the data product fields and set them in the service
         product = result['product']
         product['title'] = "CTD3 data"
+        result = yield self.dpmsc.set_data_product_detail(ParameterDictionary=product)
+        result = yield self.dpmsc.get_data_product_detail(data_product_ooi_id=define_result['data_product_ooi_id'])
+        if isinstance(result, dict) != True:
+            self.fail("response is not a dictionary")
+        log.debug("get_data_product_detail returned " + str(result))
+            
+        # add a data producer to the data product
+        product['data_producer'] = {'data_producer_name':'InstrumentAgent_123'}
         result = yield self.dpmsc.set_data_product_detail(ParameterDictionary=product)
         result = yield self.dpmsc.get_data_product_detail(data_product_ooi_id=define_result['data_product_ooi_id'])
         if isinstance(result, dict) != True:
