@@ -4,4 +4,4 @@
 from _version import Version
 
 # VERSION !!! This is the main version !!!
-version = Version('ion', 1, 1, 3)
+version = Version('ion', 1, 1, 4)
