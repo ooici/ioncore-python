@@ -19,8 +19,22 @@ from ion.test.iontest import IonTestCase
 
 from ion.agents.instrumentagents.simulators.sim_NMEA0183_preplanned \
     import NMEA0183SimPrePlanned as sim
-from ion.agents.instrumentagents.simulators.sim_NMEA0183 \
-    import SERPORTSLAVE, OFF, ON
+from ion.agents.instrumentagents.simulators.sim_NMEA0183 import SERPORTSLAVE
+
+from ion.agents.instrumentagents.instrument_constants import \
+    AgentState, \
+    AgentStatus, \
+    InstErrorCode, \
+    AgentEvent, \
+    AgentCommand
+
+"""AgentParameter, \
+    AgentConnectionState, driver_client, \
+    DriverAnnouncement, DriverParameter, DriverChannel, \
+    ObservatoryState, DriverStatus, InstrumentCapability, DriverCapability, \
+    MetadataParameter, Datatype, TimeSource, ConnectionMethod, \
+    AgentStatus, ObservatoryCapability
+"""
 
 
 class InstrumentManagementTest(IonTestCase):
@@ -112,7 +126,7 @@ class InstrumentManagementTest(IonTestCase):
         Tests whether an instrument can be added to the DB
         """
         serial = 12345
-        result = yield self._define_instrument(serial)
+        yield self._define_instrument(serial)
 
 
 
@@ -267,8 +281,55 @@ class InstrumentManagementTest(IonTestCase):
         result = yield self.imc.activate_instrument(resourceId=inst_resource, agentId=str(self.ia_svc_id))
         self.failUnlessEqual(True, result["success"])
 
-        raise SkipTest("Need to work out how to put it into observatory mode")
+        log.info("Putting instrument agent into observatory mode")
+        log.debug ('----- Begin  IA transaction.')
+        reply = yield self.iac.start_transaction()
+        success = reply['success']
+        tid = reply['transaction_id']
+        self.assert_(InstErrorCode.is_ok (success))
+        self.assertEqual(type (tid), str)
+        self.assertEqual(len (tid), 36)
 
+        # Initialize the agent to bring up the driver and client.
+        log.debug ('----- Initialize the agent and driver.')
+        cmd = [AgentCommand.TRANSITION, AgentEvent.INITIALIZE]
+        reply = yield self.iac.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
+        # Get IA into an active running state
+        log.debug ('----- Get IA into an active running state.')
+        cmd = [AgentCommand.TRANSITION, AgentEvent.GO_ACTIVE]
+        reply = yield self.iac.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+        cmd = [AgentCommand.TRANSITION, AgentEvent.RUN]
+        reply = yield self.iac.execute_observatory (cmd, tid)
+        success = reply['success']
+        result = reply['result']
+        self.assert_(InstErrorCode.is_ok (success))
+
+        # Verify that the agent is in observatory mode.
+        log.debug ('----- Verify that the agent is in observatory mode...')
+        params = [AgentStatus.AGENT_STATE]
+        reply = yield self.iac.get_observatory_status (params, tid)
+        success = reply['success']
+        result = reply['result']
+        agent_state = result[AgentStatus.AGENT_STATE][1]
+        self.assert_(InstErrorCode.is_ok (success))
+        log.debug ('           ... agent state now: ' + str (agent_state))
+        self.assert_(agent_state == AgentState.OBSERVATORY_MODE)
+
+        # End the transaction.
+        log.debug ('----- End the explicit transaction.')
+        reply = yield self.iac.end_transaction (tid)
+
+        log.info("Attempting to request direct access")
+        reply2 = yield self.imc.request_direct_access(identity="me", resourceId=inst_resource)
+        log.debug(reply2)
+        self.failUnlessEqual(True, reply2["success"])
 
 
     @defer.inlineCallbacks
@@ -282,7 +343,7 @@ class InstrumentManagementTest(IonTestCase):
         reply1 = yield self.imc.request_direct_access(identity="me", resourceId=inst_resource)
         log.debug(reply1)
         self.failIfEqual(True, reply1["success"])
-        
+
 
         log.info("Attempting to activate an instrument with id=" + inst_resource)
         result = yield self.imc.activate_instrument(resourceId=inst_resource, agentId=str(self.ia_svc_id))

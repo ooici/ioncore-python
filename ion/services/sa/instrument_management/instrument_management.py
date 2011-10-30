@@ -18,13 +18,15 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.dm.distribution.events import BusinessStateChangeSubscriber
 
 import ion.agents.instrumentagents.instrument_agent as instrument_agent
-from ion.agents.instrumentagents.instrument_constants import AgentParameter, \
+
+from ion.agents.instrumentagents.instrument_constants import AgentState, AgentStatus
+"""AgentParameter, \
     AgentConnectionState, AgentState, driver_client, \
     DriverAnnouncement, InstErrorCode, DriverParameter, DriverChannel, \
     ObservatoryState, DriverStatus, InstrumentCapability, DriverCapability, \
     MetadataParameter, AgentCommand, Datatype, TimeSource, ConnectionMethod, \
     AgentEvent, AgentStatus, ObservatoryCapability
-
+"""
 
 
 
@@ -64,8 +66,9 @@ class InstrumentManagementService(ServiceProcess):
                            self.DM_PLATFORM,
                            ])
 
-        self.agents = {}
-        self.subscribers = {}
+        self.agents       = {}
+        self.subscribers  = {}
+        self.da_clients   = {}
 
     @defer.inlineCallbacks
     def op_define_instrument(self, request, headers, msg):
@@ -176,9 +179,9 @@ class InstrumentManagementService(ServiceProcess):
             new_id = self.db.insert(self.DM_INSTRUMENT, {"serialNumber" : serialNumber,
                                                          "make"         : make,
                                                          "model"        : model,
-                                                         "agent"        : None
+                                                         "agent_id"     : None
                                                          })
-            
+
             # Create associations
             # IK: for ... ?
 
@@ -207,7 +210,7 @@ class InstrumentManagementService(ServiceProcess):
 
             #record instrument agent params in store
             log.info("Storing instrument agent ID")
-            self.db.update(self.DM_INSTRUMENT, resourceId, {"agent" : agentId})
+            self.db.update(self.DM_INSTRUMENT, resourceId, {"agent_id" : agentId})
 
             log.info("Creating subprocess for instrument")
             subproc = Process()
@@ -217,7 +220,7 @@ class InstrumentManagementService(ServiceProcess):
             log.debug("target=%s", str(agentId))
             iac = instrument_agent.InstrumentAgentClient(proc=subproc, target=agentId)
 
-            #FIXME : create state machine for instrument, 
+            #FIXME : create state machine for instrument,
             #        pass as argument to subscriber
 
             log.info("subscribing to instrument events in a subprocess")
@@ -241,13 +244,13 @@ class InstrumentManagementService(ServiceProcess):
 
             log.info("Agent connection state: %s", reply1["result"][AgentStatus.CONNECTION_STATE][1])
             log.info("Agent state: %s",            reply1["result"][AgentStatus.AGENT_STATE][1])
-            
+
             log.info("closing transaction")
             yield iac.end_transaction(transaction_id)
 
             #FIXME: what does it mean to be in these states?
-            
-            
+
+
             log.info("Recording agent and listener process")
             self.agents[resourceId] = iac
             self.subscribers[resourceId] = inst_state_change_handler
@@ -461,14 +464,15 @@ class InstrumentManagementService(ServiceProcess):
 
         else:
             log.debug("getting agent")
-            iac = self.agents[resourceId]
+            iac    = self.agents[resourceId]
 
             #check state
             transaction = yield iac.start_transaction(5)
             log.debug("got transaction: %s" + str(transaction))
             transaction_id = transaction["transaction_id"]
-
             reply1 = yield iac.get_observatory_status([AgentStatus.AGENT_STATE], transaction_id)
+            log.info("closing transaction")
+            yield iac.end_transaction(transaction_id)
 
             if not "OK" == reply1["success"][0]:
                 response = self.make_error("Instrument request failed! FIXME make more descriptive")
@@ -477,12 +481,35 @@ class InstrumentManagementService(ServiceProcess):
             else:
 
                 #FIXME: what does it mean to be in these states?
-            
-                
-                response = {"success" : True}
 
-            log.info("closing transaction")
-            yield iac.end_transaction(transaction_id)
+                #FIXME: does the instrument agent transaction timeout affect things?
+
+                #FIXME: spawn direct access process
+                """
+                iac_id = inst["agent_id"]
+                DA_args = {'name':      'instrument_direct_access',
+                           'module':    'ion.services.sa.instrument_management.instrument_direct_access',
+                           'class':     'InstrumentDirectAccessServiceClient', #THIS IS WRONG, shouldn't be client!
+                           'spawnargs': {'instrumentAgent': iac_id }}
+
+                #FIXME: SPAWN DIRECT ACCESS PROCESS HERE
+                da_id = yield start_process_somehow ('instrument_direct_access')
+                da_proc = "USE SUBPROC OF INSTRUMENT AGENT???"
+                log.debug("Spawining client")
+                da_client = direct_access.InstrumentDirectAccessServiceClient (proc=da_proc, target=da_id)
+
+                self.da_clients[resourceId] = da_client
+
+                da_success = yield da_client.start_session(instrumentAgent=iac)
+
+                log.debug("da_success: %s", str(da_success))
+                """
+                da_success = True #FIXME
+                if da_success:
+                    response = {"success" : True}
+                else:
+                    response = self.make_error("Error going into direct access mode: %s", str("DA response"))
+
 
         yield defer.returnValue(response)
 
@@ -513,12 +540,12 @@ class InstrumentManagementService(ServiceProcess):
         # validate request
 
         # check whether user has access to specified commands
-        
+
         # send commands to instrument
 
         # FIXME: do we re-invent the transaction_id system used by instrument agent
-        #        or just use it (with potentially disastrous results, as we don't have 
-        #        access to the timeout callback)?  
+        #        or just use it (with potentially disastrous results, as we don't have
+        #        access to the timeout callback)?
         #
         #        leaning toward the following:
         #         - re-invention of transaction code
@@ -529,7 +556,7 @@ class InstrumentManagementService(ServiceProcess):
         #
         #         - async implementation!
         #           - get results from subscription to IA event stream, not immediately
-        #           - make a "check" function to check on progress 
+        #           - make a "check" function to check on progress
         #           - make a get_results function to grab & clear async
         #           - get_results returns {} if still running but results not available
         #           - get_results returns errors if not running and results not available
@@ -539,7 +566,7 @@ class InstrumentManagementService(ServiceProcess):
 
         return
 
-        
+
 
 
 class InstrumentManagementServiceClient(ServiceClient):
