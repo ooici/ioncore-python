@@ -10,6 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
+import ion.util.procutils as pu
 
 
 from ion.core.process.process import ProcessFactory
@@ -62,7 +63,10 @@ class DataAcquisitionManagementService(ServiceProcess):
 
         # Return the XP information to the data agent
 
-        return
+        log.debug('DataAcquisitionManagementService.define_data_producer: producer = %s', str(producer))
+        DpId = pu.create_guid()
+        DsId = pu.create_guid()
+        return {'data_producer_ooi_id':DpId, 'data_stream_ooi_id':DsId}
 
 
 
