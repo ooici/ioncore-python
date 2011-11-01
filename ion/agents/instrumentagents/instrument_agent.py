@@ -685,7 +685,11 @@ class InstrumentAgent(Process):
             origin = 'agent.%s' % self.event_publisher_origin
             yield self._state_publisher.create_and_publish_event(origin=origin,
                             description=AgentState.DIRECT_ACCESS_MODE)
-            pass
+
+            # Launch the serial port emulator and return the connection info
+            reply = yield self._LaunchSoCat()
+            success = reply['success']
+            result = reply['result']
 
         elif event == AgentEvent.EXIT:
             pass
@@ -735,6 +739,55 @@ class InstrumentAgent(Process):
 
         defer.returnValue((success, next_state, result))
 
+    @defer.inlineCallbacks
+    def _LaunchSoCat(self):
+        """ """
+        result = {'success': None, 'result': None}
+        import os
+        import socket
+        import subprocess
+        import tempfile
+        import random
+
+        # Open a null stream to pipe unwanted console messages to nowhere
+        tmpDir = tempfile.gettempdir()
+        SERPORTMASTER = tmpDir +  '/serPortMaster'
+        SERPORTSLAVE = tmpDir + '/serPortSlave'
+        SOCATapp = 'socat'
+        switch = '-d'
+        SERPORTMODE = 'w+'
+        NULLPORTMODE = 'w'
+        port = random.randint (10000,60000)
+        nullDesc = open (os.devnull, NULLPORTMODE)
+        localName = socket.gethostname()
+        agentIP = socket.gethostbyname (localName)
+        master =  '-' #pty,link=' + SERPORTMASTER + ',raw,echo=0'
+        slave = 'TCP-LISTEN:0' #pty,link=' + SERPORTSLAVE + ',raw,echo=0'
+        print SOCATapp + '\n' + switch + '\n' + master + '\n' + slave
+        vsp = subprocess.Popen("socat -d -d - TCP-LISTEN:0 &", shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            #vsp = subprocess.Popen([SOCATapp, switch, switch, master, slave, '&'], shell=False,stdout = subprocess.PIPE,stderr=subprocess.PIPE)
+    return vsp.communicate(), vsp
+        try:
+            log.info('Creating virtual serial port. Running %s...' % SOCATapp)
+            self._vsp = subprocess.Popen([SOCATapp, switch, switch, master, slave, '&'], stdout = subprocess.PIPE)
+                                    #     stdout = nullDesc.fileno(), stderr = nullDesc.fileno(), shell =True)
+        except OSError, e:
+            log.error('Failure:  Could not create virtual serial port(s): %s' % e)
+            return
+        yield pu.asleep(1) # wait just a bit for connect
+        if not os.path.exists(SERPORTMASTER) and os.path.exists(SERPORTSLAVE):
+            log.error('Failure:  Unknown reason.')
+            return
+        log.debug('Successfully created virtual serial ports. socat PID: %d'
+            % self._vsp.pid)
+        self._serMaster = os.readlink(SERPORTMASTER)
+        self._serSlave = os.readlink(SERPORTSLAVE)
+        log.debug('Master port: %s   Slave port: %s' %(self._serMaster, self._serSlave))
+        self._goodComms = True
+
+
+        defer.returnValue (result)
+
     ###########################################################################
     #   Transaction Management
     ###########################################################################
@@ -774,14 +827,14 @@ class InstrumentAgent(Process):
             #origin = "agent.%s" % self.event_publisher_origin
             #yield self._log_publisher.create_and_publish_event(origin=origin,
             #    description=desc_str)
-        
+
         else:
             desc_str = 'opened transaction %s' % tid
-            
+
         origin = "agent.%s" % self.event_publisher_origin
         yield self._log_publisher.create_and_publish_event(origin=origin,
             description=desc_str)
-            
+
 
 
         yield self.reply_ok(msg, result)
@@ -918,9 +971,9 @@ class InstrumentAgent(Process):
         @param content A uuid specifying the current transaction to end.
         @retval success/fail message.
         """
-        
+
         tid = self.transaction_id
-        
+
         result = self._end_transaction(content)
 
         # Publish an end transaction message...mainly as a test for now
@@ -935,14 +988,14 @@ class InstrumentAgent(Process):
             #origin = "agent.%s" % self.event_publisher_origin
             #yield self._log_publisher.create_and_publish_event(origin=origin,
             #    description=desc_str)
-            
+
         else:
             desc_str = 'closed transaction %s' % tid
 
         origin = "agent.%s" % self.event_publisher_origin
         yield self._log_publisher.create_and_publish_event(origin=origin,
             description=desc_str)
-            
+
         yield self.reply_ok(msg, result)
 
     def _end_transaction(self, tid):
@@ -2412,7 +2465,7 @@ class InstrumentAgent(Process):
                 log.debug("Instrument Agent publishing data: %s on origin: %s", json_val, origin)
                 yield self._data_publisher.create_and_publish_event(\
                     origin=origin, data_block=json_val)
-                
+
         # Driver configuration changed, publish config.
         elif type == DriverAnnouncement.CONFIG_CHANGE:
 
