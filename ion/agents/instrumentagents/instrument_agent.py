@@ -750,6 +750,7 @@ class InstrumentAgent(Process):
         import random
 
         # Open a null stream to pipe unwanted console messages to nowhere
+        """
         tmpDir = tempfile.gettempdir()
         SERPORTMASTER = tmpDir +  '/serPortMaster'
         SERPORTSLAVE = tmpDir + '/serPortSlave'
@@ -766,7 +767,7 @@ class InstrumentAgent(Process):
         print SOCATapp + '\n' + switch + '\n' + master + '\n' + slave
         vsp = subprocess.Popen("socat -d -d - TCP-LISTEN:0 &", shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             #vsp = subprocess.Popen([SOCATapp, switch, switch, master, slave, '&'], shell=False,stdout = subprocess.PIPE,stderr=subprocess.PIPE)
-    return vsp.communicate(), vsp
+        return vsp.communicate(), vsp
         try:
             log.info('Creating virtual serial port. Running %s...' % SOCATapp)
             self._vsp = subprocess.Popen([SOCATapp, switch, switch, master, slave, '&'], stdout = subprocess.PIPE)
@@ -784,8 +785,8 @@ class InstrumentAgent(Process):
         self._serSlave = os.readlink(SERPORTSLAVE)
         log.debug('Master port: %s   Slave port: %s' %(self._serMaster, self._serSlave))
         self._goodComms = True
-
-
+        """
+        result = {'success': InstErrorCode.NOT_IMPLEMENTED[0], 'result': InstErrorCode.NOT_IMPLEMENTED[1]}
         defer.returnValue (result)
 
     ###########################################################################
