@@ -56,7 +56,6 @@ class DataProcessManagementTest(IonTestCase):
 
         log.info("test_define_data_process Now testing: Create sample data process")
 
-        result = yield self.dpmc.define_data_process(process='proc1')
-
+        # result = yield self.dpmc.define_data_process(process='proc1')
+        yield
         log.info("define_data_process Finished testing: Create sample data process")
-  

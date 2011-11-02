@@ -88,18 +88,21 @@ class TransformationClient(ServiceClient):
         @brief transform an object to a different type
         @param what?
         '''
+        pass
 
     @defer.inlineCallbacks
     def bind_transform(self, process='default'):
-        (content, headers, msg) = yield self.rpc_send('bind_transform', {'process':process})
+        (content, headers, msg) = yield self.rpc_send ('bind_transform', {'process':process})
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def define_transform(self, process='default'):
-        (content, headers, msg) = yield self.rpc_send('define_transform', {'process':process})
-        defer.returnValue(content)
+    def define_transform(self, process='default', params={}):
+        (content, headers, msg) = yield self.rpc_send ('define_transform',
+                                                       {'process':process},
+                                                       params={})
+        defer.returnValue ({'Success': 'OK', 'Result': content})
 
     @defer.inlineCallbacks
     def schedule_transform(self, process='default'):
-        (content, headers, msg) = yield self.rpc_send('schedule_transform', {'process':process})
+        (content, headers, msg) = yield self.rpc_send ('schedule_transform', {'process':process})
         defer.returnValue(content)
