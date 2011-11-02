@@ -1112,21 +1112,34 @@ class IngestionService(ServiceProcess):
 
 
             # Get the agg vars - if this is not an FMRC...
-            if cur_agg_var is None:
-                try:
-                    cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
-                except OOIObjectError, oe:
+            try:
+                cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+            except OOIObjectError, oe:
+                ret_vars = self._find_time_var(cur_root)
+                if len(ret_vars) == 1:
+                    log.info('ret_vars[1] = %s' % ret_vars[1])
+                    cur_agg_var = ret_vars[1]
+                else:
+                    log.warn('More than 1 \'time\' variable returned (count == %s): determining if one is suitable' % len(ret_vars))
+                    for var in ret_vars:
+                        log.info('var.name = %s' % var.name)
+                        for i in range(len(var.shape)):
+                            dim = var.shape[i]
+                            log.info('dim = %s' % dim.name)                        
+                            if dim.name == sup_agg_dim_name:
+                                cur_agg_var = var
+                                break
+
+            finally:
+                if cur_agg_var is None:
                     log.exception('Time Variable name does not match its dimension name')
                     raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
 
-            if sup_agg_var is None:
-
-                try:
-                    sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
-                except OOIObjectError, oe:
-                    log.exception('Time Variable name does not match its dimension name')
-                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
-
+            try:
+                sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
+            except OOIObjectError, oe:
+                log.exception('Time Variable name does not match its dimension name')
+                raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
 
             # First calculate runtime and forecast offsets (these will affect the other offsets)
             if sup_fcst_dim_name is not None and not len(sup_fcst_dim_name) == 0:
