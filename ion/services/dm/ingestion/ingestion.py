@@ -1032,7 +1032,15 @@ class IngestionService(ServiceProcess):
         # Get the start time of the supplement
         try:
             string_time = sup_root.FindAttributeByName('ion_time_coverage_start')
-            sup_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            sup_stime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            sup_stime += (millis * 0.001)
             log.debug('Supplement Start Time: %s (%i)' % (string_time.GetValue(), sup_stime))
 
         except OOIObjectError, oe:
@@ -1043,7 +1051,15 @@ class IngestionService(ServiceProcess):
         # Get the end time of the supplement
         try:
             string_time = sup_root.FindAttributeByName('ion_time_coverage_end')
-            sup_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            sup_etime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            sup_etime += (millis * 0.001)
             log.debug('Supplement End Time: %s (%i)' % (string_time.GetValue(), sup_etime))
 
         except OOIObjectError, oe:
@@ -1051,8 +1067,8 @@ class IngestionService(ServiceProcess):
             # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
         
         
-        result.update({EM_START_DATE:sup_stime*1000,
-                       EM_END_DATE:sup_etime*1000})
+        result.update({EM_START_DATE:int(sup_stime*1000),
+                       EM_END_DATE:int(sup_etime*1000)})
         
         
         
@@ -1061,7 +1077,15 @@ class IngestionService(ServiceProcess):
         is_new_ds = False
         try:
             string_time = cur_root.FindAttributeByName('ion_time_coverage_end')
-            cur_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            cur_etime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            cur_etime += (millis * 0.001)
             log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), cur_etime))
             
         except OOIObjectError, oe:
@@ -1445,7 +1469,7 @@ class IngestionService(ServiceProcess):
                 else:
                     raise IngestionError('Variable %s does not exist in the dataset.  Supplement is invalid!' % var_name)
 
-
+            
             # Step 2: Skip merge for variables which are not dimensioned on the sup_agg_dim
             # @todo: check to see if supplement shape and dataset shape don't match (like if time dimensions are at different indices)
             merge_agg_dim_idx = -1
