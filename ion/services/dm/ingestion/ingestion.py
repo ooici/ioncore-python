@@ -1478,7 +1478,19 @@ class IngestionService(ServiceProcess):
                     merge_agg_dim_idx = i
                     break
             else:
-                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
+                log.info('The Static variable %s will be updated if it has changed' % var_name)
+
+                if merge_var.MyId != var.MyId:
+                    log.info('The Static variable has changed! Overwriting the link.')
+
+                    assert len(var.ParentLinks) is 1, 'Unexpected number of parent links in variable!'
+                    link = var.ParentLinks.pop()
+
+                    link.key = merge_var.MyId
+
+                    # Do not leave this log statement here!
+                    log.info(link.Root.Debug())
+
                 continue # Ignore this variable...
 
 
