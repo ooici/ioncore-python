@@ -210,7 +210,15 @@ def _GetNumericValue(self, data_type, value):
     def _norm_string(val):
         result = 0
         if ':' in val:
-            result = calendar.timegm(time.strptime(val, '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=val.split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=val
+                millis=000
+            result = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            result += millis * 0.001
         elif '.' in val:
             result = float(val)
         else:
