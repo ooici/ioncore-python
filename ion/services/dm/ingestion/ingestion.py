@@ -1032,7 +1032,15 @@ class IngestionService(ServiceProcess):
         # Get the start time of the supplement
         try:
             string_time = sup_root.FindAttributeByName('ion_time_coverage_start')
-            sup_stime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            sup_stime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            sup_stime += (millis * 0.001)
             log.debug('Supplement Start Time: %s (%i)' % (string_time.GetValue(), sup_stime))
 
         except OOIObjectError, oe:
@@ -1043,7 +1051,15 @@ class IngestionService(ServiceProcess):
         # Get the end time of the supplement
         try:
             string_time = sup_root.FindAttributeByName('ion_time_coverage_end')
-            sup_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            sup_etime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            sup_etime += (millis * 0.001)
             log.debug('Supplement End Time: %s (%i)' % (string_time.GetValue(), sup_etime))
 
         except OOIObjectError, oe:
@@ -1051,8 +1067,8 @@ class IngestionService(ServiceProcess):
             # this is an error - the attribute must be present to determine how to append the data supplement time coordinate!
         
         
-        result.update({EM_START_DATE:sup_stime*1000,
-                       EM_END_DATE:sup_etime*1000})
+        result.update({EM_START_DATE:int(sup_stime*1000),
+                       EM_END_DATE:int(sup_etime*1000)})
         
         
         
@@ -1061,7 +1077,15 @@ class IngestionService(ServiceProcess):
         is_new_ds = False
         try:
             string_time = cur_root.FindAttributeByName('ion_time_coverage_end')
-            cur_etime = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            cur_etime = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            cur_etime += (millis * 0.001)
             log.debug('Current End Time:      %s (%i)' % (string_time.GetValue(), cur_etime))
             
         except OOIObjectError, oe:
@@ -1112,21 +1136,34 @@ class IngestionService(ServiceProcess):
 
 
             # Get the agg vars - if this is not an FMRC...
-            if cur_agg_var is None:
-                try:
-                    cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
-                except OOIObjectError, oe:
+            try:
+                cur_agg_var = cur_root.FindVariableByName(sup_agg_dim_name)
+            except OOIObjectError, oe:
+                ret_vars = self._find_time_var(cur_root)
+                if len(ret_vars) == 1:
+                    log.info('ret_vars[1] = %s' % ret_vars[1])
+                    cur_agg_var = ret_vars[1]
+                else:
+                    log.warn('More than 1 \'time\' variable returned (count == %s): determining if one is suitable' % len(ret_vars))
+                    for var in ret_vars:
+                        log.info('var.name = %s' % var.name)
+                        for i in range(len(var.shape)):
+                            dim = var.shape[i]
+                            log.info('dim = %s' % dim.name)                        
+                            if dim.name == sup_agg_dim_name:
+                                cur_agg_var = var
+                                break
+
+            finally:
+                if cur_agg_var is None:
                     log.exception('Time Variable name does not match its dimension name')
                     raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
 
-            if sup_agg_var is None:
-
-                try:
-                    sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
-                except OOIObjectError, oe:
-                    log.exception('Time Variable name does not match its dimension name')
-                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
-
+            try:
+                sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
+            except OOIObjectError, oe:
+                log.exception('Time Variable name does not match its dimension name')
+                raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
 
             # First calculate runtime and forecast offsets (these will affect the other offsets)
             if sup_fcst_dim_name is not None and not len(sup_fcst_dim_name) == 0:
@@ -1432,7 +1469,7 @@ class IngestionService(ServiceProcess):
                 else:
                     raise IngestionError('Variable %s does not exist in the dataset.  Supplement is invalid!' % var_name)
 
-
+            
             # Step 2: Skip merge for variables which are not dimensioned on the sup_agg_dim
             # @todo: check to see if supplement shape and dataset shape don't match (like if time dimensions are at different indices)
             merge_agg_dim_idx = -1
@@ -1441,7 +1478,19 @@ class IngestionService(ServiceProcess):
                     merge_agg_dim_idx = i
                     break
             else:
-                log.info('Nothing to merge on variable %s which does not share the aggregation dimension' % var_name)
+                log.info('The Static variable %s will be updated if it has changed' % var_name)
+
+                if merge_var.MyId != var.MyId:
+                    log.info('The Static variable has changed! Overwriting the link.')
+
+                    assert len(var.ParentLinks) is 1, 'Unexpected number of parent links in variable!'
+                    link = var.ParentLinks.pop()
+
+                    link.key = merge_var.MyId
+
+                    # Do not leave this log statement here!
+                    log.info(link.Root.Debug())
+
                 continue # Ignore this variable...
 
 

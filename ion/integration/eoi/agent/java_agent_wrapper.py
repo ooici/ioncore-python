@@ -509,7 +509,15 @@ class JavaAgentWrapper(ServiceProcess):
             # Set the start time of this update to the last time in the dataset (ion_time_coverage_end)
             # minus the start time offset provided by the datasource (starttime_offset_millis)
             string_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end')
-            start_time_seconds = calendar.timegm(time.strptime(string_time.GetValue(), '%Y-%m-%dT%H:%M:%SZ'))
+            tstr=string_time.GetValue().split('.')
+            if len(tstr) is 2:
+                basetime=tstr[0] + 'Z'
+                millis=int(tstr[1].strip('Z'))
+            else:
+                basetime=string_time.GetValue()
+                millis=000
+            start_time_seconds = calendar.timegm(time.strptime(basetime, '%Y-%m-%dT%H:%M:%SZ'))
+            start_time_seconds += (millis * 0.001)
             start_time_seconds -= int(datasource.starttime_offset_millis * 0.001)
             context['is_initial'] = False
 
@@ -557,9 +565,9 @@ class JavaAgentWrapper(ServiceProcess):
         etime = time.strftime("%Y-%m-%d'T'%H:%M:%S", time.gmtime(end_time_seconds))
         log.info('Getting Data End time: %s' % etime)
 
-        context['start_datetime_millis'] = start_time_seconds * 1000
+        context['start_datetime_millis'] = int(start_time_seconds * 1000)
 
-        context['end_datetime_millis'] = end_time_seconds * 1000
+        context['end_datetime_millis'] = int(end_time_seconds * 1000)
 
         context['property'] = [str(x) for x in datasource.property]
         context['station_id'] = [str(x) for x in datasource.station_id]
