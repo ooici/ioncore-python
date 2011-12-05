@@ -24,7 +24,7 @@ from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
 from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
 
 from ion.core.data import store
-from ion.core.data.store import Query
+from ion.core.data.store import Query, SimpleBatchRequest
 
 from ion.core.data.store import IndexStoreError
 
@@ -142,6 +142,7 @@ class CassandraError(Exception):
     """
 
 
+    
 class CassandraStore(TCPConnection):
     """
     An Adapter class that implements the IStore interface by way of a
@@ -331,6 +332,44 @@ class CassandraStore(TCPConnection):
         yield TCPConnection.on_activate(self)
 
 
+class CassandraBatchRequest(SimpleBatchRequest):
+
+
+    def __init__(self, index_client):
+
+
+        # @TODO make sure that this is an instance of an IndexStore
+        self.index_client = index_client
+
+        self._br = {}
+
+    @defer.inlineCallbacks
+    def add_request(self,key, value, index_attributes=None):
+        """
+        @param key The key to the Cassandra row
+        @param value The value of the value column in the Cassandra row
+        @param index_attributes The dictionary contains keys for the column name and the index value
+        """
+
+        if index_attributes is None:
+            index_cols = {}
+        else:
+            index_cols = dict(**index_attributes)
+
+        #log.info("Put: index_attributes %s" % (index_cols))
+        yield self.index_client._check_index(index_cols)
+
+        columns = {"value":value, "has_key":"1"}
+
+        index_cols.update(columns)
+
+        self._br[key] = {self.index_client._cache_name:index_cols}
+
+        defer.returnValue(True)
+
+    def __len__(self):
+        return len(self._br)
+
 
 
 class CassandraIndexedStore(CassandraStore):
@@ -346,6 +385,7 @@ class CassandraIndexedStore(CassandraStore):
     get_stats = SizeStats()
     has_stats = SizeStats()
     update_stats = SizeStats()
+    batch_put_stats = SizeStats()
 
     query_stats = QueryStats()
 
@@ -360,6 +400,11 @@ class CassandraIndexedStore(CassandraStore):
         """   
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)  
         self._query_attribute_names = None
+
+
+    def new_batch_request(self):
+
+        return CassandraBatchRequest(self)
 
 
     @timeout(cassandra_timeout)
@@ -398,6 +443,37 @@ class CassandraIndexedStore(CassandraStore):
         if self.put_stats.t_count >= self.stats_out:
             log.critical('Cassandra Index Store Put Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb;' % self.put_stats.put_stats())
             self.put_stats.__init__()
+
+
+    @timeout(cassandra_timeout)
+    @defer.inlineCallbacks
+    def batch_put(self, batch_request):
+        """
+        Istore batch_put for indexed stuff in cassandra
+
+        @param batch_request is a batch request object containing one or more keys to put
+        """
+
+        tic = time.time()
+
+        assert isinstance(batch_request, CassandraBatchRequest), 'IndexStore batch_put method takes a BatchRequest object, got type: %s' % type(batch_request)
+
+        import pprint
+        pprint.pprint(batch_request._br)
+        yield self.client.batch_mutate(batch_request._br)
+
+
+        toc = time.time()
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra batch_put operation elapsed time %f; result size: %s' % (toc - tic, len(batch_request)))
+
+        self.batch_put_stats.add_stats(tic,toc,len(batch_request))
+
+        if self.batch_put_stats.t_count >= self.stats_out:
+            log.critical('Cassandra Index Store Batch Put Stats(%d ops): time seconds (mean/mean per row/max) %f/%f/%f; size (mean/max) %f/%f rows;' % self.batch_put_stats.put_stats())
+            self.batch_put_stats.__init__()
+
 
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
