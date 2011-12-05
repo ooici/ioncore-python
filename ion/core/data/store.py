@@ -170,7 +170,7 @@ class SimpleBatchRequest(object):
 
         self._br = {}
 
-    def add_request(self,key, value, index_attributes=None):
+    def add_request(self,key, value=None, index_attributes=None):
         """
         @param key The key to the Cassandra row
         @param value The value of the value column in the Cassandra row
@@ -265,11 +265,16 @@ class IndexStore(object):
 
         assert isinstance(batch_request, SimpleBatchRequest), 'IndexStore batch_put method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
 
+
         batch={}
         for key, (value, index_atts) in batch_request._br.iteritems():
             self._update_index(key, index_atts)
 
-            batch[key] = dict({"value":value},**index_atts)
+            if value is not None:
+                batch[key] = dict({"value":value},**index_atts)
+            else:
+                # Don't overwrite this row, update it!
+                self.kvs[key].update(index_atts)
 
         return defer.maybeDeferred(self.kvs.update, batch)
 

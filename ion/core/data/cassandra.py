@@ -344,7 +344,7 @@ class CassandraBatchRequest(SimpleBatchRequest):
         self._br = {}
 
     @defer.inlineCallbacks
-    def add_request(self,key, value, index_attributes=None):
+    def add_request(self,key, value=None, index_attributes=None):
         """
         @param key The key to the Cassandra row
         @param value The value of the value column in the Cassandra row
@@ -359,9 +359,10 @@ class CassandraBatchRequest(SimpleBatchRequest):
         #log.info("Put: index_attributes %s" % (index_cols))
         yield self.index_client._check_index(index_cols)
 
-        columns = {"value":value, "has_key":"1"}
+        if value is not None:
+            columns = {"value":value, "has_key":"1"}
 
-        index_cols.update(columns)
+            index_cols.update(columns)
 
         self._br[key] = {self.index_client._cache_name:index_cols}
 
@@ -458,8 +459,6 @@ class CassandraIndexedStore(CassandraStore):
 
         assert isinstance(batch_request, CassandraBatchRequest), 'IndexStore batch_put method takes a BatchRequest object, got type: %s' % type(batch_request)
 
-        import pprint
-        pprint.pprint(batch_request._br)
         yield self.client.batch_mutate(batch_request._br)
 
 

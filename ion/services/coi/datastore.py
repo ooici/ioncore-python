@@ -657,14 +657,20 @@ class DataStoreWorkbench(WorkBench):
 
             raise DataStoreWorkBenchError(msg)
 
+        """
+        ### Now everything goes in one batch...
         # now put any new commits that are not at the head
-        def_list = []
+        #def_list = []
 
         # list of the keys which are no longer heads
-        clear_head_list=[]
+        #clear_head_list=[]
 
         # list of the new heads to push at the same time
-        new_head_list=[]
+        #new_head_list=[]
+        """
+
+        batch = self._commit_store.new_batch_request()
+
         for repo_key, commit_keys in new_commits.items():
             # Get the updated repository
             repo = self.get_repository(repo_key)
@@ -680,6 +686,9 @@ class DataStoreWorkbench(WorkBench):
             head_keys = []
             for cref in repo.current_heads():
                 head_keys.append( cref.MyId )
+
+
+
 
             for key in commit_keys:
 
@@ -729,11 +738,14 @@ class DataStoreWorkbench(WorkBench):
 
 
                 if key not in head_keys:
-
+                    """
                     defd = self._commit_store.put(key = key,
                                        value = wse.serialize(),
                                        index_attributes = attributes)
                     def_list.append((defd, key, wse))
+                    """
+
+                    batch.add_request(key, wse.serialize(), attributes)
 
                 else:
 
@@ -748,8 +760,11 @@ class DataStoreWorkbench(WorkBench):
                                 attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
 
 
-
+                    """
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
+                    """
+                    batch.add_request(key, wse.serialize(), attributes)
+
 
             # Get the current head list
             q = Query()
@@ -758,6 +773,14 @@ class DataStoreWorkbench(WorkBench):
 
             rows = yield self._commit_store.query(q)
 
+            for key, columns in rows.items():
+                if key not in head_keys:
+                    batch.add_request(key, index_attributes={BRANCH_NAME:''})
+
+        yield self._commit_store.batch_put(batch)
+        # Nothing to check in the result, let any exceptions bubble up.
+
+        """
             for key, columns in rows.items():
                 if key not in head_keys:
                     clear_head_list.append(key)
@@ -818,6 +841,9 @@ class DataStoreWorkbench(WorkBench):
         #import pprint
         #print 'After update to heads'
         #pprint.pprint(self._commit_store.kvs)
+
+        """
+
 
 
         response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
