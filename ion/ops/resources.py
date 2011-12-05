@@ -20,7 +20,8 @@ import os, os.path
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, MYOOICI_USER_ID, ANONYMOUS_USER_ID, TypeIDMap, PredicateMap
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, HAS_ROLE_ID, HAS_A_ID, IS_A_ID
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, ADMIN_ROLE_ID, DATA_PROVIDER_ROLE_ID, MARINE_OPERATOR_ROLE_ID, EARLY_ADOPTER_ROLE_ID, AUTHENTICATED_ROLE_ID
-from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import RESOURCE_TYPE_TYPE_ID, DATASET_RESOURCE_TYPE_ID, TOPIC_RESOURCE_TYPE_ID, EXCHANGE_POINT_RES_TYPE_ID,EXCHANGE_SPACE_RES_TYPE_ID, PUBLISHER_RES_TYPE_ID, SUBSCRIBER_RES_TYPE_ID, SUBSCRIPTION_RES_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, DISPATCHER_RESOURCE_TYPE_ID, DATARESOURCE_SCHEDULE_TYPE_ID, IDENTITY_RESOURCE_TYPE_ID, INSTRUMENT_RES_TYPE_ID, INSTRUMENT_AGENT_RES_TYPE_ID
+
 
 from ion.services.coi.datastore import DataStoreService, DataStoreWorkbench, DataStoreWorkBenchError, BLOB_CACHE, COMMIT_CACHE, Query, REPOSITORY_KEY, MUTABLE_TYPE, BRANCH_NAME, VALUE
 from ion.core.data.cassandra_bootstrap import CassandraIndexedStoreBootstrap, CassandraStoreBootstrap
@@ -42,6 +43,9 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 
 
 from ion.services.coi.identity_registry import IdentityRegistryClient, RESOURCE_CFG_REQUEST_TYPE
+from ion.util.procutils import create_guid
+from ion.core.object.object_utils import sha1hex
+
 
 # Create a process
 resource_process = Process()
@@ -64,13 +68,28 @@ irc = IdentityRegistryClient(resource_process)
 type_id_map = TypeIDMap()
 predicate_map = PredicateMap()
 
+NEW = 'New'
+ACTIVE = 'Active'
+INACTIVE = 'Inactive'
+COMMISSIONED = 'Commissioned'
+DECOMMISSIONED = 'Decommissioned'
+RETIRED = 'Retired'
+DEVELOPED = 'Developed'
+UPDATE = 'Update'
+
+
 # Set ALL for import *
 __all__= ['resource_process','rc','asc','ac','mc','ROOT_USER_ID', 'MYOOICI_USER_ID', 'ANONYMOUS_USER_ID','predicate_map', 'type_id_map']
 __all__.extend(['TYPE_OF_ID', 'HAS_LIFE_CYCLE_STATE_ID', 'OWNED_BY_ID', 'HAS_ROLE_ID', 'HAS_A_ID', 'IS_A_ID'])
 __all__.extend(['SAMPLE_PROFILE_DATASET_ID', 'SAMPLE_PROFILE_DATA_SOURCE_ID', 'ADMIN_ROLE_ID', 'DATA_PROVIDER_ROLE_ID', 'MARINE_OPERATOR_ROLE_ID', 'EARLY_ADOPTER_ROLE_ID', 'AUTHENTICATED_ROLE_ID'])
-__all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID'])
+__all__.extend(['RESOURCE_TYPE_TYPE_ID', 'DATASET_RESOURCE_TYPE_ID', 'TOPIC_RESOURCE_TYPE_ID', 'EXCHANGE_POINT_RES_TYPE_ID', 'EXCHANGE_SPACE_RES_TYPE_ID', 'PUBLISHER_RES_TYPE_ID', 'SUBSCRIBER_RES_TYPE_ID', 'SUBSCRIPTION_RES_TYPE_ID', 'DATASOURCE_RESOURCE_TYPE_ID', 'DISPATCHER_RESOURCE_TYPE_ID', 'DATARESOURCE_SCHEDULE_TYPE_ID', 'IDENTITY_RESOURCE_TYPE_ID','INSTRUMENT_AGENT_RES_TYPE_ID','INSTRUMENT_RES_TYPE_ID'])
 __all__.extend(['ASSOCIATION_TYPE','PREDICATE_REFERENCE_TYPE','LCS_REFERENCE_TYPE','ASSOCIATION_QUERY_MSG_TYPE', 'PREDICATE_OBJECT_QUERY_TYPE', 'IDREF_TYPE', 'SUBJECT_PREDICATE_QUERY_TYPE'])
-__all__.extend(['find_resource_keys','find_dataset_keys','find_datasets','find_broken_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all','print_dataset_time'])
+
+# Commands
+__all__.extend(['create_branch_name','change_resource_lifecycle','find_resource_keys','find_dataset_keys','find_datasets','find_broken_datasets','pprint_datasets','clear', 'print_dataset_history','update_identity_subject','get_identities_by_subject', '_checkout_all','print_dataset_time'])
+
+
+__all__.extend(['NEW','ACTIVE','INACTIVE','COMMISSIONED','DECOMMISSIONED','RETIRED','DEVELOPED','UPDATE'])
 
 # graphviz related
 __all__.extend(['_gv_resource_commits', '_graph', 'graph_resource_commits', '_gv_resource_associations', 'graph_resource_associations', '_gv_resource', 'graph_resource'])
@@ -80,6 +99,12 @@ __all__.extend(['time','sha1_to_hex'])
 
 # Data Store Repair
 __all__.extend(['cassandra_repair_shop',])
+
+def create_branch_name():
+    """
+    Create a new random 8 character branch name
+    """
+    return sha1hex(create_guid())[:8]
 
 
 @defer.inlineCallbacks
@@ -91,6 +116,14 @@ def find_resource_keys(resource_type, lifecycle_state=None):
     @param lifecycle_state: an int value of a lifecycle state as from the LifeCycleState enum
                             embedded in MessageInstance_Wrapper objects.  If lifecycle_state is
                             None it will not be used in the query.
+        NEW=1;
+    	ACTIVE=2;
+	    INACTIVE=3;
+	    COMMISSIONED=4;
+	    DECOMMISSIONED=5;
+	    RETIRED=6;
+	    DEVELOPED=7;
+	    UPDATE=8; // A state reserved for an update record.
     
     @return: A list containing the ID reference keys of the resources found.  If nothing is
              found, an empty list is returned
@@ -134,6 +167,26 @@ def find_resource_keys(resource_type, lifecycle_state=None):
     result = yield asc.get_subjects(query)
 
     defer.returnValue(result.idrefs[:])
+
+@defer.inlineCallbacks
+def change_resource_lifecycle(id_list, lifecycle):
+    """
+    Convenience method for changing the life cycle state of a set of resources
+    @param id_list a list of resources Ids (result of find_resource_keys)
+    @param lifecycle_state: one of the life cycle states imported with this module
+    """
+
+    for id in id_list:
+
+        res = yield rc.get_instance(id)
+
+        res.ResourceLifeCycleState = lifecycle
+
+        yield rc.put_instance(res)
+
+
+
+
 
 
 @defer.inlineCallbacks
