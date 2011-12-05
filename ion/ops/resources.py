@@ -1075,7 +1075,18 @@ class RepairBench(DataStoreWorkbench):
                             new_broken.append(new_ref)
 
                 broken_refs = new_broken
-                
+
+        # Make sure the dotgit object does not end up in any of these dictionaries!
+        dotgit_key = repo._dotgit.MyId
+
+        if dotgit_key in repo.orphaned_crefs:
+            del repo.orphaned_crefs[dotgit_key]
+
+        if dotgit_key in repo.broken_children:
+            del repo.broken_children[dotgit_key]
+
+        if dotgit_key in repo.broken_parents:
+            del repo.broken_parents[dotgit_key]
 
         log.info('read_repo_state: complete')
 
@@ -1099,6 +1110,11 @@ class RepairBench(DataStoreWorkbench):
     @defer.inlineCallbacks
     def resolve_broken_repository(self,repo, cref):
 
+
+        for key in repo.orphaned_crefs.iterkeys():
+
+            if key == cref.MyId:
+                raise RuntimeError('Can not delete the commit ref that you are trying to make the head!')
 
         # Must reconstitute the head
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
