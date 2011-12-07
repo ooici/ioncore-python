@@ -142,6 +142,48 @@ class CassandraError(Exception):
     """
 
 
+class CassandraBatchRequest(SimpleBatchRequest):
+
+
+    def __init__(self, index_client=None):
+
+
+        # @TODO make sure that this is an instance of an IndexStore
+        self.index_client = index_client
+
+        self._br = {}
+
+    @defer.inlineCallbacks
+    def add_request(self,key, value=None, index_attributes=None):
+        """
+        @param key The key to the Cassandra row
+        @param value The value of the value column in the Cassandra row
+        @param index_attributes The dictionary contains keys for the column name and the index value
+        """
+
+
+
+        if index_attributes is None:
+            index_cols = {}
+        else:
+            index_cols = dict(**index_attributes)
+
+        if self.index_client is not None and isinstance(self.index_client, CassandraIndexedStore):
+            yield self.index_client._check_index(index_cols)
+
+        if value is not None:
+            columns = {"value":value, "has_key":"1"}
+
+            index_cols.update(columns)
+
+        self._br[key] = {self.index_client._cache_name:index_cols}
+
+        defer.returnValue(True)
+
+    def __len__(self):
+        return len(self._br)
+
+
     
 class CassandraStore(TCPConnection):
     """
@@ -164,8 +206,13 @@ class CassandraStore(TCPConnection):
     implements(store.IStore)
 
     put_stats = SizeStats()
+    batch_put_stats = SizeStats()
+
     get_stats = SizeStats()
+    batch_get_stats = SizeStats()
+
     has_stats = SizeStats()
+    batch_has_stats = SizeStats()
 
     stats_out = 10000
 
@@ -200,7 +247,12 @@ class CassandraStore(TCPConnection):
         log.info("leaving __init__")
 
 
+    def new_batch_request(self):
+
+        return CassandraBatchRequest(self)
+
     get_stats_string = 'Cassandra Store Get Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb, Not Found - %d;'
+
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def get(self, key):
@@ -238,6 +290,50 @@ class CassandraStore(TCPConnection):
 
         defer.returnValue(value)
 
+    batch_get_stats_string = 'Cassandra Store Batch Get Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb, Not Found - %d;'
+
+
+    @timeout(cassandra_timeout)
+    @defer.inlineCallbacks
+    def batch_get(self, batch_request):
+        """
+        @brief Return a dictionary of values corresponding to a given batch of keys
+        @param key
+        @retval Deferred that fires with the value of key
+        """
+
+        #log.debug("CassandraStore: Calling get on key %s " % key)
+
+        tic = time.time()
+        lval = 0
+
+        assert isinstance(batch_request, CassandraBatchRequest), 'CassandraStore batch_put method takes a BatchRequest object, got type: %s' % type(batch_request)
+
+        result = yield self.client.multiget(batch_request._br.keys(), self._cache_name, column='value')
+
+        batch = {}
+        for key, columns in result.iteritems():
+            if len(columns) is 1:
+                batch[key] = columns[0].column.value
+            else:
+                batch[key] = None
+
+        lval = len(batch)
+        toc = time.time()
+
+
+        if toc - tic > 4.0:
+            log.info('Cassandra batch get operation elapsed time %f; result size: %s' % (toc - tic, lval))
+
+        self.batch_get_stats.add_stats(tic,toc,lval)
+
+        if self.batch_get_stats.t_count >= self.stats_out:
+            log.critical(self.batch_get_stats_string % self.batch_get_stats.get_stats())
+            self.batch_get_stats.__init__()
+
+        defer.returnValue(batch)
+
+
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
     def put(self, key, value):
@@ -267,6 +363,36 @@ class CassandraStore(TCPConnection):
             log.critical('Cassandra Store Put Stats(%d ops): time seconds (mean/mean per Kb/max) %f/%f/%f; size (mean/max) %f/%f Kb;' % self.put_stats.put_stats())
             self.put_stats.__init__()
 
+    @timeout(cassandra_timeout)
+    @defer.inlineCallbacks
+    def batch_put(self, batch_request):
+        """
+        Istore batch_put for indexed stuff in cassandra
+
+        @param batch_request is a batch request object containing one or more keys to put
+        """
+
+        tic = time.time()
+
+        assert isinstance(batch_request, CassandraBatchRequest), 'CassandraStore batch_put method takes a BatchRequest object, got type: %s' % type(batch_request)
+
+        yield self.client.batch_mutate(batch_request._br)
+
+
+        toc = time.time()
+
+        if toc - tic > 4.0:
+            log.warn('Cassandra batch_put operation elapsed time %f; result size: %s' % (toc - tic, len(batch_request)))
+
+        self.batch_put_stats.add_stats(tic,toc,len(batch_request))
+
+        if self.batch_put_stats.t_count >= self.stats_out:
+            log.critical('Cassandra Store Batch Put Stats(%d ops): time seconds (mean/mean per row/max) %f/%f/%f; size (mean/max) %f/%f rows;' % self.batch_put_stats.put_stats())
+            self.batch_put_stats.__init__()
+
+
+
+
     has_key_stats_string = 'Cassandra Store Has_Key Stats(%d ops): time seconds (mean/max) %f/%f;'
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
@@ -287,7 +413,7 @@ class CassandraStore(TCPConnection):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.info('Cassandra has_key operation elapsed time %f;' % (toc - tic))
+            log.info('CassandraStore has_key operation elapsed time %f;' % (toc - tic))
 
         self.has_stats.add_stats(tic,toc)
 
@@ -296,6 +422,44 @@ class CassandraStore(TCPConnection):
             self.has_stats.__init__()
 
         defer.returnValue(ret)
+
+
+    batch_has_key_stats_string = 'Cassandra Store Batch_Has_Key Stats(%d ops): time seconds (mean/max) %f/%f;'
+    @timeout(cassandra_timeout)
+    @defer.inlineCallbacks
+    def batch_has_key(self, batch_request):
+        """
+        Checks to see if the key exists in the column family
+        @param batch_request is a batch request of keys
+        @retVal Returns a dictionary of bools in a deferred
+        """
+        tic = time.time()
+
+        assert isinstance(batch_request, CassandraBatchRequest), 'CassandraStore batch_has_key method takes a BatchRequest object, got type: %s' % type(batch_request)
+
+        result = yield self.client.multiget(batch_request._br.keys(), self._cache_name, column="has_key")
+
+        batch = {}
+        for key, columns in result.iteritems():
+            if len(columns) is 1:
+                batch[key] = True
+            else:
+                batch[key] = False
+
+        toc = time.time()
+
+        if toc - tic > 4.0:
+            log.info('CassandraStore batch_has_key operation elapsed time %f;' % (toc - tic))
+
+        self.has_stats.add_stats(tic,toc)
+
+        if self.has_stats.t_count >= self.stats_out:
+            log.critical(self.batch_has_key_stats_string % self.has_stats.simple_stats())
+            self.has_stats.__init__()
+
+        defer.returnValue(batch)
+
+
 
     @timeout(cassandra_timeout)
     @defer.inlineCallbacks
@@ -330,46 +494,6 @@ class CassandraStore(TCPConnection):
     def on_activate(self, *args, **kwargs):
 
         yield TCPConnection.on_activate(self)
-
-
-class CassandraBatchRequest(SimpleBatchRequest):
-
-
-    def __init__(self, index_client):
-
-
-        # @TODO make sure that this is an instance of an IndexStore
-        self.index_client = index_client
-
-        self._br = {}
-
-    @defer.inlineCallbacks
-    def add_request(self,key, value=None, index_attributes=None):
-        """
-        @param key The key to the Cassandra row
-        @param value The value of the value column in the Cassandra row
-        @param index_attributes The dictionary contains keys for the column name and the index value
-        """
-
-        if index_attributes is None:
-            index_cols = {}
-        else:
-            index_cols = dict(**index_attributes)
-
-        #log.info("Put: index_attributes %s" % (index_cols))
-        yield self.index_client._check_index(index_cols)
-
-        if value is not None:
-            columns = {"value":value, "has_key":"1"}
-
-            index_cols.update(columns)
-
-        self._br[key] = {self.index_client._cache_name:index_cols}
-
-        defer.returnValue(True)
-
-    def __len__(self):
-        return len(self._br)
 
 
 

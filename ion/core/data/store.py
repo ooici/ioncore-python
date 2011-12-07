@@ -20,6 +20,52 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 
+class IndexStoreError(Exception):
+    """
+    An exception class for the index store
+    """
+
+class SimpleBatchRequest(object):
+
+
+    def __init__(self, index_client=None):
+
+        # @TODO make sure that this is an instance of an IndexStore
+        self.index_client = index_client
+
+        self._br = {}
+
+    def add_request(self,key, value=None, index_attributes=None):
+        """
+        @param key The key to the Cassandra row
+        @param value The value of the value column in the Cassandra row
+        @param index_attributes The dictionary contains keys for the column name and the index value
+        """
+
+        if index_attributes is not None:
+
+            if self.index_client is None:
+                raise IndexStoreError('Called add_request with index_attributes for a batch object which was not created with an index store!')
+
+
+            query_attribute_names = set(self.index_client.indices.keys())
+            index_attribute_names = set(index_attributes.keys())
+
+            if not index_attribute_names.issubset(query_attribute_names):
+                bad_attrs = index_attribute_names.difference(query_attribute_names)
+                raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
+
+
+        self._br[key] = (value, index_attributes)
+
+        return defer.succeed(True)
+
+    def __len__(self):
+        return len(self._br)
+
+
+
+
 class IStore(Interface):
     """
     Interface all store backend implementations.
@@ -62,17 +108,53 @@ class Store(object):
     def __init__(self, *args, **kwargs):
         pass
 
+    def new_batch_request(self):
+
+        return SimpleBatchRequest()
+
+
     def get(self, key):
         """
         @see IStore.get
         """
         return defer.maybeDeferred(self.kvs.get, key, None)
 
+    def batch_get(self, batch_request):
+        """
+        Istore batch_put
+
+        @param batch_request is a batch request object containing one or more keys to get
+        """
+
+        assert isinstance(batch_request, SimpleBatchRequest), 'Store batch_get method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
+
+        kv = {}
+        for key in batch_request._br.iterkeys():
+            kv[key] =  self.kvs.get(key)
+
+        return defer.succeed(kv)
+
+
     def put(self, key, value):
         """
         @see IStore.put
         """
         return defer.maybeDeferred(self.kvs.update, {key:value})
+
+    def batch_put(self, batch_request):
+        """
+        Istore batch_put
+
+        @param batch_request is a batch request object containing one or more keys & values to put
+        """
+
+        assert isinstance(batch_request, SimpleBatchRequest), 'Store batch_put method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
+
+        batch={}
+        for key, (value, index_atts) in batch_request._br.iteritems():
+            batch[key] = value
+
+        return defer.maybeDeferred(self.kvs.update, batch)
 
     def remove(self, key):
         """
@@ -92,6 +174,22 @@ class Store(object):
         """ 
         return defer.maybeDeferred(self.kvs.has_key, key )
 
+    def batch_has_key(self, batch_request):
+        """
+        Istore batch_has_key
+
+        @param batch_request is a batch request object containing one or more keys to test
+        """
+
+        assert isinstance(batch_request, SimpleBatchRequest), 'Store batch_has_key method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
+
+        kv = {}
+        for key in batch_request._br.iterkeys():
+            kv[key] =  self.kvs.has_key(key)
+
+        return defer.succeed(kv)
+
+
 
 class IIndexStore(IStore):
     """
@@ -105,6 +203,12 @@ class IIndexStore(IStore):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for value associated with key, or None if not existing.
+        """
+
+    def batch_get(batch_request):
+        """
+        @param batch_request is a BatchRequest object containing all the keys to get
+        @retval Deferred, dictionary of keys and value, or None if not existing.
         """
 
     def put(key, value, index_attributes=None):
@@ -149,51 +253,19 @@ class IIndexStore(IStore):
         @param key is the key to check in the column family
         @retVal Returns a bool in a deferred
         """ 
-    
+
+    def batch_has_key(batch_request):
+        """
+        Checks to see if the key exists in the column family
+        @param batch_request is a BatchRequest object containing all the keys to check in the column family
+        @retVal Returns a dictionary of key and bool in a deferred
+        """
+
+
     def get_query_attributes( ):
         """
         Return the column names that are indexed.
         """
-
-class IndexStoreError(Exception):
-    """
-    An exception class for the index store
-    """
-
-class SimpleBatchRequest(object):
-
-
-    def __init__(self, index_client):
-
-        # @TODO make sure that this is an instance of an IndexStore
-        self.index_client = index_client
-
-        self._br = {}
-
-    def add_request(self,key, value=None, index_attributes=None):
-        """
-        @param key The key to the Cassandra row
-        @param value The value of the value column in the Cassandra row
-        @param index_attributes The dictionary contains keys for the column name and the index value
-        """
-
-        query_attribute_names = set(self.index_client.indices.keys())
-        index_attribute_names = set(index_attributes.keys())
-
-        if not index_attribute_names.issubset(query_attribute_names):
-            bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
-
-
-        self._br[key] = (value, index_attributes)
-
-        return defer.succeed(True)
-
-    def __len__(self):
-        return len(self._br)
-
-
-
 
 class IndexStore(object):
     """
@@ -237,6 +309,26 @@ class IndexStore(object):
         """
         @see IStore.get
         """
+        row = self.kvs.get(key, None)
+        if row is None:
+            return defer.succeed(None)
+        else:
+            return defer.maybeDeferred(row.get, "value")
+
+    def batch_get(self, batch_request):
+        """
+        @see IStore.batch_get
+        """
+
+        assert isinstance(batch_request, SimpleBatchRequest), 'IndexStore batch_get method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
+
+        kv = {}
+        for key in batch_request._br.iterkeys():
+            kv[key]  =  self.kvs.get(key,{}).get('value',None)
+
+        return defer.succeed(kv)
+
+
         row = self.kvs.get(key, None)
         if row is None:
             return defer.succeed(None)
@@ -396,7 +488,23 @@ class IndexStore(object):
         @retVal Returns a bool in a deferred
         """
         return defer.maybeDeferred(self.kvs.has_key, key)
-    
+
+    def batch_has_key(self, batch_request):
+        """
+        Istore batch_has_key
+
+        @param batch_request is a batch request object containing one or more keys to test
+        """
+
+        assert isinstance(batch_request, SimpleBatchRequest), 'IndexStore batch_has_key method takes a SimpleBatchRequest object, got type: %s' % type(batch_request)
+
+        kv = {}
+        for key in batch_request._br.iterkeys():
+            kv[key] =  self.kvs.has_key(key)
+
+        return defer.succeed(kv)
+
+
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
