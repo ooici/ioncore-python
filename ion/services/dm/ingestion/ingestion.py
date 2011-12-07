@@ -1157,13 +1157,13 @@ class IngestionService(ServiceProcess):
             finally:
                 if cur_agg_var is None:
                     log.exception('Time Variable name does not match its dimension name')
-                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+                    raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.ResourceIdentity) )
 
             try:
                 sup_agg_var = sup_root.FindVariableByName(cur_agg_var.name)
             except OOIObjectError, oe:
                 log.exception('Time Variable name does not match its dimension name')
-                raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.repository_key) )
+                raise IngestionError('Can not get current dataset Time Variable: "%s", in dataset: %s' % (sup_agg_dim_name, self.dataset.ResourceIdentity) )
 
             # First calculate runtime and forecast offsets (these will affect the other offsets)
             if sup_fcst_dim_name is not None and not len(sup_fcst_dim_name) == 0:
@@ -1231,7 +1231,7 @@ class IngestionService(ServiceProcess):
 
 
                     if sup_agg_var.GetUnits() != cur_agg_var.GetUnits():
-                        raise IngestionError('Aggregation variable units do not match in the latest supplement. Time Variable: "%s", in dataset: %s' % (sup_agg_var.name, self.dataset.repository_key))
+                        raise IngestionError('Aggregation variable units do not match in the latest supplement. Time Variable: "%s", in dataset: %s' % (sup_agg_var.name, self.dataset.ResourceIdentity))
 
 
                     repo = self.dataset.Repository
