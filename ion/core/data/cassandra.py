@@ -227,7 +227,7 @@ class CassandraStore(TCPConnection):
 
 
         if toc - tic > 4.0:
-            log.warn('Cassandra get operation elapsed time %f; result size: %s' % (toc - tic, lval))
+            log.info('Cassandra get operation elapsed time %f; result size: %s' % (toc - tic, lval))
 
         self.get_stats.add_stats(tic,toc,lval)
 
@@ -258,7 +258,7 @@ class CassandraStore(TCPConnection):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.warn('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
+            log.info('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
 
         self.put_stats.add_stats(tic,toc,len(value))
 
@@ -286,7 +286,7 @@ class CassandraStore(TCPConnection):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.warn('Cassandra has_key operation elapsed time %f;' % (toc - tic))
+            log.info('Cassandra has_key operation elapsed time %f;' % (toc - tic))
 
         self.has_stats.add_stats(tic,toc)
 
@@ -391,7 +391,7 @@ class CassandraIndexedStore(CassandraStore):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.warn('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
+            log.info('Cassandra put operation elapsed time %f; result size: %s' % (toc - tic, len(value)))
 
         self.put_stats.add_stats(tic,toc,len(value))
 
@@ -417,7 +417,7 @@ class CassandraIndexedStore(CassandraStore):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.warn('Cassandra update_index operation elapsed time %f;' % (toc - tic))
+            log.info('Cassandra update_index operation elapsed time %f;' % (toc - tic))
 
         self.update_stats.add_stats(tic,toc)
 
@@ -506,7 +506,7 @@ class CassandraIndexedStore(CassandraStore):
         toc = time.time()
 
         if toc - tic > 4.0:
-            log.warn('Cassandra Query operation elapsed time %f; # of rows returned: %d, # of predicates in request: %d' % (toc - tic, len(rows), len(predicates)))
+            log.info('Cassandra Query operation elapsed time %f; # of rows returned: %d, # of predicates in request: %d' % (toc - tic, len(rows), len(predicates)))
 
         self.query_stats.add_stats(tic,toc,len(predicates), len(rows))
 
