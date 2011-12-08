@@ -845,7 +845,7 @@ class DataStoreWorkbench(WorkBench):
 
         res_dict = yield self._blob_store.batch_get(batch_request)
 
-        for key, blob in res_dict:
+        for key, blob in res_dict.iteritems():
             if blob is None:
                 raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
