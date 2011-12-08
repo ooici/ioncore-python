@@ -65,6 +65,63 @@ class IStoreTest(unittest.TestCase):
     #    pass
 
     @defer.inlineCallbacks
+    def test_batch(self):
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1','value1')
+        yield batch.add_request('key2','value2')
+        yield batch.add_request('key3','value3')
+
+        yield self.ds.batch_put(batch)
+
+        # Test has key
+        has_key = yield self.ds.has_key("I don't exist")
+        self.failUnlessEqual(has_key, False)
+
+        has_key = yield self.ds.has_key("key1")
+        self.failUnlessEqual(has_key, True)
+
+        # Test get key
+        rc = yield self.ds.get("I don't exist")
+        self.assertEqual(rc, None)
+
+        rc = yield self.ds.get("key2")
+        self.assertEqual(rc, 'value2')
+
+        # Test batch_get
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1')
+        yield batch.add_request('key2')
+        yield batch.add_request('key4')
+
+        res = yield self.ds.batch_get(batch)
+
+        self.assertEqual(res.get('key1'),'value1')
+        self.assertEqual(res.get('key2'),'value2')
+        self.assertEqual(res.get('key3','Not Here'),'Not Here')
+        self.assertEqual(res.get('key4','Not Here'),None)
+
+
+        # Test batch_has_key
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1')
+        yield batch.add_request('key2')
+        yield batch.add_request('key4')
+
+        res = yield self.ds.batch_has_key(batch)
+
+        self.assertEqual(res.get('key1'),True)
+        self.assertEqual(res.get('key2'),True)
+        self.assertEqual(res.get('key3','Not Here'),'Not Here')
+        self.assertEqual(res.get('key4','Not Here'),False)
+
+
+    @defer.inlineCallbacks
     def test_get_none(self):
         # Make sure we can't read the not-written
         rc = yield self.ds.get(self.key)
@@ -150,6 +207,10 @@ class StoreServiceTest(IStoreTest, IonTestCase):
         yield self._shutdown_processes()
         yield self._stop_container()
 
+    @defer.inlineCallbacks
+    def test_batch(self):
+
+        raise unittest.SkipTest('Not implementing batch_put in store service!')
 
 
 
@@ -179,6 +240,73 @@ class IndexStoreTest(IStoreTest):
         store.Store.kvs.clear()
         store.IndexStore.kvs.clear()
         store.IndexStore.indices.clear()
+
+    @defer.inlineCallbacks
+    def test_batch(self):
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1','value1',{'state':'RI'})
+        yield batch.add_request('key2','value2',{'state':'RI'})
+        yield batch.add_request('key3','value3',{'state':'MA'})
+
+        yield self.ds.batch_put(batch)
+
+        # Test has key
+        has_key = yield self.ds.has_key("I don't exist")
+        self.failUnlessEqual(has_key, False)
+
+        has_key = yield self.ds.has_key("key1")
+        self.failUnlessEqual(has_key, True)
+
+        # Test get key
+        rc = yield self.ds.get("I don't exist")
+        self.assertEqual(rc, None)
+
+        rc = yield self.ds.get("key2")
+        self.assertEqual(rc, 'value2')
+
+        # Test batch_get
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1')
+        yield batch.add_request('key2')
+        yield batch.add_request('key4')
+
+        res = yield self.ds.batch_get(batch)
+
+        self.assertEqual(res.get('key1'),'value1')
+        self.assertEqual(res.get('key2'),'value2')
+        self.assertEqual(res.get('key3','Not Here'),'Not Here')
+        self.assertEqual(res.get('key4','Not Here'),None)
+
+
+        # Test batch_has_key
+
+        batch = self.ds.new_batch_request()
+
+        yield batch.add_request('key1')
+        yield batch.add_request('key2')
+        yield batch.add_request('key4')
+
+        res = yield self.ds.batch_has_key(batch)
+
+        self.assertEqual(res.get('key1'),True)
+        self.assertEqual(res.get('key2'),True)
+        self.assertEqual(res.get('key3','Not Here'),'Not Here')
+        self.assertEqual(res.get('key4','Not Here'),False)
+
+
+        # Test query
+        query = Query()
+        query.add_predicate_eq('state', 'RI')
+        rows = yield self.ds.query(query)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows['key1']['value'], 'value1')
+        self.assertEqual(rows['key2']['value'], 'value2')
+
 
 
     @defer.inlineCallbacks
@@ -432,3 +560,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
+    @defer.inlineCallbacks
+    def test_batch(self):
+
+        raise unittest.SkipTest('Not implementing batch_put in store service!')
