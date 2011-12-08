@@ -372,7 +372,7 @@ class Receiver(BasicLifecycleObject):
                             count = workbench.count_persistent()
                             if count > 0:
                                     # Print a warning if someone else is using the persistence tricks...
-                                log.warn('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
+                                log.info('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
 
 
 
@@ -400,7 +400,7 @@ class Receiver(BasicLifecycleObject):
                             count = workbench.count_persistent()
                             if count > 0:
                                     # Print a warning if someone else is using the persistence tricks...
-                                log.warn('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
+                                log.info('The "%s" process is holding persistent state in %d repository objects!' % (process.proc_name, count))
 
 
 

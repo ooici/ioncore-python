@@ -213,7 +213,7 @@ class MetadataCache(AIS_Mixin):
                 log.debug('Metadata keys for ' + dSetID + ': ' + str(metadata.keys()))
                 returnValue = metadata[DSET]
             except KeyError:
-                log.error('Metadata not found for datasetID: %s'  %(dSetID))
+                log.info('Metadata not found for datasetID: %s'  %(dSetID))
                 returnValue = None
     
             finally:
@@ -298,7 +298,7 @@ class MetadataCache(AIS_Mixin):
     
 
             except KeyError:
-                log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
+                log.info('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
                 returnValue = False
             else:
                 self.numDSets -= 1
@@ -418,7 +418,7 @@ class MetadataCache(AIS_Mixin):
     
 
             except KeyError:
-                log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
+                log.info('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
                 returnValue = False
             else:
                 self.numDSources -= 1
