@@ -13,6 +13,7 @@
 """
 import os
 import time
+import binascii
 
 from twisted.internet import defer
 
@@ -136,6 +137,8 @@ class QueryStats(object):
 
 # Don't let cassandra timeout cause failure
 cassandra_timeout = CONF.getValue('CassandraTimeout',60.0)
+cassandra_verify = CONF.getValue('CassandraVerify',False)
+
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
@@ -352,6 +355,16 @@ class CassandraStore(TCPConnection):
         columns = {"value": value, "has_key":"1"}
         yield self.client.batch_insert(key, self._cache_name, columns)
 
+        if cassandra_verify:
+            cv = yield self.has_key(key)
+            if cv is False:
+                raise CassandraError('Verification of put failed for key: %s' % binascii.b2a_hex(key))
+            elif cv is True:
+                log.info('Verified put key: %s' % binascii.b2a_hex(key))
+            else:
+                raise CassandraError('Unexpected condition in Cassandra Verify has key result! Key: %s' % binascii.b2a_hex(key))
+
+
         toc = time.time()
 
         if toc - tic > 4.0:
@@ -378,6 +391,24 @@ class CassandraStore(TCPConnection):
 
         yield self.client.batch_mutate(batch_request._br)
 
+        if cassandra_verify:
+            cv = yield self.batch_has_key(batch_request)
+
+            bad_keys = []
+            good_keys = 0
+            for key, res in cv.iteritems():
+                if res is False:
+                    bad_keys.append(key)
+                elif res is True:
+                    good_keys += 1
+                else:
+                    raise CassandraError('Unexpected condition in Cassandra Verify has key result! Key: %s' % binascii.b2a_hex(key))
+
+            if len(bad_keys) > 0:
+                log.info('Bad Cassandra Verify keys: %s' % [binascii.b2a_hex(key) for key in bad_keys])
+                raise CassandraError('Verification of batch put failed for %d keys out of %d in batch request.' % (len(bad_keys), len(batch_request)))
+            elif len(bad_keys) is 0:
+                log.info('Verified batch put for %d keys!' % good_keys)
 
         toc = time.time()
 
@@ -557,6 +588,15 @@ class CassandraIndexedStore(CassandraStore):
         
         yield self.client.batch_insert(key, self._cache_name, index_cols)
 
+        if cassandra_verify:
+            cv = yield self.has_key(key)
+            if cv is False:
+                raise CassandraError('Verification of put failed for key: %s' % binascii.b2a_hex(key))
+            elif cv is True:
+                log.info('Verified put key: %s' % binascii.b2a_hex(key))
+            else:
+                raise CassandraError('Unexpected condition in Cassandra Verify has key result! Key: %s' % binascii.b2a_hex(key))
+
 
         toc = time.time()
 
@@ -585,6 +625,24 @@ class CassandraIndexedStore(CassandraStore):
 
         yield self.client.batch_mutate(batch_request._br)
 
+        if cassandra_verify:
+            cv = yield self.batch_has_key(batch_request)
+
+            bad_keys = []
+            good_keys = 0
+            for key, res in cv.iteritems():
+                if res is False:
+                    bad_keys.append(key)
+                elif res is True:
+                    good_keys += 1
+                else:
+                    raise CassandraError('Unexpected condition in Cassandra Verify has key result! Key: %s' % binascii.b2a_hex(key))
+
+            if len(bad_keys) > 0:
+                log.info('Bad Cassandra Verify keys: %s' % [binascii.b2a_hex(key) for key in bad_keys])
+                raise CassandraError('Verification of batch put failed for %d keys out of %d in batch request.' % (len(bad_keys), len(batch_request)))
+            elif len(bad_keys) is 0:
+                log.info('Verified batch put for %d keys!' % good_keys)
 
         toc = time.time()
 
