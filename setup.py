@@ -45,13 +45,13 @@ setup( name = 'ioncore',
                       },
        test_suite = 'ion',
        install_requires = [
-           'Twisted==10.2.0', 
+           'Twisted==10.2.0',
            'txamqp==0.3',
-           'simplejson==2.1.2', 
+           'simplejson==2.1.2',
            'msgpack-python==015final',
-           'gviz_api.py==1.7.0', 
-           'Telephus==0.7-beta3.3', 
-           'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
+           'gviz_api.py==1.7.0',
+           'Telephus==0.8.0_beta1',
+           'thrift==0.8.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ply==3.4',
            'pysnmp==4.1.16a',
