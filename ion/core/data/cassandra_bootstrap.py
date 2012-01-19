@@ -42,7 +42,8 @@ def parse_cassandra_config(username, password, storage_provider, keyspace=None):
     port = storage_provider["port"]
 
 
-    client_factory_kwargs = {'check_api_version':True}
+    #client_factory_kwargs = {'check_api_version':True}
+    client_factory_kwargs = {} # kwarg changed in telephus to require_api_version. It is not required so skip it!
 
     if keyspace is not None:
         client_factory_kwargs['keyspace'] = keyspace
