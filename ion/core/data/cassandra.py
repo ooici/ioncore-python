@@ -23,6 +23,7 @@ from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
 from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
+from telephus.cassandra.ttypes import ConsistencyLevel
 
 from ion.core.data import store
 from ion.core.data.store import Query, SimpleBatchRequest
@@ -135,14 +136,21 @@ class QueryStats(object):
         return tuple(stats)
 
 
-# Don't let cassandra timeout cause failure
-cassandra_timeout = CONF.getValue('CassandraTimeout',60.0)
-cassandra_verify = CONF.getValue('CassandraVerify',False)
-
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
     """
+
+# Don't let cassandra timeout cause failure
+cassandra_timeout = CONF.getValue('CassandraTimeout',60.0)
+cassandra_verify = CONF.getValue('CassandraVerify',False)
+consistency_string = CONF.getValue('CassandraConsistency','ONE')
+try:
+    cassandra_consistency = getattr(ConsistencyLevel, consistency_string)
+except AttributeError:
+    raise CassandraError('Invalid CassandraConsistency configuration: %s' % consistency_string)
+
+
 
 
 class CassandraBatchRequest(SimpleBatchRequest):
@@ -243,7 +251,7 @@ class CassandraStore(TCPConnection):
         
         # Call the initialization of the Managed TCP connection base class
         TCPConnection.__init__(self,host, port, self._manager)
-        self.client = CassandraClient(self._manager)    
+        self.client = CassandraClient(self._manager, consistency=cassandra_consistency)
         
         self._cache = cache # Cassandra Column Family maps to an ION Cache resource
         self._cache_name = cache.name
