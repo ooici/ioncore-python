@@ -20,7 +20,7 @@ from twisted.internet import reactor
 from ion.core.process import process
 from ion.core.process.process import ProcessFactory
 
-from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore
+from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore, cassandra_consistency
 from ion.core.data.storage_configuration_utility import PERSISTENT_ARCHIVE, STORAGE_PROVIDER, DEFAULT_KEYSPACE_NAME
 from ion.core.data import storage_configuration_utility
 import ion.util.ionlog
@@ -69,7 +69,7 @@ class CassandraIndexedStoreBootstrap(CassandraIndexedStore):
 
         TCPConnection.__init__(self,host, port, manager)
 
-        self.client = CassandraClient(manager)
+        self.client = CassandraClient(manager, consistency=cassandra_consistency)
         self._manager = manager
 
         self._keyspace = keyspace
@@ -91,7 +91,7 @@ class CassandraStoreBootstrap(CassandraStore):
 
         TCPConnection.__init__(self,host, port, manager)
 
-        self.client = CassandraClient(manager)
+        self.client = CassandraClient(manager, consistency=cassandra_consistency)
         self._manager = manager
 
 
@@ -120,7 +120,7 @@ class CassandraSchemaProvider(object):
 
         self._storage_conf = storage_conf
 
-        self.client = CassandraClient(manager)
+        self.client = CassandraClient(manager, consistency=cassandra_consistency)
 
         self._host = host
         self._port = port
