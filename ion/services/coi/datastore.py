@@ -733,8 +733,27 @@ class DataStoreWorkbench(WorkBench):
                 # Extract the GPB Message for comparison with type objects!
                 root_type = link.type.GPBMessage
 
+                if link.key not in self._workbench_cache:
+
+                    blob = yield self._blob_store.get(link.key)
+                    wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                    repo.index_hash[link.key] = wse
+
 
                 if root_type == ASSOCIATION_TYPE:
+
+                    links = []
+                    links.append(cref.objectroot.GetLink('subject'))
+                    links.append(cref.objectroot.GetLink('predicate'))
+                    links.append(cref.objectroot.GetLink('object'))
+
+                    for link in links:
+                        if link.key not in self._workbench_cache:
+
+                            blob = yield self._blob_store.get(link.key)
+                            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                            repo.index_hash[link.key] = wse
+
 
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
@@ -750,6 +769,12 @@ class DataStoreWorkbench(WorkBench):
 
                 elif root_type == RESOURCE_TYPE:
 
+                    link = cref.objectroot.GetLink('resource_type')
+                    if link.key not in self._workbench_cache:
+
+                        blob = yield self._blob_store.get(link.key)
+                        wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                        repo.index_hash[link.key] = wse
 
                     attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
                     attributes[RESOURCE_LIFE_CYCLE_STATE] = str(cref.objectroot.lcs)
