@@ -894,7 +894,7 @@ class MulitDataStoreTest(IonTestCase):
     services = [
 
             {'name':'ds2','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:preload}
+             'spawnargs':{PRELOAD_CFG:preload, }
                 },
             {'name':'ds3','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{PRELOAD_CFG:preload}
@@ -1100,6 +1100,68 @@ class MulitDataStoreTest(IonTestCase):
             repo.checkout('master')
 
             self.assertEqual(repo.root_object.person[0].id,n-1)
+
+
+    @defer.inlineCallbacks
+    def test_backend_recovery(self):
+        log.info('starting multi push test...')
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        n=12
+        commits = []
+        for i in range(n):
+
+            repo.root_object.person[0].id = i
+
+            key = repo.commit('The %d commit!' % i)
+
+            commits.append(key)
+
+            log.info('Commit #%d and push workbench test object:\n%s' % (i, self.wb1.workbench))
+        yield self.wb1.workbench.push('datastore', repo)
+
+
+        # Delete a commit !
+        yield self.ds1.workbench._commit_store.remove(commits[1])
+        yield self.ds1.workbench._commit_store.remove(commits[2])
+
+
+        tp = Process()
+        yield tp.spawn()
+
+
+        tp.workbench.clear()
+
+        log.info('Pull the object back to new process - # %d' % i)
+        yield tp.workbench.pull('datastore', self.repo_key)
+
+        tp_repo = tp.workbench.get_repository(self.repo_key)
+        tp_repo.checkout('master')
+
+        self.assertEqual(tp_repo.root_object.person[0].id,n-1)
+
+
+        # assert that these keys are not there!
+        f = yield self.ds1.workbench._commit_store.has_key(commits[1])
+        self.assertEqual(f, False)
+        f = yield self.ds1.workbench._commit_store.has_key(commits[2])
+        self.assertEqual(f, False)
+
+
+        # Now update the object again!
+        repo.root_object.person[0].id += 1
+        repo.commit('New Commit!')
+
+        yield self.wb1.workbench.push('datastore', repo)
+
+
+        t = yield self.ds1.workbench._commit_store.has_key(commits[1])
+        self.assertEqual(t, True)
+        t = yield self.ds1.workbench._commit_store.has_key(commits[2])
+        self.assertEqual(t, True)
+
+
 
 
     @defer.inlineCallbacks

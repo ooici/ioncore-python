@@ -386,6 +386,7 @@ class DataStoreWorkbench(WorkBench):
                     # Any time we found a new parent - we have to keep looking for its parents...
                     early_exit = False
 
+
                     if key not in repo.index_hash:
                         try:
                             columns = rows[key]
@@ -395,12 +396,16 @@ class DataStoreWorkbench(WorkBench):
                         except KeyError:
 
                             log.exception('Recovering missing commit in cassandra')
-
                             wse = yield self.recover_commit(key)
                             repo.index_hash[key] = wse
 
                     else:
+
+                        if key not in rows:
+                            log.warn('I have a key that is not in cassandra!')
+
                         wse = repo.index_hash.get(key)
+
 
                     parent = repo._load_element(wse)
 
@@ -563,66 +568,70 @@ class DataStoreWorkbench(WorkBench):
             repo = yield self._resolve_repo_state(repostate.repository_key, fail_if_not_found=False)
             repo.cached = True
 
-            repo_keys = set(self.list_repository_blobs(repo))
-
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
 
 
-            # Hold onto any keys that the remote is trying to push...
-            repo.keys_to_keep = set(repostate.blob_keys)
-
-            # Get the set of keys in repostate that are not in repo_keys
-            need_keys = set(repostate.blob_keys).difference(repo_keys)
-
-            workbench_keys = set(self._workbench_cache.keys())
-
-            local_keys = workbench_keys.intersection(need_keys)
-
-
+            ### See what cassandra has - this is inefficient but safe...
             batch_commit_req = self._commit_store.new_batch_request()
             batch_blob_req = self._blob_store.new_batch_request()
 
-            key_list = []
-            for key in local_keys:
-                try:
-                    repo.index_hash.get(key)
-                    need_keys.remove(key)
-                    continue
-                except KeyError, ke:
-                    log.info('Key disappeared - get it from the remote after all')
+            key_list = repostate.blob_keys[:]
+            for key in key_list:
 
-                # @TODO Assumption is that this check is less costly than getting it from the remote service
-                key_list.append(key)
                 batch_commit_req.add_request(key)
                 batch_blob_req.add_request(key)
 
 
-            if key_list:
-                def_list = []
-                def_list.append(self._commit_store.batch_has_key(batch_commit_req))
-                def_list.append(self._blob_store.batch_has_key(batch_blob_req))
+            def_list = []
+            def_list.append(self._commit_store.batch_has_key(batch_commit_req))
+            def_list.append(self._blob_store.batch_has_key(batch_blob_req))
 
-                dl_res = yield defer.DeferredList(def_list)
+            dl_res = yield defer.DeferredList(def_list)
 
-                assert dl_res[0][0] is True, 'batch_has_key failed for commits'
-                assert dl_res[1][0] is True, 'batch_has_key failed for blobs'
+            assert dl_res[0][0] is True, 'batch_has_key failed for commits'
+            assert dl_res[1][0] is True, 'batch_has_key failed for blobs'
 
-                result_commit_dict = dl_res[0][1]
-                result_blob_dict = dl_res[1][1]
+            result_commit_dict = dl_res[0][1]
+            result_blob_dict = dl_res[1][1]
 
-                # Remove
-                for key in key_list:
+            # Remove items that are in cassandra from the list that we need
+            need_keys = repostate.blob_keys[:]
+            for key in key_list:
 
-                    have_blob = result_blob_dict[key]
-                    have_commit = result_commit_dict[key]
+                have_blob = result_blob_dict[key]
+                have_commit = result_commit_dict[key]
 
-                    if have_blob or have_commit:
-                        need_keys.remove(key)
+                if have_blob or have_commit:
+                    need_keys.remove(key)
+
 
             if len(need_keys) > 0:
+
+                # Any keys we have locally but are not in Cassandra - use the local copy
+                ### This should not really happen!
+
+                get_keys = need_keys[:]
+                for key in need_keys:
+
+                    element = self._workbench_cache.get(key, None)
+                    if element is None:
+                        # If we don't have this object in memory - just continue and get it from the pusher
+                        continue
+
+                    # If we have it in memory, add it to the list of stuff to put in cassandra
+                    repo.index_hash[element.key] = element
+
+                    if element.type == COMMIT_TYPE:
+                        new_commits[repo.repository_key].append(element.key)
+                    else:
+                        new_blob_keys.append(element.key)
+
+                    get_keys.remove(key)
+
+
                 blobs_request = yield self._process.message_client.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
-                blobs_request.blob_keys.extend(need_keys)
+                blobs_request.blob_keys.extend(get_keys)
 
                 try:
                     blobs_msg = yield self.fetch_blobs(headers.get('reply-to'), blobs_request)
