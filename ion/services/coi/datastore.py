@@ -387,10 +387,18 @@ class DataStoreWorkbench(WorkBench):
                     early_exit = False
 
                     if key not in repo.index_hash:
-                        columns = rows[key]
-                        blob = columns[VALUE]
-                        wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                        repo.index_hash[key] = wse
+                        try:
+                            columns = rows[key]
+                            blob = columns[VALUE]
+                            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                            repo.index_hash[key] = wse
+                        except KeyError:
+
+                            log.exception('Recovering missing commit in cassandra')
+
+                            wse = yield self.recover_commit(key)
+                            repo.index_hash[key] = wse
+
                     else:
                         wse = repo.index_hash.get(key)
 
@@ -413,6 +421,34 @@ class DataStoreWorkbench(WorkBench):
 
         # return repository
         defer.returnValue(repo)
+
+
+
+    @defer.inlineCallbacks
+    def recover_commit(self,key):
+
+        blobs_request = yield self._process.message_client.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
+        blobs_request.blob_keys.extend([key])
+
+        servicename = pu.get_scoped_name('datastore', 'system')
+
+
+        for i in xrange(24):
+            try:
+                blobs_msg = yield self.fetch_blobs(servicename, blobs_request)
+                break
+            except ReceivedError:
+                log.info('Other store %d did not have the key!' % i)
+        else:
+            raise DataStoreError('Could not find the missing key anywhere!')
+
+
+        se = blobs_msg.blob_elements[0]
+        element = gpb_wrapper.StructureElement(se.GPBMessage)
+
+        defer.returnValue(element)
+
+
 
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
