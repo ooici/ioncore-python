@@ -8,7 +8,7 @@ ioncore-python - Python Capability Container and Core Modules
 ===========================================================
 
 This project provides a Python process execution framework (capability
-container, CC) with core, auxilliary and testing functions for deploying,
+container, CC) with core, auxiliary and testing functions for deploying,
 running and testing capability container processes within a standard local and
 distributed execution environment.
 
